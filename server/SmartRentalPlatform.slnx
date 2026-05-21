@@ -1,0 +1,9 @@
+<Solution>
+  <Folder Name="/src/">
+    <Project Path="src/SmartRentalPlatform.Api/SmartRentalPlatform.Api.csproj" />
+    <Project Path="src/SmartRentalPlatform.Application/SmartRentalPlatform.Application.csproj" />
+    <Project Path="src/SmartRentalPlatform.Contracts/SmartRentalPlatform.Contracts.csproj" />
+    <Project Path="src/SmartRentalPlatform.Domain/SmartRentalPlatform.Domain.csproj" />
+    <Project Path="src/SmartRentalPlatform.Infrastructure/SmartRentalPlatform.Infrastructure.csproj" />
+  </Folder>
+</Solution>
