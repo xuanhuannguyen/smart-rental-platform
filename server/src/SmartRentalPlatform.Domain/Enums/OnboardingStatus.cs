@@ -1,9 +1,8 @@
-namespace SmartRentalPlatfrom.Domain.Enums;
+namespace SmartRentalPlatform.Domain.Enums;
 
 public enum OnboardingStatus
 {
-    NeedRoleSelection = 1,
-    NeedProfileUpdate = 2,
-    NeedKyc = 3,
-    Completed = 4
+    NeedProfileUpdate = 1,
+    NeedKyc = 2,
+    Completed = 3
 }
