@@ -2,6 +2,9 @@ using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using SmartRentalPlatform.Infrastructure.Persistence;
+using SmartRentalPlatform.Application.Interfaces;
+using SmartRentalPlatform.Application.Services;
+using SmartRentalPlatform.Application.Common;
 
 namespace SmartRentalPlatform.Infrastructure;
 
@@ -17,6 +20,7 @@ public static class InfrastructureServiceRegistration
         {
             options.UseNpgsql(connectionString);
         });
+        services.AddScoped<IAppDbContext>(provider => provider.GetRequiredService<AppDbContext>());
 
         return services;
     }
