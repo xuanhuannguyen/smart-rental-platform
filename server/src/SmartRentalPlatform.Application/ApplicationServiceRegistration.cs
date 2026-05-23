@@ -1,4 +1,6 @@
 using Microsoft.Extensions.DependencyInjection;
+using SmartRentalPlatform.Application.Auth;
+using SmartRentalPlatform.Application.Users;
 
 namespace SmartRentalPlatform.Application;
 
@@ -6,11 +8,8 @@ public static class ApplicationServiceRegistration
 {
     public static IServiceCollection AddApplication(this IServiceCollection services)
     {
-        // Sau này đăng ký các service nghiệp vụ ở đây.
-        // Ví dụ:
-        // services.AddScoped<IAuthService, AuthService>();
-        // services.AddScoped<IKycService, KycService>();
-
+        services.AddScoped<IAuthService, AuthService>();
+        services.AddScoped<IUserService, UserService>();
         return services;
     }
 }
