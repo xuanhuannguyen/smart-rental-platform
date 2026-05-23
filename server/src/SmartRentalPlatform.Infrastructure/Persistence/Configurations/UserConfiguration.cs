@@ -1,9 +1,6 @@
-using System.Security.Cryptography.X509Certificates;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Metadata.Builders;
 using SmartRentalPlatform.Domain.Entities;
-using SmartRentalPlatfrom.Domain.Entities;
-
 namespace SmartRentalPlatform.Infrastructure.Persistence.Configurations;
 
 public class UserConfiguration : IEntityTypeConfiguration<User>
@@ -12,17 +9,23 @@ public class UserConfiguration : IEntityTypeConfiguration<User>
     {
         builder.ToTable("users");
         builder.HasKey(x => x.Id);
-        builder.Property(x => x.Email).HasMaxLength(256).IsRequired();
+        builder.Property(x => x.Id).HasColumnName("id");
+        builder.Property(x => x.Email).HasColumnName("email").HasMaxLength(255).IsRequired();
+        builder.Property(x => x.NormalizedEmail).HasColumnName("normalized_email").HasMaxLength(255).IsRequired();
         builder.HasIndex(x => x.NormalizedEmail).IsUnique();
-        builder.Property(x => x.PhoneNumber).HasMaxLength(13);
-        builder.HasIndex(x => x.PhoneNumber).IsUnique();
-        builder.Property(x => x.PasswordHash).HasMaxLength(500);
-        builder.Property(x => x.DisplayName).HasMaxLength(150).IsRequired();
-        builder.Property(x => x.AvatarObjectKey).HasMaxLength(500);
-        builder.Property(x => x.Status).HasConversion<string>().HasMaxLength(30).IsRequired();
-        builder.Property(x => x.OnboardingStatus).HasConversion<string>().HasMaxLength(50).IsRequired();
-        builder.Property(x => x.CreatedAt).HasDefaultValueSql("now()").IsRequired();
-        builder.Property(x => x.UpdatedAt).HasDefaultValueSql("now()").IsRequired();
-
+        builder.Property(x => x.PhoneNumber).HasColumnName("phone_number").HasMaxLength(20);
+        builder.Property(x => x.PasswordHash).HasColumnName("password_hash").HasColumnType("text");
+        builder.Property(x => x.DisplayName).HasColumnName("display_name").HasMaxLength(150).IsRequired();
+        builder.Property(x => x.AvatarUrl).HasColumnName("avatar_url").HasColumnType("text");
+        builder.Property(x => x.Status).HasColumnName("status").HasConversion<string>().HasMaxLength(50).IsRequired();
+        builder.Property(x => x.OnboardingStatus).HasColumnName("onboarding_status").HasConversion<string>().HasMaxLength(50).IsRequired();
+        builder.Property(x => x.EmailConfirmed).HasColumnName("email_confirmed").IsRequired();
+        builder.Property(x => x.PhoneConfirmed).HasColumnName("phone_confirmed").IsRequired();
+        builder.Property(x => x.AccessFailedCount).HasColumnName("access_failed_count").IsRequired();
+        builder.Property(x => x.LockoutEndAt).HasColumnName("lockout_end_at");
+        builder.Property(x => x.LastLoginAt).HasColumnName("last_login_at");
+        builder.Property(x => x.CreatedAt).HasColumnName("created_at").IsRequired();
+        builder.Property(x => x.UpdatedAt).HasColumnName("updated_at");
+        builder.Property(x => x.DeletedAt).HasColumnName("deleted_at");
     }
 }
