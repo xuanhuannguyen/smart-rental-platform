@@ -1,8 +1,5 @@
 ﻿using Microsoft.EntityFrameworkCore.Storage;
-using SmartRentalPlatform.Application.Common;
-using System;
-using System.Collections.Generic;
-using System.Text;
+using SmartRentalPlatform.Application.Common.Interfaces;
 
 namespace SmartRentalPlatform.Infrastructure.Persistence
 {

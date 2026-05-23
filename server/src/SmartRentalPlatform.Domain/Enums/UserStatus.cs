@@ -2,8 +2,8 @@ namespace SmartRentalPlatform.Domain.Enums;
 
 public enum UserStatus
 {
-    Active,
-    Locked,
-    Banned,
-    Deleted
+    Active = 1,
+    Locked = 2,
+    Banned = 3,
+    Deleted = 4
 }

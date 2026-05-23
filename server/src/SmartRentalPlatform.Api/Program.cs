@@ -1,3 +1,6 @@
+using System.Text;
+using Microsoft.AspNetCore.Authentication.JwtBearer;
+using Microsoft.IdentityModel.Tokens;
 using SmartRentalPlatform.Application;
 using SmartRentalPlatform.Infrastructure;
 
@@ -10,7 +13,31 @@ builder.Services.AddControllers();
 builder.Services.AddEndpointsApiExplorer();
 builder.Services.AddSwaggerGen();
 
-// Đăng ký Authorization trước, JWT sẽ thêm sau.
+var jwtSection = builder.Configuration.GetSection("Jwt");
+var secretKey = jwtSection["SecretKey"];
+
+if (string.IsNullOrWhiteSpace(secretKey))
+{
+    throw new InvalidOperationException("JWT secret key is not configured.");
+}
+
+builder.Services
+    .AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
+    .AddJwtBearer(options =>
+    {
+        options.TokenValidationParameters = new TokenValidationParameters
+        {
+            ValidateIssuer = true,
+            ValidateAudience = true,
+            ValidateLifetime = true,
+            ValidateIssuerSigningKey = true,
+            ValidIssuer = jwtSection["Issuer"],
+            ValidAudience = jwtSection["Audience"],
+            IssuerSigningKey = new SymmetricSecurityKey(
+                Encoding.UTF8.GetBytes(secretKey))
+        };
+    });
+
 builder.Services.AddAuthorization();
 
 // Cho phép frontend React gọi backend.
@@ -44,9 +71,7 @@ if (app.Environment.IsDevelopment())
 // CORS phải đặt trước Authorization.
 app.UseCors("ClientApp");
 
-// Sau này thêm JWT thì bật Authentication.
-// app.UseAuthentication();
-
+app.UseAuthentication();
 app.UseAuthorization();
 
 app.MapControllers();

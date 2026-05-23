@@ -5,7 +5,7 @@ namespace SmartRentalPlatform.Domain.Entities.Users;
 
 public class User
 {
-    public Guid Id { get; set; }
+    public Guid Id { get; set; } = Guid.NewGuid();
     public string Email { get; set; } = string.Empty;
     public string NormalizedEmail { get; set; } = string.Empty;
     public string? PhoneNumber { get; set; }
@@ -19,8 +19,8 @@ public class User
     public int AccessFailedCount { get; set; }
     public DateTimeOffset? LockoutEndAt { get; set; }
     public DateTimeOffset? LastLoginAt { get; set; }
-    public DateTimeOffset CreatedAt { get; set; }
-    public DateTimeOffset UpdatedAt { get; set; }
+    public DateTimeOffset CreatedAt { get; set; } = DateTimeOffset.UtcNow;
+    public DateTimeOffset? UpdatedAt { get; set; }
     public DateTimeOffset? DeletedAt { get; set; }
 
     public UserProfile? UserProfile { get; set; }

@@ -1,5 +1,5 @@
 using Microsoft.EntityFrameworkCore;
-using SmartRentalPlatform.Application.Common;
+using SmartRentalPlatform.Application.Common.Interfaces;
 using SmartRentalPlatform.Domain.Entities.Administrative;
 using SmartRentalPlatform.Domain.Entities.Properties;
 using SmartRentalPlatform.Domain.Entities.Users;
@@ -45,9 +45,6 @@ public class AppDbContext : DbContext, IAppDbContext
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
         base.OnModelCreating(modelBuilder);
-
-        // Sau này sẽ tự động load các cấu hình bảng ở folder Configurations.
-        // Ví dụ: UserConfiguration, RoleConfiguration, RoomConfiguration...
         modelBuilder.ApplyConfigurationsFromAssembly(typeof(AppDbContext).Assembly);
     }
 }

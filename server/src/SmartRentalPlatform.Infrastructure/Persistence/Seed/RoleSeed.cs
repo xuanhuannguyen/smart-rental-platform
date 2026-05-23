@@ -1,4 +1,5 @@
 using SmartRentalPlatform.Domain.Entities.Users;
+using SmartRentalPlatform.Domain.Enums;
 
 namespace SmartRentalPlatform.Infrastructure.Persistence.Seed;
 
@@ -17,21 +18,21 @@ public static class RoleSeed
             new Role
             {
                 Id = AdminRoleId,
-                Name = "Admin",
+                Name = RoleName.Admin,
                 Description = "System administrator",
                 CreatedAt = SeededAt
             },
             new Role
             {
                 Id = TenantRoleId,
-                Name = "Tenant",
+                Name = RoleName.Tenant,
                 Description = "Rental tenant",
                 CreatedAt = SeededAt
             },
             new Role
             {
                 Id = LandlordRoleId,
-                Name = "Landlord",
+                Name = RoleName.Landlord,
                 Description = "Rooming house landlord",
                 CreatedAt = SeededAt
             }
