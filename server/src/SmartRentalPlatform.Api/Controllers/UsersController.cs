@@ -31,4 +31,50 @@ public class UsersController : ControllerBase
             Data = result
         });
     }
+
+    [Authorize]
+    [HttpGet("me/profile")]
+    public async Task<ActionResult<ApiResponse<UserProfileResponse>>> GetProfile(
+        CancellationToken cancellationToken)
+    {
+        var result = await _userService.GetUserProfileAsync(cancellationToken);
+
+        return Ok(new ApiResponse<UserProfileResponse>
+        {
+            Success = true,
+            Message = "Lấy thông tin hồ sơ thành công.",
+            Data = result
+        });
+    }
+
+    [Authorize]
+    [HttpPut("me/profile")]
+    public async Task<ActionResult<ApiResponse<UserProfileResponse>>> UpdateProfile(
+        [FromBody] UpdateUserProfileRequest request,
+        CancellationToken cancellationToken)
+    {
+        var result = await _userService.UpdateUserProfileAsync(request, cancellationToken);
+
+        return Ok(new ApiResponse<UserProfileResponse>
+        {
+            Success = true,
+            Message = "Cập nhật hồ sơ thành công.",
+            Data = result
+        });
+    }
+
+    [Authorize]
+    [HttpGet("me/landlord-eligibility")]
+    public async Task<ActionResult<ApiResponse<LandlordEligibilityResponse>>> GetLandlordEligibility(
+        CancellationToken cancellationToken)
+    {
+        var result = await _userService.GetLandlordEligibilityAsync(cancellationToken);
+
+        return Ok(new ApiResponse<LandlordEligibilityResponse>
+        {
+            Success = true,
+            Message = "Kiểm tra điều kiện đăng ký chủ trọ thành công.",
+            Data = result
+        });
+    }
 }
