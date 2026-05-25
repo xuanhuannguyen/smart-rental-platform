@@ -1,6 +1,6 @@
-using SmartRentalPlatform.Domain.Entities;
-using SmartRentalPlatfrom.Domain.Enums;
-namespace SmartRentalPlatfrom.Domain.Entities;
+using SmartRentalPlatform.Domain.Enums;
+
+namespace SmartRentalPlatform.Domain.Entities;
 
 public class User
 {

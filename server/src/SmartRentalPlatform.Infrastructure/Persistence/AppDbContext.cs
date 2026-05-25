@@ -1,7 +1,5 @@
 using Microsoft.EntityFrameworkCore;
 using SmartRentalPlatform.Domain.Entities;
-using SmartRentalPlatfrom.Domain.Entities;
-
 
 namespace SmartRentalPlatform.Infrastructure.Persistence;
 
@@ -16,6 +14,7 @@ public class AppDbContext : DbContext
     public DbSet<UserRole> UserRoles => Set<UserRole>();
     public DbSet<UserProfile> UserProfiles => Set<UserProfile>();
 
+    public DbSet<KycVerification> KycVerifications => Set<KycVerification>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {

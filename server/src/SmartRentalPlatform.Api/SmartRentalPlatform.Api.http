@@ -1,6 +1,17 @@
-@RentalPlatform.Api_HostAddress = http://localhost:5294
+@host = http://localhost:5294
+@devUserId = 00000000-0000-0000-0000-000000000001
 
-GET {{RentalPlatform.Api_HostAddress}}/weatherforecast/
-Accept: application/json
+### Health
+GET {{host}}/api/health
 
-###
+### KYC status
+GET {{host}}/api/kyc/my-status
+X-Dev-User-Id: {{devUserId}}
+
+### KYC history
+GET {{host}}/api/kyc/my-history
+X-Dev-User-Id: {{devUserId}}
+
+### KYC submission (multipart — use Swagger or frontend for file upload)
+# POST {{host}}/api/kyc/submissions
+# X-Dev-User-Id: {{devUserId}}

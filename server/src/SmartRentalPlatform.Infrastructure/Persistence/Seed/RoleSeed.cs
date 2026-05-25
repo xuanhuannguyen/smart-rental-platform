@@ -1,4 +1,5 @@
 using SmartRentalPlatform.Domain.Entities;
+
 namespace SmartRentalPlatform.Infrastructure.Persistence.Seed;
 
 public static class RoleSeed
@@ -8,18 +9,29 @@ public static class RoleSeed
     public static readonly Guid LandlordRoleId = Guid.Parse("33333333-3333-3333-3333-333333333333");
 
     private static readonly DateTime SeededAt = new(2026, 1, 1, 0, 0, 0, DateTimeKind.Utc);
-    public static Role[] GetRoles()
-    {
-        return
-        [
-            new Role
-            {
-                Id = AdminRoleId,
-                Name = "Admin",
-                Description = "System administrator",
-                CreatedAt = SeededAt
-            }
 
-        ]
-    }
+    public static Role[] GetRoles() =>
+    [
+        new Role
+        {
+            Id = AdminRoleId,
+            Name = "Admin",
+            Description = "System administrator",
+            CreatedAt = SeededAt
+        },
+        new Role
+        {
+            Id = TenantRoleId,
+            Name = "Tenant",
+            Description = "Rental tenant",
+            CreatedAt = SeededAt
+        },
+        new Role
+        {
+            Id = LandlordRoleId,
+            Name = "Landlord",
+            Description = "Property landlord",
+            CreatedAt = SeededAt
+        }
+    ];
 }

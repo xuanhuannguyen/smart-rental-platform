@@ -1,4 +1,4 @@
-namespace SmartRentalPlatfrom.Domain.Enums;
+namespace SmartRentalPlatform.Domain.Enums;
 
 public enum OnboardingStatus
 {

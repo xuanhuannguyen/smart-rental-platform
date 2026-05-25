@@ -3,9 +3,12 @@
   <ItemGroup>
     <ProjectReference Include="..\SmartRentalPlatform.Application\SmartRentalPlatform.Application.csproj" />
     <ProjectReference Include="..\SmartRentalPlatform.Domain\SmartRentalPlatform.Domain.csproj" />
+    <ProjectReference Include="..\SmartRentalPlatform.Contracts\SmartRentalPlatform.Contracts.csproj" />
   </ItemGroup>
 
   <ItemGroup>
+    <FrameworkReference Include="Microsoft.AspNetCore.App" />
+    <PackageReference Include="Microsoft.Extensions.Http" Version="10.0.8" />
     <PackageReference Include="Microsoft.EntityFrameworkCore" Version="10.0.8" />
     <PackageReference Include="Microsoft.EntityFrameworkCore.Design" Version="10.0.8">
       <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>

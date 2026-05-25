@@ -4,7 +4,7 @@ using SmartRentalPlatform.Domain.Entities;
 
 namespace SmartRentalPlatform.Infrastructure.Persistence.Configurations;
 
-public class UserRoleConfiguration : IEntityTypeConfiguration<UserProfile>
+public class UserProfileConfiguration : IEntityTypeConfiguration<UserProfile>
 {
     public void Configure(EntityTypeBuilder<UserProfile> builder)
     {

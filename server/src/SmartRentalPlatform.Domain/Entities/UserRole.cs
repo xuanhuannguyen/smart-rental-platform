@@ -1,5 +1,3 @@
-using SmartRentalPlatfrom.Domain.Entities;
-
 namespace SmartRentalPlatform.Domain.Entities;
 
 public class UserRole
