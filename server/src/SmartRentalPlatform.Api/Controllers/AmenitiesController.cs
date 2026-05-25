@@ -28,7 +28,7 @@ public class AmenitiesController : ControllerBase
             {
                 Success = false,
                 ErrorCode = ErrorCodes.ValidationError,
-                Message = "Amenity scope must be House, Room, or Both.",
+                Message = "Phạm vi tiện ích phải là House, Room hoặc Both.",
                 Details = new { field = nameof(scope), value = scope }
             });
         }
@@ -38,7 +38,7 @@ public class AmenitiesController : ControllerBase
         return Ok(new ApiResponse<List<AmenityResponse>>
         {
             Success = true,
-            Message = "Amenities loaded.",
+            Message = "Tải danh sách tiện ích thành công.",
             Data = result
         });
     }

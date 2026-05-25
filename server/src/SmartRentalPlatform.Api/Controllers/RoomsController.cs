@@ -38,7 +38,7 @@ public class RoomsController : ControllerBase
         return Ok(new ApiResponse<RoomResponse>
         {
             Success = true,
-            Message = "Room created as hidden.",
+            Message = "Tạo phòng thành công và phòng đang ở trạng thái ẩn.",
             Data = result
         });
     }
@@ -55,7 +55,7 @@ public class RoomsController : ControllerBase
         return Ok(new ApiResponse<List<RoomResponse>>
         {
             Success = true,
-            Message = "Rooms loaded.",
+            Message = "Tải danh sách phòng thành công.",
             Data = result
         });
     }
@@ -68,7 +68,7 @@ public class RoomsController : ControllerBase
     {
         var userId = GetCurrentUserId();
         var result = await roomService.GetByIdAsync(userId, id, cancellationToken);
-        return RoomResult(result, "Room detail loaded.");
+        return RoomResult(result, "Tải thông tin phòng thành công.");
     }
 
     [Authorize]
@@ -80,7 +80,7 @@ public class RoomsController : ControllerBase
     {
         var userId = GetCurrentUserId();
         var result = await roomService.UpdateAsync(userId, id, request, cancellationToken);
-        return RoomResult(result, "Room basic information saved.");
+        return RoomResult(result, "Lưu thông tin cơ bản của phòng thành công.");
     }
 
     [Authorize]
@@ -92,7 +92,7 @@ public class RoomsController : ControllerBase
     {
         var userId = GetCurrentUserId();
         var result = await roomService.UpdateImagesAsync(userId, id, request, cancellationToken);
-        return RoomResult(result, "Room images saved.");
+        return RoomResult(result, "Lưu ảnh phòng thành công.");
     }
 
     [Authorize]
@@ -104,7 +104,7 @@ public class RoomsController : ControllerBase
     {
         var userId = GetCurrentUserId();
         var result = await roomService.UpdateAmenitiesAsync(userId, id, request, cancellationToken);
-        return RoomResult(result, "Room amenities saved.");
+        return RoomResult(result, "Lưu tiện ích phòng thành công.");
     }
 
     [Authorize]
@@ -116,7 +116,7 @@ public class RoomsController : ControllerBase
     {
         var userId = GetCurrentUserId();
         var result = await roomService.UpdatePriceTiersAsync(userId, id, request, cancellationToken);
-        return RoomResult(result, "Room price tiers saved.");
+        return RoomResult(result, "Lưu bảng giá phòng thành công.");
     }
 
     [Authorize]
@@ -128,7 +128,7 @@ public class RoomsController : ControllerBase
     {
         var userId = GetCurrentUserId();
         var result = await roomService.UpdateStatusAsync(userId, id, request, cancellationToken);
-        return RoomResult(result, "Room status updated.");
+        return RoomResult(result, "Cập nhật trạng thái phòng thành công.");
     }
 
     [Authorize]
@@ -139,14 +139,14 @@ public class RoomsController : ControllerBase
     {
         var userId = GetCurrentUserId();
         var result = await roomService.SubmitAsync(userId, id, cancellationToken);
-        return RoomResult(result, "Room submitted and made available.");
+        return RoomResult(result, "Gửi phòng thành công và phòng đã chuyển sang còn trống.");
     }
 
     private Guid GetCurrentUserId()
     {
         if (!currentUserService.IsAuthenticated || currentUserService.UserId is null)
         {
-            throw new UnauthorizedAccessException("Authenticated user id is missing.");
+            throw new UnauthorizedAccessException("Không tìm thấy mã người dùng đã đăng nhập.");
         }
 
         return currentUserService.UserId.Value;
@@ -160,7 +160,7 @@ public class RoomsController : ControllerBase
             {
                 Success = false,
                 ErrorCode = ErrorCodes.RoomNotFound,
-                Message = "Room was not found."
+                Message = "Không tìm thấy phòng."
             });
         }
 

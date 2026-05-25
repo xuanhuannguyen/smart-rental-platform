@@ -54,7 +54,7 @@ namespace SmartRentalPlatform.Application.Rooms
             return await GetByIdAsync(landlordUserId, room.Id, cancellationToken)
                 ?? throw new InternalServerException(
                     ErrorCodes.InternalServerError,
-                    "Room was created but cannot be loaded.",
+                    "Đã tạo phòng nhưng không thể tải lại thông tin phòng.",
                     new { roomId = room.Id });
         }
 
@@ -195,7 +195,7 @@ namespace SmartRentalPlatform.Application.Rooms
                 {
                     throw new BadRequestException(
                         ErrorCodes.ValidationError,
-                        "Duplicate image ids are not allowed.",
+                        "Không được gửi trùng mã ảnh.",
                         new { field = nameof(request.Images) });
                 }
 
@@ -210,7 +210,7 @@ namespace SmartRentalPlatform.Application.Rooms
                 {
                     throw new BadRequestException(
                         ErrorCodes.ImageInvalidOwner,
-                        "One or more image ids are invalid.",
+                        "Một hoặc nhiều mã ảnh không hợp lệ.",
                         new { imageIds = invalidImageIds });
                 }
 
@@ -341,7 +341,7 @@ namespace SmartRentalPlatform.Application.Rooms
             {
                 throw new ConflictException(
                     ErrorCodes.RoomInvalidStatus,
-                    "Only hidden rooms can be submitted.",
+                    "Chỉ phòng đang ẩn mới có thể gửi hiển thị.",
                     new { currentStatus = room.Status.ToString() });
             }
             ValidateRoomFields(
@@ -370,7 +370,7 @@ namespace SmartRentalPlatform.Application.Rooms
             {
                 throw new BadRequestException(
                     ErrorCodes.ValidationError,
-                    "At least 3 room images are required before submitting.",
+                    "Phòng cần có ít nhất 3 ảnh trước khi gửi hiển thị.",
                     new { field = nameof(images) });
             }
 
@@ -380,7 +380,7 @@ namespace SmartRentalPlatform.Application.Rooms
             {
                 throw new BadRequestException(
                     ErrorCodes.ValidationError,
-                    "Exactly one cover image is required before submitting.",
+                    "Phòng cần có đúng 1 ảnh đại diện trước khi gửi hiển thị.",
                     new { field = nameof(images) });
             }
 
@@ -388,7 +388,7 @@ namespace SmartRentalPlatform.Application.Rooms
             {
                 throw new BadRequestException(
                     ErrorCodes.ValidationError,
-                    "Image object key is required.",
+                    "Mã lưu trữ ảnh là bắt buộc.",
                     new { field = nameof(images) });
             }
         }
@@ -411,7 +411,7 @@ namespace SmartRentalPlatform.Application.Rooms
             {
                 throw new ConflictException(
                     ErrorCodes.RoomInvalidStatus,
-                    "Hidden rooms must be submitted before their operational status can be changed.",
+                    "Phòng đang ẩn phải được gửi hiển thị trước khi thay đổi trạng thái vận hành.",
                     new { currentStatus = room.Status.ToString() });
             }
 
@@ -419,7 +419,7 @@ namespace SmartRentalPlatform.Application.Rooms
             {
                 throw new BadRequestException(
                     ErrorCodes.ValidationError,
-                    "Invalid room status.",
+                    "Trạng thái phòng không hợp lệ.",
                     new { field = nameof(request.Status) });
             }
 
@@ -427,7 +427,7 @@ namespace SmartRentalPlatform.Application.Rooms
             {
                 throw new ConflictException(
                     ErrorCodes.RoomInvalidStatus,
-                    "Published rooms cannot be moved back to hidden by the status endpoint.",
+                    "Phòng đã hiển thị không thể chuyển lại sang trạng thái ẩn bằng API trạng thái.",
                     new { requestedStatus = request.Status });
             }
 
@@ -480,7 +480,7 @@ namespace SmartRentalPlatform.Application.Rooms
             {
                 throw new NotFoundException(
                     ErrorCodes.HouseNotFound,
-                    "Rooming house was not found.",
+                    "Không tìm thấy khu trọ.",
                     new { roomingHouseId });
             }
 
@@ -493,7 +493,7 @@ namespace SmartRentalPlatform.Application.Rooms
             {
                 throw new ConflictException(
                     ErrorCodes.HouseNotApproved,
-                    "Only approved rooming houses can manage rooms.",
+                    "Chỉ khu trọ đã được duyệt mới có thể quản lý phòng.",
                     new { currentStatus = roomingHouse.ApprovalStatus.ToString() });
             }
         }
@@ -516,7 +516,7 @@ namespace SmartRentalPlatform.Application.Rooms
             {
                 throw new ConflictException(
                     ErrorCodes.RoomDuplicateNumber,
-                    "Room number already exists in this rooming house.",
+                    "Số phòng đã tồn tại trong khu trọ này.",
                     new { roomingHouseId, roomNumber });
             }
         }
@@ -538,7 +538,7 @@ namespace SmartRentalPlatform.Application.Rooms
             {
                 throw new BadRequestException(
                     ErrorCodes.AmenityNotFound,
-                    "One or more amenity ids are invalid.",
+                    "Một hoặc nhiều mã tiện ích không hợp lệ.",
                     new { amenityIds });
             }
 
@@ -555,7 +555,7 @@ namespace SmartRentalPlatform.Application.Rooms
             {
                 throw new BadRequestException(
                     ErrorCodes.ValidationError,
-                    "Room number is required.",
+                    "Số phòng là bắt buộc.",
                     new { field = nameof(roomNumber) });
             }
 
@@ -563,7 +563,7 @@ namespace SmartRentalPlatform.Application.Rooms
             {
                 throw new BadRequestException(
                     ErrorCodes.ValidationError,
-                    "Floor must be greater than or equal to 0.",
+                    "Tầng phải lớn hơn hoặc bằng 0.",
                     new { field = nameof(floor) });
             }
 
@@ -571,7 +571,7 @@ namespace SmartRentalPlatform.Application.Rooms
             {
                 throw new BadRequestException(
                     ErrorCodes.ValidationError,
-                    "Area must be greater than 0.",
+                    "Diện tích phải lớn hơn 0.",
                     new { field = nameof(areaM2) });
             }
 
@@ -579,7 +579,7 @@ namespace SmartRentalPlatform.Application.Rooms
             {
                 throw new BadRequestException(
                     ErrorCodes.ValidationError,
-                    "Max occupants must be greater than 0.",
+                    "Số người tối đa phải lớn hơn 0.",
                     new { field = nameof(maxOccupants) });
             }
         }
@@ -590,7 +590,7 @@ namespace SmartRentalPlatform.Application.Rooms
             {
                 throw new BadRequestException(
                     ErrorCodes.ValidationError,
-                    "At least 3 room images are required.",
+                    "Phòng cần có ít nhất 3 ảnh.",
                     new { field = nameof(images) });
             }
 
@@ -600,7 +600,7 @@ namespace SmartRentalPlatform.Application.Rooms
             {
                 throw new BadRequestException(
                     ErrorCodes.ValidationError,
-                    "Exactly one cover image is required.",
+                    "Phòng cần có đúng 1 ảnh đại diện.",
                     new { field = nameof(images) });
             }
 
@@ -608,7 +608,7 @@ namespace SmartRentalPlatform.Application.Rooms
             {
                 throw new BadRequestException(
                     ErrorCodes.ValidationError,
-                    "Image object key is required.",
+                    "Mã lưu trữ ảnh là bắt buộc.",
                     new { field = nameof(images) });
             }
         }
@@ -621,7 +621,7 @@ namespace SmartRentalPlatform.Application.Rooms
             {
                 throw new BadRequestException(
                     ErrorCodes.PriceTierInvalid,
-                    "At least one price tier is required.",
+                    "Cần có ít nhất 1 mức giá phòng.",
                     new { field = nameof(priceTiers) });
             }
 
@@ -635,7 +635,7 @@ namespace SmartRentalPlatform.Application.Rooms
             {
                 throw new BadRequestException(
                     ErrorCodes.PriceTierInvalid,
-                    "Duplicate occupant count is not allowed.",
+                    "Không được trùng số người ở trong bảng giá.",
                     new { occupantCounts = duplicateOccupantCounts });
             }
 
@@ -654,7 +654,7 @@ namespace SmartRentalPlatform.Application.Rooms
             {
                 throw new BadRequestException(
                     ErrorCodes.PriceTierInvalid,
-                    "Occupant count must be between 1 and max occupants.",
+                    "Số người áp dụng phải nằm trong khoảng từ 1 đến số người tối đa.",
                     new { occupantCount, maxOccupants });
             }
 
@@ -662,7 +662,7 @@ namespace SmartRentalPlatform.Application.Rooms
             {
                 throw new BadRequestException(
                     ErrorCodes.PriceTierInvalid,
-                    "Monthly rent must be greater than 0.",
+                    "Giá thuê hằng tháng phải lớn hơn 0.",
                     new { monthlyRent });
             }
         }
@@ -673,7 +673,7 @@ namespace SmartRentalPlatform.Application.Rooms
             {
                 throw new BadRequestException(
                     ErrorCodes.PriceTierInvalid,
-                    "At least one active price tier is required before submitting.",
+                    "Cần có ít nhất 1 mức giá đang áp dụng trước khi gửi hiển thị.",
                     new { roomId = room.Id });
             }
 
@@ -695,7 +695,7 @@ namespace SmartRentalPlatform.Application.Rooms
             {
                 throw new BadRequestException(
                     ErrorCodes.PriceTierInvalid,
-                    "Existing price tiers exceed the new max occupants.",
+                    "Bảng giá hiện tại có số người áp dụng vượt quá số người tối đa mới.",
                     new { maxOccupants });
             }
         }

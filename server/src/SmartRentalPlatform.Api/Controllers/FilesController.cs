@@ -63,7 +63,7 @@ public class FilesController : ControllerBase
         return Ok(new ApiResponse<FileUploadResponse>
         {
             Success = true,
-            Message = "Image uploaded.",
+            Message = "Tải ảnh lên thành công.",
             Data = result
         });
     }
@@ -72,23 +72,23 @@ public class FilesController : ControllerBase
     {
         if (file is null || file.Length == 0)
         {
-            return ValidationError("Image file is required.", new { field = "file" });
+            return ValidationError("Vui lòng chọn ảnh cần tải lên.", new { field = "file" });
         }
 
         if (file.Length > MaxImageSizeBytes)
         {
-            return ValidationError("Image file must be 5MB or smaller.", new { field = "file" });
+            return ValidationError("Dung lượng ảnh không được vượt quá 5MB.", new { field = "file" });
         }
 
         var extension = Path.GetExtension(file.FileName);
         if (string.IsNullOrWhiteSpace(extension) || !AllowedExtensions.Contains(extension))
         {
-            return ValidationError("Only JPG, PNG and WEBP images are allowed.", new { field = "file" });
+            return ValidationError("Chỉ cho phép tải ảnh JPG, PNG hoặc WEBP.", new { field = "file" });
         }
 
         if (!AllowedContentTypes.Contains(file.ContentType))
         {
-            return ValidationError("Unsupported image content type.", new { field = "file" });
+            return ValidationError("Định dạng nội dung ảnh không được hỗ trợ.", new { field = "file" });
         }
 
         return null;

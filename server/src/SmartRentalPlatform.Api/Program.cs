@@ -1,11 +1,12 @@
-using System.Text;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.IdentityModel.Tokens;
+using SmartRentalPlatform.Api.Middleware;
 using SmartRentalPlatform.Application;
 using SmartRentalPlatform.Application.Common.Interfaces;
 using SmartRentalPlatform.Infrastructure;
 using SmartRentalPlatform.Infrastructure.Persistence;
 using SmartRentalPlatform.Infrastructure.Persistence.Seed;
+using System.Text;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -70,6 +71,8 @@ if (app.Environment.IsDevelopment())
     app.UseSwagger();
     app.UseSwaggerUI();
 }
+
+app.UseMiddleware<ExceptionHandlingMiddleware>();
 
 // app.UseHttpsRedirection();
 

@@ -62,7 +62,7 @@ namespace SmartRentalPlatform.Infrastructure.Persistence.Seed
                 if (values.Count != 8)
                 {
                     throw new InvalidOperationException(
-                        $"Invalid administrative seed row format in {seedPath}: {line}");
+                        $"Dòng dữ liệu hành chính không đúng định dạng trong {seedPath}: {line}");
                 }
 
                 rows.Add(new AdministrativeSeedRow
@@ -114,7 +114,7 @@ namespace SmartRentalPlatform.Infrastructure.Persistence.Seed
             }
 
             throw new FileNotFoundException(
-                $"Administrative seed file '{SeedFileName}' was not found. Expected it under 'server/data' or 'data'.");
+                $"Không tìm thấy file seed dữ liệu hành chính '{SeedFileName}'. File cần nằm trong 'server/data' hoặc 'data'.");
         }
 
         private static List<string> ParseCsvLine(string line)

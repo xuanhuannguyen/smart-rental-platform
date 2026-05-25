@@ -36,7 +36,7 @@ public class RoomingHousesController : ControllerBase
         return Ok(new ApiResponse<RoomingHouseOnboardingResponse>
         {
             Success = true,
-            Message = "Rooming house onboarding status loaded.",
+            Message = "Tải trạng thái đăng ký chủ trọ thành công.",
             Data = result
         });
     }
@@ -53,7 +53,7 @@ public class RoomingHousesController : ControllerBase
         return Ok(new ApiResponse<RoomingHouseDetailResponse>
         {
             Success = true,
-            Message = "Rooming house draft is ready.",
+            Message = "Bản nháp khu trọ đã sẵn sàng.",
             Data = result
         });
     }
@@ -69,7 +69,7 @@ public class RoomingHousesController : ControllerBase
         return Ok(new ApiResponse<List<RoomingHouseResponse>>
         {
             Success = true,
-            Message = "My rooming houses loaded.",
+            Message = "Tải danh sách khu trọ của tôi thành công.",
             Data = result
         });
     }
@@ -84,7 +84,7 @@ public class RoomingHousesController : ControllerBase
         return Ok(new ApiResponse<List<RoomingHouseResponse>>
         {
             Success = true,
-            Message = "Rooming houses loaded.",
+            Message = "Tải danh sách khu trọ thành công.",
             Data = result
         });
     }
@@ -103,13 +103,13 @@ public class RoomingHousesController : ControllerBase
 
         if (!CanAccess(result))
         {
-            return Forbidden(ErrorCodes.Forbidden, "You cannot access this rooming house.");
+            return Forbidden(ErrorCodes.Forbidden, "Bạn không có quyền truy cập khu trọ này.");
         }
 
         return Ok(new ApiResponse<RoomingHouseDetailResponse>
         {
             Success = true,
-            Message = "Rooming house detail loaded.",
+            Message = "Tải thông tin khu trọ thành công.",
             Data = result
         });
     }
@@ -128,7 +128,7 @@ public class RoomingHousesController : ControllerBase
         }
 
         var result = await roomingHouseService.UpdateAsync(id, request, cancellationToken);
-        return RoomingHouseDetailResult(result, "Rooming house basic information saved.");
+        return RoomingHouseDetailResult(result, "Lưu thông tin cơ bản của khu trọ thành công.");
     }
 
     [Authorize]
@@ -145,7 +145,7 @@ public class RoomingHousesController : ControllerBase
         }
 
         var result = await roomingHouseService.UpdateAmenitiesAsync(id, request, cancellationToken);
-        return RoomingHouseDetailResult(result, "Rooming house amenities saved.");
+        return RoomingHouseDetailResult(result, "Lưu tiện ích khu trọ thành công.");
     }
 
     [Authorize]
@@ -162,7 +162,7 @@ public class RoomingHousesController : ControllerBase
         }
 
         var result = await roomingHouseService.UpdateImagesAsync(id, request, cancellationToken);
-        return RoomingHouseDetailResult(result, "Rooming house images saved.");
+        return RoomingHouseDetailResult(result, "Lưu ảnh khu trọ thành công.");
     }
 
     [Authorize]
@@ -179,7 +179,7 @@ public class RoomingHousesController : ControllerBase
         }
 
         var result = await roomingHouseService.UpdateLegalDocumentAsync(id, request, cancellationToken);
-        return RoomingHouseDetailResult(result, "Rooming house legal document saved.");
+        return RoomingHouseDetailResult(result, "Lưu giấy tờ pháp lý của khu trọ thành công.");
     }
 
     [Authorize]
@@ -195,7 +195,7 @@ public class RoomingHousesController : ControllerBase
             return NotFound(RoomingHouseNotFoundError());
         }
 
-        return RoomingHouseDetailResult(result, "Rooming house submitted for review.");
+        return RoomingHouseDetailResult(result, "Gửi khu trọ để xét duyệt thành công.");
     }
 
     [Authorize(Roles = "Admin")]
@@ -206,7 +206,7 @@ public class RoomingHousesController : ControllerBase
     {
         var adminUserId = GetCurrentUserId();
         var result = await roomingHouseService.ApproveAsync(id, adminUserId, cancellationToken);
-        return RoomingHouseDetailResult(result, "Rooming house approved.");
+        return RoomingHouseDetailResult(result, "Duyệt khu trọ thành công.");
     }
 
     [Authorize(Roles = "Admin")]
@@ -218,14 +218,14 @@ public class RoomingHousesController : ControllerBase
     {
         var adminUserId = GetCurrentUserId();
         var result = await roomingHouseService.RejectAsync(id, adminUserId, request, cancellationToken);
-        return RoomingHouseDetailResult(result, "Rooming house rejected.");
+        return RoomingHouseDetailResult(result, "Từ chối khu trọ thành công.");
     }
 
     private Guid GetCurrentUserId()
     {
         if (!currentUserService.IsAuthenticated || currentUserService.UserId is null)
         {
-            throw new UnauthorizedAccessException("Authenticated user id is missing.");
+            throw new UnauthorizedAccessException("Không tìm thấy mã người dùng đã đăng nhập.");
         }
 
         return currentUserService.UserId.Value;
@@ -243,7 +243,7 @@ public class RoomingHousesController : ControllerBase
 
         if (roomingHouse.LandlordUserId != GetCurrentUserId())
         {
-            return Forbidden(ErrorCodes.Forbidden, "You cannot update this rooming house.");
+            return Forbidden(ErrorCodes.Forbidden, "Bạn không có quyền cập nhật khu trọ này.");
         }
 
         return null;
@@ -283,7 +283,7 @@ public class RoomingHousesController : ControllerBase
         {
             Success = false,
             ErrorCode = ErrorCodes.HouseNotFound,
-            Message = "Rooming house was not found."
+            Message = "Không tìm thấy khu trọ."
         };
     }
 

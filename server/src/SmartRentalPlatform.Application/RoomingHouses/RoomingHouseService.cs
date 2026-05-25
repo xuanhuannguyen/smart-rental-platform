@@ -37,16 +37,11 @@ namespace SmartRentalPlatform.Application.RoomingHouses
                          x.DeletedAt == null,
                     cancellationToken);
 
-            if (activeOnboardingHouse?.ApprovalStatus == RoomingHouseApprovalStatus.Draft)
-            {
-                return ToDetailResponse(activeOnboardingHouse);
-            }
-
             if (activeOnboardingHouse is not null)
             {
                 throw new ConflictException(
                     ErrorCodes.HouseInvalidStatus,
-                    "You already have a rooming house application in progress.",
+                    BuildCreateDraftBlockedMessage(activeOnboardingHouse.ApprovalStatus),
                     new
                     {
                         roomingHouseId = activeOnboardingHouse.Id,
@@ -86,7 +81,7 @@ namespace SmartRentalPlatform.Application.RoomingHouses
             var draft = await GetByIdAsync(roomingHouse.Id, cancellationToken)
                 ?? throw new InternalServerException(
                     ErrorCodes.InternalServerError,
-                    "Rooming house draft was created but cannot be loaded.",
+                    "Đã tạo bản nháp khu trọ nhưng không thể tải lại thông tin.",
                     new { roomingHouseId = roomingHouse.Id });
 
             return draft;
@@ -272,7 +267,7 @@ namespace SmartRentalPlatform.Application.RoomingHouses
                 {
                     throw new BadRequestException(
                         ErrorCodes.ValidationError,
-                        "Duplicate image ids are not allowed.",
+                        "Không được gửi trùng mã ảnh.",
                         new { field = nameof(request.Images) });
                 }
 
@@ -287,7 +282,7 @@ namespace SmartRentalPlatform.Application.RoomingHouses
                 {
                     throw new BadRequestException(
                         ErrorCodes.ImageInvalidOwner,
-                        "One or more image ids are invalid.",
+                        "Một hoặc nhiều mã ảnh không hợp lệ.",
                         new { imageIds = invalidImageIds });
                 }
 
@@ -424,7 +419,7 @@ namespace SmartRentalPlatform.Application.RoomingHouses
             {
                 throw new ConflictException(
                     ErrorCodes.HouseInvalidStatus,
-                    "Only draft or rejected rooming houses can be submitted.",
+                    "Chỉ khu trọ bản nháp hoặc bị từ chối mới có thể gửi duyệt.",
                     new { currentStatus = roomingHouse.ApprovalStatus.ToString() });
             }
 
@@ -463,7 +458,7 @@ namespace SmartRentalPlatform.Application.RoomingHouses
                 {
                     throw new ConflictException(
                         ErrorCodes.HouseInvalidStatus,
-                        "Only pending rooming houses can be approved.",
+                        "Chỉ khu trọ đang chờ duyệt mới có thể được duyệt.",
                         new { currentStatus = roomingHouse.ApprovalStatus.ToString() });
                 }
 
@@ -507,7 +502,7 @@ namespace SmartRentalPlatform.Application.RoomingHouses
             {
                 throw new ConflictException(
                     ErrorCodes.HouseInvalidStatus,
-                    "Only pending rooming houses can be rejected.",
+                    "Chỉ khu trọ đang chờ duyệt mới có thể bị từ chối.",
                     new { currentStatus = roomingHouse.ApprovalStatus.ToString() });
             }
 
@@ -515,7 +510,7 @@ namespace SmartRentalPlatform.Application.RoomingHouses
             {
                 throw new BadRequestException(
                     ErrorCodes.HouseRejectReasonRequired,
-                    "Reject reason is required.",
+                    "Lý do từ chối là bắt buộc.",
                     new { field = nameof(request.Reason) });
             }
 
@@ -561,13 +556,13 @@ namespace SmartRentalPlatform.Application.RoomingHouses
                 roomingHouse.WardCode,
                 cancellationToken);
 
-            ValidateRequiredPropertyImages(roomingHouse.Images, "Rooming house images");
+            ValidateRequiredPropertyImages(roomingHouse.Images, "Ảnh khu trọ");
 
             if (roomingHouse.LegalDocument is null)
             {
                 throw new BadRequestException(
                     ErrorCodes.ValidationError,
-                    "Legal document is required before submitting.",
+                    "Giấy tờ pháp lý là bắt buộc trước khi gửi duyệt.",
                     new { field = nameof(roomingHouse.LegalDocument) });
             }
 
@@ -588,7 +583,7 @@ namespace SmartRentalPlatform.Application.RoomingHouses
             {
                 throw new BadRequestException(
                     ErrorCodes.ValidationError,
-                    "At least 3 images are required before submitting.",
+                    "Khu trọ cần có ít nhất 3 ảnh trước khi gửi duyệt.",
                     new { field = fieldName });
             }
 
@@ -598,7 +593,7 @@ namespace SmartRentalPlatform.Application.RoomingHouses
             {
                 throw new BadRequestException(
                     ErrorCodes.ValidationError,
-                    "Exactly one cover image is required before submitting.",
+                    "Khu trọ cần có đúng 1 ảnh đại diện trước khi gửi duyệt.",
                     new { field = fieldName });
             }
 
@@ -606,7 +601,7 @@ namespace SmartRentalPlatform.Application.RoomingHouses
             {
                 throw new BadRequestException(
                     ErrorCodes.ValidationError,
-                    "Image object key is required.",
+                    "Mã lưu trữ ảnh là bắt buộc.",
                     new { field = fieldName });
             }
         }
@@ -665,13 +660,28 @@ namespace SmartRentalPlatform.Application.RoomingHouses
                     or RoomingHouseApprovalStatus.Rejected);
         }
 
+        private static string BuildCreateDraftBlockedMessage(RoomingHouseApprovalStatus status)
+        {
+            return status switch
+            {
+                RoomingHouseApprovalStatus.Draft =>
+                    "Bạn đang có bản nháp khu trọ. Vui lòng hoàn thành bản nháp và gửi duyệt trước khi thêm khu trọ mới.",
+                RoomingHouseApprovalStatus.Pending =>
+                    "Bạn đang có khu trọ chờ duyệt. Vui lòng chờ kết quả xét duyệt trước khi thêm khu trọ mới.",
+                RoomingHouseApprovalStatus.Rejected =>
+                    "Bạn đang có khu trọ bị từ chối. Vui lòng chỉnh sửa và gửi duyệt lại trước khi thêm khu trọ mới.",
+                _ =>
+                    "Bạn cần xử lý hồ sơ khu trọ hiện tại trước khi thêm khu trọ mới."
+            };
+        }
+
         private static void EnsureEditable(RoomingHouse roomingHouse)
         {
             if (roomingHouse.ApprovalStatus == RoomingHouseApprovalStatus.Pending)
             {
                 throw new ConflictException(
                     ErrorCodes.HouseInvalidStatus,
-                    "Pending rooming houses cannot be updated.",
+                    "Không thể cập nhật khu trọ đang chờ duyệt.",
                     new { currentStatus = roomingHouse.ApprovalStatus.ToString() });
             }
         }
@@ -682,7 +692,7 @@ namespace SmartRentalPlatform.Application.RoomingHouses
             {
                 throw new ConflictException(
                     ErrorCodes.HouseInvalidStatus,
-                    "Legal document can only be updated while draft or rejected.",
+                    "Giấy tờ pháp lý chỉ được cập nhật khi khu trọ là bản nháp hoặc bị từ chối.",
                     new { currentStatus = roomingHouse.ApprovalStatus.ToString() });
             }
         }
@@ -702,7 +712,7 @@ namespace SmartRentalPlatform.Application.RoomingHouses
             {
                 throw new BadRequestException(
                     ErrorCodes.ValidationError,
-                    "Province is invalid.",
+                    "Tỉnh/thành phố không hợp lệ.",
                     new { field = nameof(provinceCode) });
             }
 
@@ -713,7 +723,7 @@ namespace SmartRentalPlatform.Application.RoomingHouses
             {
                 throw new BadRequestException(
                     ErrorCodes.ValidationError,
-                    "Ward is invalid.",
+                    "Phường/xã không hợp lệ.",
                     new { field = nameof(wardCode) });
             }
         }
@@ -736,7 +746,7 @@ namespace SmartRentalPlatform.Application.RoomingHouses
             {
                 throw new BadRequestException(
                     ErrorCodes.ValidationError,
-                    "Province is invalid.",
+                    "Tỉnh/thành phố không hợp lệ.",
                     new { field = nameof(provinceCode) });
             }
 
@@ -749,7 +759,7 @@ namespace SmartRentalPlatform.Application.RoomingHouses
             {
                 throw new BadRequestException(
                     ErrorCodes.ValidationError,
-                    "Ward is invalid.",
+                    "Phường/xã không hợp lệ.",
                     new { field = nameof(wardCode) });
             }
 
@@ -784,7 +794,7 @@ namespace SmartRentalPlatform.Application.RoomingHouses
             {
                 throw new BadRequestException(
                     ErrorCodes.AmenityNotFound,
-                    "One or more amenity ids are invalid.",
+                    "Một hoặc nhiều mã tiện ích không hợp lệ.",
                     new { amenityIds });
             }
 
@@ -814,7 +824,7 @@ namespace SmartRentalPlatform.Application.RoomingHouses
             {
                 throw new BadRequestException(
                     ErrorCodes.ValidationError,
-                    "Rooming house name is required.",
+                    "Tên khu trọ là bắt buộc.",
                     new { field = nameof(name) });
             }
 
@@ -822,7 +832,7 @@ namespace SmartRentalPlatform.Application.RoomingHouses
             {
                 throw new BadRequestException(
                     ErrorCodes.ValidationError,
-                    "Address line is required.",
+                    "Địa chỉ là bắt buộc.",
                     new { field = nameof(addressLine) });
             }
 
@@ -830,7 +840,7 @@ namespace SmartRentalPlatform.Application.RoomingHouses
             {
                 throw new BadRequestException(
                     ErrorCodes.ValidationError,
-                    "Province code is required.",
+                    "Mã tỉnh/thành phố là bắt buộc.",
                     new { field = nameof(provinceCode) });
             }
 
@@ -838,7 +848,7 @@ namespace SmartRentalPlatform.Application.RoomingHouses
             {
                 throw new BadRequestException(
                     ErrorCodes.ValidationError,
-                    "Ward code is required.",
+                    "Mã phường/xã là bắt buộc.",
                     new { field = nameof(wardCode) });
             }
 
@@ -846,7 +856,7 @@ namespace SmartRentalPlatform.Application.RoomingHouses
             {
                 throw new BadRequestException(
                     ErrorCodes.ValidationError,
-                    "Latitude must be between -90 and 90.",
+                    "Vĩ độ phải nằm trong khoảng từ -90 đến 90.",
                     new { field = nameof(latitude) });
             }
 
@@ -854,7 +864,7 @@ namespace SmartRentalPlatform.Application.RoomingHouses
             {
                 throw new BadRequestException(
                     ErrorCodes.ValidationError,
-                    "Longitude must be between -180 and 180.",
+                    "Kinh độ phải nằm trong khoảng từ -180 đến 180.",
                     new { field = nameof(longitude) });
             }
         }
@@ -879,7 +889,7 @@ namespace SmartRentalPlatform.Application.RoomingHouses
             {
                 throw new BadRequestException(
                     ErrorCodes.ValidationError,
-                    "Invalid legal document type.",
+                    "Loại giấy tờ pháp lý không hợp lệ.",
                     new { field = nameof(documentTypeValue) });
             }
 
@@ -887,7 +897,7 @@ namespace SmartRentalPlatform.Application.RoomingHouses
             {
                 throw new BadRequestException(
                     ErrorCodes.ValidationError,
-                    "Front image object key is required.",
+                    "Mã lưu trữ ảnh mặt trước giấy tờ là bắt buộc.",
                     new { field = nameof(frontImageObjectKey) });
             }
 
@@ -895,7 +905,7 @@ namespace SmartRentalPlatform.Application.RoomingHouses
             {
                 throw new BadRequestException(
                     ErrorCodes.ValidationError,
-                    "Back image object key is required.",
+                    "Mã lưu trữ ảnh mặt sau giấy tờ là bắt buộc.",
                     new { field = nameof(backImageObjectKey) });
             }
 
@@ -903,7 +913,7 @@ namespace SmartRentalPlatform.Application.RoomingHouses
             {
                 throw new BadRequestException(
                     ErrorCodes.ValidationError,
-                    "Document number is required.",
+                    "Số giấy tờ là bắt buộc.",
                     new { field = nameof(documentNumber) });
             }
 
@@ -916,7 +926,7 @@ namespace SmartRentalPlatform.Application.RoomingHouses
             {
                 throw new BadRequestException(
                     ErrorCodes.ValidationError,
-                    "At least 3 images are required.",
+                    "Khu trọ cần có ít nhất 3 ảnh.",
                     new { field = nameof(images) });
             }
 
@@ -926,7 +936,7 @@ namespace SmartRentalPlatform.Application.RoomingHouses
             {
                 throw new BadRequestException(
                     ErrorCodes.ValidationError,
-                    "Image object key is required.",
+                    "Mã lưu trữ ảnh là bắt buộc.",
                     new { field = nameof(images) });
             }
         }
@@ -937,8 +947,8 @@ namespace SmartRentalPlatform.Application.RoomingHouses
             {
                 throw new BadRequestException(
                     ErrorCodes.ValidationError,
-                    "Exactly one cover image is required.",
-                    new { field = "Images" });
+                    "Khu trọ cần có đúng 1 ảnh đại diện.",
+                    new { field = "Ảnh" });
             }
         }
 
