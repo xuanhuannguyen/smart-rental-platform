@@ -561,6 +561,8 @@ namespace SmartRentalPlatform.Application.RoomingHouses
                 roomingHouse.WardCode,
                 cancellationToken);
 
+            ValidateRequiredPropertyImages(roomingHouse.Images, "Rooming house images");
+
             if (roomingHouse.LegalDocument is null)
             {
                 throw new BadRequestException(
@@ -574,6 +576,39 @@ namespace SmartRentalPlatform.Application.RoomingHouses
                 roomingHouse.LegalDocument.FrontImageObjectKey,
                 roomingHouse.LegalDocument.BackImageObjectKey,
                 roomingHouse.LegalDocument.DocumentNumberMasked);
+        }
+
+        private static void ValidateRequiredPropertyImages(
+            IEnumerable<PropertyImage> images,
+            string fieldName)
+        {
+            var imageList = images.ToList();
+
+            if (imageList.Count < 3)
+            {
+                throw new BadRequestException(
+                    ErrorCodes.ValidationError,
+                    "At least 3 images are required before submitting.",
+                    new { field = fieldName });
+            }
+
+            var coverCount = imageList.Count(x => x.IsCover);
+
+            if (coverCount != 1)
+            {
+                throw new BadRequestException(
+                    ErrorCodes.ValidationError,
+                    "Exactly one cover image is required before submitting.",
+                    new { field = fieldName });
+            }
+
+            if (imageList.Any(x => string.IsNullOrWhiteSpace(x.ObjectKey)))
+            {
+                throw new BadRequestException(
+                    ErrorCodes.ValidationError,
+                    "Image object key is required.",
+                    new { field = fieldName });
+            }
         }
 
         private async Task GrantLandlordRoleIfMissingAsync(
@@ -877,6 +912,14 @@ namespace SmartRentalPlatform.Application.RoomingHouses
 
         private static void ValidatePropertyImages(IReadOnlyCollection<UpdatePropertyImageItemRequest> images)
         {
+            if (images.Count < 3)
+            {
+                throw new BadRequestException(
+                    ErrorCodes.ValidationError,
+                    "At least 3 images are required.",
+                    new { field = nameof(images) });
+            }
+
             ValidateCoverImageCount(images.Count(x => x.IsCover));
 
             if (images.Any(x => string.IsNullOrWhiteSpace(x.ObjectKey)))
@@ -890,11 +933,11 @@ namespace SmartRentalPlatform.Application.RoomingHouses
 
         private static void ValidateCoverImageCount(int coverCount)
         {
-            if (coverCount > 1)
+            if (coverCount != 1)
             {
                 throw new BadRequestException(
                     ErrorCodes.ValidationError,
-                    "Only one cover image is allowed.",
+                    "Exactly one cover image is required.",
                     new { field = "Images" });
             }
         }

@@ -323,6 +323,7 @@ namespace SmartRentalPlatform.Application.Rooms
             var room = await context.Rooms
                 .Include(x => x.RoomingHouse)
                 .Include(x => x.PriceTiers)
+                .Include(x => x.Images)
                 .FirstOrDefaultAsync(
                     x => x.Id == roomId &&
                          x.DeletedAt == null &&
@@ -343,6 +344,13 @@ namespace SmartRentalPlatform.Application.Rooms
                     "Only hidden rooms can be submitted.",
                     new { currentStatus = room.Status.ToString() });
             }
+            ValidateRoomFields(
+                room.RoomNumber,
+                room.Floor,
+                room.AreaM2,
+                room.MaxOccupants);
+
+            ValidateRequiredRoomImages(room.Images);
 
             ValidateRoomCanBeSubmitted(room);
 
@@ -352,6 +360,37 @@ namespace SmartRentalPlatform.Application.Rooms
             await context.SaveChangesAsync(cancellationToken);
 
             return await GetByIdAsync(landlordUserId, roomId, cancellationToken);
+        }
+
+        private static void ValidateRequiredRoomImages(IEnumerable<PropertyImage> images)
+        {
+            var imageList = images.ToList();
+
+            if (imageList.Count < 3)
+            {
+                throw new BadRequestException(
+                    ErrorCodes.ValidationError,
+                    "At least 3 room images are required before submitting.",
+                    new { field = nameof(images) });
+            }
+
+            var coverCount = imageList.Count(x => x.IsCover);
+
+            if (coverCount != 1)
+            {
+                throw new BadRequestException(
+                    ErrorCodes.ValidationError,
+                    "Exactly one cover image is required before submitting.",
+                    new { field = nameof(images) });
+            }
+
+            if (imageList.Any(x => string.IsNullOrWhiteSpace(x.ObjectKey)))
+            {
+                throw new BadRequestException(
+                    ErrorCodes.ValidationError,
+                    "Image object key is required.",
+                    new { field = nameof(images) });
+            }
         }
 
         public async Task<RoomResponse?> UpdateStatusAsync(
@@ -547,13 +586,21 @@ namespace SmartRentalPlatform.Application.Rooms
 
         private static void ValidatePropertyImages(IReadOnlyCollection<UpdatePropertyImageItemRequest> images)
         {
-            var coverCount = images.Count(x => x.IsCover);
-
-            if (coverCount > 1)
+            if (images.Count < 3)
             {
                 throw new BadRequestException(
                     ErrorCodes.ValidationError,
-                    "Only one cover image is allowed.",
+                    "At least 3 room images are required.",
+                    new { field = nameof(images) });
+            }
+
+            var coverCount = images.Count(x => x.IsCover);
+
+            if (coverCount != 1)
+            {
+                throw new BadRequestException(
+                    ErrorCodes.ValidationError,
+                    "Exactly one cover image is required.",
                     new { field = nameof(images) });
             }
 
