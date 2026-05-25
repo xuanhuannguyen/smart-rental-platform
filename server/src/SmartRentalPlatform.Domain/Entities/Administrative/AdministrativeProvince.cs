@@ -14,7 +14,7 @@ namespace SmartRentalPlatform.Domain.Entities.Administrative
         public bool IsActive { get; set; } = true;
         public DateTimeOffset CreatedAt { get; set; }
         public DateTimeOffset UpdatedAt { get; set; }
-        public ICollection<AdministrativeDistrict> Districts { get; set; } = new List<AdministrativeDistrict>();
+        public ICollection<AdministrativeWard> Wards { get; set; } = new List<AdministrativeWard>();
         public ICollection<RoomingHouse> RoomingHouses { get; set; } = new List<RoomingHouse>();
     }
 }

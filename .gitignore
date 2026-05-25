@@ -315,6 +315,11 @@ FakesAssemblies/
 .ntvs_analysis.dat
 node_modules/
 
+# Local uploaded files
+server/src/SmartRentalPlatform.Api/wwwroot/uploads/**
+!server/src/SmartRentalPlatform.Api/wwwroot/uploads/**/
+!server/src/SmartRentalPlatform.Api/wwwroot/uploads/**/.gitkeep
+
 # Visual Studio 6 build log
 *.plg
 

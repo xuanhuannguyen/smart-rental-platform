@@ -17,7 +17,7 @@ namespace SmartRentalPlatform.Domain.Entities.Properties
         public string? Description { get; set; }
         public DateTimeOffset CreatedAt { get; set; }
         public DateTimeOffset UpdatedAt { get; set; }
-        public DateTimeOffset DeletedAt { get; set; }
+        public DateTimeOffset? DeletedAt { get; set; }
         
         public RoomingHouse RoomingHouse { get; set; } = null!;
         public ICollection<RoomPriceTier> PriceTiers { get; set; } = new List<RoomPriceTier>();

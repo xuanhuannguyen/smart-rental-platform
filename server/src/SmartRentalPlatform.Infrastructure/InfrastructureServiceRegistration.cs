@@ -26,6 +26,7 @@ public static class InfrastructureServiceRegistration
         services.AddScoped<ITokenService, TokenService>();
         services.AddScoped<IEmailSender, EmailSender>();
         services.AddScoped<IGoogleAuthService, GoogleAuthService>();
+        services.AddScoped<IFileStorageService, LocalFileStorageService>();
         services.AddHttpContextAccessor();
         services.AddScoped<ICurrentUserService, CurrentUserService>();
 

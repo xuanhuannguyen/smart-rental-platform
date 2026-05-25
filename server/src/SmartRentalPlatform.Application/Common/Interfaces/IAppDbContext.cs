@@ -16,5 +16,29 @@ public interface IAppDbContext {
 
     DbSet<ExternalLogin> ExternalLogins { get; }
 
+<<<<<<< Updated upstream
+=======
+    DbSet<AdministrativeProvince> AdministrativeProvinces { get; }
+
+    DbSet<AdministrativeWard> AdministrativeWards { get; }
+
+    DbSet<RoomingHouse> RoomingHouses { get; }
+
+    DbSet<Room> Rooms { get; }
+
+    DbSet<Amenity> Amenities { get; }
+
+    DbSet<PropertyImage> PropertyImages { get; }
+
+    DbSet<RoomingHouseLegalDocument> RoomingHouseLegalDocuments { get; }
+
+    DbSet<RoomingHouseAmenity> RoomingHouseAmenities { get; }
+
+    DbSet<RoomAmenity> RoomAmenities { get; }
+
+    DbSet<RoomPriceTier> RoomPriceTiers { get; }
+
+    Task<IAppDbContextTransaction> BeginTransactionAsync(CancellationToken cancellationToken = default);
+>>>>>>> Stashed changes
     Task<int> SaveChangesAsync(CancellationToken cancellationToken = default);
 }

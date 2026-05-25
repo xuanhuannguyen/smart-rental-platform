@@ -7,7 +7,7 @@ namespace SmartRentalPlatform.Domain.Enums
     public enum WardType
     {
         Ward,
-        Commue,
-        Town
+        Commune,
+        SpecialAdministrativeRegion
     }
 }

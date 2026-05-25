@@ -15,13 +15,13 @@ namespace SmartRentalPlatform.Infrastructure.Persistence.Configurations.Administ
             builder.ToTable("administrative_wards");
             builder.HasKey(x => x.Code);
             builder.Property(x => x.Code).HasColumnName("code").HasMaxLength(20).IsRequired();
-            builder.Property(x => x.DistrictCode).HasColumnName("district_code").HasMaxLength(20).IsRequired();
+            builder.Property(x => x.ProvinceCode).HasColumnName("province_code").HasMaxLength(20).IsRequired();
             builder.Property(x => x.Name).HasColumnName("name").HasMaxLength(255).IsRequired();
             builder.Property(x => x.Type).HasColumnName("type").HasConversion<string>().HasMaxLength(50).IsRequired();
             builder.Property(x => x.IsActive).HasColumnName("is_active").HasDefaultValue(true).IsRequired();
             builder.Property(x => x.CreatedAt).HasColumnName("created_at").IsRequired();
             builder.Property(x => x.UpdatedAt).HasColumnName("updated_at").IsRequired();
-            builder.HasOne(x => x.District).WithMany(x => x.Wards).HasForeignKey(x => x.DistrictCode).OnDelete(DeleteBehavior.Restrict);
+            builder.HasOne(x => x.Province).WithMany(x => x.Wards).HasForeignKey(x => x.ProvinceCode).OnDelete(DeleteBehavior.Restrict);
             builder.HasData(AdministrativeSeed.GetWards());
 
         }
