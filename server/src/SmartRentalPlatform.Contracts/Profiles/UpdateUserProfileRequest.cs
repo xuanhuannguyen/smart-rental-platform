@@ -1,6 +1,6 @@
 using System.ComponentModel.DataAnnotations;
 
-namespace SmartRentalPlatform.Contracts.Users;
+namespace SmartRentalPlatform.Contracts.Profiles;
 
 public class UpdateUserProfileRequest
 {

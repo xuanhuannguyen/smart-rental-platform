@@ -1,4 +1,6 @@
-namespace SmartRentalPlatform.Contracts.Users;
+using System;
+
+namespace SmartRentalPlatform.Contracts.Profiles;
 
 public class UserProfileResponse
 {
