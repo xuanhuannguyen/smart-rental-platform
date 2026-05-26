@@ -44,7 +44,5 @@ public interface IAppDbContext {
 
     DbSet<KycVerification> KycVerifications { get; }
 
-    DbSet<RoomingHouse> RoomingHouses { get; }
-
     Task<int> SaveChangesAsync(CancellationToken cancellationToken = default);
 }
