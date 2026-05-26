@@ -2,7 +2,6 @@ using Microsoft.EntityFrameworkCore;
 using SmartRentalPlatform.Domain.Entities.Administrative;
 using SmartRentalPlatform.Domain.Entities.Properties;
 using SmartRentalPlatform.Domain.Entities.Users;
-using SmartRentalPlatform.Domain.Entities.Properties;
 
 namespace SmartRentalPlatform.Application.Common.Interfaces;
 
