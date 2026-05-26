@@ -1,5 +1,5 @@
 using SmartRentalPlatform.Domain.Enums;
-
+using SmartRentalPlatform.Domain.Entities.Users;
 namespace SmartRentalPlatform.Domain.Entities;
 
 public class KycVerification

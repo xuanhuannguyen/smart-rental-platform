@@ -6,7 +6,7 @@ using SmartRentalPlatform.Application.Services.Kyc;
 using SmartRentalPlatform.Contracts.Common;
 using SmartRentalPlatform.Contracts.Requests.Kyc;
 using SmartRentalPlatform.Contracts.Responses.Kyc;
-using SmartRentalPlatform.Domain.Entities;
+using SmartRentalPlatform.Domain.Entities.Users;
 using SmartRentalPlatform.Domain.Enums;
 using SmartRentalPlatform.Infrastructure.Persistence;
 
@@ -48,24 +48,24 @@ public class KycService : IKycService
         var blocking = await _context.KycVerifications
             .AsNoTracking()
             .Where(k => k.UserId == userId &&
-                        (k.Status == KycSubmissionStatus.PendingAdminReview ||
-                         k.Status == KycSubmissionStatus.Approved))
+                        (k.Status == KycVerificationStatus.PendingAdminReview ||
+                         k.Status == KycVerificationStatus.Approved))
             .Select(k => k.Status)
             .FirstOrDefaultAsync();
 
-        if (blocking == KycSubmissionStatus.Approved)
+        if (blocking == KycVerificationStatus.Approved)
             throw new KycBusinessException(
                 ErrorCodes.KycAlreadyApproved,
                 "KYC is already approved.",
                 400);
 
-        if (blocking == KycSubmissionStatus.PendingAdminReview)
+        if (blocking == KycVerificationStatus.PendingAdminReview)
             throw new KycBusinessException(
                 ErrorCodes.KycPendingAdminReview,
                 "A KYC submission is already pending admin review.",
                 400);
 
-        if (!Enum.TryParse<DocumentType>(request.DocumentType, ignoreCase: false, out var documentType))
+        if (!Enum.TryParse<KycDocumentType>(request.DocumentType, ignoreCase: false, out var documentType))
             throw new KycBusinessException(ErrorCodes.EkycDocumentFailed, "Invalid document type.", 400);
 
         if (!Enum.TryParse<SelfieCaptureMethod>(request.SelfieCaptureMethod, ignoreCase: false, out var selfieMethod))
@@ -103,7 +103,7 @@ public class KycService : IKycService
                 .AnyAsync(k =>
                     k.CitizenIdHash == citizenIdHash &&
                     k.UserId != userId &&
-                    k.Status == KycSubmissionStatus.Approved);
+                    k.Status == KycVerificationStatus.Approved);
 
             if (duplicate)
                 throw new KycBusinessException(
@@ -113,10 +113,10 @@ public class KycService : IKycService
         }
 
         var finalStatus = ekyc.IsProviderFailure || ekycResult == EkycResult.ProviderError || ekycResult == EkycResult.Failed
-            ? KycSubmissionStatus.EkycFailed
-            : KycSubmissionStatus.PendingAdminReview;
+            ? KycVerificationStatus.EkycFailed
+            : KycVerificationStatus.PendingAdminReview;
 
-        var now = DateTime.UtcNow;
+        var now = DateTimeOffset.UtcNow;
         var kyc = new KycVerification
         {
             Id = Guid.NewGuid(),
@@ -130,7 +130,7 @@ public class KycService : IKycService
             SelfieCaptureMethod = selfieMethod,
             OcrFullName = ekyc.OcrFullName,
             OcrCitizenIdMasked = ocrCitizenIdMasked,
-            CitizenIdHash = citizenIdHash,
+            CitizenIdHash = citizenIdHash ?? string.Empty,
             OcrDateOfBirth = ekyc.OcrDateOfBirth.HasValue
                 ? DateOnly.FromDateTime(ekyc.OcrDateOfBirth.Value)
                 : null,
@@ -172,7 +172,7 @@ public class KycService : IKycService
             LivenessResult = liveness?.ToString(),
             EkycErrorCode = kyc.EkycErrorCode,
             EkycErrorMessage = kyc.EkycErrorMessage,
-            SubmittedAt = now,
+            SubmittedAt = now.UtcDateTime,
             Message = BuildSubmissionMessage(finalStatus, ekyc)
         };
     }
@@ -196,7 +196,7 @@ public class KycService : IKycService
         var items = await _context.KycVerifications
             .AsNoTracking()
             .Where(k => k.UserId == userId)
-            .OrderByDescending(k => k.SubmittedAt ?? k.CreatedAt)
+            .OrderByDescending(k => k.SubmittedAt)
             .Select(k => new KycHistoryItemResponse
             {
                 KycId = k.Id,
@@ -208,8 +208,8 @@ public class KycService : IKycService
                 OcrCitizenIdMasked = k.OcrCitizenIdMasked,
                 FaceMatchScore = k.FaceMatchScore,
                 LivenessResult = k.LivenessResult != null ? k.LivenessResult.ToString() : null,
-                SubmittedAt = k.SubmittedAt ?? k.CreatedAt,
-                ReviewedAt = k.ReviewedAt,
+                SubmittedAt = k.SubmittedAt.UtcDateTime,
+                ReviewedAt = k.ReviewedAt.HasValue ? k.ReviewedAt.Value.UtcDateTime : null,
                 RejectedReason = k.RejectedReason
             })
             .ToListAsync();
@@ -257,8 +257,8 @@ public class KycService : IKycService
             OcrCitizenIdMasked = k.OcrCitizenIdMasked,
             FaceMatchScore = k.FaceMatchScore,
             LivenessResult = k.LivenessResult?.ToString(),
-            SubmittedAt = k.SubmittedAt,
-            ReviewedAt = k.ReviewedAt,
+            SubmittedAt = k.SubmittedAt.UtcDateTime,
+            ReviewedAt = k.ReviewedAt.HasValue ? k.ReviewedAt.Value.UtcDateTime : null,
             RejectedReason = k.RejectedReason
         };
 
@@ -279,10 +279,10 @@ public class KycService : IKycService
     }
 
     private static string BuildSubmissionMessage(
-        KycSubmissionStatus finalStatus,
+        KycVerificationStatus finalStatus,
         VnptEkycClientResult ekyc)
     {
-        if (finalStatus == KycSubmissionStatus.PendingAdminReview)
+        if (finalStatus == KycVerificationStatus.PendingAdminReview)
             return "Submission received. Your profile is pending admin review.";
 
         if (ekyc.ErrorCode == ErrorCodes.EkycDocumentFailed)

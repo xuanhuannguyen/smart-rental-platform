@@ -1,5 +1,5 @@
 using Microsoft.EntityFrameworkCore;
-using SmartRentalPlatform.Domain.Entities;
+using SmartRentalPlatform.Domain.Entities.Users;
 using SmartRentalPlatform.Domain.Enums;
 
 namespace SmartRentalPlatform.Infrastructure.Persistence.Seed;
@@ -34,7 +34,7 @@ public static class KycQaDataSeeder
         if (exists)
             return;
 
-        var now = DateTime.UtcNow;
+        var now = DateTimeOffset.UtcNow;
         db.Users.Add(new User
         {
             Id = id,
@@ -45,7 +45,7 @@ public static class KycQaDataSeeder
             DisplayName = displayName,
             Status = UserStatus.Active,
             OnboardingStatus = OnboardingStatus.NeedKyc,
-            EmailComfirmed = true,
+            EmailConfirmed = true,
             CreatedAt = now,
             UpdatedAt = now
         });
