@@ -24,7 +24,6 @@ public class AppDbContext : DbContext, IAppDbContext
     public DbSet<KycVerification> KycVerifications => Set<KycVerification>();
     // Administrative
     public DbSet<AdministrativeProvince> AdministrativeProvinces => Set<AdministrativeProvince>();
-    public DbSet<AdministrativeDistrict> AdministrativeDistricts => Set<AdministrativeDistrict>();
     public DbSet<AdministrativeWard> AdministrativeWards => Set<AdministrativeWard>();
     // Properties
     public DbSet<RoomingHouse> RoomingHouses => Set<RoomingHouse>();

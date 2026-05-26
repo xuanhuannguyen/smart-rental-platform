@@ -9,6 +9,7 @@ public static class ErrorCodes
     public const string ValidationError = "VALIDATION_ERROR";
     public const string NotFound = "NOT_FOUND";
     public const string InvalidStatus = "INVALID_STATUS";
+    public const string InternalServerError = "INTERNAL_SERVER_ERROR";
 
     // Auth
     public const string EmailAlreadyExists = "EMAIL_ALREADY_EXISTS";
@@ -43,6 +44,8 @@ public static class ErrorCodes
     public const string HouseNotApproved = "HOUSE_NOT_APPROVED";
     public const string HouseNotPublic = "HOUSE_NOT_PUBLIC";
     public const string RoomNotFound = "ROOM_NOT_FOUND";
+    public const string RoomDuplicateNumber = "ROOM_DUPLICATE_NUMBER";
+    public const string RoomInvalidStatus = "ROOM_INVALID_STATUS";
     public const string RoomNotAvailable = "ROOM_NOT_AVAILABLE";
     public const string NoAvailableRoom = "NO_AVAILABLE_ROOM";
     public const string AmenityNotFound = "AMENITY_NOT_FOUND";
