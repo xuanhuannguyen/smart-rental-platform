@@ -2,12 +2,11 @@ using Microsoft.Extensions.DependencyInjection;
 using SmartRentalPlatform.Application.Administrative;
 using SmartRentalPlatform.Application.Amenities;
 using SmartRentalPlatform.Application.Auth;
+using SmartRentalPlatform.Application.Profiles;
+using SmartRentalPlatform.Application.Roles;
 using SmartRentalPlatform.Application.RoomingHouses;
 using SmartRentalPlatform.Application.Rooms;
 using SmartRentalPlatform.Application.Users;
-using SmartRentalPlatform.Application.Profiles;
-using SmartRentalPlatform.Application.Roles;
-
 
 namespace SmartRentalPlatform.Application;
 
@@ -23,6 +22,7 @@ public static class ApplicationServiceRegistration
         services.AddScoped<IUserService, UserService>();
         services.AddScoped<IProfileService, ProfileService>();
         services.AddScoped<IRoleService, RoleService>();
+
         return services;
     }
 }

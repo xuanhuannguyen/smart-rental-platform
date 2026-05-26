@@ -1,8 +1,12 @@
 using Microsoft.AspNetCore.Authentication.JwtBearer;
+using Microsoft.AspNetCore.Mvc;
 using Microsoft.IdentityModel.Tokens;
 using SmartRentalPlatform.Api.Middleware;
+using SmartRentalPlatform.Api.Services;
 using SmartRentalPlatform.Application;
 using SmartRentalPlatform.Application.Common.Interfaces;
+using SmartRentalPlatform.Contracts.Common;
+using SmartRentalPlatform.Contracts.Requests.Kyc;
 using SmartRentalPlatform.Infrastructure;
 using SmartRentalPlatform.Infrastructure.Persistence;
 using SmartRentalPlatform.Infrastructure.Persistence.Seed;
@@ -10,10 +14,27 @@ using System.Text;
 
 var builder = WebApplication.CreateBuilder(args);
 
-// Đăng ký controller để dùng mô hình API Controller.
-builder.Services.AddControllers();
+builder.Services.AddControllers()
+    .ConfigureApiBehaviorOptions(options =>
+    {
+        options.InvalidModelStateResponseFactory = context =>
+        {
+            bool HasFieldError(string key) =>
+                context.ModelState.TryGetValue(key, out var entry) && entry.Errors.Count > 0;
 
-// Đăng ký Swagger để test API trên trình duyệt.
+            var code = ErrorCodes.ValidationError;
+
+            if (HasFieldError(nameof(SubmitKycRequest.FrontImage)))
+                code = ErrorCodes.FrontImageRequired;
+            else if (HasFieldError(nameof(SubmitKycRequest.BackImage)))
+                code = ErrorCodes.BackImageRequired;
+            else if (HasFieldError(nameof(SubmitKycRequest.SelfieImage)))
+                code = ErrorCodes.SelfieRequired;
+
+            return new BadRequestObjectResult(new { success = false, code });
+        };
+    });
+
 builder.Services.AddEndpointsApiExplorer();
 builder.Services.AddSwaggerGen();
 
@@ -43,9 +64,10 @@ builder.Services
     });
 
 builder.Services.AddAuthorization();
+builder.Services.AddHttpContextAccessor();
 
-// Cho phép frontend React gọi backend.
-// React Vite mặc định chạy ở http://localhost:5173.
+builder.Services.AddScoped<SmartRentalPlatform.Application.Abstractions.ICurrentUserService, CurrentUserService>();
+
 builder.Services.AddCors(options =>
 {
     options.AddPolicy("ClientApp", policy =>
@@ -57,7 +79,6 @@ builder.Services.AddCors(options =>
     });
 });
 
-// Đăng ký các layer tự viết.
 builder.Services.AddApplication();
 builder.Services.AddInfrastructure(builder.Configuration);
 
@@ -65,7 +86,6 @@ var app = builder.Build();
 
 await SeedDataAsync(app);
 
-// Chỉ bật Swagger ở môi trường Development.
 if (app.Environment.IsDevelopment())
 {
     app.UseSwagger();
@@ -76,7 +96,6 @@ app.UseMiddleware<ExceptionHandlingMiddleware>();
 
 // app.UseHttpsRedirection();
 
-// CORS phải đặt trước Authorization.
 app.UseCors("ClientApp");
 
 app.UseStaticFiles();

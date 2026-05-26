@@ -34,6 +34,14 @@ public static class ErrorCodes
     public const string KycInvalidStatus = "KYC_INVALID_STATUS";
     public const string KycRejectReasonRequired = "KYC_REJECT_REASON_REQUIRED";
     public const string KycAlreadyApproved = "KYC_ALREADY_APPROVED";
+    public const string KycPendingAdminReview = "KYC_PENDING_ADMIN_REVIEW";
+
+    public const string AccountNotActive = "ACCOUNT_NOT_ACTIVE";
+    public const string FrontImageRequired = "FRONT_IMAGE_REQUIRED";
+    public const string BackImageRequired = "BACK_IMAGE_REQUIRED";
+    public const string SelfieRequired = "SELFIE_REQUIRED";
+    public const string EkycDocumentFailed = "EKYC_DOCUMENT_FAILED";
+
     public const string RoleAlreadyExists = "ROLE_ALREADY_EXISTS";
     public const string RoleGrantFailed = "ROLE_GRANT_FAILED";
 

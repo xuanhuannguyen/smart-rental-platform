@@ -4,7 +4,6 @@ using SmartRentalPlatform.Domain.Entities.Administrative;
 using SmartRentalPlatform.Domain.Entities.Properties;
 using SmartRentalPlatform.Domain.Entities.Users;
 
-
 namespace SmartRentalPlatform.Infrastructure.Persistence;
 
 public class AppDbContext : DbContext, IAppDbContext
@@ -13,6 +12,7 @@ public class AppDbContext : DbContext, IAppDbContext
         : base(options)
     {
     }
+
     // Users
     public DbSet<User> Users => Set<User>();
     public DbSet<Role> Roles => Set<Role>();
@@ -22,9 +22,11 @@ public class AppDbContext : DbContext, IAppDbContext
     public DbSet<UserToken> UserTokens => Set<UserToken>();
     public DbSet<LoginLog> LoginLogs => Set<LoginLog>();
     public DbSet<KycVerification> KycVerifications => Set<KycVerification>();
+
     // Administrative
     public DbSet<AdministrativeProvince> AdministrativeProvinces => Set<AdministrativeProvince>();
     public DbSet<AdministrativeWard> AdministrativeWards => Set<AdministrativeWard>();
+
     // Properties
     public DbSet<RoomingHouse> RoomingHouses => Set<RoomingHouse>();
     public DbSet<Room> Rooms => Set<Room>();
@@ -35,7 +37,8 @@ public class AppDbContext : DbContext, IAppDbContext
     public DbSet<PropertyImage> PropertyImages => Set<PropertyImage>();
     public DbSet<RoomingHouseLegalDocument> RoomingHouseLegalDocuments => Set<RoomingHouseLegalDocument>();
 
-    public async Task<IAppDbContextTransaction> BeginTransactionAsync(CancellationToken cancellationToken = default)
+    public async Task<IAppDbContextTransaction> BeginTransactionAsync(
+        CancellationToken cancellationToken = default)
     {
         var transaction = await Database.BeginTransactionAsync(cancellationToken);
         return new AppDbContextTransaction(transaction);
