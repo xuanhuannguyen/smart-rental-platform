@@ -10,6 +10,8 @@ public class GoogleLoginResponse
 
     public string? AvatarUrl { get; set; }
 
+    public bool IsGoogleUser { get; set; } = true;
+
     public bool EmailConfirmed { get; set; }
 
     public bool RequiresEmailVerification { get; set; }

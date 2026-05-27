@@ -24,4 +24,11 @@ public interface IUserService
     Task GrantLandlordRoleAfterRoomingHouseApprovedAsync(
         Guid roomingHouseId,
         CancellationToken cancellationToken = default);
+
+    Task<IReadOnlyCollection<UserSessionResponse>> GetActiveSessionsAsync(
+        CancellationToken cancellationToken = default);
+
+    Task RevokeSessionAsync(
+        Guid sessionId,
+        CancellationToken cancellationToken = default);
 }

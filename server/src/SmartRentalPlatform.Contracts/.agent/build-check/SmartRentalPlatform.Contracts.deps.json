@@ -1,0 +1,23 @@
+{
+  "runtimeTarget": {
+    "name": ".NETCoreApp,Version=v10.0",
+    "signature": ""
+  },
+  "compilationOptions": {},
+  "targets": {
+    ".NETCoreApp,Version=v10.0": {
+      "SmartRentalPlatform.Contracts/1.0.0": {
+        "runtime": {
+          "SmartRentalPlatform.Contracts.dll": {}
+        }
+      }
+    }
+  },
+  "libraries": {
+    "SmartRentalPlatform.Contracts/1.0.0": {
+      "type": "project",
+      "serviceable": false,
+      "sha512": ""
+    }
+  }
+}

@@ -10,6 +10,22 @@
 *.userosscache
 *.sln.docstates
 *.env
+*.tsbuildinfo
+
+# Local API/runtime logs
+api-debug*.log
+
+# Frontend generated output/cache
+client/dist/
+client/.vite/
+
+# Local API file storage. Keep curated demo assets if the team adds them intentionally.
+server/src/SmartRentalPlatform.Api/wwwroot/uploads/**
+!server/src/SmartRentalPlatform.Api/wwwroot/uploads/demo/
+!server/src/SmartRentalPlatform.Api/wwwroot/uploads/demo/**
+server/src/SmartRentalPlatform.Api/private-storage/**
+!server/src/SmartRentalPlatform.Api/private-storage/demo/
+!server/src/SmartRentalPlatform.Api/private-storage/demo/**
 
 # User-specific files (MonoDevelop/Xamarin Studio)
 *.userprefs

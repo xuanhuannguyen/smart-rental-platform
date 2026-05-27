@@ -1,0 +1,84 @@
+.create-rooming-house-page {
+  min-height: 100vh;
+  padding: 32px 24px;
+  max-width: 920px;
+  margin: 0 auto;
+}
+
+.create-rooming-house-page__state {
+  display: grid;
+  gap: 14px;
+  max-width: 520px;
+  margin: 0 auto;
+  padding: 32px;
+  border: 1px solid #dbe3ef;
+  border-radius: 8px;
+  background: #ffffff;
+  text-align: center;
+}
+
+.create-rooming-house-page__state h1 {
+  margin: 0;
+  font-size: 24px;
+}
+
+.create-rooming-house-page__state p {
+  margin: 0;
+  color: #64748b;
+}
+
+.create-rooming-house-page__summary {
+  display: grid;
+  gap: 4px;
+  padding: 14px;
+  border-radius: 6px;
+  background: #f8fafc;
+  font-size: 14px;
+  color: #475569;
+  text-align: left;
+}
+
+.create-rooming-house-page__summary strong {
+  font-size: 16px;
+  color: #162033;
+}
+
+.create-rooming-house-page__primary {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 42px;
+  padding: 10px 24px;
+  border-radius: 6px;
+  background: #246bfe;
+  color: #ffffff;
+  font-weight: 700;
+  text-decoration: none;
+}
+
+.create-rooming-house-page__secondary {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 42px;
+  padding: 10px 24px;
+  border-radius: 6px;
+  background: #f1f5f9;
+  color: #334155;
+  font-weight: 700;
+  text-decoration: none;
+  border: 1px solid #cbd5e1;
+  transition: background 0.2s;
+}
+
+.create-rooming-house-page__secondary:hover {
+  background: #e2e8f0;
+}
+
+.create-rooming-house-page__actions {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  margin-top: 20px;
+  align-items: center;
+}

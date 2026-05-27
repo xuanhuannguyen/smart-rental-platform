@@ -1,4 +1,4 @@
-﻿using SmartRentalPlatform.Domain.Entities.Administrative;
+using SmartRentalPlatform.Domain.Entities.Administrative;
 using SmartRentalPlatform.Domain.Enums;
 using SmartRentalPlatform.Domain.Entities.Users;
 using System;
@@ -15,7 +15,6 @@ namespace SmartRentalPlatform.Domain.Entities.Properties
         public string? Description { get; set; }
         public string AddressLine { get; set; } = string.Empty;
         public string WardCode { get; set; } = string.Empty;
-        public string DistrictCode { get; set; } = string.Empty;
         public string ProvinceCode { get; set; } = string.Empty;
         public string AddressDisplay { get; set; } = string.Empty;
         public decimal? Latitude { get; set; }
@@ -32,11 +31,11 @@ namespace SmartRentalPlatform.Domain.Entities.Properties
         public User Landlord { get; set; } = null!;
         public User? ReviewedByAdmin { get; set; }
         public AdministrativeProvince Province { get; set; } = null!;
-        public AdministrativeDistrict District { get; set; } = null!;
         public AdministrativeWard Ward { get; set; } = null!;
         public ICollection<Room> Rooms { get; set; } = new List<Room>();
         public ICollection<RoomingHouseAmenity> RoomingHouseAmenities { get; set; } = new List<RoomingHouseAmenity>();
         public ICollection<PropertyImage> Images { get; set; } = new List<PropertyImage>();
         public RoomingHouseLegalDocument LegalDocument { get; set; } = null!;
+        public LeasePolicy? LeasePolicy { get; set; }
     }
 }

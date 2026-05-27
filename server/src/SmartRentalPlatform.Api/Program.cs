@@ -1,8 +1,10 @@
-using System.Text;
-using Microsoft.AspNetCore.Authentication.JwtBearer;
-using Microsoft.IdentityModel.Tokens;
+using SmartRentalPlatform.Api.Extensions;
+using SmartRentalPlatform.Api.Middlewares;
 using SmartRentalPlatform.Application;
+using SmartRentalPlatform.Application.Common.Interfaces;
 using SmartRentalPlatform.Infrastructure;
+using SmartRentalPlatform.Infrastructure.Persistence;
+using SmartRentalPlatform.Infrastructure.Persistence.Seed;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -10,48 +12,13 @@ var builder = WebApplication.CreateBuilder(args);
 builder.Services.AddControllers();
 
 // Đăng ký Swagger để test API trên trình duyệt.
-builder.Services.AddEndpointsApiExplorer();
-builder.Services.AddSwaggerGen();
+builder.Services.AddSwaggerDocumentation();
 
-var jwtSection = builder.Configuration.GetSection("Jwt");
-var secretKey = jwtSection["SecretKey"];
-
-if (string.IsNullOrWhiteSpace(secretKey))
-{
-    throw new InvalidOperationException("JWT secret key is not configured.");
-}
-
-builder.Services
-    .AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
-    .AddJwtBearer(options =>
-    {
-        options.TokenValidationParameters = new TokenValidationParameters
-        {
-            ValidateIssuer = true,
-            ValidateAudience = true,
-            ValidateLifetime = true,
-            ValidateIssuerSigningKey = true,
-            ValidIssuer = jwtSection["Issuer"],
-            ValidAudience = jwtSection["Audience"],
-            IssuerSigningKey = new SymmetricSecurityKey(
-                Encoding.UTF8.GetBytes(secretKey))
-        };
-    });
-
-builder.Services.AddAuthorization();
+// Đăng ký JWT authentication và authorization.
+builder.Services.AddJwtAuthentication(builder.Configuration);
 
 // Cho phép frontend React gọi backend.
-// React Vite mặc định chạy ở http://localhost:5173.
-builder.Services.AddCors(options =>
-{
-    options.AddPolicy("ClientApp", policy =>
-    {
-        policy
-            .WithOrigins("http://localhost:5173")
-            .AllowAnyHeader()
-            .AllowAnyMethod();
-    });
-});
+builder.Services.AddClientCors();
 
 // Đăng ký các layer tự viết.
 builder.Services.AddApplication();
@@ -59,21 +26,77 @@ builder.Services.AddInfrastructure(builder.Configuration);
 
 var app = builder.Build();
 
-// Chỉ bật Swagger ở môi trường Development.
 if (app.Environment.IsDevelopment())
 {
-    app.UseSwagger();
-    app.UseSwaggerUI();
+    await using var scope = app.Services.CreateAsyncScope();
+    var dbContext = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+    var passwordService = scope.ServiceProvider.GetRequiredService<IPasswordService>();
+    await DevelopmentDataSeed.SeedAdminAsync(dbContext, passwordService);
 }
+
+// Chỉ bật Swagger ở môi trường Development.
+app.UseSwaggerDocumentation();
 
 // app.UseHttpsRedirection();
 
+// Middleware bắt exception phải đặt sớm nhất để bắt mọi lỗi.
+app.UseMiddleware<ExceptionHandlingMiddleware>();
+
 // CORS phải đặt trước Authorization.
-app.UseCors("ClientApp");
+app.UseCors(CorsExtensions.ClientAppPolicyName);
+
+app.UseStaticFiles(new StaticFileOptions
+{
+    OnPrepareResponse = ctx =>
+    {
+        ctx.Context.Response.Headers["Access-Control-Allow-Origin"] = "*";
+    }
+});
 
 app.UseAuthentication();
 app.UseAuthorization();
 
+if (app.Environment.IsDevelopment())
+{
+    app.MapPost("/dev/email/test-otp", async (
+        TestEmailOtpRequest request,
+        IEmailSender emailSender,
+        CancellationToken cancellationToken) =>
+    {
+        if (string.IsNullOrWhiteSpace(request.Email))
+        {
+            return Results.BadRequest(new
+            {
+                success = false,
+                message = "Email is required."
+            });
+        }
+
+        var otp = Random.Shared.Next(0, 1_000_000).ToString("D6");
+        var displayName = string.IsNullOrWhiteSpace(request.DisplayName)
+            ? "Tester"
+            : request.DisplayName.Trim();
+
+        await emailSender.SendEmailVerificationOtpAsync(
+            request.Email.Trim(),
+            displayName,
+            otp,
+            cancellationToken);
+
+        return Results.Ok(new
+        {
+            success = true,
+            email = request.Email.Trim(),
+            otp,
+            message = "Test OTP email sent in Development environment."
+        });
+    })
+    .AllowAnonymous()
+    .WithTags("Dev");
+}
+
 app.MapControllers();
 
 app.Run();
+
+public sealed record TestEmailOtpRequest(string Email, string? DisplayName);

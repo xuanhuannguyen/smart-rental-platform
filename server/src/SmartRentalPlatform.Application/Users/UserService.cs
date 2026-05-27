@@ -1,3 +1,4 @@
+using Microsoft.AspNetCore.Http;
 using Microsoft.EntityFrameworkCore;
 using SmartRentalPlatform.Application.Common.Exceptions;
 using SmartRentalPlatform.Application.Common.Interfaces;
@@ -12,13 +13,16 @@ public class UserService : IUserService
 {
     private readonly IAppDbContext _dbContext;
     private readonly ICurrentUserService _currentUserService;
+    private readonly IHttpContextAccessor _httpContextAccessor;
 
     public UserService(
         IAppDbContext dbContext,
-        ICurrentUserService currentUserService)
+        ICurrentUserService currentUserService,
+        IHttpContextAccessor httpContextAccessor)
     {
         _dbContext = dbContext;
         _currentUserService = currentUserService;
+        _httpContextAccessor = httpContextAccessor;
     }
 
     public async Task<CurrentUserResponse> GetCurrentUserAsync(
@@ -51,6 +55,7 @@ public class UserService : IUserService
             Email = user.Email,
             DisplayName = user.DisplayName,
             AvatarUrl = user.AvatarUrl,
+            IsGoogleUser = string.IsNullOrEmpty(user.PasswordHash),
             EmailConfirmed = user.EmailConfirmed,
             Status = user.Status.ToString(),
             OnboardingStatus = user.OnboardingStatus.ToString(),
@@ -72,33 +77,54 @@ public class UserService : IUserService
 
         var userId = _currentUserService.UserId.Value;
 
-        var profile = await _dbContext.UserProfiles
-            .FirstOrDefaultAsync(x => x.UserId == userId, cancellationToken);
+        var user = await _dbContext.Users
+            .Include(x => x.UserProfile)
+            .FirstOrDefaultAsync(x => x.Id == userId, cancellationToken);
 
-        if (profile is null)
+        if (user is null)
         {
-            return new UserProfileResponse
-            {
-                UserId = userId,
-                ProfileCompleted = false
-            };
+            throw new UnauthorizedException(
+                ErrorCodes.Unauthorized,
+                "Token không còn hợp lệ.");
         }
 
-        var isCompleted = !string.IsNullOrWhiteSpace(profile.FullName) &&
-            profile.DateOfBirth != default &&
-            !string.IsNullOrWhiteSpace(profile.AddressLine);
+        var latestKyc = await _dbContext.KycVerifications
+            .Where(x => x.UserId == userId)
+            .OrderByDescending(x => x.CreatedAt)
+            .FirstOrDefaultAsync(cancellationToken);
+
+        var approvedKyc = await _dbContext.KycVerifications
+            .Where(x => x.UserId == userId && x.Status == KycVerificationStatus.Approved)
+            .OrderByDescending(x => x.ReviewedAt ?? x.CreatedAt)
+            .FirstOrDefaultAsync(cancellationToken);
+
+
+
+        var profile = user.UserProfile;
+        var identityVerified = approvedKyc is not null;
+        var profileCompleted = identityVerified &&
+            !string.IsNullOrWhiteSpace(profile?.FullName) &&
+            profile?.DateOfBirth != null &&
+            !string.IsNullOrWhiteSpace(profile?.AddressLine);
 
         return new UserProfileResponse
         {
-            UserId = profile.UserId,
-            FullName = profile.FullName,
-            DateOfBirth = profile.DateOfBirth,
-            Gender = profile.Gender,
-            AddressLine = profile.AddressLine,
-            EmergencyContactName = profile.EmergencyContactName,
-            EmergencyContactPhone = profile.EmergencyContactPhone,
-            VerifiedCitizenIdMasked = profile.VerifiedCitizenIdMasked,
-            ProfileCompleted = isCompleted
+            UserId = userId,
+            DisplayName = user.DisplayName,
+            PhoneNumber = user.PhoneNumber,
+            FullName = profile?.FullName,
+            DateOfBirth = profile?.DateOfBirth,
+            Gender = profile?.Gender,
+            AddressLine = profile?.AddressLine,
+            EmergencyContactName = profile?.EmergencyContactName,
+            EmergencyContactPhone = profile?.EmergencyContactPhone,
+            VerifiedCitizenIdMasked = profile?.VerifiedCitizenIdMasked,
+            KycStatus = latestKyc?.Status.ToString(),
+            KycReviewedAt = approvedKyc?.ReviewedAt,
+            IdentityVerified = approvedKyc is not null,
+            ProfileCompleted = profileCompleted,
+            AvatarUrl = user.AvatarUrl,
+            IsGoogleUser = string.IsNullOrEmpty(user.PasswordHash)
         };
     }
 
@@ -115,13 +141,6 @@ public class UserService : IUserService
 
         var userId = _currentUserService.UserId.Value;
 
-        if (request.DateOfBirth > DateOnly.FromDateTime(DateTime.Today))
-        {
-            throw new BadRequestException(
-                ErrorCodes.ValidationError,
-                "Ngày sinh không được là ngày ở tương lai.");
-        }
-
         var user = await _dbContext.Users
             .Include(x => x.UserProfile)
             .FirstOrDefaultAsync(x => x.Id == userId, cancellationToken);
@@ -133,8 +152,15 @@ public class UserService : IUserService
                 "Token không còn hợp lệ.");
         }
 
+        // Cập nhật thông tin đơn giản
+        user.DisplayName = request.DisplayName.Trim();
+        user.PhoneNumber = request.PhoneNumber?.Trim();
+
+        user.AvatarUrl = request.AvatarUrl?.Trim();
+
         var now = DateTimeOffset.UtcNow;
-        var profile = user.UserProfile;
+        var profile = await _dbContext.UserProfiles
+            .FirstOrDefaultAsync(p => p.UserId == userId, cancellationToken);
 
         if (profile is null)
         {
@@ -147,25 +173,35 @@ public class UserService : IUserService
             _dbContext.UserProfiles.Add(profile);
         }
 
-        profile.FullName = request.FullName.Trim();
-        profile.DateOfBirth = request.DateOfBirth;
-        profile.Gender = request.Gender?.Trim();
-        profile.AddressLine = request.AddressLine.Trim();
         profile.EmergencyContactName = request.EmergencyContactName?.Trim();
         profile.EmergencyContactPhone = request.EmergencyContactPhone?.Trim();
         profile.UpdatedAt = now;
-
-        if (user.OnboardingStatus == OnboardingStatus.NeedProfileUpdate)
-        {
-            user.OnboardingStatus = OnboardingStatus.NeedKyc;
-            user.UpdatedAt = now;
-        }
+        user.UpdatedAt = now;
 
         await _dbContext.SaveChangesAsync(cancellationToken);
+
+        // Lấy thông tin KYC để xác định trạng thái
+        var approvedKyc = await _dbContext.KycVerifications
+            .Where(x => x.UserId == userId && x.Status == KycVerificationStatus.Approved)
+            .OrderByDescending(x => x.ReviewedAt ?? x.CreatedAt)
+            .FirstOrDefaultAsync(cancellationToken);
+
+        var latestKyc = await _dbContext.KycVerifications
+            .Where(x => x.UserId == userId)
+            .OrderByDescending(x => x.CreatedAt)
+            .FirstOrDefaultAsync(cancellationToken);
+
+        var identityVerified = approvedKyc is not null;
+        var profileCompleted = identityVerified &&
+            !string.IsNullOrWhiteSpace(profile.FullName) &&
+            profile.DateOfBirth != null &&
+            !string.IsNullOrWhiteSpace(profile.AddressLine);
 
         return new UserProfileResponse
         {
             UserId = userId,
+            DisplayName = user.DisplayName,
+            PhoneNumber = user.PhoneNumber,
             FullName = profile.FullName,
             DateOfBirth = profile.DateOfBirth,
             Gender = profile.Gender,
@@ -173,7 +209,12 @@ public class UserService : IUserService
             EmergencyContactName = profile.EmergencyContactName,
             EmergencyContactPhone = profile.EmergencyContactPhone,
             VerifiedCitizenIdMasked = profile.VerifiedCitizenIdMasked,
-            ProfileCompleted = true
+            KycStatus = latestKyc?.Status.ToString(),
+            KycReviewedAt = approvedKyc?.ReviewedAt,
+            IdentityVerified = identityVerified,
+            ProfileCompleted = profileCompleted,
+            AvatarUrl = user.AvatarUrl,
+            IsGoogleUser = string.IsNullOrEmpty(user.PasswordHash)
         };
     }
 
@@ -216,10 +257,15 @@ public class UserService : IUserService
         }
 
         // 2. Check Profile Completed
-        var isProfileCompleted = user.UserProfile is not null &&
-            !string.IsNullOrWhiteSpace(user.UserProfile.FullName) &&
-            user.UserProfile.DateOfBirth != default &&
-            !string.IsNullOrWhiteSpace(user.UserProfile.AddressLine);
+        var latestApprovedKyc = user.KycVerifications
+            .Where(x => x.Status == KycVerificationStatus.Approved)
+            .OrderByDescending(x => x.ReviewedAt ?? x.CreatedAt)
+            .FirstOrDefault();
+
+        var isProfileCompleted = latestApprovedKyc is not null &&
+            !string.IsNullOrWhiteSpace(latestApprovedKyc.OcrFullName) &&
+            latestApprovedKyc.OcrDateOfBirth != null &&
+            !string.IsNullOrWhiteSpace(latestApprovedKyc.OcrAddress);
 
         if (!isProfileCompleted)
         {
@@ -238,7 +284,12 @@ public class UserService : IUserService
 
         if (latestKyc is null || latestKyc.Status != KycVerificationStatus.Approved)
         {
-            var nextStep = (latestKyc is not null && latestKyc.Status == KycVerificationStatus.Pending)
+            var isWaitingReview = latestKyc is not null &&
+                latestKyc.Status is KycVerificationStatus.Pending or
+                    KycVerificationStatus.PendingEkyc or
+                    KycVerificationStatus.PendingAdminReview;
+
+            var nextStep = isWaitingReview
                 ? "KycStatusPage"
                 : "KycSubmitPage";
 
@@ -285,6 +336,19 @@ public class UserService : IUserService
             NextStep = "LandlordApplicationPage",
             Reason = null
         };
+    }
+
+
+
+    private static bool SetIfDifferent<T>(T current, T next, Action<T> assign)
+    {
+        if (EqualityComparer<T>.Default.Equals(current, next))
+        {
+            return false;
+        }
+
+        assign(next);
+        return true;
     }
 
     public async Task AssignDefaultTenantRoleAsync(
@@ -405,5 +469,108 @@ public class UserService : IUserService
 
             await _dbContext.SaveChangesAsync(cancellationToken);
         }
+    }
+
+    public async Task<IReadOnlyCollection<UserSessionResponse>> GetActiveSessionsAsync(
+        CancellationToken cancellationToken = default)
+    {
+        if (!_currentUserService.IsAuthenticated || _currentUserService.UserId is null)
+        {
+            throw new UnauthorizedException(
+                ErrorCodes.Unauthorized,
+                "Bạn cần đăng nhập để thực hiện thao tác này.");
+        }
+
+        var userId = _currentUserService.UserId.Value;
+
+        var activeTokens = await _dbContext.UserTokens
+            .Where(x => x.UserId == userId &&
+                        x.TokenType == TokenType.Refresh &&
+                        x.RevokedAt == null &&
+                        x.ExpiresAt > DateTimeOffset.UtcNow)
+            .OrderByDescending(x => x.CreatedAt)
+            .ToListAsync(cancellationToken);
+
+        var currentIp = GetCurrentIp();
+        var currentUserAgent = GetCurrentUserAgent();
+
+        return activeTokens.Select(token => new UserSessionResponse
+        {
+            Id = token.Id,
+            IpAddress = token.CreatedByIp,
+            UserAgent = token.UserAgent,
+            CreatedAt = token.CreatedAt,
+            ExpiresAt = token.ExpiresAt,
+            IsCurrentSession = IsCurrentSession(token.CreatedByIp, token.UserAgent, currentIp, currentUserAgent)
+        }).ToList();
+    }
+
+    public async Task RevokeSessionAsync(
+        Guid sessionId,
+        CancellationToken cancellationToken = default)
+    {
+        if (!_currentUserService.IsAuthenticated || _currentUserService.UserId is null)
+        {
+            throw new UnauthorizedException(
+                ErrorCodes.Unauthorized,
+                "Bạn cần đăng nhập để thực hiện thao tác này.");
+        }
+
+        var userId = _currentUserService.UserId.Value;
+
+        var token = await _dbContext.UserTokens
+            .FirstOrDefaultAsync(x => x.Id == sessionId && x.UserId == userId, cancellationToken);
+
+        if (token is null)
+        {
+            throw new NotFoundException(
+                ErrorCodes.NotFound,
+                "Không tìm thấy phiên đăng nhập.");
+        }
+
+        if (token.RevokedAt is null)
+        {
+            token.RevokedAt = DateTimeOffset.UtcNow;
+            token.RevokedReason = TokenRevokedReason.Logout;
+
+            await _dbContext.SaveChangesAsync(cancellationToken);
+        }
+    }
+
+    private string? GetCurrentIp()
+    {
+        var context = _httpContextAccessor?.HttpContext;
+        var ip = context?.Connection?.RemoteIpAddress?.ToString();
+        if (ip == "::1") return "127.0.0.1";
+        return ip;
+    }
+
+    private string? GetCurrentUserAgent()
+    {
+        var context = _httpContextAccessor?.HttpContext;
+        return context?.Request?.Headers["User-Agent"].ToString();
+    }
+
+    private static bool IsCurrentSession(string? tokenIp, string? tokenUa, string? currentIp, string? currentUa)
+    {
+        if (string.IsNullOrEmpty(tokenUa) || string.IsNullOrEmpty(currentUa))
+            return false;
+
+        if (!string.Equals(tokenUa, currentUa, StringComparison.OrdinalIgnoreCase))
+            return false;
+
+        if (string.Equals(tokenIp, currentIp, StringComparison.OrdinalIgnoreCase))
+            return true;
+
+        if (IsLocalhost(tokenIp) && IsLocalhost(currentIp))
+            return true;
+
+        return false;
+    }
+
+    private static bool IsLocalhost(string? ip)
+    {
+        if (string.IsNullOrEmpty(ip)) return false;
+        return ip == "::1" || ip == "127.0.0.1" || ip.Equals("localhost", StringComparison.OrdinalIgnoreCase);
     }
 }

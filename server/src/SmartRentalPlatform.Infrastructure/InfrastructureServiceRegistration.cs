@@ -1,9 +1,14 @@
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Options;
 using SmartRentalPlatform.Application.Common.Interfaces;
+using SmartRentalPlatform.Infrastructure.Ekyc;
+using SmartRentalPlatform.Infrastructure.Options;
 using SmartRentalPlatform.Infrastructure.Persistence;
+using SmartRentalPlatform.Infrastructure.Security;
 using SmartRentalPlatform.Infrastructure.Services;
+using SmartRentalPlatform.Infrastructure.Storage;
 
 namespace SmartRentalPlatform.Infrastructure;
 
@@ -28,6 +33,30 @@ public static class InfrastructureServiceRegistration
         services.AddScoped<IGoogleAuthService, GoogleAuthService>();
         services.AddHttpContextAccessor();
         services.AddScoped<ICurrentUserService, CurrentUserService>();
+        services.AddScoped<IFileStorageService, LocalFileStorageService>();
+        services.Configure<VnptEkycOptions>(configuration.GetSection(VnptEkycOptions.SectionName));
+        services.AddMemoryCache();
+        services.AddScoped<IPrivateStorageService, LocalPrivateStorageService>();
+        services.AddScoped<IHashService, Sha256HashService>();
+        services.AddHttpClient(RealVnptEkycClient.HttpClientName, (provider, client) =>
+        {
+            var options = provider.GetRequiredService<IOptions<VnptEkycOptions>>().Value;
+            client.BaseAddress = new Uri(options.BaseUrl.TrimEnd('/') + "/");
+            client.Timeout = TimeSpan.FromSeconds(options.TimeoutSeconds);
+        });
+
+        var useMock = configuration
+            .GetSection(VnptEkycOptions.SectionName)
+            .GetValue(nameof(VnptEkycOptions.UseMock), true);
+
+        if (useMock)
+        {
+            services.AddScoped<IVnptEkycClient, MockVnptEkycClient>();
+        }
+        else
+        {
+            services.AddScoped<IVnptEkycClient, RealVnptEkycClient>();
+        }
 
         return services;
     }

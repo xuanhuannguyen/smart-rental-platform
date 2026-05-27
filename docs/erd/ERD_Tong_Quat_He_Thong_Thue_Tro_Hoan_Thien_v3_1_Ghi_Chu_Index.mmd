@@ -1,0 +1,735 @@
+erDiagram
+
+    users {
+        uuid id PK "Khóa chính user"
+        varchar email "Email gốc"
+        varchar normalized_email UK "Email chuẩn hóa để kiểm tra trùng"
+        varchar phone_number "Số điện thoại"
+        text password_hash "Mật khẩu đã hash, null nếu login Google"
+        varchar display_name "Tên hiển thị"
+        text avatar_url "Ảnh đại diện"
+        varchar status "Active, Locked, Banned, Deleted"
+        varchar onboarding_status "NeedProfileUpdate, NeedKyc, Completed"
+        boolean email_confirmed "Email đã xác thực"
+        boolean phone_confirmed "SĐT đã xác thực"
+        integer access_failed_count "Số lần đăng nhập sai"
+        timestamptz lockout_end_at "Thời điểm hết khóa tạm thời"
+        timestamptz last_login_at "Lần đăng nhập gần nhất"
+        timestamptz created_at "Ngày tạo"
+        timestamptz updated_at "Ngày cập nhật"
+        timestamptz deleted_at "Ngày xóa mềm"
+    }
+
+    user_profiles {
+        uuid user_id PK, FK "FK tới users.id"
+        varchar full_name "Họ tên đầy đủ"
+        date date_of_birth "Ngày sinh"
+        varchar gender "Giới tính"
+        text address_line "Địa chỉ liên hệ"
+        varchar verified_citizen_id_masked "CCCD đã xác minh, dạng che"
+        varchar emergency_contact_name "Người liên hệ khẩn cấp"
+        varchar emergency_contact_phone "SĐT khẩn cấp"
+        timestamptz created_at "Ngày tạo"
+        timestamptz updated_at "Ngày cập nhật"
+    }
+
+    roles {
+        smallint id PK "Seed: 1 Admin, 2 Tenant, 3 Landlord"
+        varchar name UK "Admin, Tenant, Landlord"
+        text description "Mô tả role"
+        timestamptz created_at "Ngày tạo"
+    }
+
+    user_roles {
+        uuid user_id PK, FK "ID người dùng"
+        smallint role_id PK, FK "ID vai trò"
+        timestamptz created_at "Ngày gán role"
+    }
+
+    external_logins {
+        uuid id PK "Khóa chính"
+        uuid user_id FK "User trong hệ thống"
+        varchar provider "Google"
+        varchar provider_user_id "ID duy nhất do Google cấp"
+        varchar provider_email "Email từ Google"
+        varchar provider_display_name "Tên từ Google"
+        text provider_avatar_url "Avatar từ Google"
+        timestamptz created_at "Ngày liên kết"
+        timestamptz last_login_at "Lần cuối login bằng Google"
+    }
+
+    user_tokens {
+        uuid id PK "Khóa chính token"
+        uuid user_id FK "Token thuộc user"
+        varchar token_type "Refresh, ResetPassword, VerifyEmail"
+        text token_hash UK "Token đã hash"
+        uuid token_family_id "Nhóm refresh token trong cùng một phiên đăng nhập, index để revoke cả family khi reuse"
+        uuid replaced_by_token_id FK "Refresh token mới thay thế token cũ, nullable"
+        timestamptz expires_at "Thời điểm hết hạn"
+        timestamptz used_at "Thời điểm đã sử dụng"
+        timestamptz revoked_at "Thời điểm bị thu hồi"
+        varchar revoked_reason "Logout, LogoutAllDevices, PasswordChanged, TokenRotated, ReuseDetected, Expired, AdminRevoked"
+        varchar created_by_ip "IP tạo token"
+        text user_agent "Thiết bị hoặc trình duyệt"
+        timestamptz created_at "Ngày tạo token"
+    }
+
+    login_logs {
+        uuid id PK "Khóa chính log"
+        uuid user_id FK "UserId, null nếu email không tồn tại"
+        varchar email_attempted "Email được nhập"
+        varchar login_provider "Local hoặc Google"
+        varchar ip_address "IP đăng nhập"
+        text user_agent "Thiết bị hoặc trình duyệt"
+        boolean is_success "Thành công hay thất bại"
+        varchar failure_reason "Lý do thất bại"
+        timestamptz created_at "Thời gian ghi log"
+    }
+
+    kyc_verifications {
+        uuid id PK "Khóa chính KYC"
+        uuid user_id FK "User gửi xác minh"
+        varchar document_type "CCCD, Passport"
+        text front_image_object_key "Key ảnh mặt trước"
+        text back_image_object_key "Key ảnh mặt sau"
+        text selfie_image_object_key "Key ảnh selfie"
+        varchar ocr_full_name "Họ tên OCR"
+        varchar ocr_citizen_id_masked "CCCD OCR đã che"
+        text citizen_id_hash "Hash CCCD để kiểm tra trùng"
+        date ocr_date_of_birth "Ngày sinh OCR"
+        varchar ocr_gender "Giới tính OCR"
+        text ocr_address "Địa chỉ OCR"
+        numeric ocr_confidence "Độ tin cậy OCR"
+        varchar status "Pending, Approved, Rejected"
+        uuid reviewed_by_admin_id FK "Admin duyệt KYC"
+        text rejected_reason "Lý do từ chối"
+        timestamptz submitted_at "Ngày gửi xác minh"
+        timestamptz reviewed_at "Ngày admin duyệt"
+        timestamptz created_at "Ngày tạo"
+        timestamptz updated_at "Ngày cập nhật"
+    }
+
+
+    administrative_provinces {
+        varchar code PK "Mã tỉnh/thành"
+        varchar name "Tên tỉnh/thành"
+        varchar type "Province, City"
+        boolean is_active "Còn sử dụng"
+        timestamptz created_at "Ngày tạo"
+        timestamptz updated_at "Ngày cập nhật"
+    }
+
+    administrative_districts {
+        varchar code PK "Mã quận/huyện"
+        varchar province_code FK "Thuộc tỉnh/thành"
+        varchar name "Tên quận/huyện"
+        varchar type "District, City, Town"
+        boolean is_active "Còn sử dụng"
+        timestamptz created_at "Ngày tạo"
+        timestamptz updated_at "Ngày cập nhật"
+    }
+
+    administrative_wards {
+        varchar code PK "Mã phường/xã"
+        varchar district_code FK "Thuộc quận/huyện"
+        varchar name "Tên phường/xã"
+        varchar type "Ward, Commune, Town"
+        boolean is_active "Còn sử dụng"
+        timestamptz created_at "Ngày tạo"
+        timestamptz updated_at "Ngày cập nhật"
+    }
+
+    notifications {
+        uuid id PK "Khóa chính thông báo"
+        uuid recipient_user_id FK "Người nhận thông báo"
+        uuid actor_user_id FK "Người tạo hành động, nullable"
+        varchar type "KycApproved, HouseApproved, ViewingRequested, RentalRequestApproved, DepositPaid, ContractCreated, InvoiceSent, PaymentConfirmed, System"
+        varchar title "Tiêu đề thông báo"
+        text message "Nội dung thông báo"
+        varchar entity_type "Bảng/nghiệp vụ liên quan"
+        uuid entity_id "Id dữ liệu liên quan"
+        text action_url "Link điều hướng trên UI"
+        varchar priority "Low, Normal, High"
+        varchar status "Unread, Read, Archived"
+        timestamptz read_at "Thời điểm đã đọc"
+        timestamptz created_at "Ngày tạo"
+    }
+
+    notification_deliveries {
+        uuid id PK "Khóa chính lần gửi thông báo"
+        uuid notification_id FK "Thông báo gốc"
+        varchar channel "InApp, Email, Sms, Push"
+        varchar provider "Nhà cung cấp gửi"
+        varchar provider_message_id "Mã message từ provider"
+        varchar status "Pending, Sent, Failed, Cancelled"
+        text failure_reason "Lý do gửi thất bại"
+        timestamptz sent_at "Thời điểm gửi"
+        timestamptz created_at "Ngày tạo"
+    }
+
+    notification_preferences {
+        uuid user_id PK, FK "User cấu hình nhận thông báo"
+        boolean in_app_enabled "Bật thông báo trong app"
+        boolean email_enabled "Bật thông báo email"
+        boolean sms_enabled "Bật thông báo SMS"
+        boolean push_enabled "Bật push notification"
+        boolean invoice_enabled "Nhận thông báo hóa đơn"
+        boolean viewing_enabled "Nhận thông báo lịch xem phòng"
+        boolean contract_enabled "Nhận thông báo hợp đồng"
+        boolean payment_enabled "Nhận thông báo thanh toán"
+        timestamptz updated_at "Ngày cập nhật"
+    }
+
+    audit_logs {
+        uuid id PK "Khóa chính audit log"
+        uuid actor_user_id FK "User thực hiện hành động"
+        varchar actor_role "Admin, Landlord, Tenant, System"
+        varchar action "Tên hành động"
+        varchar entity_type "Bảng/nghiệp vụ bị tác động"
+        uuid entity_id "Id dữ liệu bị tác động"
+        text old_values_json "Dữ liệu cũ dạng JSON"
+        text new_values_json "Dữ liệu mới dạng JSON"
+        varchar ip_address "IP thực hiện"
+        text user_agent "Thiết bị/trình duyệt"
+        timestamptz created_at "Thời điểm ghi log"
+    }
+
+    rooming_houses {
+        uuid id PK "Khóa chính khu trọ"
+        uuid landlord_user_id FK "Chủ trọ sở hữu khu trọ"
+        varchar name "Tên khu trọ"
+        text description "Mô tả khu trọ"
+        text address_line "Số nhà, tên đường, hẻm"
+        varchar ward_code FK "Mã phường/xã"
+        varchar district_code FK "Mã quận/huyện"
+        varchar province_code FK "Mã tỉnh/thành"
+        text address_display "Địa chỉ đầy đủ để hiển thị"
+        numeric latitude "Vĩ độ"
+        numeric longitude "Kinh độ"
+        varchar approval_status "Draft, Pending, Approved, Rejected"
+        varchar visibility_status "Visible, Hidden"
+        text rejected_reason "Lý do admin từ chối"
+        uuid approved_by_admin_id FK "Admin duyệt khu trọ"
+        timestamptz approved_at "Thời điểm admin duyệt"
+        timestamptz created_at "Ngày tạo"
+        timestamptz updated_at "Ngày cập nhật"
+        timestamptz deleted_at "Ngày xóa mềm"
+    }
+
+    rooms {
+        uuid id PK "Khóa chính phòng"
+        uuid rooming_house_id FK "Phòng thuộc khu trọ"
+        varchar room_number "Số phòng"
+        smallint floor "Tầng"
+        numeric area_m2 "Diện tích phòng"
+        smallint max_occupants "Số người tối đa"
+        varchar status "Available, Reserved, Occupied, Maintenance, Hidden"
+        text description "Mô tả phòng"
+        timestamptz created_at "Ngày tạo"
+        timestamptz updated_at "Ngày cập nhật"
+        timestamptz deleted_at "Ngày xóa mềm"
+    }
+
+    room_price_tiers {
+        uuid id PK "Khóa chính bảng giá"
+        uuid room_id FK "Thuộc phòng"
+        smallint occupant_count "Số người ở"
+        numeric monthly_rent "Giá thuê theo tháng"
+        boolean is_active "Giá còn áp dụng"
+        timestamptz created_at "Ngày tạo"
+        timestamptz updated_at "Ngày cập nhật"
+    }
+
+    amenities {
+        integer id PK "Khóa chính tiện nghi"
+        varchar name "Tên tiện nghi"
+        varchar scope "House, Room, Both"
+        varchar icon_code "Mã icon UI"
+        boolean is_active "Còn sử dụng"
+        timestamptz created_at "Ngày tạo"
+    }
+
+    rooming_house_amenities {
+        uuid rooming_house_id PK, FK "Khu trọ"
+        integer amenity_id PK, FK "Tiện nghi"
+    }
+
+    room_amenities {
+        uuid room_id PK, FK "Phòng"
+        integer amenity_id PK, FK "Tiện nghi"
+    }
+
+    property_images {
+        uuid id PK "Khóa chính ảnh"
+        uuid rooming_house_id FK "Ảnh thuộc khu trọ, nullable"
+        uuid room_id FK "Ảnh thuộc phòng, nullable"
+        text object_key "Key file trong storage"
+        text image_url "URL ảnh"
+        varchar caption "Chú thích ảnh"
+        boolean is_cover "Có phải ảnh bìa"
+        integer sort_order "Thứ tự hiển thị"
+        timestamptz created_at "Ngày tạo"
+    }
+
+    lease_policies {
+        uuid id PK "Khóa chính chính sách thuê"
+        uuid rooming_house_id FK "Khu trọ áp dụng"
+        boolean allow_short_term_renewal "Cho phép gia hạn ngắn hạn"
+        integer renewal_notice_days "Số ngày báo trước khi gia hạn"
+        numeric deposit_months "Số tháng tiền cọc"
+        numeric discount_6_months_percent "Giảm giá thuê 6 tháng"
+        numeric discount_9_months_percent "Giảm giá thuê 9 tháng"
+        numeric discount_12_months_percent "Giảm giá thuê 12 tháng"
+        numeric discount_24_months_percent "Giảm giá thuê 24 tháng"
+        boolean is_active "Chính sách còn hiệu lực"
+        timestamptz created_at "Ngày tạo"
+        timestamptz updated_at "Ngày cập nhật"
+    }
+
+    viewing_appointments {
+        uuid id PK "Mã lịch xem phòng"
+        uuid room_id FK "Phòng muốn xem"
+        uuid tenant_user_id FK "Người thuê đặt lịch"
+        timestamptz requested_start_at "Giờ bắt đầu mong muốn"
+        timestamptz requested_end_at "Giờ kết thúc mong muốn"
+        timestamptz confirmed_start_at "Giờ bắt đầu đã chốt"
+        timestamptz confirmed_end_at "Giờ kết thúc đã chốt"
+        varchar status "PendingLandlord, PendingTenantConfirm, Confirmed, Rejected, Cancelled, Completed, NoShow, Expired"
+        text tenant_note "Ghi chú người thuê"
+        text landlord_note "Ghi chú chủ trọ"
+        text cancel_reason "Lý do hủy"
+        timestamptz created_at "Ngày tạo"
+        timestamptz updated_at "Ngày cập nhật"
+    }
+
+    viewing_reschedule_proposals {
+        uuid id PK "Mã đề xuất đổi lịch"
+        uuid viewing_appointment_id FK "Lịch xem gốc"
+        uuid proposer_user_id FK "Người đề xuất"
+        varchar proposer_role "Tenant, Landlord"
+        timestamptz proposed_start_at "Giờ bắt đầu đề xuất"
+        timestamptz proposed_end_at "Giờ kết thúc đề xuất"
+        text message "Tin nhắn đề xuất"
+        varchar status "Pending, Accepted, Rejected, Expired, Cancelled"
+        timestamptz responded_at "Ngày phản hồi"
+        timestamptz response_deadline_at "Hạn phản hồi"
+        timestamptz created_at "Ngày tạo"
+    }
+
+    rental_requests {
+        uuid id PK "Mã yêu cầu thuê"
+        uuid room_id FK "Phòng muốn thuê"
+        uuid tenant_user_id FK "Người gửi yêu cầu"
+        uuid viewing_appointment_id FK "Lịch xem liên quan, nullable"
+        date desired_start_date "Ngày muốn bắt đầu thuê"
+        date expected_end_date "Ngày kết thúc dự kiến"
+        integer desired_lease_months "Thời hạn 6, 9, 12, 24"
+        integer expected_occupant_count "Số người ở dự kiến"
+        numeric original_monthly_rent "Giá thuê gốc snapshot"
+        numeric discount_percent "Giảm giá snapshot"
+        numeric final_monthly_rent "Giá cuối sau giảm"
+        numeric expected_deposit_amount "Tiền cọc dự kiến"
+        text tenant_note "Ghi chú"
+        varchar status "Pending, Approved, Rejected, Cancelled, Expired, ConvertedToContract"
+        uuid approved_by_landlord_id FK "Chủ trọ duyệt"
+        timestamptz approved_at "Ngày duyệt/từ chối"
+        text rejected_reason "Lý do từ chối"
+        timestamptz created_at "Ngày tạo"
+        timestamptz updated_at "Ngày cập nhật"
+    }
+
+    room_deposits {
+        uuid id PK "Mã khoản đặt cọc"
+        uuid rental_request_id FK "Yêu cầu thuê liên quan"
+        uuid tenant_user_id FK "Người thanh toán cọc"
+        uuid room_id FK "Phòng được đặt cọc"
+        numeric deposit_amount "Số tiền cọc"
+        varchar status "Unpaid, Pending, Paid, Expired, Refunded, Forfeited, PartiallyRefunded, Cancelled"
+        timestamptz payment_deadline_at "Hạn thanh toán"
+        timestamptz paid_at "Ngày thanh toán"
+        timestamptz refunded_at "Ngày hoàn cọc"
+        timestamptz forfeited_at "Ngày mất cọc"
+        numeric refunded_amount "Số tiền đã hoàn"
+        numeric forfeited_amount "Số tiền bị giữ"
+        text forfeited_reason "Lý do giữ cọc"
+        text note "Ghi chú"
+        timestamptz created_at "Ngày tạo"
+        timestamptz updated_at "Ngày cập nhật"
+    }
+
+    lease_contracts {
+        uuid id PK "Mã hợp đồng"
+        uuid room_id FK "Phòng được thuê"
+        uuid main_tenant_user_id FK "UserId MainTenant"
+        uuid rental_request_id FK "Tạo từ yêu cầu thuê"
+        uuid room_deposit_id FK "Khoản cọc liên quan"
+        uuid lease_policy_id FK "Chính sách thuê áp dụng"
+        uuid replaced_contract_id FK "Hợp đồng cũ bị thay thế"
+        varchar contract_number UK "Số hợp đồng"
+        date start_date "Ngày bắt đầu"
+        date end_date "Ngày kết thúc"
+        integer lease_months "Số tháng thuê"
+        integer occupant_count "Số người ở theo hợp đồng"
+        numeric monthly_rent "Giá thuê snapshot"
+        numeric finalized_deposit_amount "Tiền cọc snapshot"
+        numeric discount_percent "Giảm giá snapshot"
+        varchar status "WaitingTenantInfo, PendingLandlordApproval, Active, Rejected, Cancelled, Terminated, Expired, Replaced"
+        text rejected_reason "Lý do từ chối"
+        timestamptz tenant_confirmed_at "Ngày tenant xác nhận"
+        uuid approved_by_landlord_id FK "Chủ trọ duyệt"
+        timestamptz landlord_approved_at "Ngày chủ trọ duyệt"
+        timestamptz effective_at "Ngày có hiệu lực"
+        timestamptz terminated_at "Ngày chấm dứt"
+        text terminated_reason "Lý do chấm dứt"
+        timestamptz created_at "Ngày tạo"
+        timestamptz updated_at "Ngày cập nhật"
+    }
+
+    contract_occupants {
+        uuid id PK "Mã người ở trong hợp đồng"
+        uuid lease_contract_id FK "Thuộc hợp đồng"
+        uuid user_id FK "UserId nếu là MainTenant hoặc CoTenant"
+        uuid guardian_occupant_id FK "Người bảo hộ nếu là Dependent"
+        varchar full_name "Họ tên snapshot"
+        date date_of_birth "Ngày sinh"
+        varchar phone_number "Số điện thoại nếu có"
+        varchar residence_role "MainTenant, CoTenant, Dependent"
+        varchar dependent_type "Child, Elderly, Other"
+        varchar relationship_to_main_tenant "Self, Spouse, Child, Parent, Grandparent, Relative, Other"
+        varchar document_type "CCCD, Passport, BirthCertificate, None"
+        varchar masked_document_number "Số giấy tờ đã che"
+        text document_hash "Hash giấy tờ"
+        text document_front_object_key "Ảnh mặt trước giấy tờ"
+        text document_back_object_key "Ảnh mặt sau giấy tờ"
+        uuid entered_by_user_id FK "Người nhập thông tin"
+        timestamptz entered_at "Ngày nhập thông tin"
+        varchar kyc_status_at_added_time "NotRequired, Approved"
+        varchar document_verification_status "NotRequired, PendingLandlordReview, Accepted, Rejected"
+        text document_rejected_reason "Lý do từ chối giấy tờ"
+        boolean can_receive_main_tenant_transfer "Đủ điều kiện nhận chuyển quyền"
+        date move_in_date "Ngày vào ở"
+        date move_out_date "Ngày rời đi"
+        varchar status "PendingInfo, PendingKyc, PendingDocumentReview, PendingConfirm, Active, Left, Rejected"
+        timestamptz created_at "Ngày tạo"
+        timestamptz updated_at "Ngày cập nhật"
+    }
+
+    contract_change_requests {
+        uuid id PK "Mã yêu cầu thay đổi"
+        uuid current_contract_id FK "Hợp đồng hiện tại"
+        varchar change_type "AddCoTenant, AddDependent, RemoveOccupant, ChangeMainTenant, ChangeOccupantCount"
+        uuid requested_by_user_id FK "Người gửi yêu cầu"
+        uuid transfer_to_occupant_id FK "Người ở nhận chuyển quyền"
+        uuid new_main_tenant_user_id FK "UserId MainTenant mới"
+        integer old_occupant_count "Số người ở cũ"
+        integer new_occupant_count "Số người ở mới"
+        date effective_date "Ngày thay đổi hiệu lực"
+        numeric old_monthly_rent "Giá thuê cũ"
+        numeric new_monthly_rent "Giá thuê mới"
+        numeric old_deposit_amount "Tiền cọc cũ"
+        numeric new_deposit_amount "Tiền cọc mới"
+        numeric deposit_difference_amount "Chênh lệch cọc"
+        varchar deposit_handling_type "NoChange, PayAdditional, RefundDifference, CreditToNextInvoice"
+        varchar status "PendingInfo, PendingKyc, PendingLandlordApproval, Approved, Rejected, Cancelled, ConvertedToNewContract, ConvertedToAppendix"
+        uuid approved_by_landlord_id FK "Chủ trọ duyệt"
+        timestamptz approved_at "Ngày duyệt"
+        text rejected_reason "Lý do từ chối"
+        uuid new_contract_id FK "Hợp đồng mới nếu có"
+        timestamptz created_at "Ngày tạo"
+        timestamptz updated_at "Ngày cập nhật"
+    }
+
+    lease_contract_files {
+        uuid id PK "Mã file hợp đồng"
+        uuid lease_contract_id FK "Thuộc hợp đồng"
+        varchar file_type "DraftPdf, SignedPdf, Appendix"
+        text storage_object_key "Object key trong storage"
+        text file_url "URL file"
+        integer version_number "Phiên bản file"
+        timestamptz created_at "Ngày tạo"
+    }
+
+    lease_renewal_requests {
+        uuid id PK "Mã yêu cầu gia hạn"
+        uuid lease_contract_id FK "Hợp đồng muốn gia hạn"
+        uuid requested_by_tenant_id FK "Người gửi yêu cầu"
+        integer requested_renewal_months "Số tháng muốn gia hạn"
+        date current_end_date "Ngày kết thúc hiện tại"
+        date new_end_date "Ngày kết thúc mới"
+        numeric new_monthly_rent "Giá thuê mới nếu đổi"
+        numeric discount_percent "Giảm giá áp dụng"
+        varchar status "Pending, Approved, Rejected, Cancelled, ConvertedToNewContract"
+        uuid approved_by_landlord_id FK "Chủ trọ duyệt"
+        timestamptz approved_at "Ngày duyệt"
+        text rejected_reason "Lý do từ chối"
+        timestamptz created_at "Ngày tạo"
+        timestamptz updated_at "Ngày cập nhật"
+    }
+
+    billing_service_types {
+        integer id PK "Khóa chính loại dịch vụ"
+        varchar code UK "Electricity, Water, Internet, Parking, Garbage, Other"
+        varchar name "Tên dịch vụ"
+        varchar billing_method "Metered, Fixed, Manual"
+        varchar unit_name "kWh, m3, tháng, xe, lần"
+        boolean is_active "Còn sử dụng"
+        timestamptz created_at "Ngày tạo"
+    }
+
+    rooming_house_service_prices {
+        uuid id PK "Khóa chính giá dịch vụ"
+        uuid rooming_house_id FK "Khu trọ áp dụng"
+        integer service_type_id FK "Loại dịch vụ"
+        numeric unit_price "Đơn giá"
+        date effective_from "Ngày bắt đầu áp dụng"
+        date effective_to "Ngày kết thúc, nullable"
+        boolean is_active "Còn áp dụng"
+        timestamptz created_at "Ngày tạo"
+        timestamptz updated_at "Ngày cập nhật"
+    }
+
+    meter_readings {
+        uuid id PK "Khóa chính chỉ số"
+        uuid room_id FK "Phòng được ghi chỉ số"
+        uuid lease_contract_id FK "Hợp đồng đang ở"
+        integer service_type_id FK "Điện hoặc nước"
+        date billing_period_start "Ngày bắt đầu kỳ tính"
+        date billing_period_end "Ngày kết thúc kỳ tính"
+        numeric previous_reading "Chỉ số cũ"
+        numeric current_reading "Chỉ số mới"
+        numeric consumption "Số sử dụng"
+        numeric unit_price_snapshot "Đơn giá tại thời điểm ghi"
+        numeric amount "Thành tiền"
+        text proof_image_object_key "Ảnh công tơ nếu có"
+        varchar status "Draft, Confirmed, Adjusted, Cancelled"
+        uuid recorded_by_landlord_user_id FK "Chủ trọ ghi chỉ số"
+        timestamptz reading_at "Thời điểm ghi"
+        timestamptz created_at "Ngày tạo"
+        timestamptz updated_at "Ngày cập nhật"
+    }
+
+    contract_fixed_charges {
+        uuid id PK "Khoản phí cố định theo hợp đồng"
+        uuid lease_contract_id FK "Thuộc hợp đồng"
+        integer service_type_id FK "Loại dịch vụ"
+        varchar charge_name "Tên khoản phí"
+        numeric monthly_amount "Số tiền mỗi tháng"
+        date start_date "Ngày bắt đầu tính"
+        date end_date "Ngày kết thúc tính"
+        boolean is_active "Còn áp dụng"
+        timestamptz created_at "Ngày tạo"
+        timestamptz updated_at "Ngày cập nhật"
+    }
+
+    invoices {
+        uuid id PK "Khóa chính hóa đơn"
+        uuid lease_contract_id FK "Hợp đồng được lập hóa đơn"
+        uuid room_id FK "Phòng được lập hóa đơn"
+        uuid tenant_user_id FK "Người thuê phải thanh toán"
+        varchar invoice_no UK "Mã hóa đơn"
+        date billing_period_start "Ngày bắt đầu kỳ hóa đơn"
+        date billing_period_end "Ngày kết thúc kỳ hóa đơn"
+        date issue_date "Ngày phát hành hóa đơn"
+        date due_date "Hạn thanh toán"
+        numeric rent_amount "Tổng tiền phòng"
+        numeric utility_amount "Tổng tiền điện nước"
+        numeric service_amount "Tổng phí dịch vụ"
+        numeric discount_amount "Giảm trừ"
+        numeric penalty_amount "Phí phạt trả chậm"
+        numeric total_amount "Tổng tiền phải trả"
+        numeric paid_amount "Số tiền đã thanh toán"
+        numeric remaining_amount "Số tiền còn nợ"
+        varchar status "Draft, Sent, PartiallyPaid, Paid, Overdue, Cancelled, Adjusted"
+        text note "Ghi chú hóa đơn"
+        timestamptz sent_at "Thời điểm gửi hóa đơn"
+        timestamptz paid_at "Thời điểm thanh toán đủ"
+        timestamptz created_at "Ngày tạo"
+        timestamptz updated_at "Ngày cập nhật"
+    }
+
+    invoice_items {
+        uuid id PK "Dòng chi tiết hóa đơn"
+        uuid invoice_id FK "Thuộc hóa đơn"
+        integer service_type_id FK "Loại dịch vụ, nullable"
+        uuid meter_reading_id FK "Chỉ số điện nước, nullable"
+        varchar item_type "Rent, Electricity, Water, FixedService, Penalty, Discount, Other"
+        text description "Mô tả dòng phí"
+        numeric quantity "Số lượng"
+        numeric unit_price "Đơn giá"
+        numeric amount "Thành tiền"
+        timestamptz created_at "Ngày tạo"
+    }
+
+    payment_transactions {
+        uuid id PK "Khóa chính giao dịch"
+        uuid invoice_id FK "Thanh toán hóa đơn, nullable"
+        uuid room_deposit_id FK "Thanh toán cọc, nullable"
+        uuid payer_user_id FK "Người thanh toán"
+        uuid confirmed_by_landlord_user_id FK "Chủ trọ xác nhận thủ công, nullable"
+
+        varchar idempotency_key UK "DB unique index: idempotency_key - chống tạo payment request trùng"
+        numeric amount "Số tiền thanh toán"
+        varchar currency "VND"
+        varchar payment_purpose "Deposit, Invoice"
+        varchar payment_method "Cash, BankTransfer, Momo, VNPay, Other"
+
+        varchar provider_order_code "DB unique index: payment_method + provider_order_code WHERE NOT NULL"
+        varchar provider_transaction_code "DB unique index: payment_method + provider_transaction_code WHERE NOT NULL"
+        varchar gateway_response_code "Mã phản hồi từ Momo/VNPay"
+        text gateway_response_message "Thông điệp phản hồi từ gateway"
+
+        text proof_image_object_key "Ảnh minh chứng nếu thanh toán thủ công"
+        text note "Ghi chú thanh toán"
+
+        varchar status "Pending, Paid, Failed, Cancelled, Refunded"
+        timestamptz paid_at "Thời điểm thanh toán thành công"
+        timestamptz failed_at "Thời điểm thanh toán thất bại"
+        timestamptz confirmed_at "Thời điểm chủ trọ xác nhận nếu manual"
+
+        timestamptz created_at "Ngày tạo"
+        timestamptz updated_at "Ngày cập nhật"
+    }
+
+    payment_webhook_logs {
+        uuid id PK "Khóa chính webhook log"
+        uuid payment_transaction_id FK "Giao dịch liên quan, nullable nếu chưa map được"
+
+        varchar payment_method "Momo, VNPay"
+        varchar provider_event_id "ID sự kiện webhook nếu provider có"
+        varchar provider_order_code "Mã đơn hàng gateway gửi về"
+        varchar provider_transaction_code "Mã giao dịch gateway gửi về"
+        varchar idempotency_key "Khóa đối soát nội bộ nếu có"
+
+        text raw_payload "Payload gốc từ gateway"
+        text raw_payload_hash UK "DB unique index: raw_payload_hash - chống xử lý webhook trùng"
+        varchar signature_status "Valid, Invalid, Missing"
+        varchar processing_status "Received, Processed, Duplicated, Failed, Ignored"
+
+        text error_message "Lỗi khi xử lý webhook nếu có"
+        integer retry_count "Số lần retry xử lý nội bộ"
+        timestamptz received_at "Thời điểm nhận webhook"
+        timestamptz processed_at "Thời điểm xử lý xong"
+        timestamptz created_at "Ngày tạo"
+    }
+
+    payment_receipts {
+        uuid id PK "Khóa chính biên lai"
+        uuid payment_transaction_id FK "Giao dịch liên quan"
+        varchar receipt_no UK "Mã biên lai"
+        text file_object_key "Key file biên lai"
+        text file_url "URL file biên lai"
+        timestamptz issued_at "Ngày xuất biên lai"
+        timestamptz created_at "Ngày tạo"
+    }
+
+    invoice_adjustments {
+        uuid id PK "Khóa chính điều chỉnh"
+        uuid invoice_id FK "Hóa đơn bị điều chỉnh"
+        uuid adjusted_by_user_id FK "Người điều chỉnh"
+        numeric old_total_amount "Tổng tiền cũ"
+        numeric new_total_amount "Tổng tiền mới"
+        text reason "Lý do điều chỉnh"
+        timestamptz created_at "Ngày tạo"
+    }
+
+    users ||--o| user_profiles : has_profile
+    users ||--o{ user_roles : has_role
+    roles ||--o{ user_roles : contains
+    users ||--o{ external_logins : has_external_login
+    users ||--o{ user_tokens : owns_token
+    user_tokens ||--o| user_tokens : replaced_by
+    users ||--o{ login_logs : creates_login_log
+    users ||--o{ kyc_verifications : submits_kyc
+    users ||--o{ kyc_verifications : reviews_as_admin
+
+    administrative_provinces ||--o{ administrative_districts : has_districts
+    administrative_districts ||--o{ administrative_wards : has_wards
+    administrative_provinces ||--o{ rooming_houses : located_in_province
+    administrative_districts ||--o{ rooming_houses : located_in_district
+    administrative_wards ||--o{ rooming_houses : located_in_ward
+
+    users ||--o{ notifications : receives_notification
+    users ||--o{ notifications : triggers_notification
+    notifications ||--o{ notification_deliveries : has_delivery_attempts
+    users ||--o| notification_preferences : has_notification_preferences
+    users ||--o{ audit_logs : performs_action
+
+    users ||--o{ rooming_houses : owns
+    users ||--o{ rooming_houses : approves_as_admin
+    rooming_houses ||--o{ rooms : contains
+    rooms ||--o{ room_price_tiers : has_price_by_occupants
+    rooming_houses ||--o{ rooming_house_amenities : has_house_amenities
+    rooms ||--o{ room_amenities : has_room_amenities
+    amenities ||--o{ rooming_house_amenities : used_by_house
+    amenities ||--o{ room_amenities : used_by_room
+    rooming_houses ||--o{ property_images : has_house_images
+    rooms ||--o{ property_images : has_room_images
+    rooming_houses ||--o{ lease_policies : has_lease_policy
+
+    users ||--o{ viewing_appointments : books_viewing
+    rooms ||--o{ viewing_appointments : has_viewing
+    viewing_appointments ||--o{ viewing_reschedule_proposals : has_reschedule_proposal
+    users ||--o{ viewing_reschedule_proposals : proposes_schedule
+
+    users ||--o{ rental_requests : sends_rental_request
+    users ||--o{ rental_requests : approves_rental_request
+    rooms ||--o{ rental_requests : receives_rental_request
+    viewing_appointments ||--o{ rental_requests : can_convert_to_request
+
+    rental_requests ||--o| room_deposits : creates_deposit
+    users ||--o{ room_deposits : pays_deposit
+    rooms ||--o{ room_deposits : is_reserved_by_deposit
+
+    rental_requests ||--o| lease_contracts : converts_to_contract
+    room_deposits ||--o| lease_contracts : secures_contract
+    rooms ||--o{ lease_contracts : has_contract
+    users ||--o{ lease_contracts : is_main_tenant
+    users ||--o{ lease_contracts : approves_contract
+    lease_policies ||--o{ lease_contracts : applies_to_contract
+    lease_contracts ||--o{ lease_contracts : replaces_contract
+
+    lease_contracts ||--o{ contract_occupants : has_occupant
+    users ||--o{ contract_occupants : has_account
+    users ||--o{ contract_occupants : enters_information
+    contract_occupants ||--o{ contract_occupants : is_guardian_of
+
+    lease_contracts ||--o{ contract_change_requests : has_change_request
+    users ||--o{ contract_change_requests : requests_change
+    users ||--o{ contract_change_requests : approves_change
+    users ||--o{ contract_change_requests : becomes_new_main_tenant
+    contract_occupants ||--o{ contract_change_requests : receives_transfer
+    lease_contracts ||--o{ contract_change_requests : creates_new_contract
+
+    lease_contracts ||--o{ lease_contract_files : has_file
+    lease_contracts ||--o{ lease_renewal_requests : has_renewal_request
+    users ||--o{ lease_renewal_requests : requests_renewal
+    users ||--o{ lease_renewal_requests : approves_renewal
+
+    rooming_houses ||--o{ rooming_house_service_prices : has_service_prices
+    billing_service_types ||--o{ rooming_house_service_prices : priced_as
+
+    rooms ||--o{ meter_readings : has_meter_readings
+    lease_contracts ||--o{ meter_readings : records_usage
+    billing_service_types ||--o{ meter_readings : measured_by
+    users ||--o{ meter_readings : records_as_landlord
+
+    lease_contracts ||--o{ contract_fixed_charges : has_fixed_charges
+    billing_service_types ||--o{ contract_fixed_charges : used_as_fixed_charge
+
+    lease_contracts ||--o{ invoices : has_monthly_invoices
+    rooms ||--o{ invoices : billed_for_room
+    users ||--o{ invoices : receives_invoice
+
+    invoices ||--o{ invoice_items : contains_items
+    billing_service_types ||--o{ invoice_items : item_service_type
+    meter_readings ||--o{ invoice_items : used_in_invoice
+
+    invoices ||--o{ payment_transactions : paid_by
+    room_deposits ||--o{ payment_transactions : deposit_paid_by
+    users ||--o{ payment_transactions : makes_payment
+    users ||--o{ payment_transactions : confirms_payment
+
+    payment_transactions ||--o{ payment_webhook_logs : receives_gateway_callbacks
+    payment_transactions ||--o| payment_receipts : generates_receipt
+    invoices ||--o{ invoice_adjustments : has_adjustments
+    users ||--o{ invoice_adjustments : adjusts_invoice

@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using System.Text;
 using Microsoft.EntityFrameworkCore;
@@ -20,6 +20,7 @@ public class RoomConfiguration : IEntityTypeConfiguration<Room>
         builder.Property(x => x.Floor).HasColumnName("floor").IsRequired();
         builder.Property(x => x.AreaM2).HasColumnName("area_m2").HasPrecision(8, 2);
         builder.Property(x => x.MaxOccupants).HasColumnName("max_occupants").IsRequired();
+        builder.Property(x => x.IsTieredPricing).HasColumnName("is_tiered_pricing").HasDefaultValue(false).IsRequired();
         builder.Property(x => x.Status).HasColumnName("status").HasConversion<string>().HasMaxLength(30)
             .HasDefaultValue(RoomStatus.Available)
             .IsRequired();

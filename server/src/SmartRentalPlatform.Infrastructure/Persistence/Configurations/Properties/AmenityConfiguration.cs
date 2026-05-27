@@ -1,6 +1,7 @@
 ﻿using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Metadata.Builders;
 using SmartRentalPlatform.Domain.Entities.Properties;
+using SmartRentalPlatform.Infrastructure.Persistence.Seed;
 using System;
 using System.Collections.Generic;
 using System.Text;
@@ -19,6 +20,7 @@ namespace SmartRentalPlatform.Infrastructure.Persistence.Configurations.Properti
             builder.Property(x => x.IconCode).HasColumnName("icon_code").HasMaxLength(100);
             builder.Property(x => x.IsActive).HasColumnName("is_active").HasDefaultValue(true).IsRequired();
             builder.Property(x => x.CreatedAt).HasColumnName("created_at").IsRequired();
+            builder.HasData(AmenitySeed.GetAmenities());
         }
     }
 }

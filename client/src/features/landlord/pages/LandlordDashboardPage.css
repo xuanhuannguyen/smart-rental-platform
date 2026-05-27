@@ -1,0 +1,576 @@
+.landlord-dashboard {
+  display: grid;
+  grid-template-columns: 248px minmax(0, 1fr);
+  min-height: 100vh;
+}
+
+.dashboard-sidebar {
+  background: #ffffff;
+  color: #1e293b;
+  padding: 24px 16px;
+  border-right: 1px solid #e2e8f0;
+  display: flex;
+  flex-direction: column;
+  position: sticky;
+  top: 0;
+  height: 100vh;
+}
+
+.dashboard-sidebar h1 {
+  margin: 0 0 24px 4px;
+  font-size: 22px;
+  font-weight: 700;
+  color: #0f172a;
+  letter-spacing: -0.02em;
+}
+
+.sidebar-item {
+  width: 100%;
+  min-height: 42px;
+  margin: 0 0 8px;
+  padding: 10px 14px;
+  border-radius: 6px;
+  background: transparent;
+  color: #475569;
+  text-align: left;
+  font: inherit;
+  font-size: 14px;
+  font-weight: 500;
+  cursor: pointer;
+  border: none;
+  transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+  display: flex;
+  align-items: center;
+}
+
+.sidebar-item:hover:not(:disabled) {
+  background: #f1f5f9;
+  color: #0f172a;
+  transform: translateX(4px);
+}
+
+.sidebar-item.active {
+  background: #eff6ff;
+  color: #246bfe;
+  font-weight: 600;
+  border-left: 3px solid #246bfe;
+  padding-left: 11px;
+}
+
+.sidebar-item.active:hover {
+  background: #e0f2fe;
+  transform: none;
+}
+
+.sidebar-item:disabled {
+  color: #94a3b8;
+  cursor: not-allowed;
+  opacity: 0.5;
+}
+
+.sidebar-back-btn {
+  margin-top: auto !important;
+  border-top: 1px solid #f1f5f9;
+  padding-top: 16px;
+  border-radius: 0;
+  color: #64748b;
+}
+
+.sidebar-back-btn:hover {
+  color: #0f172a;
+  background: transparent !important;
+  transform: translateX(-4px) !important;
+}
+
+.dashboard-main {
+  padding: 24px;
+  background: #f4f7fb;
+}
+
+.landlord-dashboard-page .overview-band {
+  display: flex;
+  flex-direction: row;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 24px;
+  margin-bottom: 24px;
+  padding: 24px;
+  border: 1px solid #dbe3ef;
+  border-radius: 12px;
+  background: #ffffff;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.03);
+}
+
+.landlord-dashboard-page .overview-left {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  flex: 1;
+}
+
+.landlord-dashboard-page .overview-left h2 {
+  margin: 4px 0 0;
+  font-size: 30px;
+  font-weight: 700;
+  color: #0f172a;
+}
+
+.landlord-dashboard-page .overview-right {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 12px;
+}
+
+.landlord-dashboard-page .eyebrow {
+  font-size: 12px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: #64748b;
+  margin: 0;
+}
+
+.landlord-dashboard-page .overview-stats {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+  justify-content: flex-end;
+}
+
+.landlord-dashboard-page .stat-item {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 10px;
+  border-radius: 6px;
+  border: 1px solid transparent;
+  font-size: 12px;
+  font-weight: 500;
+}
+
+.landlord-dashboard-page .stat-item svg {
+  width: 14px;
+  height: 14px;
+}
+
+.landlord-dashboard-page .stat-item span {
+  color: inherit;
+  font-size: 12px;
+  font-weight: 600;
+  white-space: nowrap;
+}
+
+.landlord-dashboard-page .stat-badge {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 18px;
+  height: 18px;
+  padding: 0 4px;
+  border-radius: 999px;
+  font-size: 10px;
+  font-weight: 700;
+  margin-left: 6px;
+}
+
+/* Total Stat Item */
+.landlord-dashboard-page .stat-item--total {
+  background: #f3f4f6;
+  border-color: #e5e7eb;
+  color: #4b5563;
+}
+.landlord-dashboard-page .stat-item--total .stat-badge {
+  background: #cbd5e1;
+  color: #1f2937;
+}
+
+/* Approved Stat Item */
+.landlord-dashboard-page .stat-item--approved {
+  background: #f0fdf4;
+  border-color: #bbf7d0;
+  color: #166534;
+}
+.landlord-dashboard-page .stat-item--approved .stat-badge {
+  background: #86efac;
+  color: #14532d;
+}
+
+/* Pending Stat Item */
+.landlord-dashboard-page .stat-item--pending {
+  background: #fef9c3;
+  border-color: #fef08a;
+  color: #854d0e;
+}
+.landlord-dashboard-page .stat-item--pending .stat-badge {
+  background: #fde047;
+  color: #713f12;
+}
+
+/* Rejected Stat Item */
+.landlord-dashboard-page .stat-item--rejected {
+  background: #fee2e2;
+  border-color: #fecaca;
+  color: #991b1b;
+}
+.landlord-dashboard-page .stat-item--rejected .stat-badge {
+  background: #fca5a5;
+  color: #7f1d1d;
+}
+
+.landlord-dashboard-page .overview-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+}
+
+.landlord-dashboard-page .primary-action {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  background: #246bfe !important; /* ocean blue */
+  color: #ffffff !important;
+  font-weight: 700 !important;
+  border: none;
+  cursor: pointer;
+  min-height: 42px;
+  padding: 10px 20px;
+  border-radius: 8px;
+  font-size: 15px;
+  transition: background-color 0.2s;
+  box-shadow: 0 2px 4px rgba(36, 107, 254, 0.15);
+}
+
+.landlord-dashboard-page .primary-action:hover:not(:disabled) {
+  background: #1a5ce0 !important;
+}
+
+.landlord-dashboard-page .primary-action:disabled {
+  background: #cbd5e1 !important;
+  color: #64748b !important;
+  cursor: not-allowed;
+}
+
+.landlord-dashboard-page .overview-description {
+  margin: 0;
+  font-size: 14.5px;
+  color: #64748b;
+}
+
+.dashboard-message {
+  margin: 0 0 12px;
+  padding: 10px 12px;
+  border-radius: 6px;
+  background: #fef9c3;
+  color: #92400e;
+  font-size: 14px;
+}
+
+.card-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+  gap: 14px;
+}
+
+.landlord-dashboard-page .dashboard-card {
+  display: flex;
+  flex-direction: column;
+  width: 100%;
+  padding: 0;
+  border: 1px solid #dbe3ef;
+  border-radius: 12px;
+  background: #ffffff;
+  color: inherit;
+  text-align: left;
+  font: inherit;
+  cursor: pointer;
+  overflow: hidden;
+  transition: border-color 0.2s, box-shadow 0.2s, transform 0.2s;
+}
+
+.landlord-dashboard-page .dashboard-card:hover {
+  border-color: #246bfe;
+  box-shadow: 0 6px 20px rgba(36, 107, 254, 0.1);
+  transform: translateY(-2px);
+}
+
+.landlord-dashboard-page .card-media-wrapper {
+  position: relative;
+  width: 100%;
+  height: 120px;
+  background: #f1f5f9;
+  overflow: hidden;
+}
+
+.landlord-dashboard-page .card-cover-image {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  transition: transform 0.3s;
+}
+
+.landlord-dashboard-page .dashboard-card:hover .card-cover-image {
+  transform: scale(1.05);
+}
+
+.landlord-dashboard-page .card-status-overlay {
+  position: absolute;
+  top: 8px;
+  left: 8px;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.landlord-dashboard-page .card-status-overlay .status-pill {
+  font-size: 10px;
+  padding: 2px 8px;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.08);
+  border-radius: 999px;
+  border: none;
+  min-height: auto;
+}
+
+.landlord-dashboard-page .card-body-content {
+  padding: 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  flex: 1;
+}
+
+.landlord-dashboard-page .card-title-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 8px;
+}
+
+.landlord-dashboard-page .card-title-row h3 {
+  margin: 0;
+  font-size: 14.5px;
+  font-weight: 700;
+  color: #0f172a;
+  line-height: 1.4;
+  display: -webkit-box;
+  -webkit-line-clamp: 1;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+  flex: 1;
+}
+
+.landlord-dashboard-page .card-menu-trigger {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 28px;
+  border-radius: 999px;
+  color: #64748b;
+  transition: background-color 0.2s, color 0.2s;
+  background: transparent;
+  border: none;
+  padding: 0;
+  cursor: pointer;
+}
+
+.landlord-dashboard-page .card-menu-trigger:hover {
+  background-color: #f1f5f9;
+  color: #0f172a;
+}
+
+.landlord-dashboard-page .card-location {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  color: #64748b;
+  font-size: 12px;
+  line-height: 1.4;
+}
+
+.landlord-dashboard-page .card-location span {
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.landlord-dashboard-page .card-divider {
+  border: 0;
+  border-top: 1px solid #e2e8f0;
+  margin: 0;
+}
+
+.landlord-dashboard-page .card-stats-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.landlord-dashboard-page .card-rooms-count {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+}
+
+.landlord-dashboard-page .stats-label {
+  font-size: 9px;
+  font-weight: 700;
+  letter-spacing: 0.05em;
+  color: #94a3b8;
+}
+
+.landlord-dashboard-page .stats-value {
+  font-size: 14px;
+  font-weight: 700;
+  color: #0f172a;
+}
+
+.landlord-dashboard-page .card-update-time {
+  font-size: 11px;
+  color: #94a3b8;
+}
+
+.landlord-dashboard-page .card-error-row {
+  margin-top: 4px;
+}
+
+.landlord-dashboard-page .card-footer-action {
+  display: flex;
+  justify-content: flex-end;
+  margin-top: 4px;
+}
+
+.landlord-dashboard-page .action-link {
+  font-size: 13px;
+  font-weight: 600;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  transition: transform 0.2s;
+}
+
+.landlord-dashboard-page .dashboard-card:hover .action-link {
+  transform: translateX(4px);
+}
+
+.landlord-dashboard-page .action-link.text-success {
+  color: #246bfe;
+}
+.landlord-dashboard-page .action-link.text-warning {
+  color: #eab308;
+}
+.landlord-dashboard-page .action-link.text-info {
+  color: #64748b;
+}
+
+.status-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 8px;
+}
+
+.status-pill {
+  display: inline-flex;
+  align-items: center;
+  min-height: 26px;
+  padding: 3px 10px;
+  border-radius: 999px;
+  background: #e2e8f0;
+  color: #475569;
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.status-pill--success {
+  background: #dcfce7;
+  color: #166534;
+}
+
+.status-pill--info {
+  background: #dbeafe;
+  color: #1e40af;
+}
+
+.status-pill--warning {
+  background: #fef3c7;
+  color: #92400e;
+}
+
+.status-pill--danger {
+  background: #fee2e2;
+  color: #991b1b;
+}
+
+.status-pill--neutral {
+  background: #e5e7eb;
+  color: #374151;
+}
+
+.status-pill--reserved {
+  background: #ede9fe;
+  color: #5b21b6;
+}
+
+.warning-text {
+  color: #991b1b !important;
+  font-size: 13px;
+}
+
+.empty-panel {
+  padding: 24px;
+  border: 1px solid #dbe3ef;
+  border-radius: 8px;
+  background: #ffffff;
+}
+
+.empty-panel h2 {
+  margin: 0 0 8px;
+  font-size: 20px;
+}
+
+.empty-panel p {
+  margin: 0;
+  color: #64748b;
+}
+
+.back-link {
+  margin: 0 0 14px;
+  display: inline-flex;
+  align-items: center;
+}
+
+@media (max-width: 980px) {
+  .landlord-dashboard {
+    grid-template-columns: 1fr;
+  }
+
+  .landlord-dashboard-page .overview-band {
+    flex-direction: column;
+    align-items: stretch;
+    gap: 16px;
+  }
+
+  .landlord-dashboard-page .overview-right {
+    align-items: stretch;
+  }
+
+  .landlord-dashboard-page .overview-actions {
+    justify-content: flex-start;
+  }
+
+  .landlord-dashboard-page .overview-stats {
+    flex-direction: column;
+    align-items: stretch;
+    justify-content: flex-start;
+  }
+
+  .landlord-dashboard-page .stat-item {
+    justify-content: space-between;
+  }
+
+  .landlord-dashboard-page .stat-badge {
+    margin-left: auto;
+  }
+}

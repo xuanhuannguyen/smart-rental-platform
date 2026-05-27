@@ -6,6 +6,7 @@ namespace SmartRentalPlatform.Domain.Enums
 {
     public enum RoomingHouseApprovalStatus
     {
+        Draft = 0,
         Pending = 1,
         Approved = 2,
         Rejected = 3

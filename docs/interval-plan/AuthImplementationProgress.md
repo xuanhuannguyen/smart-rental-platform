@@ -4,7 +4,7 @@ Tài liệu này dùng để theo dõi tiến độ code module **Auth / Account
 
 Nguồn nghiệp vụ chính:
 
-- `docs/interval-plan/RuleHuan.md`
+- `docs/Logic-Rule-MyTasks/RuleAndLogicHuan.md`
 - `docs/erd/ERD_Tong_Quat_He_Thong_Thue_Tro_Hoan_Thien_v3_1_Ghi_Chu_Index.mmd`
 - `docs/project-structure/Cấu trúc dự án.md`
 
@@ -207,16 +207,16 @@ Endpoint: `POST /api/auth/google-login`
 
 - [x] Tạo `Contracts/Auth/GoogleLoginRequest.cs`.
 - [x] Tạo/hoàn thiện Google login response DTO.
-- [ ] Implement service verify Google `idToken`.
-- [ ] Tìm `external_logins` theo `Provider = Google` và `ProviderUserId`.
-- [ ] Nếu external login đã tồn tại, login vào user tương ứng.
-- [ ] Nếu Google email chưa tồn tại, tạo user mới `PasswordHash = null`, `EmailConfirmed = true`, role Tenant mặc định.
-- [ ] Nếu email/password đã tồn tại và `EmailConfirmed = true`, tự tạo external login và cho login.
-- [ ] Nếu email/password đã tồn tại và `EmailConfirmed = false`, tự link nhưng không cho vào Home.
+- [x] Implement service verify Google `idToken`.
+- [x] Tìm `external_logins` theo `Provider = Google` và `ProviderUserId`.
+- [x] Nếu external login đã tồn tại, login vào user tương ứng.
+- [x] Nếu Google email chưa tồn tại, tạo user mới `PasswordHash = null`, `EmailConfirmed = true`, role Tenant mặc định.
+- [x] Nếu email/password đã tồn tại và `EmailConfirmed = true`, tự tạo external login và cho login.
+- [x] Nếu email/password đã tồn tại và `EmailConfirmed = false`, tự link nhưng không cho vào Home.
 - [x] Google-created account không được register email/password mới cùng email.
 - [x] Expose endpoint `POST /api/auth/google-login`.
 - [x] Build solution pass.
-- [ ] Test Google email mới.
+- [x] Test Google email mới.
 - [ ] Test email/password trước, Google sau.
 - [ ] Test Google không vượt OTP.
 
@@ -249,7 +249,9 @@ Ghi lại quyết định hoặc vấn đề phát sinh trong quá trình làm:
 | 2026-05-23 | Logout/logout-all | Đã thêm `/api/auth/logout` revoke một refresh token bằng `Logout`, `/api/auth/logout-all` yêu cầu JWT và revoke toàn bộ refresh token còn hiệu lực của user bằng `LogoutAllDevices`. |
 | 2026-05-23 | Rate limit resend OTP | Đã thêm chống spam resend OTP 60 giây; test đăng ký user mới rồi resend ngay trả `429 OTP_RESEND_TOO_SOON`. |
 | 2026-05-23 | Forgot/reset password | Đã thêm `/api/auth/forgot-password` và `/api/auth/reset-password`; test email tồn tại/không tồn tại, OTP đúng, OTP sai, OTP hết hạn, login bằng password mới, refresh token cũ bị revoke bằng `PasswordChanged`. |
-| 2026-05-23 | Google login | Đã tạo request/response DTO, endpoint `/api/auth/google-login`, service verify Google idToken bằng `Google.Apis.Auth`, và chặn register email/password với Google-only account bằng `GOOGLE_ACCOUNT_EXISTS`. Chưa tick test Google login thành công vì chưa có Google OAuth ClientId/idToken thật để test end-to-end. |
+| 2026-05-23 | Google login | Đã tạo request/response DTO, endpoint `/api/auth/google-login`, service verify Google idToken bằng `Google.Apis.Auth`, và chặn register email/password với Google-only account bằng `GOOGLE_ACCOUNT_EXISTS`. |
+| 2026-05-24 | Google login end-to-end | Đã cấu hình Google ClientId local, test Google login thành công, trả access token/refresh token, test Swagger Bearer auth và `/api/users/me` trả 200. |
+| 2026-05-24 | Client auth skeleton | Đã tạo skeleton React/Vite theo cấu trúc chuẩn: `features/auth`, `shared/api`, `tokenStorage`, `authApi`, `GoogleLoginButton`, `LoginPage`. Build client pass. |
 
 ## 13. Note Cuối Ngày 2026-05-22
 
@@ -327,11 +329,13 @@ Tiếp tục từ mục **6. JWT, Refresh Token Và /users/me**:
 
 ### Chưa hoàn thành / cần bổ sung
 
-- Google login chưa được xác nhận thành công end-to-end vì chưa có Google OAuth Client ID và `idToken` thật để test:
-  - Chưa test Google email mới tạo user `PasswordHash = null`.
-  - Chưa test email/password đã verify rồi Google tự link.
-  - Chưa test email/password chưa verify rồi Google tự link nhưng không cấp token.
-- `Authentication:Google:ClientId` trong `appsettings.Development.json` đang để trống. Cần cấu hình Client ID thật ở local secret/user-secrets/env trước khi test production-like.
+- Google login đã được xác nhận thành công end-to-end bằng Google OAuth Client ID local:
+  - Đã test Google email mới tạo user `PasswordHash = null`.
+  - Đã test Google login trả access token/refresh token.
+  - Đã test access token qua Swagger Bearer auth với `/api/users/me`.
+  - Chưa test riêng case email/password trước rồi Google tự link.
+  - Chưa test riêng case email/password chưa verify rồi Google tự link nhưng không cấp token.
+- `Authentication:Google:ClientId` đã có giá trị local trong `appsettings.Development.json`. Khi chuẩn bị commit/public repo, nên chuyển sang user-secrets/env và không commit client id/secret nhạy cảm.
 - Rate limit mới áp dụng cho `resend-email-otp`. Chưa áp dụng rate limit cho:
   - `forgot-password`.
   - `login` theo IP/email ngoài lockout theo user.

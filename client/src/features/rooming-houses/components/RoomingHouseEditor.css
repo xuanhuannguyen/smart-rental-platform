@@ -1,0 +1,279 @@
+.rooming-house-editor {
+  display: grid;
+  gap: 20px;
+}
+
+.rooming-house-editor__header {
+  padding-bottom: 16px;
+  border-bottom: 1px solid #dbe3ef;
+}
+
+.rooming-house-editor__header h1 {
+  margin: 0 0 6px;
+  font-size: 24px;
+}
+
+.rooming-house-editor__header p {
+  margin: 0;
+  color: #64748b;
+}
+
+.rooming-house-editor__status {
+  margin-top: 8px !important;
+  font-weight: 700;
+}
+
+.rooming-house-editor__message {
+  padding: 10px 14px;
+  border-radius: 6px;
+  background: #fef9c3;
+  color: #92400e;
+}
+
+.rooming-house-editor__panel {
+  padding: 20px;
+  border: 1px solid #dbe3ef;
+  border-radius: 8px;
+  background: #ffffff;
+}
+
+.rooming-house-editor__tabs {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-bottom: 20px;
+  padding-bottom: 14px;
+  border-bottom: 1px solid #e2e8f0;
+}
+
+.rooming-house-editor__tabs button {
+  min-height: 38px;
+  padding: 8px 14px;
+  border: 1px solid #cbd5e1;
+  border-radius: 6px;
+  background: #f8fafc;
+  color: #475569;
+  font: inherit;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.rooming-house-editor__tabs button.active {
+  border-color: #246bfe;
+  background: #eff6ff;
+  color: #1d4ed8;
+}
+
+.rooming-house-editor__tabs button:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+
+.rooming-house-editor__form-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 16px;
+}
+
+.rooming-house-editor__field {
+  display: grid;
+  gap: 6px;
+}
+
+.rooming-house-editor__field span {
+  font-size: 13px;
+  font-weight: 700;
+  color: #334155;
+}
+
+.rooming-house-editor__field input,
+.rooming-house-editor__field select {
+  width: 100%;
+  min-height: 40px;
+  padding: 8px 10px;
+  border: 1px solid #cbd5e1;
+  border-radius: 6px;
+  font: inherit;
+}
+
+.rooming-house-editor__field input:read-only {
+  background: #f1f5f9;
+  color: #64748b;
+}
+
+.rooming-house-editor__actions {
+  grid-column: 1 / -1;
+  display: flex;
+  justify-content: flex-end;
+  gap: 10px;
+  padding-top: 8px;
+}
+
+.rooming-house-editor__primary {
+  min-height: 40px;
+  padding: 9px 20px;
+  border-radius: 6px;
+  background: #246bfe;
+  color: #ffffff;
+  font: inherit;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.rooming-house-editor__primary:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+.rooming-house-editor__readonly-note {
+  grid-column: 1 / -1;
+  margin: 0;
+  padding: 10px 14px;
+  border-radius: 6px;
+  background: #f1f5f9;
+  color: #64748b;
+  font-size: 14px;
+}
+
+.rooming-house-editor__legal-image {
+  display: grid;
+  gap: 8px;
+}
+
+.rooming-house-editor__legal-image span {
+  font-size: 13px;
+  font-weight: 700;
+  color: #334155;
+}
+
+.rooming-house-editor__legal-image img {
+  width: 100%;
+  max-height: 180px;
+  object-fit: cover;
+  border-radius: 6px;
+  background: #e2e8f0;
+}
+
+.rooming-house-editor__image-placeholder {
+  height: 120px;
+  display: grid;
+  place-items: center;
+  border: 1px dashed #cbd5e1;
+  border-radius: 6px;
+  color: #94a3b8;
+  font-size: 13px;
+}
+
+.rooming-house-editor__legal-image-actions {
+  display: flex;
+  gap: 8px;
+}
+
+.rooming-house-editor__stack {
+  display: grid;
+  gap: 16px;
+}
+
+.rooming-house-editor__amenities {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
+  gap: 10px;
+}
+
+.rooming-house-editor__checkbox {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 12px;
+  border: 1px solid #dbe3ef;
+  border-radius: 6px;
+  background: #f8fafc;
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+/* PropertyImageEditor */
+.property-image-editor {
+  display: grid;
+  gap: 14px;
+}
+
+.property-image-editor__toolbar {
+  display: flex;
+  gap: 10px;
+  align-items: center;
+}
+
+.property-image-editor__upload {
+  display: inline-flex;
+  align-items: center;
+  min-height: 40px;
+  padding: 8px 16px;
+  border: 1px dashed #94a3b8;
+  border-radius: 6px;
+  background: #f8fafc;
+  color: #475569;
+  font: inherit;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.property-image-editor__upload input {
+  display: none;
+}
+
+.property-image-editor__empty {
+  color: #64748b;
+}
+
+.property-image-editor__grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+  gap: 14px;
+}
+
+.property-image-editor__item {
+  display: grid;
+  gap: 8px;
+  padding: 12px;
+  border: 1px solid #dbe3ef;
+  border-radius: 8px;
+  background: #ffffff;
+}
+
+.property-image-editor__item img {
+  width: 100%;
+  aspect-ratio: 4 / 3;
+  object-fit: cover;
+  border-radius: 6px;
+  background: #e2e8f0;
+}
+
+.property-image-editor__actions {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.property-image-editor__delete {
+  padding: 6px 12px;
+  border-radius: 6px;
+  background: #fee2e2;
+  color: #991b1b;
+  font: inherit;
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+@media (max-width: 720px) {
+  .rooming-house-editor__form-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .rooming-house-editor__tabs {
+    gap: 6px;
+  }
+}
