@@ -19,26 +19,4 @@ public interface IAuthService
         LoginRequest request,
         CancellationToken cancellationToken = default);
 
-    Task<RefreshTokenResponse> RefreshTokenAsync(
-        RefreshTokenRequest request,
-        CancellationToken cancellationToken = default);
-
-    Task<LogoutResponse> LogoutAsync(
-        LogoutRequest request,
-        CancellationToken cancellationToken = default);
-
-    Task<LogoutResponse> LogoutAllAsync(
-        CancellationToken cancellationToken = default);
-
-    Task<ForgotPasswordResponse> ForgotPasswordAsync(
-        ForgotPasswordRequest request,
-        CancellationToken cancellationToken = default);
-
-    Task<ResetPasswordResponse> ResetPasswordAsync(
-        ResetPasswordRequest request,
-        CancellationToken cancellationToken = default);
-
-    Task<GoogleLoginResponse> GoogleLoginAsync(
-        GoogleLoginRequest request,
-        CancellationToken cancellationToken = default);
 }

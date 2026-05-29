@@ -1,6 +1,7 @@
 using Microsoft.EntityFrameworkCore;
 using SmartRentalPlatform.Application.Common.Interfaces;
 using SmartRentalPlatform.Domain.Entities.Administrative;
+using SmartRentalPlatform.Domain.Entities.AdminApproval;
 using SmartRentalPlatform.Domain.Entities.Properties;
 using SmartRentalPlatform.Domain.Entities.Users;
 
@@ -24,7 +25,6 @@ public class AppDbContext : DbContext, IAppDbContext
     public DbSet<KycVerification> KycVerifications => Set<KycVerification>();
     // Administrative
     public DbSet<AdministrativeProvince> AdministrativeProvinces => Set<AdministrativeProvince>();
-    public DbSet<AdministrativeDistrict> AdministrativeDistricts => Set<AdministrativeDistrict>();
     public DbSet<AdministrativeWard> AdministrativeWards => Set<AdministrativeWard>();
     // Properties
     public DbSet<RoomingHouse> RoomingHouses => Set<RoomingHouse>();
@@ -35,6 +35,8 @@ public class AppDbContext : DbContext, IAppDbContext
     public DbSet<RoomAmenity> RoomAmenities => Set<RoomAmenity>();
     public DbSet<PropertyImage> PropertyImages => Set<PropertyImage>();
     public DbSet<RoomingHouseLegalDocument> RoomingHouseLegalDocuments => Set<RoomingHouseLegalDocument>();
+    public DbSet<LeasePolicy> LeasePolicies => Set<LeasePolicy>();
+    public DbSet<ApprovalAuditLog> ApprovalAuditLogs => Set<ApprovalAuditLog>();
 
     public async Task<IAppDbContextTransaction> BeginTransactionAsync(CancellationToken cancellationToken = default)
     {
