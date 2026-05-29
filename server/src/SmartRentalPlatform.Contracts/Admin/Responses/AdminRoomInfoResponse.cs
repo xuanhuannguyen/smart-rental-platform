@@ -1,6 +1,6 @@
 using System;
 
-namespace SmartRentalPlatform.Contracts.Admin;
+namespace SmartRentalPlatform.Contracts.Admin.Responses;
 
 public class AdminRoomInfoResponse
 {

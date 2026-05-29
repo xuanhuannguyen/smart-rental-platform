@@ -376,7 +376,6 @@ export function MyProfilePage() {
     setSessionsError(null);
     try {
       const response = await profileApi.getActiveSessions();
-      console.log('[Sessions] Loaded sessions:', response.data);
       setSessions(response.data || []);
     } catch (err) {
       console.error('[Sessions] Failed to load:', err);

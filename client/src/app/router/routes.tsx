@@ -4,7 +4,7 @@ import { RegisterPage } from '../../features/auth/pages/RegisterPage';
 import { VerifyEmailOtpPage } from '../../features/auth/pages/VerifyEmailOtpPage';
 import { ForgotPasswordPage } from '../../features/auth/pages/ForgotPasswordPage';
 import { ResetPasswordPage } from '../../features/auth/pages/ResetPasswordPage';
-import { MePage } from '../../features/me/pages/MePage';
+import { MePage } from '../../features/home/pages/MePage';
 import { MyProfilePage } from '../../features/profile/pages/MyProfilePage';
 import { KycSubmitPage } from '../../features/kyc/pages/KycSubmitPage';
 import { KycStatusPage } from '../../features/kyc/pages/KycStatusPage';

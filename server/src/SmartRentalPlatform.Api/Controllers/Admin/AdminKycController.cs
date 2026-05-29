@@ -1,7 +1,7 @@
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using SmartRentalPlatform.Contracts.Admin;
-using SmartRentalPlatform.Application.AdminApproval.Services;
+using SmartRentalPlatform.Application.AdminApproval;
 using SmartRentalPlatform.Application.Common.Interfaces;
 using SmartRentalPlatform.Contracts.Common;
 

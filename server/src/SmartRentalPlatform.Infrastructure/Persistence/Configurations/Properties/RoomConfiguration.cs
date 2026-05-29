@@ -6,7 +6,7 @@ using Microsoft.EntityFrameworkCore.Metadata.Builders;
 using SmartRentalPlatform.Domain.Entities.Properties;
 using SmartRentalPlatform.Domain.Enums;
 
-namespace SmartRentalPlatform.Infrastructure.Data.Configurations;
+namespace SmartRentalPlatform.Infrastructure.Persistence.Configurations.Properties;
 
 public class RoomConfiguration : IEntityTypeConfiguration<Room>
 {

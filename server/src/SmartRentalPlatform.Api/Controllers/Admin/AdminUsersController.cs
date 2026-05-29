@@ -3,7 +3,7 @@ using System.Threading.Tasks;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using SmartRentalPlatform.Contracts.Admin;
-using SmartRentalPlatform.Application.AdminApproval.Services;
+using SmartRentalPlatform.Application.AdminApproval;
 using SmartRentalPlatform.Contracts.Common;
 
 namespace SmartRentalPlatform.Api.Controllers.Admin;

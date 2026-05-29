@@ -4,7 +4,7 @@ using SmartRentalPlatform.Contracts.Amenities;
 using SmartRentalPlatform.Contracts.LegalDocuments;
 using SmartRentalPlatform.Contracts.PropertyImages;
 
-namespace SmartRentalPlatform.Contracts.Admin;
+namespace SmartRentalPlatform.Contracts.Admin.Responses;
 
 public class AdminRoomingHouseDetailResponse : AdminRoomingHouseListItemResponse
 {

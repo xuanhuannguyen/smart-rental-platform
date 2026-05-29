@@ -1,7 +1,7 @@
 using System;
 using System.Collections.Generic;
 
-namespace SmartRentalPlatform.Contracts.Admin;
+namespace SmartRentalPlatform.Contracts.Admin.Responses;
 
 public class AdminUserListItemResponse
 {

@@ -1,4 +1,4 @@
-namespace SmartRentalPlatform.Contracts.Admin;
+namespace SmartRentalPlatform.Contracts.Admin.Requests;
 
 public class AdminRejectRequest
 {

@@ -25,7 +25,7 @@ internal static class RoomingHouseReadModelMapper
             CoverImageUrl = house.Images.OrderBy(x => x.SortOrder).FirstOrDefault(x => x.IsCover)?.ImageUrl 
                 ?? house.Images.OrderBy(x => x.SortOrder).FirstOrDefault()?.ImageUrl,
             TotalRooms = house.Rooms?.Count(x => x.DeletedAt == null) ?? 0,
-            AvailableRooms = house.Rooms?.Count(x => x.Status == SmartRentalPlatform.Domain.Enums.RoomStatus.Available && x.DeletedAt == null) ?? 0
+            AvailableRooms = house.Rooms?.Count(x => x.Status == RoomStatus.Available && x.DeletedAt == null) ?? 0
         };
     }
 
