@@ -8,10 +8,12 @@ namespace SmartRentalPlatform.Infrastructure.Persistence.Seed;
 
 public static class DevelopmentDataSeed
 {
+    public const string AdminEmail = "admin.demo@example.com";
     public const string TenantEmail = "tenant.demo@example.com";
     public const string LandlordEmail = "landlord.demo@example.com";
     public const string DemoPassword = "Demo@123456";
 
+    private static readonly Guid AdminUserId = Guid.Parse("10000000-0000-0000-0000-000000000099");
     private static readonly Guid TenantUserId = Guid.Parse("10000000-0000-0000-0000-000000000001");
     private static readonly Guid LandlordUserId = Guid.Parse("10000000-0000-0000-0000-000000000002");
     private static readonly Guid ApprovedHouseId = Guid.Parse("20000000-0000-0000-0000-000000000001");
@@ -35,6 +37,48 @@ public static class DevelopmentDataSeed
         await SeedUsersAsync(context, passwordService, cancellationToken);
         await SeedRoomingHousesAsync(context, location, cancellationToken);
         await SeedRoomsAsync(context, cancellationToken);
+    }
+
+    public static async Task SeedAdminAsync(
+        AppDbContext context,
+        IPasswordService passwordService,
+        CancellationToken cancellationToken = default)
+    {
+        var normalizedEmail = AdminEmail.ToUpperInvariant();
+        var admin = await context.Users
+            .Include(x => x.UserRoles)
+            .FirstOrDefaultAsync(x => x.NormalizedEmail == normalizedEmail, cancellationToken);
+
+        if (admin is null)
+        {
+            admin = CreateUser(AdminUserId, AdminEmail, "Admin Demo", passwordService);
+            context.Users.Add(admin);
+        }
+
+        if (!await context.UserProfiles.AnyAsync(x => x.UserId == admin.Id, cancellationToken))
+        {
+            context.UserProfiles.Add(CreateProfile(admin.Id, "Admin Demo"));
+        }
+
+        if (admin.UserRoles.All(x => x.RoleId != RoleSeed.AdminRoleId))
+        {
+            context.UserRoles.Add(new UserRole
+            {
+                UserId = admin.Id,
+                RoleId = RoleSeed.AdminRoleId,
+                CreatedAt = SeededAt
+            });
+        }
+
+        if (!admin.EmailConfirmed || admin.OnboardingStatus != OnboardingStatus.Completed)
+        {
+            admin.EmailConfirmed = true;
+            admin.OnboardingStatus = OnboardingStatus.Completed;
+            admin.Status = UserStatus.Active;
+            admin.UpdatedAt = DateTimeOffset.UtcNow;
+        }
+
+        await context.SaveChangesAsync(cancellationToken);
     }
 
     private static async Task SeedUsersAsync(

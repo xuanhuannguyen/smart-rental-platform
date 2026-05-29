@@ -1,14 +1,14 @@
 services:
   postgres:
     image: postgres:16
-    container_name: smart-rental_postgres
+    container_name: smart_rental_postgres
     restart: always
     environment:
-      POSTGRES_DB: smart-rental_platform
+      POSTGRES_DB: smart_rental_platform
       POSTGRES_USER: postgres
       POSTGRES_PASSWORD: postgres
     ports:
-      - "5433:5432"
+      - "5444:5432"
     volumes:
       - rental_pg_data:/var/lib/postgresql/data
 

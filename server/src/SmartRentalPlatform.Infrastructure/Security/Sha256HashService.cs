@@ -1,6 +1,6 @@
 using System.Security.Cryptography;
 using System.Text;
-using SmartRentalPlatform.Application.Abstractions;
+using SmartRentalPlatform.Application.Common.Interfaces;
 
 namespace SmartRentalPlatform.Infrastructure.Security;
 

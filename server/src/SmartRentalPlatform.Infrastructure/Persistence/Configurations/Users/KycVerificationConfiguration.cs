@@ -46,6 +46,8 @@ public class KycVerificationConfiguration : IEntityTypeConfiguration<KycVerifica
 
         builder.HasIndex(x => x.UserId);
         builder.HasIndex(x => x.CitizenIdHash);
+        builder.HasIndex(x => x.Status);
+        builder.HasIndex(x => x.CreatedAt);
 
         builder.HasOne(x => x.User)
             .WithMany(x => x.KycVerifications)

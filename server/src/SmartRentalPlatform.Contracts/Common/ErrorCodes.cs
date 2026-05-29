@@ -35,13 +35,11 @@ public static class ErrorCodes
     public const string KycRejectReasonRequired = "KYC_REJECT_REASON_REQUIRED";
     public const string KycAlreadyApproved = "KYC_ALREADY_APPROVED";
     public const string KycPendingAdminReview = "KYC_PENDING_ADMIN_REVIEW";
-
-    public const string AccountNotActive = "ACCOUNT_NOT_ACTIVE";
     public const string FrontImageRequired = "FRONT_IMAGE_REQUIRED";
     public const string BackImageRequired = "BACK_IMAGE_REQUIRED";
     public const string SelfieRequired = "SELFIE_REQUIRED";
     public const string EkycDocumentFailed = "EKYC_DOCUMENT_FAILED";
-
+    public const string AccountNotActive = "ACCOUNT_NOT_ACTIVE";
     public const string RoleAlreadyExists = "ROLE_ALREADY_EXISTS";
     public const string RoleGrantFailed = "ROLE_GRANT_FAILED";
 
@@ -59,4 +57,8 @@ public static class ErrorCodes
     public const string AmenityNotFound = "AMENITY_NOT_FOUND";
     public const string ImageInvalidOwner = "IMAGE_INVALID_OWNER";
     public const string PriceTierInvalid = "PRICE_TIER_INVALID";
+
+    // Lease Policy
+    public const string LeasePolicyRequired = "LEASE_POLICY_REQUIRED";
+    public const string LeasePolicyInvalid = "LEASE_POLICY_INVALID";
 }

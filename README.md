@@ -1,30 +1,81 @@
 # smart-rental-platform
 
-Nền tảng quản lý thuê trọ / tìm trọ - ASP.NET Core Web API + React + PostgreSQL
+Nền tảng quản lý thuê trọ / tìm trọ - ASP.NET Core Web API + React + PostgreSQL.
 
-## KYC module (Interval 1)
+## Tech stack
 
-### Backend
+- Backend: ASP.NET Core Web API, Entity Framework Core, PostgreSQL.
+- Frontend: React, TypeScript, Vite.
+- Database/local infra: Docker Compose.
 
-- API base path: `/api/kyc`
-- DbContext: `AppDbContext` (PostgreSQL, enums stored as `varchar`)
-- Private file storage: `private-storage/` (gitignored)
-- Dev auth shim: header `X-Dev-User-Id` or query `?userId=` until JWT (Person 1) is wired
+## Project structure
 
-```bash
-docker compose up -d
-# PostgreSQL host port: 5433 (mapped in docker-compose.yml)
-cd server/src/SmartRentalPlatform.Api
-dotnet ef database update
-dotnet run
+```txt
+client/                         React + Vite frontend
+server/
+  SmartRentalPlatform.slnx       Backend solution
+  src/
+    SmartRentalPlatform.Api
+    SmartRentalPlatform.Application
+    SmartRentalPlatform.Contracts
+    SmartRentalPlatform.Domain
+    SmartRentalPlatform.Infrastructure
+docs/                            Architecture notes and interval plans
+docker/                          Docker-related files
 ```
 
-### Frontend
+## Backend convention
 
-```bash
+- `Api` exposes controllers, middleware, authentication, Swagger and HTTP concerns.
+- `Application` owns business use cases and service interfaces.
+- `Domain` owns entities and enums.
+- `Infrastructure` implements persistence, storage, security and external services.
+- `Contracts` owns API DTOs. DTO folders that are split into `Requests` and `Responses` use matching namespaces, for example `SmartRentalPlatform.Contracts.Auth.Requests`.
+
+## Frontend convention
+
+```txt
+client/src/
+  app/             app shell, providers, router
+  config/          runtime config
+  features/        feature-owned pages, components, services, types
+  shared/          reusable API, UI, feedback and utility code
+  styles/          global styles
+```
+
+Feature folders should use `pages`, `components`, `hooks`, `services`, `types` and `utils` when the feature grows large enough.
+
+## Run locally
+
+Start database:
+
+```powershell
+docker compose up -d
+```
+
+Run backend:
+
+```powershell
+dotnet build server/SmartRentalPlatform.slnx
+dotnet run --project server/src/SmartRentalPlatform.Api/SmartRentalPlatform.Api.csproj
+```
+
+Run frontend:
+
+```powershell
 cd client
 npm install
 npm run dev
 ```
 
-Use the Dev User ID field on KYC pages (must exist in `users` table). JWT from `localStorage` key `srp_access_token` is sent automatically when present.
+Production build checks:
+
+```powershell
+dotnet build server/SmartRentalPlatform.slnx
+cd client
+npm run build
+```
+
+## Refactor notes
+
+Internal 2 structural refactor follows `docs/interval-plan/OverallRefactorExecutionPlan.md`.

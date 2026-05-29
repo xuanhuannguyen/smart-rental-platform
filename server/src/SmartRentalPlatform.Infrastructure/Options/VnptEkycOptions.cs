@@ -8,15 +8,22 @@ public class VnptEkycOptions
 
     public string BaseUrl { get; set; } = "https://api.idg.vnpt.vn";
 
-    public string TokenId { get; set; } = string.Empty;
-
-    public string TokenKey { get; set; } = string.Empty;
-
+    /// <summary>
+    /// Access token from VNPT eKYC portal (Quản lý token).
+    /// Used as: Authorization: Bearer {AccessToken}
+    /// Expires every ~24 hours — must be manually refreshed from the VNPT portal.
+    /// </summary>
     public string AccessToken { get; set; } = string.Empty;
 
-    public string AuthMode { get; set; } = "StaticToken";
+    /// <summary>
+    /// Token-id header value from VNPT eKYC portal.
+    /// </summary>
+    public string TokenId { get; set; } = string.Empty;
 
-    public int TokenCacheDurationMinutes { get; set; } = 50;
+    /// <summary>
+    /// Token-key header value from VNPT eKYC portal.
+    /// </summary>
+    public string TokenKey { get; set; } = string.Empty;
 
     public string MacAddress { get; set; } = "TEST1";
 
@@ -27,6 +34,8 @@ public class VnptEkycOptions
     public string CropParam { get; set; } = "0.14,0.3";
 
     public bool ValidatePostcode { get; set; } = true;
+
+    public bool EnableFaceVerification { get; set; } = false;
 
     public double FaceMatchThreshold { get; set; } = 80.0;
 

@@ -4,23 +4,24 @@ public class ApiErrorResponse
 {
     public bool Success { get; set; } = false;
 
-    public string ErrorCode { get; set; } = string.Empty;
+    public string ErrorCode { get; set; } = default!;
 
-    public string Message { get; set; } = string.Empty;
+    public string Message { get; set; } = default!;
 
     public object? Details { get; set; }
-
-    public static ApiErrorResponse Create(
-        string errorCode,
-        string message,
-        object? details = null)
-    {
-        return new ApiErrorResponse
-        {
-            Success = false,
-            ErrorCode = errorCode,
-            Message = message,
-            Details = details
-        };
-    }
 }
+
+// {
+//   "success": false,
+//   "errorCode": "INVALID_EMAIL_OR_PASSWORD",
+//   "message": "Email hoặc mật khẩu không đúng.",
+//   "details": null
+// }
+// {
+//   "success": false,
+//   "errorCode": "KYC_INVALID_STATUS",
+//   "message": "Only PendingAdminReview KYC can be approved.",
+//   "details": {
+//     "currentStatus": "Approved"
+//   }
+// }

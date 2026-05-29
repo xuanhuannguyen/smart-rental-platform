@@ -1,16 +1,26 @@
-using Microsoft.Extensions.Configuration;
-using SmartRentalPlatform.Application.Abstractions;
+using Microsoft.AspNetCore.Hosting;
+using SmartRentalPlatform.Application.Common.Interfaces;
 
 namespace SmartRentalPlatform.Infrastructure.Storage;
 
+/// <summary>
+/// Lưu trữ file private (KYC) cùng thư mục với public uploads (wwwroot/uploads/).
+/// Tất cả file đều ở một chỗ, dễ quản lý backup.
+/// KYC ảnh vẫn được bảo vệ vì chỉ serve qua admin endpoint có [Authorize].
+/// </summary>
 public class LocalPrivateStorageService : IPrivateStorageService
 {
     private readonly string _rootPath;
 
-    public LocalPrivateStorageService(IConfiguration configuration)
+    public LocalPrivateStorageService(IWebHostEnvironment environment)
     {
-        _rootPath = configuration["Storage:PrivateRootPath"]
-            ?? Path.Combine(Directory.GetCurrentDirectory(), "private-storage");
+        var webRootPath = environment.WebRootPath;
+        if (string.IsNullOrWhiteSpace(webRootPath))
+        {
+            webRootPath = Path.Combine(environment.ContentRootPath, "wwwroot");
+        }
+
+        _rootPath = Path.Combine(webRootPath, "uploads");
         Directory.CreateDirectory(_rootPath);
     }
 
@@ -40,7 +50,7 @@ public class LocalPrivateStorageService : IPrivateStorageService
         var fullPath = Path.Combine(_rootPath, normalizedKey.Replace('/', Path.DirectorySeparatorChar));
 
         if (!File.Exists(fullPath))
-            throw new FileNotFoundException("Private storage object not found.", normalizedKey);
+            throw new FileNotFoundException("Storage object not found.", normalizedKey);
 
         Stream stream = File.OpenRead(fullPath);
         return Task.FromResult(stream);

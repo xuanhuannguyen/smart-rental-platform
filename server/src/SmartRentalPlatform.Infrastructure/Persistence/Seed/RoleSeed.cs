@@ -9,8 +9,7 @@ public static class RoleSeed
     public const int TenantRoleId = 2;
     public const int LandlordRoleId = 3;
 
-    private static readonly DateTimeOffset SeededAt =
-        new(2026, 1, 1, 0, 0, 0, TimeSpan.Zero);
+    private static readonly DateTimeOffset SeededAt = new(2026, 1, 1, 0, 0, 0, TimeSpan.Zero);
 
     public static Role[] GetRoles()
     {

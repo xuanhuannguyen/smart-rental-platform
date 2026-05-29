@@ -3,13 +3,23 @@ import react from '@vitejs/plugin-react';
 
 export default defineConfig({
   plugins: [react()],
-  server: {
-    port: 5173,
-    proxy: {
-      '/api': {
-        target: 'http://localhost:5294',
-        changeOrigin: true
+  build: {
+    rollupOptions: {
+      onwarn(warning, warn) {
+        if (
+          warning.code === 'MODULE_LEVEL_DIRECTIVE' &&
+          typeof warning.id === 'string' &&
+          warning.id.includes('node_modules/react-router')
+        ) {
+          return;
+        }
+
+        warn(warning);
       }
     }
+  },
+  server: {
+    host: 'localhost',
+    port: 5173
   }
 });
