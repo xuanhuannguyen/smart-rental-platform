@@ -11,6 +11,8 @@ import { KycStatusPage } from '../../features/kyc/pages/KycStatusPage';
 import CreateRoomingHousePage from '../../features/rooming-houses/CreateRoomingHousePage';
 import LandlordDashboardPage from '../../features/landlord/pages/LandlordDashboardPage';
 import RoomingHouseDetailPage from '../../features/landlord/pages/RoomingHouseDetailPage';
+import LandlordBillingPage from '../../features/billing/pages/LandlordBillingPage';
+import TenantInvoicesPage from '../../features/billing/pages/TenantInvoicesPage';
 import { AdminHomePage } from '../../features/admin/pages/AdminHomePage';
 import { OnboardingGuard } from './OnboardingGuard';
 import { ProtectedRoute } from './ProtectedRoute';
@@ -73,6 +75,10 @@ export const router = createBrowserRouter([
                         element: <KycStatusPage />
                     },
                     {
+                        path: ROUTE_PATHS.ME.INVOICES,
+                        element: <TenantInvoicesPage />
+                    },
+                    {
                         path: ROUTE_PATHS.LANDLORD.REGISTER,
                         element: <CreateRoomingHousePage />
                     },
@@ -87,6 +93,34 @@ export const router = createBrowserRouter([
                     {
                         path: '/landlord/rooming-houses/:id',
                         element: <RoomingHouseDetailPage />
+                    },
+                    {
+                        path: '/landlord/rooming-houses/:id/billing',
+                        element: <LandlordBillingPage />
+                    },
+                    {
+                        path: '/landlord/rooming-houses/:id/service-prices',
+                        element: <LandlordBillingPage />
+                    },
+                    {
+                        path: ROUTE_PATHS.LANDLORD.METER_READINGS,
+                        element: <LandlordBillingPage />
+                    },
+                    {
+                        path: ROUTE_PATHS.LANDLORD.INVOICES,
+                        element: <LandlordBillingPage />
+                    },
+                    {
+                        path: ROUTE_PATHS.LANDLORD.INVOICE_CREATE,
+                        element: <LandlordBillingPage />
+                    },
+                    {
+                        path: '/landlord/invoices/:invoiceId',
+                        element: <LandlordBillingPage />
+                    },
+                    {
+                        path: '/me/invoices/:invoiceId',
+                        element: <TenantInvoicesPage />
                     },
                     {
                         element: <RoleGuard allowedRoles={['Admin']} />,

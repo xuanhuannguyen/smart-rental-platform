@@ -1,4 +1,4 @@
-import { useState, useEffect, useMemo, ReactNode } from 'react';
+import { useState, useEffect, useMemo, ReactNode, FormEvent } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { useAuth } from '../../../app/providers/AuthProvider';
 import { ROUTE_PATHS } from '../../../app/router/routePaths';
@@ -24,6 +24,7 @@ import {
   updateRoomImages,
   updateRoomPriceTiers,
 } from '../../rooms/api';
+import { billingApi } from '../../billing/api';
 import type {
   RoomingHouseDetail,
   Amenity,
@@ -32,14 +33,33 @@ import type {
   UpdateLeasePolicyRequest,
 } from '../../rooming-houses/types';
 import type { Room, CreateRoomRequest, RoomPriceTierRequest } from '../../rooms/types';
+import type { BillingServiceCode, CreateServicePriceRequest, ServicePrice } from '../../billing/types';
 import { getProvinces, getWardsByProvince } from '../../administrative/api';
 import type { Province, Ward } from '../../administrative/types';
 import PropertyImageEditor from '../../rooming-houses/components/PropertyImageEditor';
 import { cleanImages, toImageRequests } from '../../rooming-houses/utils/imageRequests';
 import './RoomingHouseDetailPage.css';
 
-type MainTab = 'basic' | 'images' | 'amenities' | 'legal' | 'lease-policy' | 'rooms';
+type MainTab = 'basic' | 'images' | 'amenities' | 'legal' | 'lease-policy' | 'service-prices' | 'rooms';
 type RoomTab = 'basic' | 'images' | 'amenities' | 'price';
+
+const today = new Date().toISOString().slice(0, 10);
+
+const serviceOptions: Array<{ code: BillingServiceCode; label: string; method: 'Metered' | 'Fixed'; unit: string; defaultPrice: number }> = [
+  { code: 'Electric', label: 'Điện', method: 'Metered', unit: 'kWh', defaultPrice: 4000 },
+  { code: 'Water', label: 'Nước', method: 'Metered', unit: 'm3', defaultPrice: 18000 },
+  { code: 'Wifi', label: 'Wifi', method: 'Fixed', unit: 'tháng', defaultPrice: 100000 },
+  { code: 'Trash', label: 'Rác', method: 'Fixed', unit: 'tháng', defaultPrice: 50000 },
+];
+
+const emptyServicePriceForm: CreateServicePriceRequest = {
+  serviceCode: 'Electric',
+  billingMethod: 'Metered',
+  unitName: 'kWh',
+  unitPrice: 4000,
+  effectiveFrom: today,
+  note: '',
+};
 
 const emptyRoomForm: CreateRoomRequest = {
   roomNumber: '',
@@ -74,6 +94,11 @@ export default function RoomingHouseDetailPage() {
 
   // Lease Policy
   const [leasePolicyForm, setLeasePolicyForm] = useState<UpdateLeasePolicyRequest>(emptyLeasePolicyForm);
+
+  // Giá dịch vụ theo từng khu trọ
+  const [servicePrices, setServicePrices] = useState<ServicePrice[]>([]);
+  const [servicePricesLoading, setServicePricesLoading] = useState(false);
+  const [servicePriceForm, setServicePriceForm] = useState<CreateServicePriceRequest>(emptyServicePriceForm);
 
   // Địa giới hành chính cho Tab 1
   const [provinces, setProvinces] = useState<Province[]>([]);
@@ -184,6 +209,9 @@ export default function RoomingHouseDetailPage() {
     if (activeTab === 'amenities' && houseAmenities.length === 0) {
       getAmenities('House').then(setHouseAmenities).catch(() => {});
     }
+    if (activeTab === 'service-prices' && house) {
+      loadServicePrices();
+    }
   }, [activeTab]);
 
   // Tải Phường/Xã theo Tỉnh/Thành
@@ -202,6 +230,16 @@ export default function RoomingHouseDetailPage() {
     occupied: rooms.filter((r) => r.status === 'Occupied').length,
     hidden: rooms.filter((r) => r.status === 'Hidden').length,
   }), [rooms]);
+
+  const activeServicePrices = useMemo(
+    () => servicePrices.filter((price) => price.isActive),
+    [servicePrices]
+  );
+
+  const servicePriceHistory = useMemo(
+    () => servicePrices.filter((price) => !price.isActive),
+    [servicePrices]
+  );
 
   // ─── Tab 1: Lưu thông tin cơ bản khu trọ ──────────────────────────────────
   async function handleSaveBasicInfo() {
@@ -282,6 +320,54 @@ export default function RoomingHouseDetailPage() {
   }
 
   // ─── Tab 5: Logic Quản lý phòng ──────────────────────────────────────────
+  async function loadServicePrices() {
+    if (!house) return;
+    setServicePricesLoading(true);
+    try {
+      const response = await billingApi.getServicePrices(house.id);
+      setServicePrices(response.data);
+    } catch (err) {
+      setMessage(getApiErrorMessage(err, 'Không thể tải bảng giá dịch vụ của khu trọ.'));
+    } finally {
+      setServicePricesLoading(false);
+    }
+  }
+
+  function handleSelectServicePrice(code: BillingServiceCode) {
+    const option = serviceOptions.find((item) => item.code === code);
+    if (!option) return;
+
+    setServicePriceForm((current) => ({
+      ...current,
+      serviceCode: option.code,
+      billingMethod: option.method,
+      unitName: option.unit,
+      unitPrice: option.defaultPrice,
+    }));
+  }
+
+  async function handleSaveServicePrice(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    if (!house) return;
+
+    setActionLoading(true);
+    setMessage('');
+    try {
+      await billingApi.createServicePrice(house.id, {
+        ...servicePriceForm,
+        unitPrice: Number(servicePriceForm.unitPrice) || 0,
+        note: servicePriceForm.note?.trim() || null,
+      });
+      const response = await billingApi.getServicePrices(house.id);
+      setServicePrices(response.data);
+      setMessage('Đã cập nhật giá dịch vụ cho khu trọ thành công.');
+    } catch (err) {
+      setMessage(getApiErrorMessage(err, 'Không thể cập nhật giá dịch vụ.'));
+    } finally {
+      setActionLoading(false);
+    }
+  }
+
   async function openRoom(roomId: string) {
     setActionLoading(true);
     setMessage('');
@@ -586,6 +672,9 @@ export default function RoomingHouseDetailPage() {
             <button className={activeTab === 'lease-policy' ? 'active' : ''} onClick={() => setActiveTab('lease-policy')}>
               Chính sách thuê
             </button>
+            <button className={activeTab === 'service-prices' ? 'active' : ''} onClick={() => setActiveTab('service-prices')}>
+              Giá dịch vụ
+            </button>
             <button
               type="button"
               className="primary-action"
@@ -882,6 +971,21 @@ export default function RoomingHouseDetailPage() {
           )}
 
           {/* TAB 5: QUẢN LÝ PHÒNG */}
+          {activeTab === 'service-prices' && (
+            <ServicePriceEditor
+              prices={servicePrices}
+              activePrices={activeServicePrices}
+              priceHistory={servicePriceHistory}
+              loading={servicePricesLoading}
+              form={servicePriceForm}
+              actionLoading={actionLoading}
+              onSelectService={handleSelectServicePrice}
+              onChangeForm={setServicePriceForm}
+              onSubmit={handleSaveServicePrice}
+              onReload={loadServicePrices}
+            />
+          )}
+
           {activeTab === 'rooms' && (
             <div>
               {roomEditorMode === 'list' && (
@@ -929,6 +1033,18 @@ export default function RoomingHouseDetailPage() {
                     </button>
                     {roomEditorMode === 'edit' && selectedRoom && (
                       <div style={{ display: 'flex', gap: '8px' }}>
+                        <button
+                          className="secondary-action"
+                          onClick={() => navigate(`${ROUTE_PATHS.LANDLORD.METER_READINGS}?roomId=${selectedRoom.id}`)}
+                        >
+                          Nhập chỉ số
+                        </button>
+                        <button
+                          className="secondary-action"
+                          onClick={() => navigate(`${ROUTE_PATHS.LANDLORD.INVOICE_CREATE}?roomId=${selectedRoom.id}`)}
+                        >
+                          Tạo hóa đơn
+                        </button>
                         {selectedRoom.status === 'Hidden' && (
                           <button className="primary-action" onClick={handlePublishRoom}>
                             Hiển thị phòng (Hoạt động)
@@ -1076,6 +1192,157 @@ export default function RoomingHouseDetailPage() {
 }
 
 // ─── Subcomponents ──────────────────────────────────────────────────────────
+
+function ServicePriceEditor({
+  activePrices,
+  priceHistory,
+  loading,
+  form,
+  actionLoading,
+  onSelectService,
+  onChangeForm,
+  onSubmit,
+  onReload,
+}: {
+  prices: ServicePrice[];
+  activePrices: ServicePrice[];
+  priceHistory: ServicePrice[];
+  loading: boolean;
+  form: CreateServicePriceRequest;
+  actionLoading: boolean;
+  onSelectService: (code: BillingServiceCode) => void;
+  onChangeForm: (form: CreateServicePriceRequest) => void;
+  onSubmit: (event: FormEvent<HTMLFormElement>) => void;
+  onReload: () => void;
+}) {
+  const activeByCode = new Map(activePrices.map((price) => [price.serviceCode, price]));
+
+  return (
+    <div className="editor-panel service-price-editor">
+      <div className="service-price-header">
+        <div>
+          <h3>Giá dịch vụ của khu trọ</h3>
+          <p>Mỗi khu trọ có thể cấu hình giá điện, nước và các khoản cố định riêng.</p>
+        </div>
+        <button type="button" className="secondary-action" onClick={onReload} disabled={loading}>
+          Làm mới
+        </button>
+      </div>
+
+      <div className="service-price-grid">
+        <section className="service-price-panel">
+          <div className="section-heading">
+            <h4>Giá đang áp dụng</h4>
+            <span>{activePrices.length}/4 dịch vụ</span>
+          </div>
+
+          {loading ? (
+            <div className="empty-panel compact">Đang tải bảng giá dịch vụ...</div>
+          ) : (
+            <div className="service-price-cards">
+              {serviceOptions.map((service) => {
+                const price = activeByCode.get(service.code);
+                return (
+                  <div className="service-price-card" key={service.code}>
+                    <div>
+                      <strong>{service.label}</strong>
+                      <span>{price ? `${formatMoneyString(price.unitPrice)} VND / ${price.unitName}` : 'Chưa cấu hình'}</span>
+                    </div>
+                    <small>{price ? `Từ ${price.effectiveFrom}` : service.method === 'Metered' ? 'Theo chỉ số' : 'Cố định'}</small>
+                  </div>
+                );
+              })}
+            </div>
+          )}
+        </section>
+
+        <section className="service-price-panel">
+          <div className="section-heading">
+            <h4>Cập nhật giá mới</h4>
+          </div>
+
+          <form className="service-price-form" onSubmit={onSubmit}>
+            <label className="field">
+              <span>Dịch vụ</span>
+              <select value={form.serviceCode} onChange={(event) => onSelectService(event.target.value as BillingServiceCode)}>
+                {serviceOptions.map((service) => (
+                  <option key={service.code} value={service.code}>{service.label}</option>
+                ))}
+              </select>
+            </label>
+
+            <div className="form-grid">
+              <label className="field">
+                <span>Cách tính</span>
+                <input value={form.billingMethod === 'Metered' ? 'Theo chỉ số' : 'Cố định'} readOnly />
+              </label>
+              <label className="field">
+                <span>Đơn vị</span>
+                <input value={form.unitName} onChange={(event) => onChangeForm({ ...form, unitName: event.target.value })} />
+              </label>
+            </div>
+
+            <div className="form-grid">
+              <label className="field">
+                <span>Đơn giá (VND)</span>
+                <input
+                  type="text"
+                  value={formatMoneyString(form.unitPrice)}
+                  onChange={(event) => onChangeForm({ ...form, unitPrice: parseMoneyString(event.target.value) })}
+                  placeholder="0"
+                />
+              </label>
+              <label className="field">
+                <span>Hiệu lực từ</span>
+                <input type="date" value={form.effectiveFrom} onChange={(event) => onChangeForm({ ...form, effectiveFrom: event.target.value })} />
+              </label>
+            </div>
+
+            <label className="field">
+              <span>Ghi chú</span>
+              <input value={form.note ?? ''} onChange={(event) => onChangeForm({ ...form, note: event.target.value })} placeholder="Ví dụ: điều chỉnh theo biểu giá tháng này" />
+            </label>
+
+            <div className="save-row">
+              <button type="submit" className="primary-action" disabled={actionLoading || form.unitPrice <= 0}>
+                {actionLoading ? 'Đang lưu...' : 'Lưu giá dịch vụ'}
+              </button>
+            </div>
+          </form>
+        </section>
+      </div>
+
+      <section className="service-price-panel service-price-history">
+        <div className="section-heading">
+          <h4>Lịch sử thay đổi giá</h4>
+          <span>{priceHistory.length} bản ghi</span>
+        </div>
+        {priceHistory.length === 0 ? (
+          <div className="empty-panel compact">Chưa có lịch sử thay đổi giá.</div>
+        ) : (
+          <div className="service-price-table">
+            <div className="service-price-row service-price-row--head">
+              <span>Dịch vụ</span>
+              <span>Đơn giá</span>
+              <span>Đơn vị</span>
+              <span>Từ ngày</span>
+              <span>Đến ngày</span>
+            </div>
+            {priceHistory.map((price) => (
+              <div className="service-price-row" key={price.id}>
+                <span>{serviceOptions.find((service) => service.code === price.serviceCode)?.label ?? price.serviceName}</span>
+                <span>{formatMoneyString(price.unitPrice)} VND</span>
+                <span>{price.unitName}</span>
+                <span>{price.effectiveFrom}</span>
+                <span>{price.effectiveTo ?? 'Đang thay thế'}</span>
+              </div>
+            ))}
+          </div>
+        )}
+      </section>
+    </div>
+  );
+}
 
 function AmenityEditor({
   amenities,

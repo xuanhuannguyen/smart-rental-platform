@@ -33676,6 +33676,574 @@ namespace SmartRentalPlatform.Infrastructure.Persistence.Migrations
                         });
                 });
 
+            modelBuilder.Entity("SmartRentalPlatform.Domain.Entities.Billing.BillingServiceType", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid")
+                        .HasColumnName("id");
+
+                    b.Property<string>("Code")
+                        .IsRequired()
+                        .HasMaxLength(30)
+                        .HasColumnType("character varying(30)")
+                        .HasColumnName("code");
+
+                    b.Property<DateTimeOffset>("CreatedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("created_at");
+
+                    b.Property<bool>("IsActive")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("boolean")
+                        .HasDefaultValue(true)
+                        .HasColumnName("is_active");
+
+                    b.Property<bool>("IsMetered")
+                        .HasColumnType("boolean")
+                        .HasColumnName("is_metered");
+
+                    b.Property<string>("Name")
+                        .IsRequired()
+                        .HasMaxLength(100)
+                        .HasColumnType("character varying(100)")
+                        .HasColumnName("name");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("Code")
+                        .IsUnique();
+
+                    b.ToTable("billing_service_types", (string)null);
+
+                    b.HasData(
+                        new
+                        {
+                            Id = new Guid("60000000-0000-0000-0000-000000000001"),
+                            Code = "Electric",
+                            CreatedAt = new DateTimeOffset(new DateTime(2026, 1, 1, 0, 0, 0, 0, DateTimeKind.Unspecified), new TimeSpan(0, 0, 0, 0, 0)),
+                            IsActive = true,
+                            IsMetered = true,
+                            Name = "Electric"
+                        },
+                        new
+                        {
+                            Id = new Guid("60000000-0000-0000-0000-000000000002"),
+                            Code = "Water",
+                            CreatedAt = new DateTimeOffset(new DateTime(2026, 1, 1, 0, 0, 0, 0, DateTimeKind.Unspecified), new TimeSpan(0, 0, 0, 0, 0)),
+                            IsActive = true,
+                            IsMetered = true,
+                            Name = "Water"
+                        },
+                        new
+                        {
+                            Id = new Guid("60000000-0000-0000-0000-000000000003"),
+                            Code = "Wifi",
+                            CreatedAt = new DateTimeOffset(new DateTime(2026, 1, 1, 0, 0, 0, 0, DateTimeKind.Unspecified), new TimeSpan(0, 0, 0, 0, 0)),
+                            IsActive = true,
+                            IsMetered = false,
+                            Name = "Wifi"
+                        },
+                        new
+                        {
+                            Id = new Guid("60000000-0000-0000-0000-000000000004"),
+                            Code = "Trash",
+                            CreatedAt = new DateTimeOffset(new DateTime(2026, 1, 1, 0, 0, 0, 0, DateTimeKind.Unspecified), new TimeSpan(0, 0, 0, 0, 0)),
+                            IsActive = true,
+                            IsMetered = false,
+                            Name = "Trash"
+                        });
+                });
+
+            modelBuilder.Entity("SmartRentalPlatform.Domain.Entities.Billing.Invoice", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid")
+                        .HasColumnName("id");
+
+                    b.Property<DateOnly>("BillingPeriodEnd")
+                        .HasColumnType("date")
+                        .HasColumnName("billing_period_end");
+
+                    b.Property<DateOnly>("BillingPeriodStart")
+                        .HasColumnType("date")
+                        .HasColumnName("billing_period_start");
+
+                    b.Property<string>("CancelReason")
+                        .HasColumnType("text")
+                        .HasColumnName("cancel_reason");
+
+                    b.Property<DateTimeOffset?>("CancelledAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("cancelled_at");
+
+                    b.Property<Guid>("ContractId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("contract_id");
+
+                    b.Property<DateTimeOffset>("CreatedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("created_at");
+
+                    b.Property<decimal>("DiscountAmount")
+                        .HasPrecision(12, 2)
+                        .HasColumnType("numeric(12,2)")
+                        .HasColumnName("discount_amount");
+
+                    b.Property<DateOnly>("DueDate")
+                        .HasColumnType("date")
+                        .HasColumnName("due_date");
+
+                    b.Property<string>("InvoiceNo")
+                        .IsRequired()
+                        .HasMaxLength(50)
+                        .HasColumnType("character varying(50)")
+                        .HasColumnName("invoice_no");
+
+                    b.Property<DateOnly?>("IssueDate")
+                        .HasColumnType("date")
+                        .HasColumnName("issue_date");
+
+                    b.Property<Guid>("LandlordUserId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("landlord_user_id");
+
+                    b.Property<string>("Note")
+                        .HasColumnType("text")
+                        .HasColumnName("note");
+
+                    b.Property<decimal>("PaidAmount")
+                        .HasPrecision(12, 2)
+                        .HasColumnType("numeric(12,2)")
+                        .HasColumnName("paid_amount");
+
+                    b.Property<DateTimeOffset?>("PaidAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("paid_at");
+
+                    b.Property<decimal>("RemainingAmount")
+                        .HasPrecision(12, 2)
+                        .HasColumnType("numeric(12,2)")
+                        .HasColumnName("remaining_amount");
+
+                    b.Property<decimal>("RentAmount")
+                        .HasPrecision(12, 2)
+                        .HasColumnType("numeric(12,2)")
+                        .HasColumnName("rent_amount");
+
+                    b.Property<Guid>("RoomId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("room_id");
+
+                    b.Property<DateTimeOffset?>("SentAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("sent_at");
+
+                    b.Property<decimal>("ServiceAmount")
+                        .HasPrecision(12, 2)
+                        .HasColumnType("numeric(12,2)")
+                        .HasColumnName("service_amount");
+
+                    b.Property<string>("Status")
+                        .IsRequired()
+                        .ValueGeneratedOnAdd()
+                        .HasMaxLength(30)
+                        .HasColumnType("character varying(30)")
+                        .HasDefaultValue("Draft")
+                        .HasColumnName("status");
+
+                    b.Property<Guid>("TenantUserId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("tenant_user_id");
+
+                    b.Property<decimal>("TotalAmount")
+                        .HasPrecision(12, 2)
+                        .HasColumnType("numeric(12,2)")
+                        .HasColumnName("total_amount");
+
+                    b.Property<DateTimeOffset>("UpdatedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("updated_at");
+
+                    b.Property<decimal>("UtilityAmount")
+                        .HasPrecision(12, 2)
+                        .HasColumnType("numeric(12,2)")
+                        .HasColumnName("utility_amount");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("InvoiceNo")
+                        .IsUnique();
+
+                    b.HasIndex("LandlordUserId");
+
+                    b.HasIndex("RoomId");
+
+                    b.HasIndex("TenantUserId");
+
+                    b.HasIndex("ContractId", "BillingPeriodStart", "BillingPeriodEnd")
+                        .IsUnique();
+
+                    b.ToTable("invoices", (string)null);
+                });
+
+            modelBuilder.Entity("SmartRentalPlatform.Domain.Entities.Billing.InvoiceItem", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid")
+                        .HasColumnName("id");
+
+                    b.Property<decimal>("Amount")
+                        .HasPrecision(12, 2)
+                        .HasColumnType("numeric(12,2)")
+                        .HasColumnName("amount");
+
+                    b.Property<DateTimeOffset>("CreatedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("created_at");
+
+                    b.Property<string>("Description")
+                        .IsRequired()
+                        .HasColumnType("text")
+                        .HasColumnName("description");
+
+                    b.Property<Guid>("InvoiceId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("invoice_id");
+
+                    b.Property<string>("ItemType")
+                        .IsRequired()
+                        .HasMaxLength(30)
+                        .HasColumnType("character varying(30)")
+                        .HasColumnName("item_type");
+
+                    b.Property<Guid?>("MeterReadingId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("meter_reading_id");
+
+                    b.Property<decimal>("Quantity")
+                        .HasPrecision(12, 2)
+                        .HasColumnType("numeric(12,2)")
+                        .HasColumnName("quantity");
+
+                    b.Property<Guid?>("ServiceTypeId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("service_type_id");
+
+                    b.Property<decimal>("UnitPrice")
+                        .HasPrecision(12, 2)
+                        .HasColumnType("numeric(12,2)")
+                        .HasColumnName("unit_price");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("InvoiceId");
+
+                    b.HasIndex("MeterReadingId");
+
+                    b.HasIndex("ServiceTypeId");
+
+                    b.ToTable("invoice_items", (string)null);
+                });
+
+            modelBuilder.Entity("SmartRentalPlatform.Domain.Entities.Billing.InvoicePayment", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid")
+                        .HasColumnName("id");
+
+                    b.Property<decimal>("Amount")
+                        .HasPrecision(12, 2)
+                        .HasColumnType("numeric(12,2)")
+                        .HasColumnName("amount");
+
+                    b.Property<DateTimeOffset>("CreatedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("created_at");
+
+                    b.Property<Guid>("InvoiceId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("invoice_id");
+
+                    b.Property<Guid>("LandlordUserId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("landlord_user_id");
+
+                    b.Property<DateTimeOffset>("PaidAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("paid_at");
+
+                    b.Property<string>("Status")
+                        .IsRequired()
+                        .ValueGeneratedOnAdd()
+                        .HasMaxLength(30)
+                        .HasColumnType("character varying(30)")
+                        .HasDefaultValue("Succeeded")
+                        .HasColumnName("status");
+
+                    b.Property<Guid>("TenantUserId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("tenant_user_id");
+
+                    b.Property<Guid>("WalletTransferGroupId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("wallet_transfer_group_id");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("InvoiceId");
+
+                    b.HasIndex("LandlordUserId");
+
+                    b.HasIndex("TenantUserId");
+
+                    b.HasIndex("WalletTransferGroupId")
+                        .IsUnique();
+
+                    b.ToTable("invoice_payments", (string)null);
+                });
+
+            modelBuilder.Entity("SmartRentalPlatform.Domain.Entities.Billing.MeterReading", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid")
+                        .HasColumnName("id");
+
+                    b.Property<DateOnly>("BillingPeriodEnd")
+                        .HasColumnType("date")
+                        .HasColumnName("billing_period_end");
+
+                    b.Property<DateOnly>("BillingPeriodStart")
+                        .HasColumnType("date")
+                        .HasColumnName("billing_period_start");
+
+                    b.Property<decimal>("Consumption")
+                        .HasPrecision(12, 2)
+                        .HasColumnType("numeric(12,2)")
+                        .HasColumnName("consumption");
+
+                    b.Property<Guid>("ContractId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("contract_id");
+
+                    b.Property<DateTimeOffset>("CreatedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("created_at");
+
+                    b.Property<decimal>("CurrentReading")
+                        .HasPrecision(12, 2)
+                        .HasColumnType("numeric(12,2)")
+                        .HasColumnName("current_reading");
+
+                    b.Property<decimal>("PreviousReading")
+                        .HasPrecision(12, 2)
+                        .HasColumnType("numeric(12,2)")
+                        .HasColumnName("previous_reading");
+
+                    b.Property<string>("ProofImageObjectKey")
+                        .HasColumnType("text")
+                        .HasColumnName("proof_image_object_key");
+
+                    b.Property<DateTimeOffset>("ReadingAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("reading_at");
+
+                    b.Property<Guid>("RecordedByLandlordUserId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("recorded_by_landlord_user_id");
+
+                    b.Property<Guid>("RoomId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("room_id");
+
+                    b.Property<Guid>("ServiceTypeId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("service_type_id");
+
+                    b.Property<string>("Status")
+                        .IsRequired()
+                        .ValueGeneratedOnAdd()
+                        .HasMaxLength(30)
+                        .HasColumnType("character varying(30)")
+                        .HasDefaultValue("Draft")
+                        .HasColumnName("status");
+
+                    b.Property<DateTimeOffset>("UpdatedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("updated_at");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("RecordedByLandlordUserId");
+
+                    b.HasIndex("RoomId");
+
+                    b.HasIndex("ServiceTypeId");
+
+                    b.HasIndex("ContractId", "ServiceTypeId", "BillingPeriodStart", "BillingPeriodEnd")
+                        .IsUnique();
+
+                    b.ToTable("meter_readings", (string)null);
+                });
+
+            modelBuilder.Entity("SmartRentalPlatform.Domain.Entities.Billing.RoomingHouseServicePrice", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid")
+                        .HasColumnName("id");
+
+                    b.Property<string>("BillingMethod")
+                        .IsRequired()
+                        .HasMaxLength(30)
+                        .HasColumnType("character varying(30)")
+                        .HasColumnName("billing_method");
+
+                    b.Property<DateTimeOffset>("CreatedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("created_at");
+
+                    b.Property<DateOnly>("EffectiveFrom")
+                        .HasColumnType("date")
+                        .HasColumnName("effective_from");
+
+                    b.Property<DateOnly?>("EffectiveTo")
+                        .HasColumnType("date")
+                        .HasColumnName("effective_to");
+
+                    b.Property<bool>("IsActive")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("boolean")
+                        .HasDefaultValue(true)
+                        .HasColumnName("is_active");
+
+                    b.Property<string>("Note")
+                        .HasColumnType("text")
+                        .HasColumnName("note");
+
+                    b.Property<Guid>("RoomingHouseId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("rooming_house_id");
+
+                    b.Property<Guid>("ServiceTypeId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("service_type_id");
+
+                    b.Property<string>("UnitName")
+                        .IsRequired()
+                        .HasMaxLength(50)
+                        .HasColumnType("character varying(50)")
+                        .HasColumnName("unit_name");
+
+                    b.Property<decimal>("UnitPrice")
+                        .HasPrecision(12, 2)
+                        .HasColumnType("numeric(12,2)")
+                        .HasColumnName("unit_price");
+
+                    b.Property<DateTimeOffset>("UpdatedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("updated_at");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("ServiceTypeId");
+
+                    b.HasIndex("RoomingHouseId", "ServiceTypeId", "EffectiveFrom")
+                        .IsUnique();
+
+                    b.HasIndex("RoomingHouseId", "ServiceTypeId", "IsActive")
+                        .HasDatabaseName("IX_rooming_house_service_prices_rooming_house_id_service_type~1");
+
+                    b.ToTable("rooming_house_service_prices", (string)null);
+                });
+
+            modelBuilder.Entity("SmartRentalPlatform.Domain.Entities.Leasing.Contract", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid")
+                        .HasColumnName("id");
+
+                    b.Property<DateTimeOffset?>("ActivatedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("activated_at");
+
+                    b.Property<string>("ContractNumber")
+                        .IsRequired()
+                        .HasMaxLength(50)
+                        .HasColumnType("character varying(50)")
+                        .HasColumnName("contract_number");
+
+                    b.Property<DateTimeOffset>("CreatedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("created_at");
+
+                    b.Property<decimal>("DepositAmount")
+                        .HasPrecision(12, 2)
+                        .HasColumnType("numeric(12,2)")
+                        .HasColumnName("deposit_amount");
+
+                    b.Property<DateOnly>("EndDate")
+                        .HasColumnType("date")
+                        .HasColumnName("end_date");
+
+                    b.Property<Guid>("MainTenantUserId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("main_tenant_user_id");
+
+                    b.Property<decimal>("MonthlyRent")
+                        .HasPrecision(12, 2)
+                        .HasColumnType("numeric(12,2)")
+                        .HasColumnName("monthly_rent");
+
+                    b.Property<int>("PaymentDay")
+                        .HasColumnType("integer")
+                        .HasColumnName("payment_day");
+
+                    b.Property<Guid?>("RentalRequestId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("rental_request_id");
+
+                    b.Property<Guid?>("RoomDepositId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("room_deposit_id");
+
+                    b.Property<Guid>("RoomId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("room_id");
+
+                    b.Property<string>("RoomSnapshot")
+                        .HasColumnType("jsonb")
+                        .HasColumnName("room_snapshot");
+
+                    b.Property<DateOnly>("StartDate")
+                        .HasColumnType("date")
+                        .HasColumnName("start_date");
+
+                    b.Property<string>("Status")
+                        .IsRequired()
+                        .ValueGeneratedOnAdd()
+                        .HasMaxLength(30)
+                        .HasColumnType("character varying(30)")
+                        .HasDefaultValue("Draft")
+                        .HasColumnName("status");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("ContractNumber")
+                        .IsUnique();
+
+                    b.HasIndex("MainTenantUserId");
+
+                    b.HasIndex("RoomId", "Status");
+
+                    b.ToTable("contracts", (string)null);
+                });
+
             modelBuilder.Entity("SmartRentalPlatform.Domain.Entities.Properties.Amenity", b =>
                 {
                     b.Property<int>("Id")
@@ -34812,6 +35380,114 @@ namespace SmartRentalPlatform.Infrastructure.Persistence.Migrations
                     b.ToTable("user_tokens", (string)null);
                 });
 
+            modelBuilder.Entity("SmartRentalPlatform.Domain.Entities.Wallets.WalletAccount", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid")
+                        .HasColumnName("id");
+
+                    b.Property<decimal>("Balance")
+                        .HasPrecision(12, 2)
+                        .HasColumnType("numeric(12,2)")
+                        .HasColumnName("balance");
+
+                    b.Property<string>("Currency")
+                        .IsRequired()
+                        .ValueGeneratedOnAdd()
+                        .HasMaxLength(10)
+                        .HasColumnType("character varying(10)")
+                        .HasDefaultValue("VND")
+                        .HasColumnName("currency");
+
+                    b.Property<decimal>("ReservedBalance")
+                        .HasPrecision(12, 2)
+                        .HasColumnType("numeric(12,2)")
+                        .HasColumnName("reserved_balance");
+
+                    b.Property<string>("Status")
+                        .IsRequired()
+                        .ValueGeneratedOnAdd()
+                        .HasMaxLength(30)
+                        .HasColumnType("character varying(30)")
+                        .HasDefaultValue("Active")
+                        .HasColumnName("status");
+
+                    b.Property<Guid>("UserId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("user_id");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("UserId")
+                        .IsUnique();
+
+                    b.ToTable("wallet_accounts", (string)null);
+                });
+
+            modelBuilder.Entity("SmartRentalPlatform.Domain.Entities.Wallets.WalletTransaction", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid")
+                        .HasColumnName("id");
+
+                    b.Property<decimal>("Amount")
+                        .HasPrecision(12, 2)
+                        .HasColumnType("numeric(12,2)")
+                        .HasColumnName("amount");
+
+                    b.Property<decimal>("BalanceAfter")
+                        .HasPrecision(12, 2)
+                        .HasColumnType("numeric(12,2)")
+                        .HasColumnName("balance_after");
+
+                    b.Property<decimal>("BalanceBefore")
+                        .HasPrecision(12, 2)
+                        .HasColumnType("numeric(12,2)")
+                        .HasColumnName("balance_before");
+
+                    b.Property<string>("Direction")
+                        .IsRequired()
+                        .HasMaxLength(20)
+                        .HasColumnType("character varying(20)")
+                        .HasColumnName("direction");
+
+                    b.Property<string>("Status")
+                        .IsRequired()
+                        .ValueGeneratedOnAdd()
+                        .HasMaxLength(30)
+                        .HasColumnType("character varying(30)")
+                        .HasDefaultValue("Pending")
+                        .HasColumnName("status");
+
+                    b.Property<string>("TransactionType")
+                        .IsRequired()
+                        .HasMaxLength(50)
+                        .HasColumnType("character varying(50)")
+                        .HasColumnName("transaction_type");
+
+                    b.Property<Guid>("TransferGroupId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("transfer_group_id");
+
+                    b.Property<Guid>("UserId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("user_id");
+
+                    b.Property<Guid>("WalletAccountId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("wallet_account_id");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("TransferGroupId");
+
+                    b.HasIndex("WalletAccountId");
+
+                    b.ToTable("wallet_transactions", (string)null);
+                });
+
             modelBuilder.Entity("SmartRentalPlatform.Domain.Entities.Administrative.AdministrativeWard", b =>
                 {
                     b.HasOne("SmartRentalPlatform.Domain.Entities.Administrative.AdministrativeProvince", "Province")
@@ -34821,6 +35497,166 @@ namespace SmartRentalPlatform.Infrastructure.Persistence.Migrations
                         .IsRequired();
 
                     b.Navigation("Province");
+                });
+
+            modelBuilder.Entity("SmartRentalPlatform.Domain.Entities.Billing.Invoice", b =>
+                {
+                    b.HasOne("SmartRentalPlatform.Domain.Entities.Leasing.Contract", "Contract")
+                        .WithMany("Invoices")
+                        .HasForeignKey("ContractId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.HasOne("SmartRentalPlatform.Domain.Entities.Users.User", "Landlord")
+                        .WithMany()
+                        .HasForeignKey("LandlordUserId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.HasOne("SmartRentalPlatform.Domain.Entities.Properties.Room", "Room")
+                        .WithMany()
+                        .HasForeignKey("RoomId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.HasOne("SmartRentalPlatform.Domain.Entities.Users.User", "Tenant")
+                        .WithMany()
+                        .HasForeignKey("TenantUserId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.Navigation("Contract");
+
+                    b.Navigation("Landlord");
+
+                    b.Navigation("Room");
+
+                    b.Navigation("Tenant");
+                });
+
+            modelBuilder.Entity("SmartRentalPlatform.Domain.Entities.Billing.InvoiceItem", b =>
+                {
+                    b.HasOne("SmartRentalPlatform.Domain.Entities.Billing.Invoice", "Invoice")
+                        .WithMany("Items")
+                        .HasForeignKey("InvoiceId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.HasOne("SmartRentalPlatform.Domain.Entities.Billing.MeterReading", "MeterReading")
+                        .WithMany("InvoiceItems")
+                        .HasForeignKey("MeterReadingId")
+                        .OnDelete(DeleteBehavior.Restrict);
+
+                    b.HasOne("SmartRentalPlatform.Domain.Entities.Billing.BillingServiceType", "ServiceType")
+                        .WithMany("InvoiceItems")
+                        .HasForeignKey("ServiceTypeId")
+                        .OnDelete(DeleteBehavior.Restrict);
+
+                    b.Navigation("Invoice");
+
+                    b.Navigation("MeterReading");
+
+                    b.Navigation("ServiceType");
+                });
+
+            modelBuilder.Entity("SmartRentalPlatform.Domain.Entities.Billing.InvoicePayment", b =>
+                {
+                    b.HasOne("SmartRentalPlatform.Domain.Entities.Billing.Invoice", "Invoice")
+                        .WithMany("Payments")
+                        .HasForeignKey("InvoiceId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.HasOne("SmartRentalPlatform.Domain.Entities.Users.User", "Landlord")
+                        .WithMany()
+                        .HasForeignKey("LandlordUserId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.HasOne("SmartRentalPlatform.Domain.Entities.Users.User", "Tenant")
+                        .WithMany()
+                        .HasForeignKey("TenantUserId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.Navigation("Invoice");
+
+                    b.Navigation("Landlord");
+
+                    b.Navigation("Tenant");
+                });
+
+            modelBuilder.Entity("SmartRentalPlatform.Domain.Entities.Billing.MeterReading", b =>
+                {
+                    b.HasOne("SmartRentalPlatform.Domain.Entities.Leasing.Contract", "Contract")
+                        .WithMany("MeterReadings")
+                        .HasForeignKey("ContractId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.HasOne("SmartRentalPlatform.Domain.Entities.Users.User", "RecordedByLandlord")
+                        .WithMany()
+                        .HasForeignKey("RecordedByLandlordUserId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.HasOne("SmartRentalPlatform.Domain.Entities.Properties.Room", "Room")
+                        .WithMany()
+                        .HasForeignKey("RoomId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.HasOne("SmartRentalPlatform.Domain.Entities.Billing.BillingServiceType", "ServiceType")
+                        .WithMany("MeterReadings")
+                        .HasForeignKey("ServiceTypeId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.Navigation("Contract");
+
+                    b.Navigation("RecordedByLandlord");
+
+                    b.Navigation("Room");
+
+                    b.Navigation("ServiceType");
+                });
+
+            modelBuilder.Entity("SmartRentalPlatform.Domain.Entities.Billing.RoomingHouseServicePrice", b =>
+                {
+                    b.HasOne("SmartRentalPlatform.Domain.Entities.Properties.RoomingHouse", "RoomingHouse")
+                        .WithMany()
+                        .HasForeignKey("RoomingHouseId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.HasOne("SmartRentalPlatform.Domain.Entities.Billing.BillingServiceType", "ServiceType")
+                        .WithMany("RoomingHouseServicePrices")
+                        .HasForeignKey("ServiceTypeId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.Navigation("RoomingHouse");
+
+                    b.Navigation("ServiceType");
+                });
+
+            modelBuilder.Entity("SmartRentalPlatform.Domain.Entities.Leasing.Contract", b =>
+                {
+                    b.HasOne("SmartRentalPlatform.Domain.Entities.Users.User", "MainTenant")
+                        .WithMany()
+                        .HasForeignKey("MainTenantUserId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.HasOne("SmartRentalPlatform.Domain.Entities.Properties.Room", "Room")
+                        .WithMany()
+                        .HasForeignKey("RoomId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.Navigation("MainTenant");
+
+                    b.Navigation("Room");
                 });
 
             modelBuilder.Entity("SmartRentalPlatform.Domain.Entities.Properties.LeasePolicy", b =>
@@ -35043,6 +35879,28 @@ namespace SmartRentalPlatform.Infrastructure.Persistence.Migrations
                     b.Navigation("User");
                 });
 
+            modelBuilder.Entity("SmartRentalPlatform.Domain.Entities.Wallets.WalletAccount", b =>
+                {
+                    b.HasOne("SmartRentalPlatform.Domain.Entities.Users.User", "User")
+                        .WithMany()
+                        .HasForeignKey("UserId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.Navigation("User");
+                });
+
+            modelBuilder.Entity("SmartRentalPlatform.Domain.Entities.Wallets.WalletTransaction", b =>
+                {
+                    b.HasOne("SmartRentalPlatform.Domain.Entities.Wallets.WalletAccount", "WalletAccount")
+                        .WithMany("Transactions")
+                        .HasForeignKey("WalletAccountId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.Navigation("WalletAccount");
+                });
+
             modelBuilder.Entity("SmartRentalPlatform.Domain.Entities.Administrative.AdministrativeProvince", b =>
                 {
                     b.Navigation("RoomingHouses");
@@ -35053,6 +35911,34 @@ namespace SmartRentalPlatform.Infrastructure.Persistence.Migrations
             modelBuilder.Entity("SmartRentalPlatform.Domain.Entities.Administrative.AdministrativeWard", b =>
                 {
                     b.Navigation("RoomingHouses");
+                });
+
+            modelBuilder.Entity("SmartRentalPlatform.Domain.Entities.Billing.BillingServiceType", b =>
+                {
+                    b.Navigation("InvoiceItems");
+
+                    b.Navigation("MeterReadings");
+
+                    b.Navigation("RoomingHouseServicePrices");
+                });
+
+            modelBuilder.Entity("SmartRentalPlatform.Domain.Entities.Billing.Invoice", b =>
+                {
+                    b.Navigation("Items");
+
+                    b.Navigation("Payments");
+                });
+
+            modelBuilder.Entity("SmartRentalPlatform.Domain.Entities.Billing.MeterReading", b =>
+                {
+                    b.Navigation("InvoiceItems");
+                });
+
+            modelBuilder.Entity("SmartRentalPlatform.Domain.Entities.Leasing.Contract", b =>
+                {
+                    b.Navigation("Invoices");
+
+                    b.Navigation("MeterReadings");
                 });
 
             modelBuilder.Entity("SmartRentalPlatform.Domain.Entities.Properties.Amenity", b =>
@@ -35112,6 +35998,11 @@ namespace SmartRentalPlatform.Infrastructure.Persistence.Migrations
             modelBuilder.Entity("SmartRentalPlatform.Domain.Entities.Users.UserToken", b =>
                 {
                     b.Navigation("ReplacingTokens");
+                });
+
+            modelBuilder.Entity("SmartRentalPlatform.Domain.Entities.Wallets.WalletAccount", b =>
+                {
+                    b.Navigation("Transactions");
                 });
 #pragma warning restore 612, 618
         }

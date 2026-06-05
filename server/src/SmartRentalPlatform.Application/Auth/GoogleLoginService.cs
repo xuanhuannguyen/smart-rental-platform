@@ -67,6 +67,8 @@ public class GoogleLoginService : IGoogleLoginService
                 user.UpdatedAt = now;
             }
 
+            ConfirmGoogleVerifiedEmail(user, now);
+
             dbContext.ExternalLogins.Add(new ExternalLogin
             {
                 UserId = user.Id,
@@ -80,16 +82,10 @@ public class GoogleLoginService : IGoogleLoginService
             });
         }
 
+        ConfirmGoogleVerifiedEmail(user, now);
         EnsureUserCanLogin(user, now);
 
         var roles = user.UserRoles.Select(x => x.Role.Name.ToString()).ToArray();
-
-        if (!user.EmailConfirmed)
-        {
-            await dbContext.SaveChangesAsync(cancellationToken);
-            return BuildGoogleLoginResponse(user, roles, true, null, null);
-        }
-
         var accessToken = tokenService.GenerateAccessToken(user, roles);
         var refreshToken = tokenService.GenerateRefreshToken();
 
@@ -152,6 +148,15 @@ public class GoogleLoginService : IGoogleLoginService
 
         dbContext.Users.Add(user);
         return user;
+    }
+
+    private static void ConfirmGoogleVerifiedEmail(User user, DateTimeOffset now)
+    {
+        if (!user.EmailConfirmed)
+        {
+            user.EmailConfirmed = true;
+            user.UpdatedAt = now;
+        }
     }
 
     private static void SyncGoogleAvatar(

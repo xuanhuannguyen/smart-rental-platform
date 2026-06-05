@@ -61,4 +61,17 @@ public static class ErrorCodes
     // Lease Policy
     public const string LeasePolicyRequired = "LEASE_POLICY_REQUIRED";
     public const string LeasePolicyInvalid = "LEASE_POLICY_INVALID";
+
+    // Billing
+    public const string BillingServiceInvalid = "BILLING_SERVICE_INVALID";
+    public const string BillingPriceInvalid = "BILLING_PRICE_INVALID";
+    public const string BillingPriceNotFound = "BILLING_PRICE_NOT_FOUND";
+    public const string ContractNotFound = "CONTRACT_NOT_FOUND";
+    public const string ContractNotActive = "CONTRACT_NOT_ACTIVE";
+    public const string MeterReadingInvalid = "METER_READING_INVALID";
+    public const string MeterReadingNotFound = "METER_READING_NOT_FOUND";
+    public const string InvoiceNotFound = "INVOICE_NOT_FOUND";
+    public const string InvoiceInvalidStatus = "INVOICE_INVALID_STATUS";
+    public const string InvoiceDuplicatePeriod = "INVOICE_DUPLICATE_PERIOD";
+    public const string WalletPaymentFailed = "WALLET_PAYMENT_FAILED";
 }

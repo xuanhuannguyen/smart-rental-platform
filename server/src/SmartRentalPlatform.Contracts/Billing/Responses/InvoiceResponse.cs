@@ -1,0 +1,26 @@
+namespace SmartRentalPlatform.Contracts.Billing.Responses;
+
+public sealed record InvoiceResponse(
+    Guid Id,
+    Guid ContractId,
+    Guid RoomId,
+    Guid TenantUserId,
+    Guid LandlordUserId,
+    string InvoiceNo,
+    DateOnly BillingPeriodStart,
+    DateOnly BillingPeriodEnd,
+    DateOnly? IssueDate,
+    DateOnly DueDate,
+    decimal RentAmount,
+    decimal UtilityAmount,
+    decimal ServiceAmount,
+    decimal DiscountAmount,
+    decimal TotalAmount,
+    decimal PaidAmount,
+    decimal RemainingAmount,
+    string Status,
+    string? Note,
+    DateTimeOffset? SentAt,
+    DateTimeOffset? PaidAt,
+    List<InvoiceItemResponse> Items,
+    List<InvoicePaymentResponse> Payments);

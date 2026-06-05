@@ -3,6 +3,7 @@ using SmartRentalPlatform.Application.AdminApproval;
 using SmartRentalPlatform.Application.Administrative;
 using SmartRentalPlatform.Application.Amenities;
 using SmartRentalPlatform.Application.Auth;
+using SmartRentalPlatform.Application.Billing;
 using SmartRentalPlatform.Application.Common.Interfaces;
 using SmartRentalPlatform.Application.Kyc;
 using SmartRentalPlatform.Application.RoomingHouses;
@@ -38,6 +39,9 @@ public static class DependencyInjection
         services.AddScoped<IAdminRoomingHouseApprovalService, AdminRoomingHouseApprovalService>();
         services.AddScoped<IApprovalAuditService, ApprovalAuditService>();
         services.AddScoped<IAdminUserService, AdminUserService>();
+        services.AddScoped<IBillingContractReadService, ContractBillingReadService>();
+        services.AddScoped<IInvoiceWalletPaymentService, PendingInvoiceWalletPaymentService>();
+        services.AddScoped<IBillingService, BillingService>();
         return services;
     }
 }

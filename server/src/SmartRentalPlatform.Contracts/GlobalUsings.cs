@@ -2,6 +2,8 @@ global using SmartRentalPlatform.Contracts.Admin.Requests;
 global using SmartRentalPlatform.Contracts.Admin.Responses;
 global using SmartRentalPlatform.Contracts.Auth.Requests;
 global using SmartRentalPlatform.Contracts.Auth.Responses;
+global using SmartRentalPlatform.Contracts.Billing.Requests;
+global using SmartRentalPlatform.Contracts.Billing.Responses;
 global using SmartRentalPlatform.Contracts.Files.Responses;
 global using SmartRentalPlatform.Contracts.Kyc.Requests;
 global using SmartRentalPlatform.Contracts.Kyc.Responses;
