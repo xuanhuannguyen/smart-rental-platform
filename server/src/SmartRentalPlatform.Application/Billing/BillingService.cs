@@ -67,6 +67,7 @@ public class BillingService : IBillingService
             .Include(x => x.MainTenant)
             .Where(x => x.RoomId == roomId &&
                         x.Status == ContractStatus.Active &&
+                        x.Room.Status == RoomStatus.Occupied &&
                         x.Room.RoomingHouse.LandlordUserId == landlordUserId &&
                         x.Room.DeletedAt == null &&
                         x.Room.RoomingHouse.DeletedAt == null)
@@ -251,7 +252,8 @@ public class BillingService : IBillingService
         var duplicate = await context.Invoices.AnyAsync(
             x => x.ContractId == request.ContractId &&
                  x.BillingPeriodStart == request.BillingPeriodStart &&
-                 x.BillingPeriodEnd == request.BillingPeriodEnd,
+                 x.BillingPeriodEnd == request.BillingPeriodEnd &&
+                 x.Status != InvoiceStatus.Cancelled,
             cancellationToken);
 
         if (duplicate)
@@ -441,7 +443,9 @@ public class BillingService : IBillingService
         Guid invoiceId,
         CancellationToken cancellationToken = default)
     {
-        var invoice = await context.Invoices.FirstOrDefaultAsync(x => x.Id == invoiceId, cancellationToken)
+        var invoice = await context.Invoices
+            .Include(x => x.Items)
+            .FirstOrDefaultAsync(x => x.Id == invoiceId, cancellationToken)
             ?? throw new NotFoundException(ErrorCodes.InvoiceNotFound, "Khong tim thay hoa don.");
 
         if (invoice.LandlordUserId != landlordUserId)
@@ -479,12 +483,33 @@ public class BillingService : IBillingService
         }
 
         if (invoice.Status == InvoiceStatus.Paid ||
+            invoice.Status == InvoiceStatus.PartiallyPaid ||
             invoice.Status == InvoiceStatus.Cancelled)
         {
             throw new BadRequestException(ErrorCodes.InvoiceInvalidStatus, "Chi co the huy hoa don chua thanh toan.");
         }
 
         var now = DateTimeOffset.UtcNow;
+        var meterReadingIds = invoice.Items
+            .Where(x => x.MeterReadingId.HasValue)
+            .Select(x => x.MeterReadingId!.Value)
+            .Distinct()
+            .ToList();
+
+        if (meterReadingIds.Count > 0)
+        {
+            var readings = await context.MeterReadings
+                .Where(x => meterReadingIds.Contains(x.Id) &&
+                            x.Status == MeterReadingStatus.UsedInInvoice)
+                .ToListAsync(cancellationToken);
+
+            foreach (var reading in readings)
+            {
+                reading.Status = MeterReadingStatus.Draft;
+                reading.UpdatedAt = now;
+            }
+        }
+
         invoice.Status = InvoiceStatus.Cancelled;
         invoice.CancelledAt = now;
         invoice.CancelReason = string.IsNullOrWhiteSpace(reason) ? null : reason.Trim();

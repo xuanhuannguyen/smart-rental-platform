@@ -741,11 +741,7 @@ function InvoiceCreateSection({
           </div>
         </div>
         <form className="billing-form" onSubmit={onSubmit}>
-          {roomContext && <RoomContextCard context={roomContext} />}
-          <label>
-            Contract ID
-            <input value={form.contractId} onChange={(event) => onChangeForm((prev) => ({ ...prev, contractId: event.target.value }))} placeholder="Hop dong Active" readOnly={Boolean(roomContext)} required />
-          </label>
+          {roomContext && <RoomContextCard context={roomContext} showContract={false} />}
           <div className="form-row">
             <label>
               Tu ngay
@@ -777,7 +773,7 @@ function InvoiceCreateSection({
           </div>
         </div>
         <div className="check-list">
-          <span>Hop dong phai dang Active.</span>
+          <span>Phong phai dang co nguoi thue.</span>
           <span>Dien/Nuoc can co meter reading cung ky.</span>
           <span>Gia dich vu duoc snapshot vao invoice item.</span>
           <span>He thong chan duplicate invoice cung hop dong va ky.</span>
@@ -874,7 +870,7 @@ function NotificationStrip({ invoices }: { invoices: Invoice[] }) {
   );
 }
 
-function RoomContextCard({ context }: { context: RoomBillingContext }) {
+function RoomContextCard({ context, showContract = true }: { context: RoomBillingContext; showContract?: boolean }) {
   return (
     <div className="room-context-card">
       <div>
@@ -885,10 +881,12 @@ function RoomContextCard({ context }: { context: RoomBillingContext }) {
         <span>Tenant</span>
         <strong>{context.tenantName || context.tenantEmail}</strong>
       </div>
-      <div>
-        <span>Hop dong</span>
-        <strong>{context.contractNumber}</strong>
-      </div>
+      {showContract && (
+        <div>
+          <span>Hop dong</span>
+          <strong>{context.contractNumber}</strong>
+        </div>
+      )}
       <div>
         <span>Tien phong</span>
         <strong>{formatMoney(context.monthlyRent)}</strong>

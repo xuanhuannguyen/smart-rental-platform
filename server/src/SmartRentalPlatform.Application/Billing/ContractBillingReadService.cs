@@ -20,6 +20,7 @@ public class ContractBillingReadService : IBillingContractReadService
         return await context.Contracts
             .AsNoTracking()
             .Where(x => x.Id == contractId && x.Status == ContractStatus.Active)
+            .Where(x => x.Room.Status == RoomStatus.Occupied)
             .Select(x => new BillingContractSnapshot(
                 x.Id,
                 x.RoomId,
