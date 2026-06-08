@@ -11,7 +11,11 @@ export const ROUTE_PATHS = {
         PROFILE: '/me/profile',
         CHANGE_PASSWORD: '/me/change-password',
         KYC: '/me/kyc',
-        KYC_STATUS: '/me/kyc/status'
+        KYC_STATUS: '/me/kyc/status',
+        WALLET: '/me/wallet',
+        WALLET_TOPUP: '/me/wallet/topup',
+        WALLET_TOPUP_RETURN: '/me/wallet/topups',
+        WALLET_TRANSACTIONS: '/me/wallet/transactions'
     },
     LANDLORD: {
         REGISTER: '/landlord/register',
@@ -22,5 +26,8 @@ export const ROUTE_PATHS = {
     ADMIN: {
         ROOT: '/admin',
         APPROVALS: '/admin/approvals'
+    },
+    DEV: {
+        MOCK_PAYMENT: '/dev/mock-payment'
     }
 } as const;

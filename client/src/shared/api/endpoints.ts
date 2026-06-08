@@ -62,5 +62,14 @@ export const ENDPOINTS = {
     ROOMING_HOUSE_REJECT: (id: string) => `/api/admin/rooming-houses/${id}/reject`,
     USERS: '/api/admin/users',
     USER_DETAIL: (id: string) => `/api/admin/users/${id}`
+  },
+  WALLET: {
+    ME: '/api/me/wallet',
+    TRANSACTIONS: '/api/me/wallet/transactions',
+    TOPUP_PAYOS: '/api/me/wallet/topups/payos'
+  },
+  MOCK_PAYMENTS: {
+    SUCCESS: (paymentTransactionId: string) => `/api/dev/mock-payments/${paymentTransactionId}/success`,
+    FAILED: (paymentTransactionId: string) => `/api/dev/mock-payments/${paymentTransactionId}/failed`
   }
 } as const;

@@ -12,6 +12,11 @@ import CreateRoomingHousePage from '../../features/rooming-houses/CreateRoomingH
 import LandlordDashboardPage from '../../features/landlord/pages/LandlordDashboardPage';
 import RoomingHouseDetailPage from '../../features/landlord/pages/RoomingHouseDetailPage';
 import { AdminHomePage } from '../../features/admin/pages/AdminHomePage';
+import { WalletPage } from '../../features/wallet/pages/WalletPage';
+import { WalletTopUpPage } from '../../features/wallet/pages/WalletTopUpPage';
+import { PayOSTopUpReturnPage } from '../../features/wallet/pages/PayOSTopUpReturnPage';
+import { WalletTransactionsPage } from '../../features/wallet/pages/WalletTransactionsPage';
+import { DevMockPaymentPage } from '../../features/wallet/pages/DevMockPaymentPage';
 import { OnboardingGuard } from './OnboardingGuard';
 import { ProtectedRoute } from './ProtectedRoute';
 import { RoleGuard } from './RoleGuard';
@@ -47,6 +52,10 @@ export const router = createBrowserRouter([
         element: <ResetPasswordPage />
     },
     {
+        path: ROUTE_PATHS.DEV.MOCK_PAYMENT,
+        element: <DevMockPaymentPage />
+    },
+    {
         element: <ProtectedRoute />,
         children: [
             {
@@ -71,6 +80,22 @@ export const router = createBrowserRouter([
                     {
                         path: ROUTE_PATHS.ME.KYC_STATUS,
                         element: <KycStatusPage />
+                    },
+                    {
+                        path: ROUTE_PATHS.ME.WALLET,
+                        element: <WalletPage />
+                    },
+                    {
+                        path: ROUTE_PATHS.ME.WALLET_TOPUP,
+                        element: <WalletTopUpPage />
+                    },
+                    {
+                        path: ROUTE_PATHS.ME.WALLET_TOPUP_RETURN,
+                        element: <PayOSTopUpReturnPage />
+                    },
+                    {
+                        path: ROUTE_PATHS.ME.WALLET_TRANSACTIONS,
+                        element: <WalletTransactionsPage />
                     },
                     {
                         path: ROUTE_PATHS.LANDLORD.REGISTER,

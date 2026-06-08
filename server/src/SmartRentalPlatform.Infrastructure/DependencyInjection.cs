@@ -6,6 +6,7 @@ using SmartRentalPlatform.Application.Common.Interfaces;
 using SmartRentalPlatform.Infrastructure.ExternalServices.Ekyc;
 using SmartRentalPlatform.Infrastructure.ExternalServices.Email;
 using SmartRentalPlatform.Infrastructure.ExternalServices.Google;
+using SmartRentalPlatform.Infrastructure.ExternalServices.PayOS;
 using SmartRentalPlatform.Infrastructure.Identity;
 using SmartRentalPlatform.Infrastructure.Options;
 using SmartRentalPlatform.Infrastructure.Persistence;
@@ -40,6 +41,16 @@ public static class DependencyInjection
         services.AddMemoryCache();
         services.AddScoped<IPrivateStorageService, LocalPrivateStorageService>();
         services.AddScoped<IHashService, Sha256HashService>();
+        services.Configure<PayOSOptions>(configuration.GetSection(PayOSOptions.SectionName));
+        services.AddHttpClient(PayOSClient.HttpClientName, (provider, client) =>
+        {
+            var options = provider.GetRequiredService<IOptions<PayOSOptions>>().Value;
+            client.BaseAddress = new Uri(options.BaseUrl.TrimEnd('/') + "/");
+            client.Timeout = TimeSpan.FromSeconds(options.TimeoutSeconds);
+        });
+        services.AddScoped<IPayOSClient, PayOSClient>();
+        services.AddScoped<IPayOSWebhookSignatureVerifier, PayOSWebhookSignatureVerifier>();
+        services.AddScoped<IPaymentRowLockService, PaymentRowLockService>();
         services.AddHttpClient(RealVnptEkycClient.HttpClientName, (provider, client) =>
         {
             var options = provider.GetRequiredService<IOptions<VnptEkycOptions>>().Value;

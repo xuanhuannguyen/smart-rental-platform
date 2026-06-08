@@ -33676,6 +33676,386 @@ namespace SmartRentalPlatform.Infrastructure.Persistence.Migrations
                         });
                 });
 
+            modelBuilder.Entity("SmartRentalPlatform.Domain.Entities.Payments.PaymentTransaction", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid")
+                        .HasColumnName("id");
+
+                    b.Property<decimal>("Amount")
+                        .HasPrecision(18, 2)
+                        .HasColumnType("numeric(18,2)")
+                        .HasColumnName("amount");
+
+                    b.Property<DateTimeOffset?>("ConfirmedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("confirmed_at");
+
+                    b.Property<DateTimeOffset>("CreatedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("created_at");
+
+                    b.Property<string>("Currency")
+                        .IsRequired()
+                        .ValueGeneratedOnAdd()
+                        .HasMaxLength(3)
+                        .HasColumnType("character varying(3)")
+                        .HasDefaultValue("VND")
+                        .HasColumnName("currency");
+
+                    b.Property<DateTimeOffset?>("ExpiresAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("expires_at");
+
+                    b.Property<DateTimeOffset?>("FailedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("failed_at");
+
+                    b.Property<string>("GatewayResponseCode")
+                        .HasMaxLength(100)
+                        .HasColumnType("character varying(100)")
+                        .HasColumnName("gateway_response_code");
+
+                    b.Property<string>("GatewayResponseMessage")
+                        .HasColumnType("text")
+                        .HasColumnName("gateway_response_message");
+
+                    b.Property<string>("IdempotencyKey")
+                        .IsRequired()
+                        .HasMaxLength(120)
+                        .HasColumnType("character varying(120)")
+                        .HasColumnName("idempotency_key");
+
+                    b.Property<DateTimeOffset?>("PaidAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("paid_at");
+
+                    b.Property<Guid>("PayerUserId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("payer_user_id");
+
+                    b.Property<string>("PaymentMethod")
+                        .IsRequired()
+                        .HasMaxLength(30)
+                        .HasColumnType("character varying(30)")
+                        .HasColumnName("payment_method");
+
+                    b.Property<string>("PaymentPurpose")
+                        .IsRequired()
+                        .HasMaxLength(50)
+                        .HasColumnType("character varying(50)")
+                        .HasColumnName("payment_purpose");
+
+                    b.Property<string>("ProviderCheckoutUrl")
+                        .HasColumnType("text")
+                        .HasColumnName("provider_checkout_url");
+
+                    b.Property<string>("ProviderOrderCode")
+                        .IsRequired()
+                        .HasMaxLength(100)
+                        .HasColumnType("character varying(100)")
+                        .HasColumnName("provider_order_code");
+
+                    b.Property<string>("ProviderQrCode")
+                        .HasColumnType("text")
+                        .HasColumnName("provider_qr_code");
+
+                    b.Property<string>("ProviderTransactionCode")
+                        .HasMaxLength(100)
+                        .HasColumnType("character varying(100)")
+                        .HasColumnName("provider_transaction_code");
+
+                    b.Property<string>("Status")
+                        .IsRequired()
+                        .HasMaxLength(30)
+                        .HasColumnType("character varying(30)")
+                        .HasColumnName("status");
+
+                    b.Property<DateTimeOffset>("UpdatedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("updated_at");
+
+                    b.Property<Guid>("WalletAccountId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("wallet_account_id");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("CreatedAt");
+
+                    b.HasIndex("IdempotencyKey")
+                        .IsUnique();
+
+                    b.HasIndex("PayerUserId");
+
+                    b.HasIndex("ProviderOrderCode")
+                        .IsUnique();
+
+                    b.HasIndex("Status");
+
+                    b.HasIndex("WalletAccountId");
+
+                    b.ToTable("payment_transactions", null, t =>
+                        {
+                            t.HasCheckConstraint("ck_payment_transactions_amount_positive", "amount > 0");
+                        });
+                });
+
+            modelBuilder.Entity("SmartRentalPlatform.Domain.Entities.Payments.PaymentWebhookLog", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid")
+                        .HasColumnName("id");
+
+                    b.Property<DateTimeOffset>("CreatedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("created_at");
+
+                    b.Property<string>("ErrorMessage")
+                        .HasColumnType("text")
+                        .HasColumnName("error_message");
+
+                    b.Property<string>("IdempotencyKey")
+                        .HasMaxLength(120)
+                        .HasColumnType("character varying(120)")
+                        .HasColumnName("idempotency_key");
+
+                    b.Property<string>("PaymentMethod")
+                        .IsRequired()
+                        .HasMaxLength(30)
+                        .HasColumnType("character varying(30)")
+                        .HasColumnName("payment_method");
+
+                    b.Property<Guid?>("PaymentTransactionId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("payment_transaction_id");
+
+                    b.Property<DateTimeOffset?>("ProcessedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("processed_at");
+
+                    b.Property<string>("ProcessingStatus")
+                        .IsRequired()
+                        .HasMaxLength(30)
+                        .HasColumnType("character varying(30)")
+                        .HasColumnName("processing_status");
+
+                    b.Property<string>("ProviderEventId")
+                        .HasMaxLength(120)
+                        .HasColumnType("character varying(120)")
+                        .HasColumnName("provider_event_id");
+
+                    b.Property<string>("ProviderOrderCode")
+                        .HasMaxLength(100)
+                        .HasColumnType("character varying(100)")
+                        .HasColumnName("provider_order_code");
+
+                    b.Property<string>("ProviderTransactionCode")
+                        .HasMaxLength(100)
+                        .HasColumnType("character varying(100)")
+                        .HasColumnName("provider_transaction_code");
+
+                    b.Property<string>("RawPayload")
+                        .IsRequired()
+                        .HasColumnType("text")
+                        .HasColumnName("raw_payload");
+
+                    b.Property<string>("RawPayloadHash")
+                        .IsRequired()
+                        .HasColumnType("text")
+                        .HasColumnName("raw_payload_hash");
+
+                    b.Property<DateTimeOffset>("ReceivedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("received_at");
+
+                    b.Property<int>("RetryCount")
+                        .HasColumnType("integer")
+                        .HasColumnName("retry_count");
+
+                    b.Property<string>("SignatureStatus")
+                        .IsRequired()
+                        .HasMaxLength(30)
+                        .HasColumnType("character varying(30)")
+                        .HasColumnName("signature_status");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("PaymentTransactionId");
+
+                    b.HasIndex("ProcessingStatus");
+
+                    b.HasIndex("ProviderOrderCode");
+
+                    b.HasIndex("RawPayloadHash")
+                        .IsUnique();
+
+                    b.HasIndex("ReceivedAt");
+
+                    b.ToTable("payment_webhook_logs", (string)null);
+                });
+
+            modelBuilder.Entity("SmartRentalPlatform.Domain.Entities.Payments.WalletAccount", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid")
+                        .HasColumnName("id");
+
+                    b.Property<decimal>("Balance")
+                        .HasPrecision(18, 2)
+                        .HasColumnType("numeric(18,2)")
+                        .HasColumnName("balance");
+
+                    b.Property<DateTimeOffset>("CreatedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("created_at");
+
+                    b.Property<string>("Currency")
+                        .IsRequired()
+                        .ValueGeneratedOnAdd()
+                        .HasMaxLength(3)
+                        .HasColumnType("character varying(3)")
+                        .HasDefaultValue("VND")
+                        .HasColumnName("currency");
+
+                    b.Property<decimal>("ReservedBalance")
+                        .HasPrecision(18, 2)
+                        .HasColumnType("numeric(18,2)")
+                        .HasColumnName("reserved_balance");
+
+                    b.Property<string>("Status")
+                        .IsRequired()
+                        .ValueGeneratedOnAdd()
+                        .HasMaxLength(30)
+                        .HasColumnType("character varying(30)")
+                        .HasDefaultValue("Active")
+                        .HasColumnName("status");
+
+                    b.Property<DateTimeOffset>("UpdatedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("updated_at");
+
+                    b.Property<Guid>("UserId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("user_id");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("Status");
+
+                    b.HasIndex("UserId")
+                        .IsUnique();
+
+                    b.ToTable("wallet_accounts", null, t =>
+                        {
+                            t.HasCheckConstraint("ck_wallet_accounts_balance_non_negative", "balance >= 0");
+
+                            t.HasCheckConstraint("ck_wallet_accounts_reserved_balance_lte_balance", "reserved_balance <= balance");
+
+                            t.HasCheckConstraint("ck_wallet_accounts_reserved_balance_non_negative", "reserved_balance >= 0");
+                        });
+                });
+
+            modelBuilder.Entity("SmartRentalPlatform.Domain.Entities.Payments.WalletTransaction", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid")
+                        .HasColumnName("id");
+
+                    b.Property<decimal>("Amount")
+                        .HasPrecision(18, 2)
+                        .HasColumnType("numeric(18,2)")
+                        .HasColumnName("amount");
+
+                    b.Property<decimal>("BalanceAfter")
+                        .HasPrecision(18, 2)
+                        .HasColumnType("numeric(18,2)")
+                        .HasColumnName("balance_after");
+
+                    b.Property<decimal>("BalanceBefore")
+                        .HasPrecision(18, 2)
+                        .HasColumnType("numeric(18,2)")
+                        .HasColumnName("balance_before");
+
+                    b.Property<DateTimeOffset>("CreatedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("created_at");
+
+                    b.Property<string>("Description")
+                        .HasColumnType("text")
+                        .HasColumnName("description");
+
+                    b.Property<string>("Direction")
+                        .IsRequired()
+                        .HasMaxLength(20)
+                        .HasColumnType("character varying(20)")
+                        .HasColumnName("direction");
+
+                    b.Property<Guid?>("RelatedEntityId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("related_entity_id");
+
+                    b.Property<string>("RelatedEntityType")
+                        .HasMaxLength(50)
+                        .HasColumnType("character varying(50)")
+                        .HasColumnName("related_entity_type");
+
+                    b.Property<decimal>("ReservedBalanceAfter")
+                        .HasPrecision(18, 2)
+                        .HasColumnType("numeric(18,2)")
+                        .HasColumnName("reserved_balance_after");
+
+                    b.Property<decimal>("ReservedBalanceBefore")
+                        .HasPrecision(18, 2)
+                        .HasColumnType("numeric(18,2)")
+                        .HasColumnName("reserved_balance_before");
+
+                    b.Property<string>("Status")
+                        .IsRequired()
+                        .HasMaxLength(30)
+                        .HasColumnType("character varying(30)")
+                        .HasColumnName("status");
+
+                    b.Property<string>("TransactionType")
+                        .IsRequired()
+                        .HasMaxLength(50)
+                        .HasColumnType("character varying(50)")
+                        .HasColumnName("transaction_type");
+
+                    b.Property<Guid?>("TransferGroupId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("transfer_group_id");
+
+                    b.Property<Guid>("UserId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("user_id");
+
+                    b.Property<Guid>("WalletAccountId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("wallet_account_id");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("CreatedAt");
+
+                    b.HasIndex("TransferGroupId");
+
+                    b.HasIndex("UserId");
+
+                    b.HasIndex("WalletAccountId");
+
+                    b.HasIndex("RelatedEntityType", "RelatedEntityId");
+
+                    b.ToTable("wallet_transactions", null, t =>
+                        {
+                            t.HasCheckConstraint("ck_wallet_transactions_amount_positive", "amount > 0");
+                        });
+                });
+
             modelBuilder.Entity("SmartRentalPlatform.Domain.Entities.Properties.Amenity", b =>
                 {
                     b.Property<int>("Id")
@@ -34823,6 +35203,65 @@ namespace SmartRentalPlatform.Infrastructure.Persistence.Migrations
                     b.Navigation("Province");
                 });
 
+            modelBuilder.Entity("SmartRentalPlatform.Domain.Entities.Payments.PaymentTransaction", b =>
+                {
+                    b.HasOne("SmartRentalPlatform.Domain.Entities.Users.User", "PayerUser")
+                        .WithMany()
+                        .HasForeignKey("PayerUserId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.HasOne("SmartRentalPlatform.Domain.Entities.Payments.WalletAccount", "WalletAccount")
+                        .WithMany("PaymentTransactions")
+                        .HasForeignKey("WalletAccountId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.Navigation("PayerUser");
+
+                    b.Navigation("WalletAccount");
+                });
+
+            modelBuilder.Entity("SmartRentalPlatform.Domain.Entities.Payments.PaymentWebhookLog", b =>
+                {
+                    b.HasOne("SmartRentalPlatform.Domain.Entities.Payments.PaymentTransaction", "PaymentTransaction")
+                        .WithMany("WebhookLogs")
+                        .HasForeignKey("PaymentTransactionId")
+                        .OnDelete(DeleteBehavior.Restrict);
+
+                    b.Navigation("PaymentTransaction");
+                });
+
+            modelBuilder.Entity("SmartRentalPlatform.Domain.Entities.Payments.WalletAccount", b =>
+                {
+                    b.HasOne("SmartRentalPlatform.Domain.Entities.Users.User", "User")
+                        .WithMany()
+                        .HasForeignKey("UserId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.Navigation("User");
+                });
+
+            modelBuilder.Entity("SmartRentalPlatform.Domain.Entities.Payments.WalletTransaction", b =>
+                {
+                    b.HasOne("SmartRentalPlatform.Domain.Entities.Users.User", "User")
+                        .WithMany()
+                        .HasForeignKey("UserId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.HasOne("SmartRentalPlatform.Domain.Entities.Payments.WalletAccount", "WalletAccount")
+                        .WithMany("WalletTransactions")
+                        .HasForeignKey("WalletAccountId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.Navigation("User");
+
+                    b.Navigation("WalletAccount");
+                });
+
             modelBuilder.Entity("SmartRentalPlatform.Domain.Entities.Properties.LeasePolicy", b =>
                 {
                     b.HasOne("SmartRentalPlatform.Domain.Entities.Properties.RoomingHouse", "RoomingHouse")
@@ -35053,6 +35492,18 @@ namespace SmartRentalPlatform.Infrastructure.Persistence.Migrations
             modelBuilder.Entity("SmartRentalPlatform.Domain.Entities.Administrative.AdministrativeWard", b =>
                 {
                     b.Navigation("RoomingHouses");
+                });
+
+            modelBuilder.Entity("SmartRentalPlatform.Domain.Entities.Payments.PaymentTransaction", b =>
+                {
+                    b.Navigation("WebhookLogs");
+                });
+
+            modelBuilder.Entity("SmartRentalPlatform.Domain.Entities.Payments.WalletAccount", b =>
+                {
+                    b.Navigation("PaymentTransactions");
+
+                    b.Navigation("WalletTransactions");
                 });
 
             modelBuilder.Entity("SmartRentalPlatform.Domain.Entities.Properties.Amenity", b =>

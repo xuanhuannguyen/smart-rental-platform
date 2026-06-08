@@ -1,0 +1,168 @@
+# Wallet and PayOS QA
+
+Use this checklist to test the Person 5 wallet top-up flow in local mock mode or with real PayOS credentials.
+
+Do not commit real PayOS credentials to source code or appsettings files.
+
+## Accounts
+
+Development seed creates a KYC-approved tenant:
+
+```text
+Email: tenant.demo@example.com
+Password: Demo@123456
+```
+
+## Start Apps
+
+Start the backend in Development:
+
+```powershell
+dotnet run --project server/src/SmartRentalPlatform.Api/SmartRentalPlatform.Api.csproj
+```
+
+Start the frontend:
+
+```powershell
+cd client
+npm run dev
+```
+
+Log in as the KYC-approved tenant.
+
+## Local Mock Mode
+
+Mock mode is used when any of these PayOS options are missing or placeholders:
+
+- `PayOS:ClientId`
+- `PayOS:ApiKey`
+- `PayOS:ChecksumKey`
+- `PayOS:BaseUrl`
+
+Create a top-up from `/me/wallet/topup`. The response should include:
+
+- `paymentTransactionId`
+- `providerOrderCode`
+- fake `paymentUrl`
+- fake `qrCode`
+- `expiredAt`
+
+Mock success:
+
+1. Create a top-up with amount `10000`.
+2. Copy `paymentTransactionId`, or click `Thanh toán thử bằng Mock (Dev only)`.
+3. Open `/dev/mock-payment`.
+4. Run `Mock success`.
+5. Open `/me/wallet`.
+6. Verify wallet balance increased by `10000`.
+7. Open `/me/wallet/transactions`.
+8. Verify one `WalletTopUp` ledger row exists.
+
+Duplicate success:
+
+1. Reuse the same `paymentTransactionId`.
+2. Run `Mock success` again.
+3. Verify wallet balance did not increase a second time.
+
+Wrong amount:
+
+1. Create a new top-up with amount `10000`.
+2. Open `/dev/mock-payment` with the new `paymentTransactionId`.
+3. Enter amount override `20000`.
+4. Run `Mock success`.
+5. Verify wallet balance did not increase.
+
+Failed payment:
+
+1. Create a new top-up with amount `10000`.
+2. Open `/dev/mock-payment` with the new `paymentTransactionId`.
+3. Run `Mock failed`.
+4. Verify payment status becomes `Failed`.
+5. Verify wallet balance did not increase.
+6. Verify no `WalletTopUp` ledger row was created for that failed payment.
+
+## Real PayOS Local Setup
+
+Use dotnet user-secrets for local real credentials. From the `server` directory, run:
+
+```powershell
+dotnet user-secrets init --project src/SmartRentalPlatform.Api
+dotnet user-secrets set "PayOS:ClientId" "<REAL_CLIENT_ID>" --project src/SmartRentalPlatform.Api
+dotnet user-secrets set "PayOS:ApiKey" "<REAL_API_KEY>" --project src/SmartRentalPlatform.Api
+dotnet user-secrets set "PayOS:ChecksumKey" "<REAL_CHECKSUM_KEY>" --project src/SmartRentalPlatform.Api
+dotnet user-secrets set "PayOS:BaseUrl" "https://api-merchant.payos.vn" --project src/SmartRentalPlatform.Api
+dotnet user-secrets set "PayOS:ReturnUrl" "http://localhost:5173/me/wallet/topup/success" --project src/SmartRentalPlatform.Api
+dotnet user-secrets set "PayOS:CancelUrl" "http://localhost:5173/me/wallet/topup/cancel" --project src/SmartRentalPlatform.Api
+```
+
+Equivalent environment variables are also supported by .NET configuration:
+
+```powershell
+$env:PayOS__ClientId="<REAL_CLIENT_ID>"
+$env:PayOS__ApiKey="<REAL_API_KEY>"
+$env:PayOS__ChecksumKey="<REAL_CHECKSUM_KEY>"
+$env:PayOS__BaseUrl="https://api-merchant.payos.vn"
+$env:PayOS__ReturnUrl="http://localhost:5173/me/wallet/topup/success"
+$env:PayOS__CancelUrl="http://localhost:5173/me/wallet/topup/cancel"
+```
+
+Do not put real values in committed `appsettings.json`.
+
+## Real PayOS Create-Payment Test
+
+1. Configure real credentials with user-secrets or environment variables.
+2. Restart the backend.
+3. Log in as the KYC-approved tenant.
+4. Open `/me/wallet/topup`.
+5. Create a top-up with amount `10000`.
+6. Verify a real PayOS `paymentUrl` and `qrCode` are returned.
+7. Click `Mở trang thanh toán PayOS`.
+8. Payment creation must leave `payment_transactions.status = Pending`.
+9. Wallet balance must not increase until a valid webhook is processed.
+
+## Real PayOS Webhook Limitation
+
+PayOS cannot call a plain localhost webhook from the public internet. For real webhook testing, expose the backend through a public tunnel such as ngrok/cloudflared, or deploy the backend to a public test server.
+
+Webhook URL to configure later:
+
+```text
+https://<public-domain>/api/payment-webhooks/payos
+```
+
+After a successful real webhook:
+
+- the webhook payload is logged in `payment_webhook_logs`
+- duplicate payloads are ignored by `raw_payload_hash`
+- wallet balance is credited exactly once
+- one `WalletTopUp` ledger row is created
+
+## SQL Verification
+
+```sql
+select id, user_id, balance, reserved_balance, currency, status
+from wallet_accounts
+order by created_at desc;
+```
+
+```sql
+select id, wallet_account_id, payer_user_id, amount, payment_method, payment_purpose,
+       provider_order_code, status, created_at, paid_at, failed_at, confirmed_at
+from payment_transactions
+order by created_at desc;
+```
+
+```sql
+select id, wallet_account_id, user_id, transaction_type, direction, amount,
+       balance_before, balance_after, related_entity_type, related_entity_id, created_at
+from wallet_transactions
+order by created_at desc;
+```
+
+```sql
+select id, payment_transaction_id, payment_method, provider_order_code,
+       raw_payload_hash, signature_status, processing_status, error_message, received_at, processed_at
+from payment_webhook_logs
+order by received_at desc;
+```
+

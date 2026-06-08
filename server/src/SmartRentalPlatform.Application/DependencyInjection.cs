@@ -5,9 +5,11 @@ using SmartRentalPlatform.Application.Amenities;
 using SmartRentalPlatform.Application.Auth;
 using SmartRentalPlatform.Application.Common.Interfaces;
 using SmartRentalPlatform.Application.Kyc;
+using SmartRentalPlatform.Application.Payments;
 using SmartRentalPlatform.Application.RoomingHouses;
 using SmartRentalPlatform.Application.Rooms;
 using SmartRentalPlatform.Application.Users;
+using SmartRentalPlatform.Application.Wallets;
 
 namespace SmartRentalPlatform.Application;
 
@@ -38,6 +40,10 @@ public static class DependencyInjection
         services.AddScoped<IAdminRoomingHouseApprovalService, AdminRoomingHouseApprovalService>();
         services.AddScoped<IApprovalAuditService, ApprovalAuditService>();
         services.AddScoped<IAdminUserService, AdminUserService>();
+        services.AddScoped<IWalletService, WalletService>();
+        services.AddScoped<IPayOSTopUpService, PayOSTopUpService>();
+        services.AddScoped<IPaymentWebhookService, PaymentWebhookService>();
+        services.AddScoped<IMockPaymentService, MockPaymentService>();
         return services;
     }
 }

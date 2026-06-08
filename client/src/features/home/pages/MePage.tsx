@@ -96,6 +96,9 @@ export function MePage() {
                   <button className="dropdown-item" onClick={() => { setShowDropdown(false); navigate(ROUTE_PATHS.ME.PROFILE); }}>
                     Chỉnh sửa thông tin
                   </button>
+                  <button className="dropdown-item" onClick={() => { setShowDropdown(false); navigate(ROUTE_PATHS.ME.WALLET); }}>
+                    Ví của tôi
+                  </button>
                   {isAdmin && (
                     <button className="dropdown-item" onClick={() => { setShowDropdown(false); navigate(ROUTE_PATHS.ADMIN.APPROVALS); }}>
                       Duyệt hồ sơ
