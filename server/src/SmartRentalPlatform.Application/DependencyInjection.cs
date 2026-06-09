@@ -8,6 +8,7 @@ using SmartRentalPlatform.Application.Kyc;
 using SmartRentalPlatform.Application.RoomingHouses;
 using SmartRentalPlatform.Application.Rooms;
 using SmartRentalPlatform.Application.Users;
+using SmartRentalPlatform.Application.ViewingAppointments;
 
 namespace SmartRentalPlatform.Application;
 
@@ -38,6 +39,7 @@ public static class DependencyInjection
         services.AddScoped<IAdminRoomingHouseApprovalService, AdminRoomingHouseApprovalService>();
         services.AddScoped<IApprovalAuditService, ApprovalAuditService>();
         services.AddScoped<IAdminUserService, AdminUserService>();
+        services.AddScoped<IViewingAppointmentService, ViewingAppointmentService>();
         return services;
     }
 }
