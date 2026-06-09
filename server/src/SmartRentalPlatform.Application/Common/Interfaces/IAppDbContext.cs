@@ -47,6 +47,8 @@ public interface IAppDbContext {
 
     DbSet<ApprovalAuditLog> ApprovalAuditLogs { get; }
 
+    DbSet<ViewingAppointment> ViewingAppointments { get; }
+
     Task<IAppDbContextTransaction> BeginTransactionAsync(CancellationToken cancellationToken = default);
 
     Task<int> SaveChangesAsync(CancellationToken cancellationToken = default);

@@ -37,6 +37,7 @@ public class AppDbContext : DbContext, IAppDbContext
     public DbSet<RoomingHouseLegalDocument> RoomingHouseLegalDocuments => Set<RoomingHouseLegalDocument>();
     public DbSet<LeasePolicy> LeasePolicies => Set<LeasePolicy>();
     public DbSet<ApprovalAuditLog> ApprovalAuditLogs => Set<ApprovalAuditLog>();
+    public DbSet<ViewingAppointment> ViewingAppointments => Set<ViewingAppointment>();
 
     public async Task<IAppDbContextTransaction> BeginTransactionAsync(CancellationToken cancellationToken = default)
     {
