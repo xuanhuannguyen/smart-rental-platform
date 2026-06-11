@@ -2,5 +2,6 @@ namespace SmartRentalPlatform.Domain.Enums.Payments;
 
 public enum PaymentPurpose
 {
-    WalletTopUp
+    WalletTopUp,
+    DevTest
 }

@@ -25,6 +25,23 @@ public class WalletTopUpsController : ControllerBase
         this.currentUserService = currentUserService;
     }
 
+    [HttpGet]
+    public async Task<ActionResult<ApiResponse<PagedResult<WalletTopUpHistoryResponse>>>> GetTopUpHistory(
+        [FromQuery] int page = 1,
+        [FromQuery] int pageSize = 20,
+        CancellationToken cancellationToken = default)
+    {
+        var userId = GetCurrentUserId();
+        var result = await payOSTopUpService.GetTopUpHistoryAsync(userId, page, pageSize, cancellationToken);
+
+        return Ok(new ApiResponse<PagedResult<WalletTopUpHistoryResponse>>
+        {
+            Success = true,
+            Message = "Lấy lịch sử yêu cầu nạp ví thành công.",
+            Data = result
+        });
+    }
+
     [HttpPost("payos")]
     public async Task<ActionResult<ApiResponse<CreatePayOSTopUpResponse>>> CreatePayOSTopUp(
         CreatePayOSTopUpRequest request,

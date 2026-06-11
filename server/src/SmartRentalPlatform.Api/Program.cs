@@ -5,6 +5,7 @@ using SmartRentalPlatform.Application.Common.Interfaces;
 using SmartRentalPlatform.Infrastructure;
 using SmartRentalPlatform.Infrastructure.Persistence;
 using SmartRentalPlatform.Infrastructure.Persistence.Seed;
+using SmartRentalPlatform.Infrastructure.Persistence.Seeders;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -32,6 +33,16 @@ if (app.Environment.IsDevelopment())
     var dbContext = scope.ServiceProvider.GetRequiredService<AppDbContext>();
     var passwordService = scope.ServiceProvider.GetRequiredService<IPasswordService>();
     await DevelopmentDataSeed.SeedAdminAsync(dbContext, passwordService);
+}
+
+if (app.Environment.IsDevelopment()
+    || app.Environment.IsEnvironment("QA")
+    || app.Environment.IsEnvironment("Test"))
+{
+    await using var scope = app.Services.CreateAsyncScope();
+    var dbContext = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+    var passwordService = scope.ServiceProvider.GetRequiredService<IPasswordService>();
+    await WalletQaDataSeeder.SeedAsync(dbContext, passwordService);
 }
 
 // Chỉ bật Swagger ở môi trường Development.

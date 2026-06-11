@@ -2,6 +2,7 @@ import { useNavigate, useSearchParams } from 'react-router-dom';
 import { ROUTE_PATHS } from '../../../app/router/routePaths';
 import { Button } from '../../../shared/components/ui/Button';
 import './WalletLayout.css';
+import { WalletNavigation } from './WalletNavigation';
 
 export function PayOSTopUpReturnPage() {
   const navigate = useNavigate();
@@ -15,64 +16,81 @@ export function PayOSTopUpReturnPage() {
   const isCancelled = cancel.toLowerCase() === 'true' || status.toUpperCase() === 'CANCELLED';
   const isPaid = status.toUpperCase() === 'PAID' && cancel.toLowerCase() === 'false';
 
+  const bannerClass = isCancelled
+    ? 'wallet-banner wallet-banner-warning'
+    : isPaid
+      ? 'wallet-banner wallet-banner-success'
+      : 'wallet-banner';
+
+  const statusText = isCancelled ? 'Đã hủy' : isPaid ? 'Đã thanh toán' : status || 'Đang kiểm tra';
   const message = isCancelled
     ? 'Thanh toán đã bị hủy.'
     : isPaid
-      ? 'Thanh toán PayOS đã hoàn tất. Hệ thống đang chờ webhook xác nhận để cộng tiền vào ví.'
-      : 'PayOS đã chuyển bạn về hệ thống. Vui lòng kiểm tra ví hoặc lịch sử giao dịch sau khi webhook được xử lý.';
+      ? 'Thanh toán đã hoàn tất. Hệ thống đang xác nhận để cộng tiền vào ví.'
+      : 'PayOS đã chuyển bạn về hệ thống. Vui lòng kiểm tra ví sau khi webhook được xử lý.';
 
   return (
     <main className="wallet-page">
       <div className="wallet-shell">
+        <WalletNavigation />
+
         <header className="wallet-header">
-          <div>
-            <p className="wallet-muted">PayOS</p>
-            <h1>Kết quả thanh toán</h1>
-            <p>{message}</p>
-          </div>
-          <div className="wallet-actions">
-            <Button type="button" variant="secondary" onClick={() => navigate(ROUTE_PATHS.ME.ROOT)}>
-              Quay lại trang chủ
-            </Button>
-          </div>
+          <p className="wallet-kicker">Kết quả PayOS</p>
+          <h1>Kết quả thanh toán</h1>
+          <p className="wallet-muted">
+            Trang này chỉ hiển thị trạng thái PayOS trả về. Frontend không tự cộng tiền vào ví.
+          </p>
         </header>
 
         <section className="wallet-panel">
-          <div className="wallet-result" style={{ marginTop: 0, paddingTop: 0, borderTop: 'none' }}>
+          <div className={bannerClass}>
+            <strong>{statusText}</strong>
+            <br />
+            {message}
+          </div>
+          <p className="wallet-helper">
+            Nếu số dư chưa thay đổi ngay, vui lòng chờ vài giây rồi tải lại trang ví.
+          </p>
+
+          <div className="wallet-result wallet-result-flat">
             <div className="wallet-result-row">
-              <span>Code</span>
+              <span>Mã phản hồi</span>
               <strong>{code || 'Chưa có'}</strong>
             </div>
             <div className="wallet-result-row">
-              <span>Status</span>
-              <strong>{status || 'Chưa có'}</strong>
+              <span>Trạng thái</span>
+              <strong>
+                <span className={`wallet-status-badge ${isCancelled ? 'wallet-status-cancelled' : isPaid ? 'wallet-status-succeeded' : 'wallet-status-pending'}`}>
+                  {statusText}
+                </span>
+              </strong>
             </div>
             <div className="wallet-result-row">
-              <span>Cancel</span>
+              <span>Đã hủy</span>
               <strong>{cancel || 'Chưa có'}</strong>
             </div>
             <div className="wallet-result-row">
-              <span>Order code</span>
+              <span>Mã PayOS</span>
               <strong className="wallet-code">{orderCode || 'Chưa có'}</strong>
             </div>
             <div className="wallet-result-row">
-              <span>PayOS id</span>
+              <span>Mã định danh PayOS</span>
               <strong className="wallet-code">{id || 'Chưa có'}</strong>
             </div>
           </div>
 
-          <div className="wallet-actions" style={{ marginTop: 20 }}>
+          <div className="wallet-actions wallet-actions-spaced">
             <Button type="button" onClick={() => navigate(ROUTE_PATHS.ME.WALLET)}>
-              Về ví của tôi
+              Kiểm tra ví
             </Button>
             <Button type="button" variant="secondary" onClick={() => navigate(ROUTE_PATHS.ME.WALLET_TRANSACTIONS)}>
               Xem lịch sử giao dịch
             </Button>
             <Button type="button" variant="secondary" onClick={() => navigate(ROUTE_PATHS.ME.WALLET_TOPUP)}>
-              Nạp tiếp
+              Nạp thêm tiền
             </Button>
             <Button type="button" variant="secondary" onClick={() => navigate(ROUTE_PATHS.ME.ROOT)}>
-              Quay lại trang chủ
+              Trang chủ
             </Button>
           </div>
         </section>

@@ -4,5 +4,6 @@ public enum PaymentMethod
 {
     PayOS,
     Mock,
-    SePay
+    SePay,
+    InternalWallet
 }

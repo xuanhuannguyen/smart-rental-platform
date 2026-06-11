@@ -143,6 +143,53 @@ public class PayOSTopUpService : IPayOSTopUpService
         return ToResponse(paymentTransaction);
     }
 
+    public async Task<PagedResult<WalletTopUpHistoryResponse>> GetTopUpHistoryAsync(
+        Guid userId,
+        int page,
+        int pageSize,
+        CancellationToken cancellationToken = default)
+    {
+        page = Math.Max(1, page);
+        pageSize = Math.Clamp(pageSize, 1, 100);
+
+        var query = context.PaymentTransactions
+            .AsNoTracking()
+            .Where(x => x.PayerUserId == userId && x.PaymentPurpose == PaymentPurpose.WalletTopUp)
+            .OrderByDescending(x => x.CreatedAt);
+
+        var totalItems = await query.CountAsync(cancellationToken);
+        var items = await query
+            .Skip((page - 1) * pageSize)
+            .Take(pageSize)
+            .Select(x => new WalletTopUpHistoryResponse
+            {
+                Id = x.Id,
+                Amount = x.Amount,
+                Currency = x.Currency,
+                PaymentMethod = x.PaymentMethod.ToString(),
+                ProviderOrderCode = x.ProviderOrderCode,
+                ProviderCheckoutUrl = x.ProviderCheckoutUrl,
+                Status = x.Status.ToString(),
+                ExpiresAt = x.ExpiresAt,
+                PaidAt = x.PaidAt,
+                FailedAt = x.FailedAt,
+                ConfirmedAt = x.ConfirmedAt,
+                CreatedAt = x.CreatedAt,
+                GatewayResponseCode = x.GatewayResponseCode,
+                GatewayResponseMessage = x.GatewayResponseMessage
+            })
+            .ToListAsync(cancellationToken);
+
+        return new PagedResult<WalletTopUpHistoryResponse>
+        {
+            Items = items,
+            Page = page,
+            PageSize = pageSize,
+            TotalItems = totalItems,
+            TotalPages = totalItems == 0 ? 0 : (int)Math.Ceiling(totalItems / (double)pageSize)
+        };
+    }
+
     private static void ValidateAmount(decimal amount)
     {
         if (amount <= 0)

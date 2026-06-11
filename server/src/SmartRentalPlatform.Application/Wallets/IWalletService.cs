@@ -44,4 +44,13 @@ public interface IWalletService
         WalletTransactionType transactionType,
         WalletTransactionMetadata? metadata = null,
         CancellationToken cancellationToken = default);
+
+    Task<WalletTransferResponse> TransferAsync(
+        Guid sourceWalletAccountId,
+        Guid targetWalletAccountId,
+        decimal amount,
+        WalletTransactionType debitTransactionType,
+        WalletTransactionType creditTransactionType,
+        WalletTransactionMetadata? metadata = null,
+        CancellationToken cancellationToken = default);
 }

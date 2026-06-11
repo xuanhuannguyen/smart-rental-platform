@@ -15,10 +15,14 @@ public class WalletService : IWalletService
     private const int MaxPageSize = 100;
 
     private readonly IAppDbContext context;
+    private readonly IPaymentRowLockService rowLockService;
 
-    public WalletService(IAppDbContext context)
+    public WalletService(
+        IAppDbContext context,
+        IPaymentRowLockService rowLockService)
     {
         this.context = context;
+        this.rowLockService = rowLockService;
     }
 
     public async Task<WalletResponse> GetMyWalletAsync(Guid userId, CancellationToken cancellationToken = default)
@@ -199,46 +203,20 @@ public class WalletService : IWalletService
 
         try
         {
-            var wallet = await LoadWalletByIdAsync(walletAccountId, cancellationToken);
+            var wallet = await rowLockService.LockWalletAccountAsync(walletAccountId, cancellationToken);
             if (wallet is null)
             {
                 throw new NotFoundException(ErrorCodes.NotFound, "Wallet account not found.");
             }
 
-            EnsureWalletActive(wallet);
-
-            var balanceBefore = wallet.Balance;
-            var reservedBefore = wallet.ReservedBalance;
-            var balanceAfter = balanceBefore + balanceDelta;
-            var reservedAfter = reservedBefore + reservedBalanceDelta;
-
-            ValidateWalletInvariants(balanceAfter, reservedAfter);
-
-            wallet.Balance = balanceAfter;
-            wallet.ReservedBalance = reservedAfter;
-            wallet.UpdatedAt = DateTimeOffset.UtcNow;
-
-            var walletTransaction = new WalletTransaction
-            {
-                Id = Guid.NewGuid(),
-                WalletAccountId = wallet.Id,
-                UserId = wallet.UserId,
-                TransferGroupId = metadata?.TransferGroupId,
-                TransactionType = transactionType,
-                Direction = direction,
-                Amount = amount,
-                BalanceBefore = balanceBefore,
-                BalanceAfter = balanceAfter,
-                ReservedBalanceBefore = reservedBefore,
-                ReservedBalanceAfter = reservedAfter,
-                RelatedEntityType = metadata?.RelatedEntityType,
-                RelatedEntityId = metadata?.RelatedEntityId,
-                Description = metadata?.Description,
-                Status = WalletTransactionStatus.Succeeded,
-                CreatedAt = DateTimeOffset.UtcNow
-            };
-
-            context.WalletTransactions.Add(walletTransaction);
+            var walletTransaction = ApplyWalletMutation(
+                wallet,
+                amount,
+                transactionType,
+                direction,
+                balanceDelta,
+                reservedBalanceDelta,
+                metadata);
 
             await context.SaveChangesAsync(cancellationToken);
             await transaction.CommitAsync(cancellationToken);
@@ -254,6 +232,148 @@ public class WalletService : IWalletService
             await transaction.RollbackAsync(cancellationToken);
             throw;
         }
+    }
+
+    public async Task<WalletTransferResponse> TransferAsync(
+        Guid sourceWalletAccountId,
+        Guid targetWalletAccountId,
+        decimal amount,
+        WalletTransactionType debitTransactionType,
+        WalletTransactionType creditTransactionType,
+        WalletTransactionMetadata? metadata = null,
+        CancellationToken cancellationToken = default)
+    {
+        ValidateAmount(amount);
+
+        if (sourceWalletAccountId == targetWalletAccountId)
+        {
+            throw new BadRequestException(ErrorCodes.ValidationError, "Source and target wallets must be different.");
+        }
+
+        await using var transaction = await context.BeginTransactionAsync(cancellationToken);
+
+        try
+        {
+            var firstWalletId = sourceWalletAccountId.CompareTo(targetWalletAccountId) <= 0
+                ? sourceWalletAccountId
+                : targetWalletAccountId;
+            var secondWalletId = firstWalletId == sourceWalletAccountId
+                ? targetWalletAccountId
+                : sourceWalletAccountId;
+
+            var firstWallet = await rowLockService.LockWalletAccountAsync(firstWalletId, cancellationToken);
+            var secondWallet = await rowLockService.LockWalletAccountAsync(secondWalletId, cancellationToken);
+
+            var sourceWallet = firstWallet?.Id == sourceWalletAccountId ? firstWallet : secondWallet;
+            var targetWallet = firstWallet?.Id == targetWalletAccountId ? firstWallet : secondWallet;
+
+            if (sourceWallet is null)
+            {
+                throw new NotFoundException(ErrorCodes.NotFound, "Source wallet account not found.");
+            }
+
+            if (targetWallet is null)
+            {
+                throw new NotFoundException(ErrorCodes.NotFound, "Target wallet account not found.");
+            }
+
+            var transferGroupId = metadata?.TransferGroupId ?? Guid.NewGuid();
+            var debitMetadata = CopyMetadata(metadata, transferGroupId, "DevTestTransfer");
+            var creditMetadata = CopyMetadata(metadata, transferGroupId, "DevTestTransfer");
+
+            var debitTransaction = ApplyWalletMutation(
+                sourceWallet,
+                amount,
+                debitTransactionType,
+                WalletTransactionDirection.Debit,
+                balanceDelta: -amount,
+                reservedBalanceDelta: 0,
+                debitMetadata);
+
+            var creditTransaction = ApplyWalletMutation(
+                targetWallet,
+                amount,
+                creditTransactionType,
+                WalletTransactionDirection.Credit,
+                balanceDelta: amount,
+                reservedBalanceDelta: 0,
+                creditMetadata);
+
+            await context.SaveChangesAsync(cancellationToken);
+            await transaction.CommitAsync(cancellationToken);
+
+            return new WalletTransferResponse
+            {
+                TransferGroupId = transferGroupId,
+                DebitTransaction = ToWalletTransactionResponse(debitTransaction),
+                CreditTransaction = ToWalletTransactionResponse(creditTransaction)
+            };
+        }
+        catch
+        {
+            await transaction.RollbackAsync(cancellationToken);
+            throw;
+        }
+    }
+
+    private WalletTransaction ApplyWalletMutation(
+        WalletAccount wallet,
+        decimal amount,
+        WalletTransactionType transactionType,
+        WalletTransactionDirection direction,
+        decimal balanceDelta,
+        decimal reservedBalanceDelta,
+        WalletTransactionMetadata? metadata)
+    {
+        EnsureWalletActive(wallet);
+
+        var balanceBefore = wallet.Balance;
+        var reservedBefore = wallet.ReservedBalance;
+        var balanceAfter = balanceBefore + balanceDelta;
+        var reservedAfter = reservedBefore + reservedBalanceDelta;
+
+        ValidateWalletInvariants(balanceAfter, reservedAfter);
+
+        wallet.Balance = balanceAfter;
+        wallet.ReservedBalance = reservedAfter;
+        wallet.UpdatedAt = DateTimeOffset.UtcNow;
+
+        var walletTransaction = new WalletTransaction
+        {
+            Id = Guid.NewGuid(),
+            WalletAccountId = wallet.Id,
+            UserId = wallet.UserId,
+            TransferGroupId = metadata?.TransferGroupId,
+            TransactionType = transactionType,
+            Direction = direction,
+            Amount = amount,
+            BalanceBefore = balanceBefore,
+            BalanceAfter = balanceAfter,
+            ReservedBalanceBefore = reservedBefore,
+            ReservedBalanceAfter = reservedAfter,
+            RelatedEntityType = metadata?.RelatedEntityType,
+            RelatedEntityId = metadata?.RelatedEntityId,
+            Description = metadata?.Description,
+            Status = WalletTransactionStatus.Succeeded,
+            CreatedAt = DateTimeOffset.UtcNow
+        };
+
+        context.WalletTransactions.Add(walletTransaction);
+        return walletTransaction;
+    }
+
+    private static WalletTransactionMetadata CopyMetadata(
+        WalletTransactionMetadata? metadata,
+        Guid transferGroupId,
+        string relatedEntityType)
+    {
+        return new WalletTransactionMetadata
+        {
+            TransferGroupId = transferGroupId,
+            RelatedEntityType = metadata?.RelatedEntityType ?? relatedEntityType,
+            RelatedEntityId = metadata?.RelatedEntityId,
+            Description = metadata?.Description
+        };
     }
 
     private Task<User?> LoadUserByIdAsync(Guid userId, CancellationToken cancellationToken)

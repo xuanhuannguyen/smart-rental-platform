@@ -6,12 +6,43 @@ Do not commit real PayOS credentials to source code or appsettings files.
 
 ## Accounts
 
-Development seed creates a KYC-approved tenant:
+Development/QA/Test seed creates stable Wallet QA accounts. These accounts are for local and QA testing only.
 
 ```text
+Tenant
 Email: tenant.demo@example.com
 Password: Demo@123456
+UserId: 10000000-0000-0000-0000-000000000001
+Role: Tenant
+KYC: Approved
+Wallet: Active VND
+Initial balance: 500000
+Use for: top-up, debit, transfer source, future invoice/deposit payment tests
 ```
+
+```text
+Landlord
+Email: landlord.demo@example.com
+Password: Demo@123456
+UserId: 10000000-0000-0000-0000-000000000002
+Role: Landlord
+KYC: Approved
+Wallet: Active VND
+Initial balance: 100000
+Use for: transfer target, future rent/deposit receive tests, reserved balance tests
+```
+
+```text
+Admin
+Email: admin.demo@example.com
+Password: Demo@123456
+UserId: 10000000-0000-0000-0000-000000000099
+Role: Admin
+KYC: not required
+Use for: admin-only endpoint testing and KYC/payment debugging
+```
+
+The seeder is idempotent. It checks normalized email, role assignment, approved KYC, and wallet existence before adding data. If a test account or wallet already exists, the seeder does not reset the password or wallet balance.
 
 ## Start Apps
 
@@ -29,6 +60,50 @@ npm run dev
 ```
 
 Log in as the KYC-approved tenant.
+
+## Recommended QA Account Usage
+
+Tenant top-up:
+
+1. Log in as `tenant.demo@example.com`.
+2. Open `/me/wallet/topup`.
+3. Create a PayOS top-up.
+4. Use mock success locally or real PayOS when credentials/webhook are configured.
+
+Tenant transfer to landlord:
+
+1. Log in as `tenant.demo@example.com`.
+2. Use Swagger endpoint `POST /api/dev/wallet-test/transfer`.
+3. Set `targetUserId` to `10000000-0000-0000-0000-000000000002`.
+4. Verify tenant balance decreases, landlord balance increases, and both ledger rows share the same `transfer_group_id`.
+
+Reserve balance test:
+
+1. Log in as `landlord.demo@example.com` or `tenant.demo@example.com`.
+2. Use Swagger endpoint `POST /api/dev/wallet-test/reserve`.
+3. Verify `reserved_balance` increases but never exceeds `balance`.
+4. Use `POST /api/dev/wallet-test/release-reserve` to release the reserved amount.
+
+Debit insufficient balance:
+
+1. Log in as `tenant.demo@example.com`.
+2. Use `POST /api/dev/wallet-test/debit` with an amount greater than available balance.
+3. Verify the request fails and wallet balance is unchanged.
+
+Mock payment flow:
+
+1. Log in as `tenant.demo@example.com`.
+2. Create a top-up from `/me/wallet/topup`.
+3. Open `/dev/mock-payment` with the returned `paymentTransactionId`.
+4. Run success, duplicate success, wrong amount, and failed tests.
+
+Real PayOS flow:
+
+1. Configure PayOS credentials with user-secrets or environment variables.
+2. Log in as `tenant.demo@example.com`.
+3. Create top-up from `/me/wallet/topup`.
+4. Open the real PayOS payment URL.
+5. Use a public webhook URL for real webhook confirmation; localhost is not reachable by PayOS without a tunnel.
 
 ## Local Mock Mode
 
@@ -137,6 +212,142 @@ After a successful real webhook:
 - wallet balance is credited exactly once
 - one `WalletTopUp` ledger row is created
 
+## DEV ONLY Wallet Spending Tests
+
+These endpoints are temporary Person 5 development endpoints. They must not be used for real invoice/deposit flows.
+
+Base route:
+
+```text
+/api/dev/wallet-test
+```
+
+Requirements:
+
+- Development environment, or Admin role outside Development.
+- Bearer token for the current authenticated user.
+- Do not call these endpoints from production navigation.
+
+Credit wallet:
+
+```http
+POST /api/dev/wallet-test/credit
+Authorization: Bearer <JWT>
+Content-Type: application/json
+
+{
+  "amount": 50000,
+  "note": "dev credit test"
+}
+```
+
+Debit wallet:
+
+```http
+POST /api/dev/wallet-test/debit
+Authorization: Bearer <JWT>
+Content-Type: application/json
+
+{
+  "amount": 50000,
+  "note": "dev debit test"
+}
+```
+
+Debit insufficient balance:
+
+```http
+POST /api/dev/wallet-test/debit
+Authorization: Bearer <JWT>
+Content-Type: application/json
+
+{
+  "amount": 999999999,
+  "note": "dev insufficient debit test"
+}
+```
+
+Expected: request fails and balance remains unchanged.
+
+Reserve balance:
+
+```http
+POST /api/dev/wallet-test/reserve
+Authorization: Bearer <JWT>
+Content-Type: application/json
+
+{
+  "amount": 100000,
+  "note": "dev reserve test"
+}
+```
+
+Reserve more than balance:
+
+```http
+POST /api/dev/wallet-test/reserve
+Authorization: Bearer <JWT>
+Content-Type: application/json
+
+{
+  "amount": 999999999,
+  "note": "dev reserve too much test"
+}
+```
+
+Expected: request fails because `reserved_balance <= balance` must hold.
+
+Release reserve:
+
+```http
+POST /api/dev/wallet-test/release-reserve
+Authorization: Bearer <JWT>
+Content-Type: application/json
+
+{
+  "amount": 100000,
+  "note": "dev release reserve test"
+}
+```
+
+Expected: request fails if reserved balance would go below zero.
+
+Transfer between wallets:
+
+```http
+POST /api/dev/wallet-test/transfer
+Authorization: Bearer <JWT>
+Content-Type: application/json
+
+{
+  "targetUserId": "<TARGET_USER_GUID>",
+  "amount": 50000,
+  "note": "dev transfer test"
+}
+```
+
+Expected:
+
+- source wallet debited
+- target wallet credited
+- exactly two wallet transaction rows
+- both rows share the same `transfer_group_id`
+
+Concurrent duplicate debit:
+
+1. Credit wallet with a known amount.
+2. Send two debit requests for the full available balance at the same time.
+3. Verify at most one succeeds.
+4. Verify balance never becomes negative.
+5. Verify every successful mutation has exactly one ledger row.
+
+Balance invariant checks:
+
+- `balance >= 0`
+- `reserved_balance >= 0`
+- `reserved_balance <= balance`
+- debit cannot spend reserved funds
+
 ## SQL Verification
 
 ```sql
@@ -165,4 +376,3 @@ select id, payment_transaction_id, payment_method, provider_order_code,
 from payment_webhook_logs
 order by received_at desc;
 ```
-
