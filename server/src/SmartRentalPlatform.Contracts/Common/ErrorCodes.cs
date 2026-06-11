@@ -61,4 +61,6 @@ public static class ErrorCodes
     // Lease Policy
     public const string LeasePolicyRequired = "LEASE_POLICY_REQUIRED";
     public const string LeasePolicyInvalid = "LEASE_POLICY_INVALID";
+    public const string HouseRuleRequired = "HOUSE_RULE_REQUIRED";
+    public const string HouseRuleInvalid = "HOUSE_RULE_INVALID";
 }
