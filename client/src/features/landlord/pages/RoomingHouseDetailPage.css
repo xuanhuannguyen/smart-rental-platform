@@ -593,6 +593,148 @@
   background: #f8fafc;
 }
 
+.service-price-batch {
+  display: grid;
+  gap: 14px;
+}
+
+.service-price-batch-table {
+  display: grid;
+  border: 1px solid #dbe3ef;
+  border-radius: 8px;
+  overflow: hidden;
+  background: #ffffff;
+}
+
+.service-price-batch-row {
+  display: grid;
+  grid-template-columns: 1.2fr 1.6fr 1.7fr 1.2fr 1.2fr;
+  align-items: center;
+  gap: 14px;
+  min-height: 92px;
+  padding: 14px 18px;
+  border-bottom: 1px solid #e2e8f0;
+}
+
+.service-price-batch-row:last-child {
+  border-bottom: 0;
+}
+
+.service-price-batch-row--head {
+  min-height: 44px;
+  background: #eef4ff;
+  color: #0f172a;
+  font-size: 12px;
+  font-weight: 800;
+  text-transform: uppercase;
+}
+
+.service-price-service {
+  display: inline-flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.service-price-icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 34px;
+  height: 34px;
+  border-radius: 8px;
+  font-size: 13px;
+  font-weight: 800;
+}
+
+.service-price-icon--electric { background: #fff7ed; color: #ea580c; }
+.service-price-icon--water { background: #eff6ff; color: #2563eb; }
+.service-price-icon--wifi { background: #faf5ff; color: #7c3aed; }
+.service-price-icon--trash { background: #f0fdf4; color: #15803d; }
+
+.service-price-current,
+.service-price-methods {
+  display: grid;
+  gap: 5px;
+}
+
+.service-price-current strong {
+  color: #0f172a;
+  font-size: 14px;
+}
+
+.service-price-current span,
+.service-price-methods small {
+  color: #64748b;
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.service-price-method-static {
+  display: inline-flex;
+  align-items: center;
+  min-height: 36px;
+  color: #475569;
+  font-weight: 800;
+}
+
+.service-price-segmented {
+  display: inline-flex;
+  width: fit-content;
+  padding: 3px;
+  border: 1px solid #cbd5e1;
+  border-radius: 8px;
+  background: #f8fafc;
+}
+
+.service-price-segmented button {
+  min-width: 72px;
+  min-height: 32px;
+  padding: 6px 10px;
+  border: 0;
+  border-radius: 6px;
+  background: transparent;
+  color: #475569;
+  font: inherit;
+  font-size: 13px;
+  font-weight: 800;
+  cursor: pointer;
+}
+
+.service-price-segmented button.active {
+  background: #162033;
+  color: #ffffff;
+}
+
+.service-price-inline-field input {
+  width: 100%;
+  min-height: 40px;
+  padding: 8px 10px;
+  border: 1px solid #cbd5e1;
+  border-radius: 6px;
+  font: inherit;
+  font-weight: 800;
+}
+
+.service-price-inline-field input[readonly] {
+  background: #f8fafc;
+  color: #334155;
+}
+
+.service-price-batch-actions {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 12px;
+  align-items: center;
+}
+
+.service-price-batch-actions input {
+  min-height: 42px;
+  padding: 9px 12px;
+  border: 1px solid #cbd5e1;
+  border-radius: 6px;
+  font: inherit;
+}
+
 .service-price-cards,
 .service-price-form {
   display: grid;
@@ -635,6 +777,52 @@
   overflow-x: auto;
 }
 
+.service-price-history-groups {
+  display: grid;
+  gap: 10px;
+  margin-top: 14px;
+}
+
+.service-price-history-group {
+  border: 1px solid #dbe3ef;
+  border-radius: 8px;
+  background: #ffffff;
+  overflow: hidden;
+}
+
+.service-price-history-group summary {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 10px;
+  min-height: 46px;
+  padding: 10px 14px;
+  color: #172033;
+  cursor: pointer;
+}
+
+.service-price-history-group summary span:last-child {
+  color: #64748b;
+  font-size: 12px;
+  font-weight: 800;
+}
+
+.history-dot-row {
+  display: inline-flex;
+  gap: 4px;
+}
+
+.history-dot {
+  width: 7px;
+  height: 7px;
+  border-radius: 999px;
+}
+
+.history-dot--electric { background: #f97316; }
+.history-dot--water { background: #3b82f6; }
+.history-dot--wifi { background: #8b5cf6; }
+.history-dot--trash { background: #22c55e; }
+
 .service-price-table {
   display: grid;
   min-width: 720px;
@@ -643,6 +831,19 @@
   border-radius: 8px;
   overflow: hidden;
   background: #ffffff;
+}
+
+.service-price-table--monthly {
+  min-width: 980px;
+  margin-top: 0;
+  border-right: 0;
+  border-bottom: 0;
+  border-left: 0;
+  border-radius: 0;
+}
+
+.service-price-table--monthly .service-price-row {
+  grid-template-columns: 1.1fr 1fr 0.75fr 1fr 1fr 1fr;
 }
 
 .service-price-row {

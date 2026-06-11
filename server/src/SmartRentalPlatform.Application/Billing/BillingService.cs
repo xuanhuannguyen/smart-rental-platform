@@ -104,11 +104,20 @@ public class BillingService : IBillingService
         var serviceCode = ParseServiceCode(request.ServiceCode);
         var billingMethod = ParseBillingMethod(request.BillingMethod);
         var serviceType = await GetServiceTypeAsync(serviceCode, cancellationToken);
-        if (serviceType.IsMetered != (billingMethod == BillingMethod.Metered))
+
+        var validBillingMethod = serviceCode switch
+        {
+            BillingServiceCode.Electric => billingMethod == BillingMethod.Metered,
+            BillingServiceCode.Water => billingMethod is BillingMethod.Metered or BillingMethod.Fixed,
+            BillingServiceCode.Wifi or BillingServiceCode.Trash => billingMethod == BillingMethod.Fixed,
+            _ => false
+        };
+
+        if (!validBillingMethod)
         {
             throw new BadRequestException(
                 ErrorCodes.BillingPriceInvalid,
-                "Phuong thuc tinh gia khong khop voi loai dich vu.");
+                "Phuong thuc tinh gia khong hop le voi loai dich vu.");
         }
 
         if (request.UnitPrice < 0)
@@ -117,6 +126,45 @@ public class BillingService : IBillingService
         }
 
         var now = DateTimeOffset.UtcNow;
+        var effectiveFrom = GetNextBillingPeriodStart(DateOnly.FromDateTime(now.UtcDateTime));
+        var unitName = request.UnitName.Trim();
+
+        var scheduledPrice = await context.RoomingHouseServicePrices
+            .Where(x => x.RoomingHouseId == roomingHouseId &&
+                        x.ServiceTypeId == serviceType.Id &&
+                        x.EffectiveFrom == effectiveFrom)
+            .FirstOrDefaultAsync(cancellationToken);
+
+        if (scheduledPrice is not null)
+        {
+            scheduledPrice.BillingMethod = billingMethod;
+            scheduledPrice.UnitName = unitName;
+            scheduledPrice.UnitPrice = request.UnitPrice;
+            scheduledPrice.Note = request.Note;
+            scheduledPrice.IsActive = true;
+            scheduledPrice.EffectiveTo = null;
+            scheduledPrice.UpdatedAt = now;
+
+            var otherActivePrices = await context.RoomingHouseServicePrices
+                .Where(x => x.RoomingHouseId == roomingHouseId &&
+                            x.ServiceTypeId == serviceType.Id &&
+                            x.Id != scheduledPrice.Id &&
+                            x.IsActive)
+                .ToListAsync(cancellationToken);
+
+            foreach (var otherPrice in otherActivePrices)
+            {
+                otherPrice.IsActive = false;
+                otherPrice.EffectiveTo = effectiveFrom.AddDays(-1);
+                otherPrice.UpdatedAt = now;
+            }
+
+            await context.SaveChangesAsync(cancellationToken);
+
+            scheduledPrice.ServiceType = serviceType;
+            return ToServicePriceResponse(scheduledPrice);
+        }
+
         var activePrice = await context.RoomingHouseServicePrices
             .Where(x => x.RoomingHouseId == roomingHouseId &&
                         x.ServiceTypeId == serviceType.Id &&
@@ -126,15 +174,25 @@ public class BillingService : IBillingService
 
         if (activePrice is not null)
         {
-            if (request.EffectiveFrom <= activePrice.EffectiveFrom)
+            if (effectiveFrom <= activePrice.EffectiveFrom)
             {
-                throw new ConflictException(
-                    ErrorCodes.BillingPriceInvalid,
-                    "Ngay ap dung moi phai lon hon ngay ap dung cua bang gia hien hanh.");
+                activePrice.BillingMethod = billingMethod;
+                activePrice.UnitName = unitName;
+                activePrice.UnitPrice = request.UnitPrice;
+                activePrice.EffectiveFrom = effectiveFrom;
+                activePrice.EffectiveTo = null;
+                activePrice.IsActive = true;
+                activePrice.Note = request.Note;
+                activePrice.UpdatedAt = now;
+
+                await context.SaveChangesAsync(cancellationToken);
+
+                activePrice.ServiceType = serviceType;
+                return ToServicePriceResponse(activePrice);
             }
 
             activePrice.IsActive = false;
-            activePrice.EffectiveTo = request.EffectiveFrom.AddDays(-1);
+            activePrice.EffectiveTo = effectiveFrom.AddDays(-1);
             activePrice.UpdatedAt = now;
         }
 
@@ -144,9 +202,9 @@ public class BillingService : IBillingService
             RoomingHouseId = roomingHouseId,
             ServiceTypeId = serviceType.Id,
             BillingMethod = billingMethod,
-            UnitName = request.UnitName.Trim(),
+            UnitName = unitName,
             UnitPrice = request.UnitPrice,
-            EffectiveFrom = request.EffectiveFrom,
+            EffectiveFrom = effectiveFrom,
             IsActive = true,
             Note = request.Note,
             CreatedAt = now,
@@ -191,6 +249,21 @@ public class BillingService : IBillingService
             throw new BadRequestException(ErrorCodes.MeterReadingInvalid, "Phong khong khop voi hop dong dang active.");
         }
 
+        var today = DateOnly.FromDateTime(DateTime.Now);
+        if (request.BillingPeriodStart > today || request.BillingPeriodEnd > today)
+        {
+            throw new BadRequestException(
+                ErrorCodes.MeterReadingInvalid,
+                "Ky ghi chi so khong duoc nam trong tuong lai.");
+        }
+
+        if (request.BillingPeriodStart < contract.StartDate || request.BillingPeriodEnd > contract.EndDate)
+        {
+            throw new BadRequestException(
+                ErrorCodes.MeterReadingInvalid,
+                "Ky ghi chi so phai nam trong thoi han hop dong.");
+        }
+
         var serviceType = await GetServiceTypeAsync(serviceCode, cancellationToken);
         var duplicate = await context.MeterReadings.AnyAsync(
             x => x.ContractId == request.ContractId &&
@@ -204,6 +277,20 @@ public class BillingService : IBillingService
             throw new ConflictException(
                 ErrorCodes.MeterReadingInvalid,
                 "Chi so cua dich vu trong ky nay da ton tai.");
+        }
+
+        var overlapping = await context.MeterReadings.AnyAsync(
+            x => x.ContractId == request.ContractId &&
+                 x.ServiceTypeId == serviceType.Id &&
+                 x.BillingPeriodStart <= request.BillingPeriodEnd &&
+                 x.BillingPeriodEnd >= request.BillingPeriodStart,
+            cancellationToken);
+
+        if (overlapping)
+        {
+            throw new ConflictException(
+                ErrorCodes.MeterReadingInvalid,
+                "Ky ghi chi so bi trung hoac chong lan voi ban ghi da co.");
         }
 
         var now = DateTimeOffset.UtcNow;
@@ -243,6 +330,13 @@ public class BillingService : IBillingService
             throw new BadRequestException(ErrorCodes.InvoiceInvalidStatus, "Ky hoa don khong hop le.");
         }
 
+        if (!IsFullCalendarMonth(request.BillingPeriodStart, request.BillingPeriodEnd))
+        {
+            throw new BadRequestException(
+                ErrorCodes.InvoiceInvalidStatus,
+                "Hoa don thang phai bat dau ngay 01 va ket thuc vao ngay cuoi cung cua cung thang.");
+        }
+
         if (request.DiscountAmount < 0)
         {
             throw new BadRequestException(ErrorCodes.InvoiceInvalidStatus, "So tien giam tru khong duoc am.");
@@ -252,15 +346,14 @@ public class BillingService : IBillingService
         var duplicate = await context.Invoices.AnyAsync(
             x => x.ContractId == request.ContractId &&
                  x.BillingPeriodStart == request.BillingPeriodStart &&
-                 x.BillingPeriodEnd == request.BillingPeriodEnd &&
-                 x.Status != InvoiceStatus.Cancelled,
+                 x.BillingPeriodEnd == request.BillingPeriodEnd,
             cancellationToken);
 
         if (duplicate)
         {
             throw new ConflictException(
                 ErrorCodes.InvoiceDuplicatePeriod,
-                "Hop dong da co hoa don trong ky nay.");
+                "Hợp đồng đã có hóa đơn trong kỳ này.");
         }
 
         var serviceTypes = await context.BillingServiceTypes
@@ -395,6 +488,8 @@ public class BillingService : IBillingService
         string? search = null,
         CancellationToken cancellationToken = default)
     {
+        await MarkOverdueInvoicesAsync(landlordUserId: landlordUserId, tenantUserId: null, invoiceId: null, cancellationToken);
+
         var query = BuildInvoiceQuery()
             .Where(x => x.LandlordUserId == landlordUserId);
 
@@ -426,6 +521,8 @@ public class BillingService : IBillingService
         Guid invoiceId,
         CancellationToken cancellationToken = default)
     {
+        await MarkOverdueInvoicesAsync(landlordUserId: landlordUserId, tenantUserId: null, invoiceId: invoiceId, cancellationToken);
+
         var invoice = await BuildInvoiceQuery()
             .FirstOrDefaultAsync(x => x.Id == invoiceId, cancellationToken)
             ?? throw new NotFoundException(ErrorCodes.InvoiceNotFound, "Khong tim thay hoa don.");
@@ -523,6 +620,8 @@ public class BillingService : IBillingService
         Guid tenantUserId,
         CancellationToken cancellationToken = default)
     {
+        await MarkOverdueInvoicesAsync(landlordUserId: null, tenantUserId: tenantUserId, invoiceId: null, cancellationToken);
+
         var invoices = await BuildInvoiceQuery()
             .Where(x => x.TenantUserId == tenantUserId &&
                         x.Status != InvoiceStatus.Draft &&
@@ -538,6 +637,8 @@ public class BillingService : IBillingService
         Guid invoiceId,
         CancellationToken cancellationToken = default)
     {
+        await MarkOverdueInvoicesAsync(landlordUserId: null, tenantUserId: tenantUserId, invoiceId: invoiceId, cancellationToken);
+
         var invoice = await BuildInvoiceQuery()
             .FirstOrDefaultAsync(x => x.Id == invoiceId, cancellationToken)
             ?? throw new NotFoundException(ErrorCodes.InvoiceNotFound, "Khong tim thay hoa don.");
@@ -561,6 +662,8 @@ public class BillingService : IBillingService
         Guid invoiceId,
         CancellationToken cancellationToken = default)
     {
+        await MarkOverdueInvoicesAsync(landlordUserId: null, tenantUserId: tenantUserId, invoiceId: invoiceId, cancellationToken);
+
         var invoice = await context.Invoices
             .FirstOrDefaultAsync(x => x.Id == invoiceId, cancellationToken)
             ?? throw new NotFoundException(ErrorCodes.InvoiceNotFound, "Khong tim thay hoa don.");
@@ -702,10 +805,56 @@ public class BillingService : IBillingService
         return ToInvoiceResponse(invoice);
     }
 
+    private async Task MarkOverdueInvoicesAsync(
+        Guid? landlordUserId,
+        Guid? tenantUserId,
+        Guid? invoiceId,
+        CancellationToken cancellationToken)
+    {
+        var today = DateOnly.FromDateTime(DateTime.UtcNow);
+        var query = context.Invoices
+            .Where(x => x.RemainingAmount > 0 &&
+                        x.DueDate < today &&
+                        (x.Status == InvoiceStatus.Issued ||
+                         x.Status == InvoiceStatus.PartiallyPaid));
+
+        if (landlordUserId.HasValue)
+        {
+            query = query.Where(x => x.LandlordUserId == landlordUserId.Value);
+        }
+
+        if (tenantUserId.HasValue)
+        {
+            query = query.Where(x => x.TenantUserId == tenantUserId.Value);
+        }
+
+        if (invoiceId.HasValue)
+        {
+            query = query.Where(x => x.Id == invoiceId.Value);
+        }
+
+        var overdueInvoices = await query.ToListAsync(cancellationToken);
+        if (overdueInvoices.Count == 0)
+        {
+            return;
+        }
+
+        var now = DateTimeOffset.UtcNow;
+        foreach (var invoice in overdueInvoices)
+        {
+            invoice.Status = InvoiceStatus.Overdue;
+            invoice.UpdatedAt = now;
+        }
+
+        await context.SaveChangesAsync(cancellationToken);
+    }
+
     private IQueryable<Invoice> BuildInvoiceQuery()
     {
         return context.Invoices
             .AsNoTracking()
+            .Include(x => x.Room)
+            .Include(x => x.Tenant)
             .Include(x => x.Items)
             .Include(x => x.Payments);
     }
@@ -723,6 +872,17 @@ public class BillingService : IBillingService
 
     private static BillingMethod ParseBillingMethod(string value)
     {
+        if (string.Equals(value, "MeterBased", StringComparison.OrdinalIgnoreCase))
+        {
+            return BillingMethod.Metered;
+        }
+
+        if (string.Equals(value, "PerMonth", StringComparison.OrdinalIgnoreCase) ||
+            string.Equals(value, "PerPerson", StringComparison.OrdinalIgnoreCase))
+        {
+            return BillingMethod.Fixed;
+        }
+
         if (!Enum.TryParse<BillingMethod>(value, true, out var method) ||
             !Enum.IsDefined(method))
         {
@@ -732,11 +892,25 @@ public class BillingService : IBillingService
         return method;
     }
 
+    private static DateOnly GetNextBillingPeriodStart(DateOnly currentDate)
+    {
+        var nextMonth = currentDate.AddMonths(1);
+        return new DateOnly(nextMonth.Year, nextMonth.Month, 1);
+    }
+
     private static DateOnly BuildDueDate(DateOnly billingPeriodEnd, int paymentDay)
     {
         var normalizedDay = Math.Clamp(paymentDay, 1, 28);
         var nextMonth = billingPeriodEnd.AddMonths(1);
         return new DateOnly(nextMonth.Year, nextMonth.Month, normalizedDay);
+    }
+
+    private static bool IsFullCalendarMonth(DateOnly start, DateOnly end)
+    {
+        return start.Day == 1 &&
+               start.Year == end.Year &&
+               start.Month == end.Month &&
+               end.Day == DateTime.DaysInMonth(end.Year, end.Month);
     }
 
     private static string GenerateInvoiceNo()
@@ -788,7 +962,10 @@ public class BillingService : IBillingService
             invoice.Id,
             invoice.ContractId,
             invoice.RoomId,
+            invoice.Room.RoomNumber,
             invoice.TenantUserId,
+            invoice.Tenant.DisplayName,
+            invoice.Tenant.Email,
             invoice.LandlordUserId,
             invoice.InvoiceNo,
             invoice.BillingPeriodStart,

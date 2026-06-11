@@ -4,7 +4,7 @@ export interface ServicePrice {
   serviceTypeId: string;
   serviceCode: BillingServiceCode;
   serviceName: string;
-  billingMethod: 'Metered' | 'Fixed';
+  billingMethod: BillingMethod;
   unitName: string;
   unitPrice: number;
   effectiveFrom: string;
@@ -16,6 +16,7 @@ export interface ServicePrice {
 }
 
 export type BillingServiceCode = 'Electric' | 'Water' | 'Wifi' | 'Trash';
+export type BillingMethod = 'Metered' | 'MeterBased' | 'Fixed' | 'PerMonth' | 'PerPerson';
 
 export interface RoomBillingContext {
   roomId: string;
@@ -35,7 +36,7 @@ export interface RoomBillingContext {
 
 export interface CreateServicePriceRequest {
   serviceCode: BillingServiceCode;
-  billingMethod: 'Metered' | 'Fixed';
+  billingMethod: BillingMethod;
   unitName: string;
   unitPrice: number;
   effectiveFrom: string;
@@ -102,7 +103,10 @@ export interface Invoice {
   id: string;
   contractId: string;
   roomId: string;
+  roomNumber: string;
   tenantUserId: string;
+  tenantName: string;
+  tenantEmail: string;
   landlordUserId: string;
   invoiceNo: string;
   billingPeriodStart: string;

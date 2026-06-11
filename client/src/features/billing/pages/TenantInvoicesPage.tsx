@@ -6,7 +6,7 @@ import { billingApi } from '../api';
 import type { Invoice } from '../types';
 import './BillingPages.css';
 
-const tenantStatuses = ['Issued', 'Paid', 'Overdue'];
+const tenantStatuses = ['Issued', 'PartiallyPaid', 'Paid', 'Overdue'];
 
 export default function TenantInvoicesPage() {
   const navigate = useNavigate();
@@ -221,24 +221,24 @@ export default function TenantInvoicesPage() {
 function TenantNotification({ invoices }: { invoices: Invoice[] }) {
   const dueSoon = invoices.filter((invoice) => {
     const diffDays = Math.ceil((new Date(invoice.dueDate).getTime() - Date.now()) / 86400000);
-    return invoice.status === 'Issued' && diffDays >= 0 && diffDays <= 3;
+    return (invoice.status === 'Issued' || invoice.status === 'PartiallyPaid') && diffDays >= 0 && diffDays <= 3;
   }).length;
-  const issued = invoices.filter((invoice) => invoice.status === 'Issued').length;
+  const payable = invoices.filter((invoice) => canPay(invoice)).length;
 
-  if (dueSoon === 0 && issued === 0) {
+  if (dueSoon === 0 && payable === 0) {
     return null;
   }
 
   return (
     <div className="billing-alert info">
-      {issued > 0 && <span>Ban co {issued} hoa don moi can thanh toan.</span>}
+      {payable > 0 && <span>Ban co {payable} hoa don can thanh toan.</span>}
       {dueSoon > 0 && <span>{dueSoon} hoa don sap den han trong 3 ngay.</span>}
     </div>
   );
 }
 
 function canPay(invoice: Invoice) {
-  return invoice.remainingAmount > 0 && (invoice.status === 'Issued' || invoice.status === 'Overdue');
+  return invoice.remainingAmount > 0 && (invoice.status === 'Issued' || invoice.status === 'PartiallyPaid' || invoice.status === 'Overdue');
 }
 
 function formatMoney(value: number) {
