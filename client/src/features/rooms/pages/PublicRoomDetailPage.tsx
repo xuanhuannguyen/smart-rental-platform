@@ -1,9 +1,12 @@
 import { useEffect, useState } from 'react';
-import { Link, useParams } from 'react-router-dom';
+import { Link, useParams, useNavigate, useLocation } from 'react-router-dom';
 import { getPublicRoomingHouseDetail } from '../../rooming-houses/api';
 import HouseImageGallery from '../../rooming-houses/components/HouseImageGallery';
 import type { RoomingHouseDetail, RoomInHouseDetail } from '../../rooming-houses/types';
 import { getApiErrorMessage } from '../../../shared/api/apiError';
+import { useAuth } from '../../../app/providers/AuthProvider';
+import { Alert } from '../../../shared/components/ui/Alert';
+import ViewingAppointmentModal from '../../viewing-appointments/components/ViewingAppointmentModal';
 import './PublicRoomDetailPage.css';
 
 function formatCurrency(value: number) {
@@ -16,9 +19,23 @@ function formatCurrency(value: number) {
 
 export default function PublicRoomDetailPage() {
   const { houseId, roomId } = useParams<{ houseId: string; roomId: string }>();
+  const navigate = useNavigate();
+  const location = useLocation();
+  const { currentUser } = useAuth();
+
   const [house, setHouse] = useState<RoomingHouseDetail | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
+  const [isModalOpen, setIsModalOpen] = useState(false);
+  const [successMessage, setSuccessMessage] = useState('');
+
+  const handleBookingClick = () => {
+    if (!currentUser) {
+      navigate('/login', { state: { from: location.pathname } });
+      return;
+    }
+    setIsModalOpen(true);
+  };
 
   useEffect(() => {
     async function loadHouseDetail() {
@@ -72,6 +89,12 @@ export default function PublicRoomDetailPage() {
         ← Quay về khu trọ: {house.name}
       </Link>
 
+      {successMessage && (
+        <div style={{ margin: '16px 0' }}>
+          <Alert type="success">{successMessage}</Alert>
+        </div>
+      )}
+
       <div className="public-room-detail__container">
         {/* Left Column: Room Gallery */}
         <section className="public-room-detail__gallery-section">
@@ -94,7 +117,7 @@ export default function PublicRoomDetailPage() {
               <button className="public-room-detail__action public-room-detail__action--primary" type="button">
                 Đặt cọc
               </button>
-              <button className="public-room-detail__action public-room-detail__action--secondary" type="button">
+              <button className="public-room-detail__action public-room-detail__action--secondary" type="button" onClick={handleBookingClick}>
                 Đặt lịch xem phòng
               </button>
             </div>
@@ -155,6 +178,19 @@ export default function PublicRoomDetailPage() {
           )}
         </section>
       </div>
+
+      {isModalOpen && (
+        <ViewingAppointmentModal
+          roomId={room.id}
+          roomNumber={room.roomNumber}
+          houseName={house.name}
+          onClose={() => setIsModalOpen(false)}
+          onSuccess={(msg) => {
+            setSuccessMessage(msg);
+            setTimeout(() => setSuccessMessage(''), 5000);
+          }}
+        />
+      )}
     </main>
   );
 }

@@ -508,6 +508,12 @@ export default function RoomingHouseDetailPage() {
         >
           Quản lý khu trọ
         </button>
+        <button
+          className="sidebar-item"
+          onClick={() => navigate(ROUTE_PATHS.LANDLORD.VIEWING_APPOINTMENTS)}
+        >
+          Lịch hẹn xem phòng
+        </button>
         <button className="sidebar-item" disabled style={{ opacity: 0.6, cursor: 'not-allowed' }}>
           Quản lý doanh thu (Sau này)
         </button>
