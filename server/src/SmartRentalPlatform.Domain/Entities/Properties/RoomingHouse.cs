@@ -19,6 +19,7 @@ namespace SmartRentalPlatform.Domain.Entities.Properties
         public string AddressDisplay { get; set; } = string.Empty;
         public decimal? Latitude { get; set; }
         public decimal? Longitude { get; set; }
+        public string? GoogleMapUrl { get; set; }
         public RoomingHouseApprovalStatus ApprovalStatus { get; set; } = RoomingHouseApprovalStatus.Pending;
         public RoomingHouseVisibilityStatus VisibilityStatus { get; set; } = RoomingHouseVisibilityStatus.Hidden;
         public string? RejectedReason {  get; set; }
@@ -37,5 +38,6 @@ namespace SmartRentalPlatform.Domain.Entities.Properties
         public ICollection<PropertyImage> Images { get; set; } = new List<PropertyImage>();
         public RoomingHouseLegalDocument LegalDocument { get; set; } = null!;
         public LeasePolicy? LeasePolicy { get; set; }
+        public RoomingHouseRule? HouseRule { get; set; }
     }
 }

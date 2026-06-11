@@ -100,3 +100,5 @@ app.MapControllers();
 app.Run();
 
 public sealed record TestEmailOtpRequest(string Email, string? DisplayName);
+
+public partial class Program;

@@ -4,15 +4,13 @@ import type { Province, Ward } from './types';
 
 export async function getProvinces(): Promise<Province[]> {
   return apiClient<Province[]>(
-    '/api/administrative/provinces',
-    { auth: true }
+    '/api/administrative/provinces'
   );
 }
 
 export async function getWardsByProvince(provinceCode: string): Promise<Ward[]> {
   return apiClient<Ward[]>(
-    `/api/administrative/provinces/${provinceCode}/wards`,
-    { auth: true }
+    `/api/administrative/provinces/${provinceCode}/wards`
   );
 }
 

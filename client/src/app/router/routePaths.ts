@@ -11,7 +11,8 @@ export const ROUTE_PATHS = {
         PROFILE: '/me/profile',
         CHANGE_PASSWORD: '/me/change-password',
         KYC: '/me/kyc',
-        KYC_STATUS: '/me/kyc/status'
+        KYC_STATUS: '/me/kyc/status',
+        ROOM_DETAIL: (houseId: string, roomId: string) => `/rooming-houses/${houseId}/rooms/${roomId}`
     },
     LANDLORD: {
         REGISTER: '/landlord/register',

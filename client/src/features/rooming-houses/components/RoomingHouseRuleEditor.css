@@ -1,0 +1,108 @@
+.rooming-house-rule-editor {
+  display: grid;
+  gap: 14px;
+}
+
+.rooming-house-rule-editor__message,
+.rooming-house-rule-editor__note {
+  margin: 0;
+  padding: 10px 14px;
+  border-radius: 6px;
+  font-size: 14px;
+  line-height: 1.5;
+}
+
+.rooming-house-rule-editor__message {
+  background: #fef9c3;
+  color: #92400e;
+}
+
+.rooming-house-rule-editor__note {
+  background: #f1f5f9;
+  color: #475569;
+}
+
+.rooming-house-rule-editor__mode {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.rooming-house-rule-editor__mode button {
+  min-height: 38px;
+  padding: 8px 14px;
+  border: 1px solid #cbd5e1;
+  border-radius: 6px;
+  background: #f8fafc;
+  color: #475569;
+  font: inherit;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.rooming-house-rule-editor__mode button.active {
+  border-color: #246bfe;
+  background: #eff6ff;
+  color: #1d4ed8;
+}
+
+.rooming-house-rule-editor__pdf {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 12px;
+  min-height: 48px;
+}
+
+.rooming-house-rule-editor__pdf p {
+  margin: 0;
+  color: #64748b;
+}
+
+.rooming-house-rule-editor__pdf a {
+  color: #1d4ed8;
+  font-weight: 700;
+}
+
+.rooming-house-rule-editor__form {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 14px;
+}
+
+.rooming-house-rule-editor__field {
+  display: grid;
+  gap: 6px;
+}
+
+.rooming-house-rule-editor__field span {
+  color: #475569;
+  font-size: 13px;
+  font-weight: 700;
+}
+
+.rooming-house-rule-editor__field textarea {
+  width: 100%;
+  min-height: 96px;
+  resize: vertical;
+  padding: 10px;
+  border: 1px solid #cbd5e1;
+  border-radius: 6px;
+  font: inherit;
+  line-height: 1.45;
+}
+
+.rooming-house-rule-editor__actions {
+  display: flex;
+  justify-content: flex-end;
+}
+
+@media (max-width: 720px) {
+  .rooming-house-rule-editor__form {
+    grid-template-columns: 1fr;
+  }
+
+  .rooming-house-rule-editor__actions {
+    justify-content: flex-start;
+  }
+}
