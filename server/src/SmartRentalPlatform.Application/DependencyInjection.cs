@@ -6,6 +6,7 @@ using SmartRentalPlatform.Application.Auth;
 using SmartRentalPlatform.Application.Common.Interfaces;
 using SmartRentalPlatform.Application.Kyc;
 using SmartRentalPlatform.Application.RoomingHouses;
+using SmartRentalPlatform.Application.RoomingHouses.Search;
 using SmartRentalPlatform.Application.Rooms;
 using SmartRentalPlatform.Application.Users;
 using SmartRentalPlatform.Application.ViewingAppointments;
@@ -24,7 +25,9 @@ public static class DependencyInjection
         services.AddScoped<IGoogleLoginService, GoogleLoginService>();
         services.AddScoped<IKycService, KycService>();
         services.AddScoped<IRoomingHouseQueryService, RoomingHouseQueryService>();
+        services.AddScoped<IRoomingHouseSearchParser, RoomingHouseSearchParser>();
         services.AddScoped<IRoomingHouseLeasePolicyService, RoomingHouseLeasePolicyService>();
+        services.AddScoped<IRoomingHouseRuleService, RoomingHouseRuleService>();
         services.AddScoped<IRoomingHouseDraftService, RoomingHouseDraftService>();
         services.AddScoped<IRoomingHouseMediaService, RoomingHouseMediaService>();
         services.AddScoped<IRoomingHouseSubmissionService, RoomingHouseSubmissionService>();

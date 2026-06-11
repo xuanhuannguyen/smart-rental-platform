@@ -45,6 +45,8 @@ public interface IAppDbContext {
 
     DbSet<LeasePolicy> LeasePolicies { get; }
 
+    DbSet<RoomingHouseRule> RoomingHouseRules { get; }
+
     DbSet<ApprovalAuditLog> ApprovalAuditLogs { get; }
 
     DbSet<ViewingAppointment> ViewingAppointments { get; }

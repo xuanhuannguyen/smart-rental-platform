@@ -15,4 +15,6 @@ public class RoomingHouseBasicInfoRequest
     public decimal? Latitude { get; set; }
 
     public decimal? Longitude { get; set; }
+
+    public string? GoogleMapUrl { get; set; }
 }

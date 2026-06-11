@@ -1,0 +1,42 @@
+[
+  {
+    "id": 5,
+    "scope": "Room",
+    "aliases": ["máy lạnh", "may lanh", "điều hòa", "điều hoà", "dieu hoa", "air conditioner", "air con", "ac", "lạnh", "lam mat"]
+  },
+  {
+    "id": 6,
+    "scope": "Room",
+    "aliases": ["gác", "gac", "gác lửng", "gac lung", "gác xép", "gac xep", "mezzanine", "tầng lửng", "tang lung", "lửng"]
+  },
+  {
+    "id": 7,
+    "scope": "Room",
+    "aliases": ["wc riêng", "ve sinh rieng", "nhà vệ sinh riêng", "nha ve sinh rieng", "toilet riêng", "toilet rieng", "phòng tắm riêng", "phong tam rieng", "khép kín", "khep kin", "wc"]
+  },
+  {
+    "id": 8,
+    "scope": "Room",
+    "aliases": ["ban công", "ban cong", "bancông", "balcony", "logia", "cửa sổ lớn", "cua so lon"]
+  },
+  {
+    "id": 1,
+    "scope": "Both",
+    "aliases": ["wifi", "wi-fi", "wi fi", "internet", "net", "mạng", "mang", "cáp quang", "cap quang", "wifi miễn phí"]
+  },
+  {
+    "id": 4,
+    "scope": "Both",
+    "aliases": ["máy giặt", "may giat", "giặt sấy", "giat say", "khu giặt", "khu giat", "phòng giặt", "phong giat", "washing"]
+  },
+  {
+    "id": 2,
+    "scope": "House",
+    "aliases": ["camera", "an ninh", "bảo vệ", "bao ve", "camera an ninh", "bao ve 24/7", "cctv", "khóa vân tay", "khoa van tay"]
+  },
+  {
+    "id": 3,
+    "scope": "House",
+    "aliases": ["chỗ để xe", "cho de xe", "để xe", "de xe", "gửi xe", "giu xe", "bãi xe", "bai xe", "parking", "xe máy", "xe may", "hầm xe", "ham xe", "gara"]
+  }
+]

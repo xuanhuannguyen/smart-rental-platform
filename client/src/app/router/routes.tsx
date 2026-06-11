@@ -9,6 +9,9 @@ import { MyProfilePage } from '../../features/profile/pages/MyProfilePage';
 import { KycSubmitPage } from '../../features/kyc/pages/KycSubmitPage';
 import { KycStatusPage } from '../../features/kyc/pages/KycStatusPage';
 import CreateRoomingHousePage from '../../features/rooming-houses/CreateRoomingHousePage';
+import PublicRoomingHouseDetailPage from '../../features/rooming-houses/PublicRoomingHouseDetailPage';
+import SearchRoomingHousesPage from '../../features/rooming-houses/SearchRoomingHousesPage';
+import PublicRoomDetailPage from '../../features/rooms/pages/PublicRoomDetailPage';
 import LandlordDashboardPage from '../../features/landlord/pages/LandlordDashboardPage';
 import RoomingHouseDetailPage from '../../features/landlord/pages/RoomingHouseDetailPage';
 import { AdminHomePage } from '../../features/admin/pages/AdminHomePage';
@@ -25,6 +28,18 @@ export const router = createBrowserRouter([
     {
         path: ROUTE_PATHS.ME.ROOT,
         element: <MePage />
+    },
+    {
+        path: '/search',
+        element: <SearchRoomingHousesPage />
+    },
+    {
+        path: '/rooming-houses/:id',
+        element: <PublicRoomingHouseDetailPage />
+    },
+    {
+        path: '/rooming-houses/:houseId/rooms/:roomId',
+        element: <PublicRoomDetailPage />
     },
     {
         path: ROUTE_PATHS.AUTH.LOGIN,

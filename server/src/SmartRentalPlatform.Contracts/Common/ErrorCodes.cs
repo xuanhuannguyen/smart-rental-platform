@@ -69,4 +69,6 @@ public static class ErrorCodes
     public const string ViewingAppointmentReasonRequired = "VIEWING_APPOINTMENT_REASON_REQUIRED";
     public const string ViewingAppointmentConflict = "VIEWING_APPOINTMENT_CONFLICT";
     public const string ViewingAppointmentNotAllowed = "VIEWING_APPOINTMENT_NOT_ALLOWED";
+    public const string HouseRuleRequired = "HOUSE_RULE_REQUIRED";
+    public const string HouseRuleInvalid = "HOUSE_RULE_INVALID";
 }
