@@ -1,56 +1,102 @@
 .billing-shell {
   min-height: 100vh;
   display: grid;
-  grid-template-columns: 260px minmax(0, 1fr);
-  background: #f4f7f6;
-  color: #17211f;
+  grid-template-columns: 248px minmax(0, 1fr);
+  background: #f4f7fb;
+  color: #0f172a;
 }
 
 .billing-sidebar {
-  background: #17211f;
-  color: #f7fbf9;
-  padding: 28px 20px;
+  background: #ffffff;
+  color: #1e293b;
+  padding: 24px 16px;
+  border-right: 1px solid #e2e8f0;
   display: flex;
   flex-direction: column;
-  gap: 16px;
+  gap: 8px;
+  position: sticky;
+  top: 0;
+  height: 100vh;
 }
 
 .billing-sidebar h1 {
-  margin: 6px 0 18px;
-  font-size: 24px;
-  line-height: 1.2;
+  margin: 10px 0 24px 4px;
+  color: #0f172a;
+  font-size: 22px;
+  font-weight: 700;
+  letter-spacing: -0.02em;
+  line-height: 1.25;
 }
 
 .billing-kicker {
   display: inline-block;
-  color: #5fbf95;
+  color: #64748b;
   font-size: 12px;
-  font-weight: 800;
-  letter-spacing: 0;
+  font-weight: 700;
+  letter-spacing: 0.08em;
   text-transform: uppercase;
 }
 
 .billing-nav {
   width: 100%;
-  border: 1px solid rgba(255, 255, 255, 0.16);
+  min-height: 42px;
+  margin: 0 0 8px;
+  border: 0;
   background: transparent;
-  color: inherit;
-  border-radius: 8px;
-  padding: 12px 14px;
+  color: #475569;
+  border-radius: 6px;
+  padding: 10px 14px;
   text-align: left;
+  font: inherit;
+  font-size: 14px;
+  font-weight: 500;
   cursor: pointer;
+  transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
 }
 
 .billing-nav.active,
 .billing-nav:hover {
-  background: #24342f;
+  background: #f1f5f9;
+  color: #0f172a;
+  transform: translateX(4px);
+}
+
+.billing-nav.active {
+  background: #eff6ff;
+  color: #246bfe;
+  font-weight: 600;
+  border-left: 3px solid #246bfe;
+  padding-left: 11px;
+  transform: none;
+}
+
+.billing-nav.active:hover {
+  background: #e0f2fe;
 }
 
 .billing-main {
-  padding: 28px;
+  padding: 24px;
   display: flex;
   flex-direction: column;
   gap: 18px;
+}
+
+.tenant-invoices-page {
+  width: min(1180px, calc(100% - 48px));
+  margin: 32px auto;
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+}
+
+.profile-invoices-section {
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+}
+
+.tenant-invoices-header {
+  margin-bottom: 0;
 }
 
 .billing-header {
@@ -59,9 +105,10 @@
   justify-content: space-between;
   gap: 18px;
   background: #ffffff;
-  border: 1px solid #dfe8e4;
-  border-radius: 8px;
-  padding: 22px;
+  border: 1px solid #dbe3ef;
+  border-radius: 12px;
+  padding: 24px;
+  box-shadow: 0 1px 3px rgba(15, 23, 42, 0.03);
 }
 
 .billing-header h2,
@@ -75,7 +122,12 @@
 .muted,
 .price-row span,
 .invoice-list-item small {
-  color: #68756f;
+  color: #64748b;
+}
+
+.billing-header p {
+  margin: 8px 0 0;
+  line-height: 1.5;
 }
 
 .billing-alert {
@@ -122,9 +174,10 @@
 
 .billing-panel {
   background: #ffffff;
-  border: 1px solid #dfe8e4;
-  border-radius: 8px;
-  padding: 20px;
+  border: 1px solid #dbe3ef;
+  border-radius: 12px;
+  padding: 22px;
+  box-shadow: 0 1px 3px rgba(15, 23, 42, 0.03);
 }
 
 .billing-panel.wide {
@@ -149,8 +202,8 @@
   padding: 4px 10px;
   font-size: 12px;
   font-weight: 800;
-  background: #edf4f1;
-  color: #2d6b55;
+  background: #eff6ff;
+  color: #246bfe;
   white-space: nowrap;
 }
 
@@ -196,8 +249,8 @@
 .invoice-item-row,
 .result-box,
 .computed-strip {
-  border: 1px solid #e4ece8;
-  background: #fbfdfc;
+  border: 1px solid #e2e8f0;
+  background: #f8fafc;
   border-radius: 8px;
 }
 
@@ -243,18 +296,26 @@
   gap: 6px;
   font-size: 13px;
   font-weight: 800;
-  color: #33423d;
+  color: #334155;
 }
 
 .billing-form input,
 .billing-form select {
   width: 100%;
   min-height: 42px;
-  border: 1px solid #cbd8d2;
+  border: 1px solid #cbd5e1;
   border-radius: 8px;
   padding: 9px 11px;
   background: #ffffff;
-  color: #17211f;
+  color: #0f172a;
+}
+
+.billing-form input:focus,
+.billing-form select:focus,
+.filter-bar input:focus,
+.filter-bar select:focus {
+  outline: 2px solid rgba(36, 107, 254, 0.18);
+  border-color: #246bfe;
 }
 
 .billing-form .span-2 {
@@ -266,14 +327,25 @@
   border-radius: 8px;
   min-height: 42px;
   padding: 10px 16px;
-  background: #1f7a59;
+  background: #246bfe;
   color: #ffffff;
   font-weight: 800;
   cursor: pointer;
+  box-shadow: 0 2px 4px rgba(36, 107, 254, 0.15);
+  transition: background-color 0.2s, box-shadow 0.2s;
 }
 
 .billing-button.secondary {
-  background: #263b72;
+  background: #e8eef7;
+  color: #334155;
+}
+
+.billing-button:hover:not(:disabled) {
+  background: #1a5ce0;
+}
+
+.billing-button.secondary:hover:not(:disabled) {
+  background: #dbe5f3;
 }
 
 .billing-button:disabled {
@@ -283,7 +355,7 @@
 
 .computed-strip {
   padding: 12px;
-  color: #33423d;
+  color: #334155;
   display: flex;
   justify-content: space-between;
   gap: 10px;
@@ -303,7 +375,7 @@
 .history-box summary {
   cursor: pointer;
   font-weight: 800;
-  color: #33423d;
+  color: #334155;
 }
 
 .result-box {
@@ -331,18 +403,18 @@
 
 .invoice-summary span {
   min-height: 64px;
-  border: 1px solid #e4ece8;
+  border: 1px solid #e2e8f0;
   border-radius: 8px;
   padding: 12px;
   display: flex;
   flex-direction: column;
   justify-content: center;
   gap: 4px;
-  color: #68756f;
+  color: #64748b;
 }
 
 .invoice-summary strong {
-  color: #17211f;
+  color: #0f172a;
 }
 
 .invoice-item-row {
@@ -360,11 +432,11 @@
 .filter-bar input,
 .filter-bar select {
   min-height: 42px;
-  border: 1px solid #cbd8d2;
+  border: 1px solid #cbd5e1;
   border-radius: 8px;
   padding: 9px 11px;
   background: #ffffff;
-  color: #17211f;
+  color: #0f172a;
 }
 
 .data-table {
@@ -379,15 +451,15 @@
   grid-template-columns: repeat(5, minmax(120px, 1fr));
   gap: 10px;
   align-items: center;
-  border: 1px solid #e4ece8;
-  background: #fbfdfc;
+  border: 1px solid #e2e8f0;
+  background: #f8fafc;
   border-radius: 8px;
   padding: 12px;
 }
 
 .table-row.table-head {
-  background: #edf4f1;
-  color: #33423d;
+  background: #eff6ff;
+  color: #1e40af;
   font-size: 12px;
   font-weight: 800;
   text-transform: uppercase;
@@ -404,7 +476,7 @@
 .link-button {
   border: 0;
   background: transparent;
-  color: #1f7a59;
+  color: #246bfe;
   font-weight: 800;
   cursor: pointer;
 }
@@ -414,15 +486,15 @@
 }
 
 .state-block {
-  border: 1px dashed #cbd8d2;
+  border: 1px dashed #cbd5e1;
   border-radius: 8px;
   padding: 22px;
-  color: #68756f;
-  background: #fbfdfc;
+  color: #64748b;
+  background: #f8fafc;
 }
 
 .state-block h3 {
-  color: #17211f;
+  color: #0f172a;
 }
 
 .loading-state {
@@ -435,24 +507,24 @@
 .check-list {
   display: grid;
   gap: 10px;
-  color: #33423d;
+  color: #334155;
 }
 
 .check-list span {
-  border: 1px solid #e4ece8;
+  border: 1px solid #e2e8f0;
   border-radius: 8px;
   padding: 11px 12px;
-  background: #fbfdfc;
+  background: #f8fafc;
 }
 
 .room-context-card {
   display: grid;
   grid-template-columns: repeat(4, minmax(0, 1fr));
   gap: 10px;
-  border: 1px solid #bbe6cc;
+  border: 1px solid #bfdbfe;
   border-radius: 8px;
   padding: 12px;
-  background: #f2fbf7;
+  background: #eff6ff;
 }
 
 .room-context-card div {
@@ -462,13 +534,13 @@
 }
 
 .room-context-card span {
-  color: #68756f;
+  color: #64748b;
   font-size: 12px;
   font-weight: 800;
 }
 
 .room-context-card strong {
-  color: #17211f;
+  color: #0f172a;
 }
 
 .modal-backdrop {
@@ -484,10 +556,10 @@
 .confirm-dialog {
   width: min(440px, 100%);
   border-radius: 8px;
-  border: 1px solid #dfe8e4;
+  border: 1px solid #dbe3ef;
   background: #ffffff;
   padding: 22px;
-  box-shadow: 0 20px 55px rgba(23, 33, 31, 0.22);
+  box-shadow: 0 20px 55px rgba(15, 23, 42, 0.18);
 }
 
 .confirm-dialog h3 {
@@ -496,7 +568,7 @@
 
 .confirm-dialog p {
   margin: 0 0 18px;
-  color: #68756f;
+  color: #64748b;
 }
 
 .tenant-layout {
@@ -506,7 +578,7 @@
 }
 
 .invoice-list-item {
-  border: 1px solid #e4ece8;
+  border: 1px solid #e2e8f0;
   background: #ffffff;
   border-radius: 8px;
   padding: 14px;
@@ -519,8 +591,8 @@
 
 .invoice-list-item.active,
 .invoice-list-item:hover {
-  border-color: #1f7a59;
-  background: #f2fbf7;
+  border-color: #246bfe;
+  background: #eff6ff;
 }
 
 .invoice-list-item em {
@@ -588,6 +660,11 @@
 }
 
 @media (max-width: 620px) {
+  .tenant-invoices-page {
+    width: calc(100% - 24px);
+    margin: 16px auto;
+  }
+
   .billing-main {
     padding: 16px;
   }

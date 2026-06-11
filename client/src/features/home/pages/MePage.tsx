@@ -63,18 +63,12 @@ export function MePage() {
                 </Button>
               ) : isLandlord ? (
                 <>
-                  <Button type="button" variant="secondary" onClick={() => navigate(ROUTE_PATHS.ME.INVOICES)}>
-                    Hóa đơn của tôi
-                  </Button>
                   <Button type="button" variant="secondary" onClick={() => navigate(ROUTE_PATHS.LANDLORD.DASHBOARD)}>
                     Kênh chủ trọ
                   </Button>
                 </>
               ) : (
                 <>
-                  <Button type="button" variant="secondary" onClick={() => navigate(ROUTE_PATHS.ME.INVOICES)}>
-                    Hóa đơn của tôi
-                  </Button>
                   <Button
                     type="button"
                     disabled={isCheckingLandlord}
@@ -116,9 +110,6 @@ export function MePage() {
                       Kênh chủ trọ
                     </button>
                   )}
-                  <button className="dropdown-item" onClick={() => { setShowDropdown(false); navigate(ROUTE_PATHS.ME.INVOICES); }}>
-                    Hóa đơn của tôi
-                  </button>
                   <button className="dropdown-item dropdown-item--danger" onClick={() => { setShowDropdown(false); logout(); }}>
                     Đăng xuất
                   </button>

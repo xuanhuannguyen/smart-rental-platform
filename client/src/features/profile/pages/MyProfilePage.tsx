@@ -16,6 +16,7 @@ import { uploadImage } from '../../files/api';
 import { getApiErrorMessage } from '../../../shared/api/apiError';
 import { toAssetUrl } from '../../../shared/api/assets';
 import { AvatarCropper, cropAvatar } from '../../../shared/components/ui/AvatarCropper';
+import { TenantInvoicesPanel } from '../../billing/pages/TenantInvoicesPage';
 import './MyProfilePage.css';
 
 function display(value?: string | null) {
@@ -83,6 +84,7 @@ export function MyProfilePage() {
   
   // Tab hiện tại: mặc định là 'info'
   const activeTab = searchParams.get('tab') || 'info';
+  const selectedInvoiceId = searchParams.get('invoiceId') ?? undefined;
 
   // --- State của Profile Info ---
   const [profile, setProfile] = useState<UserProfileResponse | null>(null);
@@ -429,6 +431,13 @@ export function MyProfilePage() {
           </button>
           <button
             type="button"
+            className={`profile-sidebar-item ${activeTab === 'invoices' ? 'active' : ''}`}
+            onClick={() => setSearchParams({ tab: 'invoices' })}
+          >
+            Hóa đơn của tôi
+          </button>
+          <button
+            type="button"
             className={`profile-sidebar-item ${activeTab === 'security' ? 'active' : ''}`}
             onClick={() => setSearchParams({ tab: 'security' })}
           >
@@ -723,6 +732,13 @@ export function MyProfilePage() {
                   </div>
                 </div>
               ) : null}
+            </section>
+          ) : activeTab === 'invoices' ? (
+            <section className="profile-section profile-invoices-section">
+              <TenantInvoicesPanel
+                invoiceId={selectedInvoiceId}
+                onOpenInvoice={(invoiceId) => setSearchParams({ tab: 'invoices', invoiceId })}
+              />
             </section>
           ) : (
             <section className="profile-section">
