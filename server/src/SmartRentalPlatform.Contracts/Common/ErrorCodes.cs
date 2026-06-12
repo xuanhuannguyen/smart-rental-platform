@@ -61,6 +61,14 @@ public static class ErrorCodes
     // Lease Policy
     public const string LeasePolicyRequired = "LEASE_POLICY_REQUIRED";
     public const string LeasePolicyInvalid = "LEASE_POLICY_INVALID";
+
+    // Viewing Appointment
+    public const string ViewingAppointmentNotFound = "VIEWING_APPOINTMENT_NOT_FOUND";
+    public const string ViewingAppointmentInvalidStatus = "VIEWING_APPOINTMENT_INVALID_STATUS";
+    public const string ViewingAppointmentTimeInPast = "VIEWING_APPOINTMENT_TIME_IN_PAST";
+    public const string ViewingAppointmentReasonRequired = "VIEWING_APPOINTMENT_REASON_REQUIRED";
+    public const string ViewingAppointmentConflict = "VIEWING_APPOINTMENT_CONFLICT";
+    public const string ViewingAppointmentNotAllowed = "VIEWING_APPOINTMENT_NOT_ALLOWED";
     public const string HouseRuleRequired = "HOUSE_RULE_REQUIRED";
     public const string HouseRuleInvalid = "HOUSE_RULE_INVALID";
 }

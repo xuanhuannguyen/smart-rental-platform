@@ -12,13 +12,15 @@ export const ROUTE_PATHS = {
         CHANGE_PASSWORD: '/me/change-password',
         KYC: '/me/kyc',
         KYC_STATUS: '/me/kyc/status',
-        ROOM_DETAIL: (houseId: string, roomId: string) => `/rooming-houses/${houseId}/rooms/${roomId}`
+        ROOM_DETAIL: (houseId: string, roomId: string) => `/rooming-houses/${houseId}/rooms/${roomId}`,
+        VIEWING_APPOINTMENTS: '/me/viewing-appointments'
     },
     LANDLORD: {
         REGISTER: '/landlord/register',
         DASHBOARD: '/landlord/dashboard',
         ROOMING_HOUSES: '/landlord/rooming-houses',
-        ROOMING_HOUSE_DETAIL: (id: string) => `/landlord/rooming-houses/${id}`
+        ROOMING_HOUSE_DETAIL: (id: string) => `/landlord/rooming-houses/${id}`,
+        VIEWING_APPOINTMENTS: '/landlord/viewing-appointments'
     },
     ADMIN: {
         ROOT: '/admin',

@@ -14,6 +14,8 @@ import SearchRoomingHousesPage from '../../features/rooming-houses/SearchRooming
 import PublicRoomDetailPage from '../../features/rooms/pages/PublicRoomDetailPage';
 import LandlordDashboardPage from '../../features/landlord/pages/LandlordDashboardPage';
 import RoomingHouseDetailPage from '../../features/landlord/pages/RoomingHouseDetailPage';
+import TenantAppointmentsPage from '../../features/viewing-appointments/pages/TenantAppointmentsPage';
+import LandlordAppointmentsPage from '../../features/viewing-appointments/pages/LandlordAppointmentsPage';
 import { AdminHomePage } from '../../features/admin/pages/AdminHomePage';
 import { OnboardingGuard } from './OnboardingGuard';
 import { ProtectedRoute } from './ProtectedRoute';
@@ -88,6 +90,10 @@ export const router = createBrowserRouter([
                         element: <KycStatusPage />
                     },
                     {
+                        path: ROUTE_PATHS.ME.VIEWING_APPOINTMENTS,
+                        element: <TenantAppointmentsPage />
+                    },
+                    {
                         path: ROUTE_PATHS.LANDLORD.REGISTER,
                         element: <CreateRoomingHousePage />
                     },
@@ -102,6 +108,10 @@ export const router = createBrowserRouter([
                     {
                         path: '/landlord/rooming-houses/:id',
                         element: <RoomingHouseDetailPage />
+                    },
+                    {
+                        path: ROUTE_PATHS.LANDLORD.VIEWING_APPOINTMENTS,
+                        element: <LandlordAppointmentsPage />
                     },
                     {
                         element: <RoleGuard allowedRoles={['Admin']} />,
