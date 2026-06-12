@@ -1,6 +1,8 @@
 using SmartRentalPlatform.Contracts.Amenities;
 using SmartRentalPlatform.Contracts.LegalDocuments;
 using SmartRentalPlatform.Contracts.PropertyImages;
+using SmartRentalPlatform.Contracts.Rooms;
+using SmartRentalPlatform.Contracts.RoomingHouseRules.Responses;
 using SmartRentalPlatform.Contracts.RentalPolicies.Responses;
 
 namespace SmartRentalPlatform.Contracts.RoomingHouses.Responses;
@@ -27,6 +29,8 @@ public class RoomingHouseDetailResponse
 
     public decimal? Longitude { get; set; }
 
+    public string? GoogleMapUrl { get; set; }
+
     public string ApprovalStatus { get; set; } = string.Empty;
 
     public string VisibilityStatus { get; set; } = string.Empty;
@@ -43,9 +47,17 @@ public class RoomingHouseDetailResponse
 
     public RoomingHouseLegalDocumentResponse? LegalDocument { get; set; }
 
+
+    public RoomingHouseRuleResponse? HouseRule { get; set; }
     public RentalPolicyResponse? RentalPolicy { get; set; }
 
     public List<PropertyImageResponse> Images { get; set; } = new();
 
     public List<AmenityResponse> Amenities { get; set; } = new();
+
+    public List<RoomResponse> Rooms { get; set; } = new();
+
+    public int TotalRooms { get; set; }
+
+    public int AvailableRooms { get; set; }
 }

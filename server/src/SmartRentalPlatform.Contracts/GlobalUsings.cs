@@ -15,6 +15,8 @@ global using SmartRentalPlatform.Contracts.RoomPriceTiers.Requests;
 global using SmartRentalPlatform.Contracts.RoomPriceTiers.Responses;
 global using SmartRentalPlatform.Contracts.RoomingHouses.Requests;
 global using SmartRentalPlatform.Contracts.RoomingHouses.Responses;
+global using SmartRentalPlatform.Contracts.RoomingHouseRules.Requests;
+global using SmartRentalPlatform.Contracts.RoomingHouseRules.Responses;
 global using SmartRentalPlatform.Contracts.Rooms.Requests;
 global using SmartRentalPlatform.Contracts.Rooms.Responses;
 global using SmartRentalPlatform.Contracts.Users.Requests;

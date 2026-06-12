@@ -37,8 +37,10 @@ public class AppDbContext : DbContext, IAppDbContext
     public DbSet<RoomAmenity> RoomAmenities => Set<RoomAmenity>();
     public DbSet<PropertyImage> PropertyImages => Set<PropertyImage>();
     public DbSet<RoomingHouseLegalDocument> RoomingHouseLegalDocuments => Set<RoomingHouseLegalDocument>();
+    public DbSet<RoomingHouseRule> RoomingHouseRules => Set<RoomingHouseRule>();
     public DbSet<RentalPolicy> RentalPolicies => Set<RentalPolicy>();
     public DbSet<ApprovalAuditLog> ApprovalAuditLogs => Set<ApprovalAuditLog>();
+    public DbSet<ViewingAppointment> ViewingAppointments => Set<ViewingAppointment>();
     // Rental
     public DbSet<RentalRequest> RentalRequests => Set<RentalRequest>();
     public DbSet<RoomDeposit> RoomDeposits => Set<RoomDeposit>();

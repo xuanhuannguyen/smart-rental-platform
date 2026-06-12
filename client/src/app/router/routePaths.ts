@@ -9,7 +9,9 @@ export const ROUTE_PATHS = {
     ME: {
         ROOT: '/home',
         KYC: '/me/kyc',
-        KYC_STATUS: '/me/kyc/status'
+        KYC_STATUS: '/me/kyc/status',
+        ROOM_DETAIL: (houseId: string, roomId: string) => `/rooming-houses/${houseId}/rooms/${roomId}`,
+        VIEWING_APPOINTMENTS: '/me/viewing-appointments'
     },
     ACCOUNT: {
         ROOT: '/account',
@@ -23,6 +25,7 @@ export const ROUTE_PATHS = {
         DASHBOARD: '/landlord/dashboard',
         ROOMING_HOUSES: '/landlord/rooming-houses',
         ROOMING_HOUSE_DETAIL: (id: string) => `/landlord/rooming-houses/${id}`,
+        VIEWING_APPOINTMENTS: '/landlord/viewing-appointments',
         RENTAL_REQUESTS: '/landlord/rental-requests'
     },
     TEST: {

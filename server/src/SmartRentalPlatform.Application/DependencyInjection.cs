@@ -8,9 +8,11 @@ using SmartRentalPlatform.Application.Kyc;
 using SmartRentalPlatform.Application.RentalContracts;
 using SmartRentalPlatform.Application.RentalRequests;
 using SmartRentalPlatform.Application.RoomingHouses;
+using SmartRentalPlatform.Application.RoomingHouses.Search;
 using SmartRentalPlatform.Application.RoomDeposits;
 using SmartRentalPlatform.Application.Rooms;
 using SmartRentalPlatform.Application.Users;
+using SmartRentalPlatform.Application.ViewingAppointments;
 
 namespace SmartRentalPlatform.Application;
 
@@ -33,6 +35,8 @@ public static class DependencyInjection
         services.AddScoped<IRentalContractService, RentalContractService>();
         services.AddScoped<IRoomDepositService, RoomDepositService>();
         services.AddScoped<IRoomingHouseQueryService, RoomingHouseQueryService>();
+        services.AddScoped<IRoomingHouseSearchParser, RoomingHouseSearchParser>();
+        services.AddScoped<IRoomingHouseRuleService, RoomingHouseRuleService>();
         services.AddScoped<IRoomingHouseRentalPolicyService, RoomingHouseRentalPolicyService>();
         services.AddScoped<IRoomingHouseDraftService, RoomingHouseDraftService>();
         services.AddScoped<IRoomingHouseMediaService, RoomingHouseMediaService>();
@@ -48,6 +52,7 @@ public static class DependencyInjection
         services.AddScoped<IAdminRoomingHouseApprovalService, AdminRoomingHouseApprovalService>();
         services.AddScoped<IApprovalAuditService, ApprovalAuditService>();
         services.AddScoped<IAdminUserService, AdminUserService>();
+        services.AddScoped<IViewingAppointmentService, ViewingAppointmentService>();
         return services;
     }
 }

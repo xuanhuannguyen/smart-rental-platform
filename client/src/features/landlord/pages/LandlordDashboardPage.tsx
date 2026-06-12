@@ -1,20 +1,18 @@
-import { useState, useEffect, useMemo } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { useAuth } from '../../../app/providers/AuthProvider';
 import { ROUTE_PATHS } from '../../../app/router/routePaths';
-import { getMyRoomingHouses, getMyRoomingHouseOnboarding } from '../../rooming-houses/api';
-import type { RoomingHouseSummary, RoomingHouseOnboarding } from '../../rooming-houses/types';
 import { getApiErrorMessage } from '../../../shared/api/apiError';
+import { toAssetUrl } from '../../../shared/api/assets';
 import { formatDateVi } from '../../../shared/utils/format';
 import { formatStatus, getCreateHouseBlockedMessage, getStatusToneClass } from '../../../shared/utils/status';
-import { toAssetUrl } from '../../../shared/api/assets';
+import { getMyRoomingHouseOnboarding, getMyRoomingHouses } from '../../rooming-houses/api';
+import type { RoomingHouseOnboarding, RoomingHouseSummary } from '../../rooming-houses/types';
 import './LandlordDashboardPage.css';
 
 const fallbackImage = 'https://images.unsplash.com/photo-1564013799919-ab600027ffc6?auto=format&fit=crop&w=600&q=80';
 
 export default function LandlordDashboardPage() {
   const navigate = useNavigate();
-  const { currentUser } = useAuth();
   const [houses, setHouses] = useState<RoomingHouseSummary[]>([]);
   const [onboarding, setOnboarding] = useState<RoomingHouseOnboarding | null>(null);
   const [loading, setLoading] = useState(true);
@@ -24,11 +22,13 @@ export default function LandlordDashboardPage() {
     async function loadData() {
       setLoading(true);
       setMessage('');
+
       try {
         const [housesData, onboardingData] = await Promise.all([
           getMyRoomingHouses(),
           getMyRoomingHouseOnboarding(),
         ]);
+
         setHouses(housesData);
         setOnboarding(onboardingData);
       } catch (err) {
@@ -37,44 +37,48 @@ export default function LandlordDashboardPage() {
         setLoading(false);
       }
     }
-    loadData();
+
+    void loadData();
   }, []);
 
   const houseStats = useMemo(() => ({
     total: houses.length,
-    approved: houses.filter((h) => h.approvalStatus === 'Approved').length,
-    pending: houses.filter((h) => h.approvalStatus === 'Pending').length,
-    rejected: houses.filter((h) => h.approvalStatus === 'Rejected').length,
-    draft: houses.filter((h) => h.approvalStatus === 'Draft').length,
+    approved: houses.filter((house) => house.approvalStatus === 'Approved').length,
+    pending: houses.filter((house) => house.approvalStatus === 'Pending').length,
+    rejected: houses.filter((house) => house.approvalStatus === 'Rejected').length,
+    draft: houses.filter((house) => house.approvalStatus === 'Draft').length,
   }), [houses]);
 
-  // Kiểm tra điều kiện có thể tạo khu trọ mới
-  const blockingHouse = useMemo(() => {
-    return houses.find(
-      (h) => h.approvalStatus === 'Draft' || h.approvalStatus === 'Pending' || h.approvalStatus === 'Rejected'
-    );
-  }, [houses]);
+  const blockingHouse = useMemo(
+    () => houses.find((house) =>
+      house.approvalStatus === 'Draft' ||
+      house.approvalStatus === 'Pending' ||
+      house.approvalStatus === 'Rejected'
+    ),
+    [houses]
+  );
 
   const canCreateNew = !blockingHouse;
+  const canEnterDashboard = onboarding?.canEnterLandlordDashboard ?? true;
 
   function handleCreateNewHouse() {
     if (blockingHouse) {
       setMessage(getCreateHouseBlockedMessage(blockingHouse.approvalStatus));
       return;
     }
+
     navigate(`${ROUTE_PATHS.LANDLORD.REGISTER}?mode=new`);
   }
 
   function handleCardClick(house: RoomingHouseSummary) {
     if (house.approvalStatus === 'Approved') {
       navigate(ROUTE_PATHS.LANDLORD.ROOMING_HOUSE_DETAIL(house.id));
-    } else if (house.approvalStatus === 'Draft' || house.approvalStatus === 'Rejected') {
+      return;
+    }
+
+    if (house.approvalStatus === 'Draft' || house.approvalStatus === 'Rejected') {
       navigate(`${ROUTE_PATHS.LANDLORD.REGISTER}?id=${house.id}`);
     }
-  }
-
-  function formatDate(dateStr: string) {
-    return formatDateVi(dateStr);
   }
 
   if (loading) {
@@ -101,11 +105,14 @@ export default function LandlordDashboardPage() {
         <button className="sidebar-item" onClick={() => navigate(ROUTE_PATHS.LANDLORD.RENTAL_REQUESTS)}>
           Yêu cầu thuê
         </button>
+        <button className="sidebar-item" onClick={() => navigate(ROUTE_PATHS.LANDLORD.VIEWING_APPOINTMENTS)}>
+          Lịch hẹn xem phòng
+        </button>
         <button className="sidebar-item" disabled style={{ opacity: 0.6, cursor: 'not-allowed' }}>
-          Quản lý doanh thu (Sau này)
+          Quản lý doanh thu (sau này)
         </button>
         <button className="sidebar-item sidebar-back-btn" onClick={() => navigate(ROUTE_PATHS.ME.ROOT)}>
-          ← Quay lại trang chủ
+          Quay lại trang chủ
         </button>
       </aside>
 
@@ -114,21 +121,21 @@ export default function LandlordDashboardPage() {
           <div className="overview-left">
             <p className="eyebrow">Quản lý</p>
             <h2>Khu trọ của tôi</h2>
-            <p className="overview-description">Quản lý danh sách các khu trọ của bạn</p>
+            <p className="overview-description">Quản lý danh sách các khu trọ của bạn.</p>
           </div>
-          
+
           <div className="overview-right">
             <div className="overview-actions">
               <button
                 className="primary-action"
-                disabled={!canCreateNew}
+                disabled={!canCreateNew || !canEnterDashboard}
                 onClick={handleCreateNewHouse}
                 title={blockingHouse ? getCreateHouseBlockedMessage(blockingHouse.approvalStatus) : 'Tạo khu trọ mới'}
               >
                 + Tạo khu trọ mới
               </button>
             </div>
-            
+
             <div className="overview-stats">
               <div className="stat-item stat-item--total">
                 <BuildingIcon />
@@ -147,7 +154,7 @@ export default function LandlordDashboardPage() {
               </div>
               <div className="stat-item stat-item--rejected">
                 <BanIcon />
-                <span>Bản nháp / Lỗi</span>
+                <span>Bản nháp / lỗi</span>
                 <strong className="stat-badge">{houseStats.draft + houseStats.rejected}</strong>
               </div>
             </div>
@@ -188,7 +195,7 @@ export default function LandlordDashboardPage() {
                 <div className="card-body-content">
                   <div className="card-title-row">
                     <h3>{house.name}</h3>
-                    <div className="card-menu-trigger" onClick={(e) => e.stopPropagation()}>
+                    <div className="card-menu-trigger" onClick={(event) => event.stopPropagation()}>
                       <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                         <circle cx="12" cy="5" r="1.5" fill="currentColor" />
                         <circle cx="12" cy="12" r="1.5" fill="currentColor" />
@@ -214,7 +221,7 @@ export default function LandlordDashboardPage() {
                         {house.availableRooms ?? 0}/{house.totalRooms ?? 0}
                       </strong>
                     </div>
-                    <span className="card-update-time">Cập nhật: {formatDate(house.updatedAt)}</span>
+                    <span className="card-update-time">Cập nhật: {formatDateVi(house.updatedAt)}</span>
                   </div>
 
                   {house.rejectedReason && (
@@ -225,17 +232,11 @@ export default function LandlordDashboardPage() {
 
                   <div className="card-footer-action">
                     {house.approvalStatus === 'Approved' ? (
-                      <span className="action-link text-success">
-                        Quản lý phòng & thông tin →
-                      </span>
+                      <span className="action-link text-success">Quản lý phòng và thông tin</span>
                     ) : house.approvalStatus === 'Draft' || house.approvalStatus === 'Rejected' ? (
-                      <span className="action-link text-warning">
-                        Chỉnh sửa hồ sơ →
-                      </span>
+                      <span className="action-link text-warning">Chỉnh sửa hồ sơ</span>
                     ) : (
-                      <span className="action-link text-info">
-                        Đang chờ quản trị viên duyệt...
-                      </span>
+                      <span className="action-link text-info">Đang chờ quản trị viên duyệt...</span>
                     )}
                   </div>
                 </div>

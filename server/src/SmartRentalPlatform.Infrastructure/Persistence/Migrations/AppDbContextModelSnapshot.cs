@@ -34072,6 +34072,10 @@ namespace SmartRentalPlatform.Infrastructure.Persistence.Migrations
                         .HasColumnType("text")
                         .HasColumnName("description");
 
+                    b.Property<string>("GoogleMapUrl")
+                        .HasColumnType("text")
+                        .HasColumnName("google_map_url");
+
                     b.Property<Guid>("LandlordUserId")
                         .HasColumnType("uuid")
                         .HasColumnName("landlord_user_id");
@@ -34210,6 +34214,156 @@ namespace SmartRentalPlatform.Infrastructure.Persistence.Migrations
                     b.HasKey("RoomingHouseId");
 
                     b.ToTable("rooming_house_legal_documents", (string)null);
+                });
+
+            modelBuilder.Entity("SmartRentalPlatform.Domain.Entities.Properties.RoomingHouseRule", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid")
+                        .HasColumnName("id");
+
+                    b.Property<string>("AdditionalNotes")
+                        .HasColumnType("text")
+                        .HasColumnName("additional_notes");
+
+                    b.Property<string>("CleaningPolicy")
+                        .HasColumnType("text")
+                        .HasColumnName("cleaning_policy");
+
+                    b.Property<DateTimeOffset>("CreatedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("created_at");
+
+                    b.Property<string>("DamageCompensationPolicy")
+                        .HasColumnType("text")
+                        .HasColumnName("damage_compensation_policy");
+
+                    b.Property<string>("GeneralRules")
+                        .HasColumnType("text")
+                        .HasColumnName("general_rules");
+
+                    b.Property<string>("GuestPolicy")
+                        .HasColumnType("text")
+                        .HasColumnName("guest_policy");
+
+                    b.Property<string>("ParkingPolicy")
+                        .HasColumnType("text")
+                        .HasColumnName("parking_policy");
+
+                    b.Property<string>("PdfObjectKey")
+                        .IsRequired()
+                        .HasColumnType("text")
+                        .HasColumnName("pdf_object_key");
+
+                    b.Property<string>("QuietHours")
+                        .HasColumnType("text")
+                        .HasColumnName("quiet_hours");
+
+                    b.Property<Guid>("RoomingHouseId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("rooming_house_id");
+
+                    b.Property<string>("SecurityPolicy")
+                        .HasColumnType("text")
+                        .HasColumnName("security_policy");
+
+                    b.Property<string>("SourceType")
+                        .IsRequired()
+                        .HasMaxLength(30)
+                        .HasColumnType("character varying(30)")
+                        .HasColumnName("source_type");
+
+                    b.Property<DateTimeOffset>("UpdatedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("updated_at");
+
+                    b.Property<string>("UtilityPolicy")
+                        .HasColumnType("text")
+                        .HasColumnName("utility_policy");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("RoomingHouseId")
+                        .IsUnique();
+
+                    b.ToTable("rooming_house_rules", (string)null);
+                });
+
+            modelBuilder.Entity("SmartRentalPlatform.Domain.Entities.Properties.ViewingAppointment", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid")
+                        .HasColumnName("id");
+
+                    b.Property<string>("CancelReason")
+                        .HasColumnType("text")
+                        .HasColumnName("cancel_reason");
+
+                    b.Property<DateTimeOffset>("CreatedAt")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("created_at")
+                        .HasDefaultValueSql("now()");
+
+                    b.Property<Guid>("CreatedByUserId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("created_by_user_id");
+
+                    b.Property<int>("DurationMinutes")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("integer")
+                        .HasDefaultValue(30)
+                        .HasColumnName("duration_minutes");
+
+                    b.Property<string>("LandlordNote")
+                        .HasColumnType("text")
+                        .HasColumnName("landlord_note");
+
+                    b.Property<DateTimeOffset?>("RespondedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("responded_at");
+
+                    b.Property<Guid>("RoomId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("room_id");
+
+                    b.Property<DateTimeOffset>("ScheduledAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("scheduled_at");
+
+                    b.Property<string>("Status")
+                        .IsRequired()
+                        .ValueGeneratedOnAdd()
+                        .HasMaxLength(30)
+                        .HasColumnType("character varying(30)")
+                        .HasDefaultValue("Pending")
+                        .HasColumnName("status");
+
+                    b.Property<string>("TenantNote")
+                        .HasColumnType("text")
+                        .HasColumnName("tenant_note");
+
+                    b.Property<Guid>("TenantUserId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("tenant_user_id");
+
+                    b.Property<DateTimeOffset>("UpdatedAt")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("updated_at")
+                        .HasDefaultValueSql("now()");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("CreatedByUserId");
+
+                    b.HasIndex("RoomId");
+
+                    b.HasIndex("TenantUserId");
+
+                    b.ToTable("viewing_appointments", (string)null);
                 });
 
             modelBuilder.Entity("SmartRentalPlatform.Domain.Entities.Rental.RentalRequest", b =>
@@ -35622,6 +35776,44 @@ namespace SmartRentalPlatform.Infrastructure.Persistence.Migrations
                     b.Navigation("RoomingHouse");
                 });
 
+            modelBuilder.Entity("SmartRentalPlatform.Domain.Entities.Properties.RoomingHouseRule", b =>
+                {
+                    b.HasOne("SmartRentalPlatform.Domain.Entities.Properties.RoomingHouse", "RoomingHouse")
+                        .WithOne("HouseRule")
+                        .HasForeignKey("SmartRentalPlatform.Domain.Entities.Properties.RoomingHouseRule", "RoomingHouseId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("RoomingHouse");
+                });
+
+            modelBuilder.Entity("SmartRentalPlatform.Domain.Entities.Properties.ViewingAppointment", b =>
+                {
+                    b.HasOne("SmartRentalPlatform.Domain.Entities.Users.User", "CreatedByUser")
+                        .WithMany("CreatedAppointments")
+                        .HasForeignKey("CreatedByUserId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.HasOne("SmartRentalPlatform.Domain.Entities.Properties.Room", "Room")
+                        .WithMany("ViewingAppointments")
+                        .HasForeignKey("RoomId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.HasOne("SmartRentalPlatform.Domain.Entities.Users.User", "TenantUser")
+                        .WithMany("TenantAppointments")
+                        .HasForeignKey("TenantUserId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.Navigation("CreatedByUser");
+
+                    b.Navigation("Room");
+
+                    b.Navigation("TenantUser");
+                });
+
             modelBuilder.Entity("SmartRentalPlatform.Domain.Entities.Rental.RentalRequest", b =>
                 {
                     b.HasOne("SmartRentalPlatform.Domain.Entities.Users.User", "ApprovedByLandlord")
@@ -35940,10 +36132,14 @@ namespace SmartRentalPlatform.Infrastructure.Persistence.Migrations
                     b.Navigation("PriceTiers");
 
                     b.Navigation("RoomAmenities");
+
+                    b.Navigation("ViewingAppointments");
                 });
 
             modelBuilder.Entity("SmartRentalPlatform.Domain.Entities.Properties.RoomingHouse", b =>
                 {
+                    b.Navigation("HouseRule");
+
                     b.Navigation("Images");
 
                     b.Navigation("LegalDocument")
@@ -36002,6 +36198,8 @@ namespace SmartRentalPlatform.Infrastructure.Persistence.Migrations
 
             modelBuilder.Entity("SmartRentalPlatform.Domain.Entities.Users.User", b =>
                 {
+                    b.Navigation("CreatedAppointments");
+
                     b.Navigation("ExternalLogins");
 
                     b.Navigation("KycVerifications");
@@ -36013,6 +36211,8 @@ namespace SmartRentalPlatform.Infrastructure.Persistence.Migrations
                     b.Navigation("ReviewedRoomingHouses");
 
                     b.Navigation("RoomingHouses");
+
+                    b.Navigation("TenantAppointments");
 
                     b.Navigation("UserProfile");
 

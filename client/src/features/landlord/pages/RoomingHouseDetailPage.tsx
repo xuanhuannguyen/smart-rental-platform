@@ -35,10 +35,12 @@ import type { Room, CreateRoomRequest, RoomPriceTierRequest } from '../../rooms/
 import { getProvinces, getWardsByProvince } from '../../administrative/api';
 import type { Province, Ward } from '../../administrative/types';
 import PropertyImageEditor from '../../rooming-houses/components/PropertyImageEditor';
+import LeafletLocationPicker from '../../rooming-houses/components/LeafletLocationPicker';
+import RoomingHouseRuleEditor from '../../rooming-houses/components/RoomingHouseRuleEditor';
 import { cleanImages, toImageRequests } from '../../rooming-houses/utils/imageRequests';
 import './RoomingHouseDetailPage.css';
 
-type MainTab = 'basic' | 'images' | 'amenities' | 'legal' | 'rental-policy' | 'rooms';
+type MainTab = 'basic' | 'images' | 'amenities' | 'legal' | 'house-rule' | 'rental-policy' | 'rooms';
 type RoomTab = 'basic' | 'images' | 'amenities' | 'price';
 
 const emptyRoomForm: CreateRoomRequest = {
@@ -85,6 +87,7 @@ export default function RoomingHouseDetailPage() {
     wardCode: '',
     latitude: null,
     longitude: null,
+    googleMapUrl: '',
   });
 
   // Tiện ích cho Tab 3
@@ -137,6 +140,7 @@ export default function RoomingHouseDetailPage() {
         wardCode: data.wardCode,
         latitude: data.latitude ?? null,
         longitude: data.longitude ?? null,
+        googleMapUrl: data.googleMapUrl ?? '',
       });
 
       setHouseImages(toImageRequests(data.images));
@@ -157,7 +161,7 @@ export default function RoomingHouseDetailPage() {
       }
 
       // Tải danh sách phòng
-      if (data.rentalPolicy) {
+      if (data.rentalPolicy && data.houseRule) {
         try {
           const roomsData = await getRoomsByRoomingHouse(id!);
           setRooms(roomsData);
@@ -166,6 +170,9 @@ export default function RoomingHouseDetailPage() {
         }
       } else {
         setRooms([]);
+        if (data.rentalPolicy && !data.houseRule) {
+          setMessage('Vui lòng hoàn thành Luật khu trọ trước khi tạo phòng đầu tiên.');
+        }
       }
     } catch (err) {
       setMessage(getApiErrorMessage(err, 'Không thể tải thông tin chi tiết khu trọ.'));
@@ -200,6 +207,10 @@ export default function RoomingHouseDetailPage() {
     occupied: rooms.filter((r) => r.status === 'Occupied').length,
     hidden: rooms.filter((r) => r.status === 'Hidden').length,
   }), [rooms]);
+  const selectedProvinceName =
+    provinces.find((province) => province.code === basicForm.provinceCode)?.name ?? '';
+  const selectedWardName = wards.find((ward) => ward.code === basicForm.wardCode)?.name ?? '';
+  const canCreateRoom = Boolean(house?.rentalPolicy && house?.houseRule);
 
   // ─── Tab 1: Lưu thông tin cơ bản khu trọ ──────────────────────────────────
   async function handleSaveBasicInfo() {
@@ -278,6 +289,11 @@ export default function RoomingHouseDetailPage() {
     }
   }
 
+  function handleHouseRuleSaved(savedRule: NonNullable<RoomingHouseDetail['houseRule']>) {
+    setHouse((current) => current ? { ...current, houseRule: savedRule } : current);
+    setMessage('Đã cập nhật luật khu trọ thành công.');
+  }
+
   // ─── Tab 5: Logic Quản lý phòng ──────────────────────────────────────────
   async function openRoom(roomId: string) {
     setActionLoading(true);
@@ -320,6 +336,18 @@ export default function RoomingHouseDetailPage() {
   }
 
   async function openCreateRoom() {
+    if (!house?.rentalPolicy) {
+      setMessage('Vui lòng hoàn thành chính sách cho thuê trước khi tạo phòng.');
+      setActiveTab('rental-policy');
+      return;
+    }
+
+    if (!house.houseRule) {
+      setMessage('Vui lòng hoàn thành Luật khu trọ trước khi tạo phòng đầu tiên.');
+      setActiveTab('house-rule');
+      return;
+    }
+
     setSelectedRoom(null);
     setRoomEditorMode('create');
     setRoomActiveTab('basic');
@@ -477,6 +505,12 @@ export default function RoomingHouseDetailPage() {
         >
           Quản lý khu trọ
         </button>
+        <button
+          className="sidebar-item"
+          onClick={() => navigate(ROUTE_PATHS.LANDLORD.VIEWING_APPOINTMENTS)}
+        >
+          Lịch hẹn xem phòng
+        </button>
         <button className="sidebar-item" disabled style={{ opacity: 0.6, cursor: 'not-allowed' }}>
           Quản lý doanh thu (Sau này)
         </button>
@@ -524,9 +558,9 @@ export default function RoomingHouseDetailPage() {
                     <button
                       className="primary-action"
                       onClick={openCreateRoom}
-                      disabled={!house.rentalPolicy}
-                      title={!house.rentalPolicy ? "Vui lòng cấu hình chính sách cho thuê trước khi tạo phòng." : undefined}
-                      style={!house.rentalPolicy ? { opacity: 0.5, cursor: 'not-allowed' } : undefined}
+                      disabled={!canCreateRoom}
+                      title={!canCreateRoom ? "Vui lòng cấu hình chính sách thuê và Luật khu trọ trước khi tạo phòng." : undefined}
+                      style={!canCreateRoom ? { opacity: 0.5, cursor: 'not-allowed' } : undefined}
                     >
                       Tạo phòng mới
                     </button>
@@ -579,6 +613,9 @@ export default function RoomingHouseDetailPage() {
             </button>
             <button className={activeTab === 'legal' ? 'active' : ''} onClick={() => setActiveTab('legal')}>
               Giấy tờ pháp lý
+            </button>
+            <button className={activeTab === 'house-rule' ? 'active' : ''} onClick={() => setActiveTab('house-rule')}>
+              Luật khu trọ
             </button>
             <button className={activeTab === 'rental-policy' ? 'active' : ''} onClick={() => setActiveTab('rental-policy')}>
               Chính sách thuê
@@ -639,25 +676,23 @@ export default function RoomingHouseDetailPage() {
                 </select>
               </label>
 
-              <label className="field">
-                <span>Vĩ độ (Latitude)</span>
-                <input
-                  type="number"
-                  step="any"
-                  value={basicForm.latitude ?? ''}
-                  onChange={e => setBasicForm({ ...basicForm, latitude: e.target.value === '' ? null : Number(e.target.value) })}
-                />
-              </label>
-
-              <label className="field">
-                <span>Kinh độ (Longitude)</span>
-                <input
-                  type="number"
-                  step="any"
-                  value={basicForm.longitude ?? ''}
-                  onChange={e => setBasicForm({ ...basicForm, longitude: e.target.value === '' ? null : Number(e.target.value) })}
-                />
-              </label>
+              <LeafletLocationPicker
+                addressLine={basicForm.addressLine}
+                provinceName={selectedProvinceName}
+                wardName={selectedWardName}
+                latitude={basicForm.latitude}
+                longitude={basicForm.longitude}
+                googleMapUrl={basicForm.googleMapUrl}
+                onAddressChange={(addressLine) =>
+                  setBasicForm((current) => ({ ...current, addressLine }))
+                }
+                onLocationChange={(latitude, longitude) =>
+                  setBasicForm((current) => ({ ...current, latitude, longitude }))
+                }
+                onGoogleMapUrlChange={(googleMapUrl) =>
+                  setBasicForm((current) => ({ ...current, googleMapUrl }))
+                }
+              />
 
               <label className="field" style={{ gridColumn: '1 / -1' }}>
                 <span>Mô tả khu trọ</span>
@@ -754,6 +789,18 @@ export default function RoomingHouseDetailPage() {
                   </div>
                 )}
               </div>
+            </div>
+          )}
+
+          {/* TAB 4.5: LUẬT KHU TRỌ */}
+          {activeTab === 'house-rule' && (
+            <div className="editor-panel">
+              <h3 style={{ margin: '0 0 12px 0' }}>Luật khu trọ</h3>
+              <RoomingHouseRuleEditor
+                roomingHouseId={house.id}
+                houseRule={house.houseRule}
+                onSaved={handleHouseRuleSaved}
+              />
             </div>
           )}
 
@@ -866,6 +913,14 @@ export default function RoomingHouseDetailPage() {
                       <p>Vui lòng hoàn thành cấu hình chính sách cho thuê trước khi bắt đầu tạo phòng.</p>
                       <button className="primary-action" onClick={() => setActiveTab('rental-policy')}>
                         Cấu hình chính sách cho thuê
+                      </button>
+                    </div>
+                  ) : !house.houseRule ? (
+                    <div className="empty-panel">
+                      <h2>Chưa có Luật khu trọ</h2>
+                      <p>Vui lòng hoàn thành Luật khu trọ trước khi bắt đầu tạo phòng.</p>
+                      <button className="primary-action" onClick={() => setActiveTab('house-rule')}>
+                        Cấu hình Luật khu trọ
                       </button>
                     </div>
                   ) : rooms.length === 0 ? (

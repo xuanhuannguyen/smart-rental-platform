@@ -3,6 +3,7 @@ using SmartRentalPlatform.Contracts.LegalDocuments;
 using SmartRentalPlatform.Contracts.PropertyImages;
 using SmartRentalPlatform.Contracts.RentalPolicies.Responses;
 using SmartRentalPlatform.Contracts.RoomingHouses;
+using SmartRentalPlatform.Application.Rooms;
 using SmartRentalPlatform.Domain.Entities.Properties;
 
 namespace SmartRentalPlatform.Application.RoomingHouses;
@@ -43,6 +44,7 @@ internal static class RoomingHouseReadModelMapper
             AddressDisplay = BuildAddressDisplay(house),
             Latitude = house.Latitude,
             Longitude = house.Longitude,
+            GoogleMapUrl = house.GoogleMapUrl,
             ApprovalStatus = house.ApprovalStatus.ToString(),
             VisibilityStatus = house.VisibilityStatus.ToString(),
             RejectedReason = house.RejectedReason,
@@ -76,6 +78,7 @@ internal static class RoomingHouseReadModelMapper
                 CreatedAt = house.RentalPolicy.CreatedAt,
                 UpdatedAt = house.RentalPolicy.UpdatedAt
             },
+            HouseRule = house.HouseRule is null ? null : RoomingHouseRuleService.ToResponse(house.HouseRule),
             Images = house.Images
                 .OrderBy(x => x.SortOrder)
                 .Select(x => new PropertyImageResponse
@@ -97,7 +100,15 @@ internal static class RoomingHouseReadModelMapper
                     Scope = x.Amenity.Scope.ToString(),
                     IconCode = x.Amenity.IconCode
                 })
-                .ToList()
+                .ToList(),
+            Rooms = house.Rooms
+                .Where(x => x.DeletedAt == null)
+                .OrderBy(x => x.Floor)
+                .ThenBy(x => x.RoomNumber)
+                .Select(RoomReadModelMapper.ToResponse)
+                .ToList(),
+            TotalRooms = house.Rooms?.Count(x => x.DeletedAt == null) ?? 0,
+            AvailableRooms = house.Rooms?.Count(x => x.Status == RoomStatus.Available && x.DeletedAt == null) ?? 0
         };
     }
 

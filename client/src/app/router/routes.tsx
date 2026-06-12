@@ -8,9 +8,14 @@ import { MePage } from '../../features/home/pages/MePage';
 import { KycSubmitPage } from '../../features/kyc/pages/KycSubmitPage';
 import { KycStatusPage } from '../../features/kyc/pages/KycStatusPage';
 import CreateRoomingHousePage from '../../features/rooming-houses/CreateRoomingHousePage';
+import PublicRoomingHouseDetailPage from '../../features/rooming-houses/PublicRoomingHouseDetailPage';
+import SearchRoomingHousesPage from '../../features/rooming-houses/SearchRoomingHousesPage';
+import PublicRoomDetailPage from '../../features/rooms/pages/PublicRoomDetailPage';
 import LandlordDashboardPage from '../../features/landlord/pages/LandlordDashboardPage';
 import { LandlordRentalRequestsPage } from '../../features/landlord/pages/LandlordRentalRequestsPage';
 import RoomingHouseDetailPage from '../../features/landlord/pages/RoomingHouseDetailPage';
+import TenantAppointmentsPage from '../../features/viewing-appointments/pages/TenantAppointmentsPage';
+import LandlordAppointmentsPage from '../../features/viewing-appointments/pages/LandlordAppointmentsPage';
 import { RentalFlowTestPage } from '../../features/rental/pages/RentalFlowTestPage';
 import { AdminHomePage } from '../../features/admin/pages/AdminHomePage';
 import { OnboardingGuard } from './OnboardingGuard';
@@ -32,6 +37,18 @@ export const router = createBrowserRouter([
     {
         path: ROUTE_PATHS.ME.ROOT,
         element: <MePage />
+    },
+    {
+        path: '/search',
+        element: <SearchRoomingHousesPage />
+    },
+    {
+        path: '/rooming-houses/:id',
+        element: <PublicRoomingHouseDetailPage />
+    },
+    {
+        path: '/rooming-houses/:houseId/rooms/:roomId',
+        element: <PublicRoomDetailPage />
     },
     {
         path: ROUTE_PATHS.AUTH.LOGIN,
@@ -98,6 +115,10 @@ export const router = createBrowserRouter([
                         element: <KycStatusPage />
                     },
                     {
+                        path: ROUTE_PATHS.ME.VIEWING_APPOINTMENTS,
+                        element: <TenantAppointmentsPage />
+                    },
+                    {
                         path: ROUTE_PATHS.LANDLORD.REGISTER,
                         element: <CreateRoomingHousePage />
                     },
@@ -112,6 +133,10 @@ export const router = createBrowserRouter([
                     {
                         path: '/landlord/rooming-houses/:id',
                         element: <RoomingHouseDetailPage />
+                    },
+                    {
+                        path: ROUTE_PATHS.LANDLORD.VIEWING_APPOINTMENTS,
+                        element: <LandlordAppointmentsPage />
                     },
                     {
                         path: ROUTE_PATHS.LANDLORD.RENTAL_REQUESTS,

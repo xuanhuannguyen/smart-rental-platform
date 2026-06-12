@@ -99,5 +99,16 @@ export const ENDPOINTS = {
     ROOMING_HOUSE_REJECT: (id: string) => `/api/admin/rooming-houses/${id}/reject`,
     USERS: '/api/admin/users',
     USER_DETAIL: (id: string) => `/api/admin/users/${id}`
+  },
+  VIEWING_APPOINTMENTS: {
+    CREATE: '/api/viewing-appointments',
+    MY_APPOINTMENTS: '/api/me/viewing-appointments',
+    LANDLORD_APPOINTMENTS: '/api/landlord/viewing-appointments',
+    CONFLICT_CHECK: (id: string) => `/api/landlord/viewing-appointments/${id}/conflict-check`,
+    CONFIRM: (id: string) => `/api/landlord/viewing-appointments/${id}/confirm`,
+    REJECT: (id: string) => `/api/landlord/viewing-appointments/${id}/reject`,
+    CANCEL_BY_TENANT: (id: string) => `/api/viewing-appointments/${id}/cancel`,
+    CANCEL_BY_LANDLORD: (id: string) => `/api/landlord/viewing-appointments/${id}/cancel`,
+    COMPLETE: (id: string) => `/api/landlord/viewing-appointments/${id}/complete`
   }
 } as const;

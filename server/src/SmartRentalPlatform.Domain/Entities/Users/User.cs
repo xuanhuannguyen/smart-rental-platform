@@ -32,5 +32,7 @@ public class User
     public ICollection<KycVerification> KycVerifications { get; set; } = new List<KycVerification>();
     public ICollection<RoomingHouse> RoomingHouses { get; set; } = new List<RoomingHouse>();
     public ICollection<RoomingHouse> ReviewedRoomingHouses { get; set; } = new List<RoomingHouse>();
+    public ICollection<ViewingAppointment> TenantAppointments { get; set; } = new List<ViewingAppointment>();
+    public ICollection<ViewingAppointment> CreatedAppointments { get; set; } = new List<ViewingAppointment>();
     public ICollection<RentalRequest> RentalRequests { get; set; } = new List<RentalRequest>();
 }

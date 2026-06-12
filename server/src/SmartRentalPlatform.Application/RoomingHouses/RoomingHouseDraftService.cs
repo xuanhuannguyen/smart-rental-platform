@@ -68,6 +68,7 @@ public class RoomingHouseDraftService : IRoomingHouseDraftService
             AddressDisplay = addressDisplay,
             Latitude = request.Latitude,
             Longitude = request.Longitude,
+            GoogleMapUrl = NormalizeOptionalUrl(request.GoogleMapUrl),
             ApprovalStatus = RoomingHouseApprovalStatus.Draft,
             VisibilityStatus = RoomingHouseVisibilityStatus.Hidden,
             CreatedAt = now,
@@ -114,6 +115,7 @@ public class RoomingHouseDraftService : IRoomingHouseDraftService
         roomingHouse.AddressDisplay = addressDisplay;
         roomingHouse.Latitude = request.Latitude;
         roomingHouse.Longitude = request.Longitude;
+        roomingHouse.GoogleMapUrl = NormalizeOptionalUrl(request.GoogleMapUrl);
         roomingHouse.UpdatedAt = DateTimeOffset.UtcNow;
 
         await context.SaveChangesAsync(cancellationToken);
@@ -190,6 +192,17 @@ public class RoomingHouseDraftService : IRoomingHouseDraftService
         {
             throw new BadRequestException(ErrorCodes.ValidationError, "Kinh độ phải nằm trong khoảng từ -180 đến 180.", new { field = nameof(request.Longitude) });
         }
+
+        if (!string.IsNullOrWhiteSpace(request.GoogleMapUrl) &&
+            !Uri.TryCreate(request.GoogleMapUrl.Trim(), UriKind.Absolute, out _))
+        {
+            throw new BadRequestException(ErrorCodes.ValidationError, "Link Google Map không hợp lệ.", new { field = nameof(request.GoogleMapUrl) });
+        }
+    }
+
+    private static string? NormalizeOptionalUrl(string? value)
+    {
+        return string.IsNullOrWhiteSpace(value) ? null : value.Trim();
     }
 
     private static void EnsureEditable(RoomingHouse roomingHouse)
