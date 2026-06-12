@@ -1,0 +1,146 @@
+.submit-rental-container {
+  max-width: 1200px;
+  margin: 0 auto;
+  padding: 40px 24px;
+}
+
+.submit-rental-header {
+  margin-bottom: 32px;
+}
+
+.submit-rental-header h1 {
+  font-size: 1.8rem;
+  color: #1e293b;
+  margin-bottom: 8px;
+}
+
+.submit-rental-content {
+  display: grid;
+  grid-template-columns: 1fr 2fr;
+  gap: 32px;
+}
+
+@media (max-width: 768px) {
+  .submit-rental-content {
+    grid-template-columns: 1fr;
+  }
+}
+
+.room-summary-pane {
+  background: #fff;
+  border: 1px solid #e2e8f0;
+  border-radius: 12px;
+  overflow: hidden;
+}
+
+.room-summary-pane img {
+  width: 100%;
+  height: 200px;
+  object-fit: cover;
+}
+
+.room-summary-details {
+  padding: 24px;
+}
+
+.room-summary-details h2 {
+  font-size: 1.4rem;
+  margin-bottom: 8px;
+  color: #0f172a;
+}
+
+.room-summary-details p {
+  color: #64748b;
+  margin-bottom: 16px;
+  line-height: 1.5;
+}
+
+.price-tier-table {
+  width: 100%;
+  border-collapse: collapse;
+  margin-top: 16px;
+}
+
+.price-tier-table th,
+.price-tier-table td {
+  border: 1px solid #e2e8f0;
+  padding: 8px 12px;
+  text-align: left;
+  font-size: 0.9rem;
+}
+
+.price-tier-table th {
+  background: #f8fafc;
+  font-weight: 600;
+  color: #475569;
+}
+
+.rental-form-pane {
+  background: #fff;
+  border: 1px solid #e2e8f0;
+  border-radius: 12px;
+  padding: 32px;
+}
+
+.rental-form-pane h3 {
+  font-size: 1.2rem;
+  margin-bottom: 24px;
+  color: #0f172a;
+  border-bottom: 1px solid #e2e8f0;
+  padding-bottom: 12px;
+}
+
+.form-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 24px;
+  margin-bottom: 24px;
+}
+
+@media (max-width: 640px) {
+  .form-grid {
+    grid-template-columns: 1fr;
+  }
+}
+
+.form-group {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.form-group label {
+  font-weight: 500;
+  color: #334155;
+  font-size: 0.95rem;
+}
+
+.form-group input,
+.form-group textarea {
+  padding: 12px;
+  border: 1px solid #cbd5e1;
+  border-radius: 8px;
+  font-size: 1rem;
+  font-family: inherit;
+  transition: border-color 0.2s;
+}
+
+.form-group input:focus,
+.form-group textarea:focus {
+  outline: none;
+  border-color: #3b82f6;
+  box-shadow: 0 0 0 2px rgba(59, 130, 246, 0.1);
+}
+
+.form-group textarea {
+  resize: vertical;
+  min-height: 100px;
+}
+
+.submit-actions {
+  display: flex;
+  justify-content: flex-end;
+  margin-top: 32px;
+  padding-top: 24px;
+  border-top: 1px solid #e2e8f0;
+}

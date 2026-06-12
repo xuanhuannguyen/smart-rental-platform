@@ -29,4 +29,19 @@ public class PublicRoomingHousesController : ControllerBase
             Data = result
         });
     }
+    [HttpGet("{roomingHouseId:guid}/rooms")]
+    public async Task<ActionResult<ApiResponse<List<SmartRentalPlatform.Contracts.Rooms.Responses.RoomResponse>>>> GetAvailableRooms(
+        Guid roomingHouseId,
+        [FromServices] SmartRentalPlatform.Application.Rooms.IRoomQueryService roomQueryService,
+        CancellationToken cancellationToken)
+    {
+        var result = await roomQueryService.GetPublicAvailableRoomsAsync(roomingHouseId, cancellationToken);
+
+        return Ok(new ApiResponse<List<SmartRentalPlatform.Contracts.Rooms.Responses.RoomResponse>>
+        {
+            Success = true,
+            Message = "Tải danh sách phòng trống thành công.",
+            Data = result
+        });
+    }
 }

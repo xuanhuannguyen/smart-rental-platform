@@ -1,4 +1,4 @@
-import { useState, useEffect, useMemo, ReactNode } from 'react';
+﻿import { useState, useEffect, useMemo, ReactNode } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { useAuth } from '../../../app/providers/AuthProvider';
 import { ROUTE_PATHS } from '../../../app/router/routePaths';
@@ -12,7 +12,7 @@ import {
   updateRoomingHouseAmenities,
   updateRoomingHouseBasicInfo,
   updateRoomingHouseImages,
-  updateRoomingHouseLeasePolicy,
+  updateRoomingHouseRentalPolicy,
 } from '../../rooming-houses/api';
 import {
   createRoom,
@@ -29,7 +29,7 @@ import type {
   Amenity,
   PropertyImageRequest,
   RoomingHouseBasicInfoRequest,
-  UpdateLeasePolicyRequest,
+  UpdateRentalPolicyRequest,
 } from '../../rooming-houses/types';
 import type { Room, CreateRoomRequest, RoomPriceTierRequest } from '../../rooms/types';
 import { getProvinces, getWardsByProvince } from '../../administrative/api';
@@ -38,7 +38,7 @@ import PropertyImageEditor from '../../rooming-houses/components/PropertyImageEd
 import { cleanImages, toImageRequests } from '../../rooming-houses/utils/imageRequests';
 import './RoomingHouseDetailPage.css';
 
-type MainTab = 'basic' | 'images' | 'amenities' | 'legal' | 'lease-policy' | 'rooms';
+type MainTab = 'basic' | 'images' | 'amenities' | 'legal' | 'rental-policy' | 'rooms';
 type RoomTab = 'basic' | 'images' | 'amenities' | 'price';
 
 const emptyRoomForm: CreateRoomRequest = {
@@ -50,14 +50,13 @@ const emptyRoomForm: CreateRoomRequest = {
   description: '',
 };
 
-const emptyLeasePolicyForm: UpdateLeasePolicyRequest = {
+const emptyRentalPolicyForm: UpdateRentalPolicyRequest = {
+  minRentalMonths: 1,
+  maxRentalMonths: 12,
   allowShortTermRenewal: false,
   renewalNoticeDays: 30,
   depositMonths: 1,
-  discount6MonthsPercent: 0,
-  discount9MonthsPercent: 0,
-  discount12MonthsPercent: 0,
-  discount24MonthsPercent: 0,
+  defaultPaymentDay: 5,
 };
 
 export default function RoomingHouseDetailPage() {
@@ -73,7 +72,7 @@ export default function RoomingHouseDetailPage() {
   const [activeTab, setActiveTab] = useState<MainTab>('rooms');
 
   // Lease Policy
-  const [leasePolicyForm, setLeasePolicyForm] = useState<UpdateLeasePolicyRequest>(emptyLeasePolicyForm);
+  const [rentalPolicyForm, setRentalPolicyForm] = useState<UpdateRentalPolicyRequest>(emptyRentalPolicyForm);
 
   // Địa giới hành chính cho Tab 1
   const [provinces, setProvinces] = useState<Province[]>([]);
@@ -143,23 +142,22 @@ export default function RoomingHouseDetailPage() {
       setHouseImages(toImageRequests(data.images));
       setSelectedAmenityIds(data.amenities.map(a => a.id));
 
-      if (data.leasePolicy) {
-        setLeasePolicyForm({
-          allowShortTermRenewal: data.leasePolicy.allowShortTermRenewal,
-          renewalNoticeDays: data.leasePolicy.renewalNoticeDays,
-          depositMonths: data.leasePolicy.depositMonths,
-          discount6MonthsPercent: data.leasePolicy.discount6MonthsPercent,
-          discount9MonthsPercent: data.leasePolicy.discount9MonthsPercent,
-          discount12MonthsPercent: data.leasePolicy.discount12MonthsPercent,
-          discount24MonthsPercent: data.leasePolicy.discount24MonthsPercent,
+      if (data.rentalPolicy) {
+        setRentalPolicyForm({
+          minRentalMonths: data.rentalPolicy.minRentalMonths,
+          maxRentalMonths: data.rentalPolicy.maxRentalMonths,
+          allowShortTermRenewal: data.rentalPolicy.allowShortTermRenewal,
+          renewalNoticeDays: data.rentalPolicy.renewalNoticeDays,
+          depositMonths: data.rentalPolicy.depositMonths,
+          defaultPaymentDay: data.rentalPolicy.defaultPaymentDay,
         });
       } else {
-        setLeasePolicyForm(emptyLeasePolicyForm);
+        setRentalPolicyForm(emptyRentalPolicyForm);
         setMessage('Vui lòng Hoàn Thành Chính Sách Thuê Ở trong thông tin khu trọ để được tạo phòng');
       }
 
       // Tải danh sách phòng
-      if (data.leasePolicy) {
+      if (data.rentalPolicy) {
         try {
           const roomsData = await getRoomsByRoomingHouse(id!);
           setRooms(roomsData);
@@ -254,23 +252,22 @@ export default function RoomingHouseDetailPage() {
   }
 
   // ─── Tab 4: Lưu chính sách thuê khu trọ ────────────────────────────────────
-  async function handleSaveLeasePolicy() {
+  async function handleSaveRentalPolicy() {
     if (!house) return;
     setActionLoading(true);
     setMessage('');
     try {
-      await updateRoomingHouseLeasePolicy(house.id, leasePolicyForm);
+      await updateRoomingHouseRentalPolicy(house.id, rentalPolicyForm);
       const updated = await getRoomingHouseDetail(house.id);
       setHouse(updated);
-      if (updated.leasePolicy) {
-        setLeasePolicyForm({
-          allowShortTermRenewal: updated.leasePolicy.allowShortTermRenewal,
-          renewalNoticeDays: updated.leasePolicy.renewalNoticeDays,
-          depositMonths: updated.leasePolicy.depositMonths,
-          discount6MonthsPercent: updated.leasePolicy.discount6MonthsPercent,
-          discount9MonthsPercent: updated.leasePolicy.discount9MonthsPercent,
-          discount12MonthsPercent: updated.leasePolicy.discount12MonthsPercent,
-          discount24MonthsPercent: updated.leasePolicy.discount24MonthsPercent,
+      if (updated.rentalPolicy) {
+        setRentalPolicyForm({
+          minRentalMonths: updated.rentalPolicy.minRentalMonths,
+          maxRentalMonths: updated.rentalPolicy.maxRentalMonths,
+          allowShortTermRenewal: updated.rentalPolicy.allowShortTermRenewal,
+          renewalNoticeDays: updated.rentalPolicy.renewalNoticeDays,
+          depositMonths: updated.rentalPolicy.depositMonths,
+          defaultPaymentDay: updated.rentalPolicy.defaultPaymentDay,
         });
       }
       setMessage('Đã cập nhật chính sách thuê thành công.');
@@ -527,9 +524,9 @@ export default function RoomingHouseDetailPage() {
                     <button
                       className="primary-action"
                       onClick={openCreateRoom}
-                      disabled={!house.leasePolicy}
-                      title={!house.leasePolicy ? "Vui lòng cấu hình chính sách cho thuê trước khi tạo phòng." : undefined}
-                      style={!house.leasePolicy ? { opacity: 0.5, cursor: 'not-allowed' } : undefined}
+                      disabled={!house.rentalPolicy}
+                      title={!house.rentalPolicy ? "Vui lòng cấu hình chính sách cho thuê trước khi tạo phòng." : undefined}
+                      style={!house.rentalPolicy ? { opacity: 0.5, cursor: 'not-allowed' } : undefined}
                     >
                       Tạo phòng mới
                     </button>
@@ -583,7 +580,7 @@ export default function RoomingHouseDetailPage() {
             <button className={activeTab === 'legal' ? 'active' : ''} onClick={() => setActiveTab('legal')}>
               Giấy tờ pháp lý
             </button>
-            <button className={activeTab === 'lease-policy' ? 'active' : ''} onClick={() => setActiveTab('lease-policy')}>
+            <button className={activeTab === 'rental-policy' ? 'active' : ''} onClick={() => setActiveTab('rental-policy')}>
               Chính sách thuê
             </button>
             <button
@@ -761,7 +758,7 @@ export default function RoomingHouseDetailPage() {
           )}
 
           {/* TAB 4.5: CHÍNH SÁCH THUÊ */}
-          {activeTab === 'lease-policy' && (
+          {activeTab === 'rental-policy' && (
             <div className="editor-panel" style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
               <h3 style={{ margin: '0 0 10px 0', borderBottom: '1px solid #e2e8f0', paddingBottom: '12px', color: '#1e293b', fontSize: '18px', fontWeight: 600 }}>
                 Cấu hình chính sách cho thuê
@@ -773,13 +770,37 @@ export default function RoomingHouseDetailPage() {
                   <h4 style={{ margin: '0 0 16px 0', color: '#334155', fontSize: '15px', fontWeight: 600 }}>Điều khoản cơ bản</h4>
                   <div className="form-grid">
                     <label className="field">
+                      <span>Số tháng thuê tối thiểu</span>
+                      <input
+                        type="number"
+                        min="1"
+                        value={rentalPolicyForm.minRentalMonths}
+                        onChange={(e) =>
+                          setRentalPolicyForm({ ...rentalPolicyForm, minRentalMonths: Number(e.target.value) || 1 })
+                        }
+                      />
+                    </label>
+
+                    <label className="field">
+                      <span>Số tháng thuê tối đa</span>
+                      <input
+                        type="number"
+                        min="1"
+                        value={rentalPolicyForm.maxRentalMonths}
+                        onChange={(e) =>
+                          setRentalPolicyForm({ ...rentalPolicyForm, maxRentalMonths: Number(e.target.value) || 1 })
+                        }
+                      />
+                    </label>
+
+                    <label className="field">
                       <span>Số ngày báo trước khi gia hạn</span>
                       <input
                         type="number"
                         min="0"
-                        value={leasePolicyForm.renewalNoticeDays}
+                        value={rentalPolicyForm.renewalNoticeDays}
                         onChange={(e) =>
-                          setLeasePolicyForm({ ...leasePolicyForm, renewalNoticeDays: Number(e.target.value) || 0 })
+                          setRentalPolicyForm({ ...rentalPolicyForm, renewalNoticeDays: Number(e.target.value) || 0 })
                         }
                       />
                     </label>
@@ -789,9 +810,22 @@ export default function RoomingHouseDetailPage() {
                       <input
                         type="number"
                         min="0"
-                        value={leasePolicyForm.depositMonths}
+                        value={rentalPolicyForm.depositMonths}
                         onChange={(e) =>
-                          setLeasePolicyForm({ ...leasePolicyForm, depositMonths: Number(e.target.value) || 0 })
+                          setRentalPolicyForm({ ...rentalPolicyForm, depositMonths: Number(e.target.value) || 0 })
+                        }
+                      />
+                    </label>
+
+                    <label className="field">
+                      <span>Ngày thanh toán mặc định</span>
+                      <input
+                        type="number"
+                        min="1"
+                        max="28"
+                        value={rentalPolicyForm.defaultPaymentDay}
+                        onChange={(e) =>
+                          setRentalPolicyForm({ ...rentalPolicyForm, defaultPaymentDay: Number(e.target.value) || 5 })
                         }
                       />
                     </label>
@@ -802,9 +836,9 @@ export default function RoomingHouseDetailPage() {
                       <input
                         type="checkbox"
                         style={{ width: '18px', height: '18px', margin: 0, cursor: 'pointer' }}
-                        checked={leasePolicyForm.allowShortTermRenewal}
+                        checked={rentalPolicyForm.allowShortTermRenewal}
                         onChange={(e) =>
-                          setLeasePolicyForm({ ...leasePolicyForm, allowShortTermRenewal: e.target.checked })
+                          setRentalPolicyForm({ ...rentalPolicyForm, allowShortTermRenewal: e.target.checked })
                         }
                       />
                       <span style={{ fontSize: '14px', fontWeight: 600, color: '#475569' }}>
@@ -813,70 +847,10 @@ export default function RoomingHouseDetailPage() {
                     </label>
                   </div>
                 </div>
-
-                {/* Section 2: Chương trình giảm giá */}
-                <div style={{ background: '#f8fafc', padding: '20px', borderRadius: '8px', border: '1px solid #e2e8f0' }}>
-                  <h4 style={{ margin: '0 0 16px 0', color: '#334155', fontSize: '15px', fontWeight: 600 }}>
-                    Ưu đãi giảm giá theo thời hạn thuê (%)
-                  </h4>
-                  <div className="form-grid">
-                    <label className="field">
-                      <span>Giảm giá thuê 6 tháng (%)</span>
-                      <input
-                        type="number"
-                        min="0"
-                        max="100"
-                        value={leasePolicyForm.discount6MonthsPercent}
-                        onChange={(e) =>
-                          setLeasePolicyForm({ ...leasePolicyForm, discount6MonthsPercent: Number(e.target.value) || 0 })
-                        }
-                      />
-                    </label>
-
-                    <label className="field">
-                      <span>Giảm giá thuê 9 tháng (%)</span>
-                      <input
-                        type="number"
-                        min="0"
-                        max="100"
-                        value={leasePolicyForm.discount9MonthsPercent}
-                        onChange={(e) =>
-                          setLeasePolicyForm({ ...leasePolicyForm, discount9MonthsPercent: Number(e.target.value) || 0 })
-                        }
-                      />
-                    </label>
-
-                    <label className="field">
-                      <span>Giảm giá thuê 12 tháng (%)</span>
-                      <input
-                        type="number"
-                        min="0"
-                        max="100"
-                        value={leasePolicyForm.discount12MonthsPercent}
-                        onChange={(e) =>
-                          setLeasePolicyForm({ ...leasePolicyForm, discount12MonthsPercent: Number(e.target.value) || 0 })
-                        }
-                      />
-                    </label>
-
-                    <label className="field">
-                      <span>Giảm giá thuê 24 tháng (%)</span>
-                      <input
-                        type="number"
-                        min="0"
-                        max="100"
-                        value={leasePolicyForm.discount24MonthsPercent}
-                        onChange={(e) =>
-                          setLeasePolicyForm({ ...leasePolicyForm, discount24MonthsPercent: Number(e.target.value) || 0 })
-                        }
-                      />
-                    </label>
-                  </div>
-                </div>
               </div>
 
               <div className="save-row" style={{ marginTop: '8px' }}>
-                <button className="primary-action" onClick={handleSaveLeasePolicy}>Lưu chính sách thuê</button>
+                <button className="primary-action" onClick={handleSaveRentalPolicy}>Lưu chính sách thuê</button>
               </div>
             </div>
           )}
@@ -886,11 +860,11 @@ export default function RoomingHouseDetailPage() {
             <div>
               {roomEditorMode === 'list' && (
                 <>
-                  {!house.leasePolicy ? (
+                  {!house.rentalPolicy ? (
                     <div className="empty-panel">
                       <h2>Chưa có chính sách cho thuê</h2>
                       <p>Vui lòng hoàn thành cấu hình chính sách cho thuê trước khi bắt đầu tạo phòng.</p>
-                      <button className="primary-action" onClick={() => setActiveTab('lease-policy')}>
+                      <button className="primary-action" onClick={() => setActiveTab('rental-policy')}>
                         Cấu hình chính sách cho thuê
                       </button>
                     </div>
@@ -1062,7 +1036,7 @@ export default function RoomingHouseDetailPage() {
                       maxOccupants={selectedRoom.maxOccupants}
                       onChange={setPriceTiers}
                       onSave={handleSaveRoomPrice}
-                      depositMonths={house?.leasePolicy?.depositMonths}
+                      depositMonths={house?.rentalPolicy?.depositMonths}
                     />
                   )}
                 </div>
@@ -1236,4 +1210,5 @@ function EyeOffIcon() {
     </svg>
   );
 }
+
 

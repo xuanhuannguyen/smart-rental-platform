@@ -5,7 +5,10 @@ using SmartRentalPlatform.Application.Amenities;
 using SmartRentalPlatform.Application.Auth;
 using SmartRentalPlatform.Application.Common.Interfaces;
 using SmartRentalPlatform.Application.Kyc;
+using SmartRentalPlatform.Application.RentalContracts;
+using SmartRentalPlatform.Application.RentalRequests;
 using SmartRentalPlatform.Application.RoomingHouses;
+using SmartRentalPlatform.Application.RoomDeposits;
 using SmartRentalPlatform.Application.Rooms;
 using SmartRentalPlatform.Application.Users;
 
@@ -22,8 +25,15 @@ public static class DependencyInjection
         services.AddScoped<IAuthPasswordService, AuthPasswordService>();
         services.AddScoped<IGoogleLoginService, GoogleLoginService>();
         services.AddScoped<IKycService, KycService>();
+        services.AddScoped<IRentalRequestService, RentalRequestService>();
+        services.AddScoped<IContractPdfRenderer, ContractPdfRenderer>();
+        services.AddScoped<IContractFileService, ContractFileService>();
+        services.AddScoped<IContractSignatureOtpService, ContractSignatureOtpService>();
+        services.AddScoped<IContractAppendixService, ContractAppendixService>();
+        services.AddScoped<IRentalContractService, RentalContractService>();
+        services.AddScoped<IRoomDepositService, RoomDepositService>();
         services.AddScoped<IRoomingHouseQueryService, RoomingHouseQueryService>();
-        services.AddScoped<IRoomingHouseLeasePolicyService, RoomingHouseLeasePolicyService>();
+        services.AddScoped<IRoomingHouseRentalPolicyService, RoomingHouseRentalPolicyService>();
         services.AddScoped<IRoomingHouseDraftService, RoomingHouseDraftService>();
         services.AddScoped<IRoomingHouseMediaService, RoomingHouseMediaService>();
         services.AddScoped<IRoomingHouseSubmissionService, RoomingHouseSubmissionService>();

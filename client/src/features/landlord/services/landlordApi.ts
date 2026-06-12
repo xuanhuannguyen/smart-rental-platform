@@ -4,13 +4,13 @@ import { ENDPOINTS } from '../../../shared/api/endpoints';
 import type {
   Amenity,
   FileUploadResponse,
-  LeasePolicy,
+  RentalPolicy,
   PropertyImageItemRequest,
   Province,
   RoomingHouseBasicInfoRequest,
   RoomingHouseDetail,
   RoomingHouseOnboarding,
-  UpdateLeasePolicyRequest,
+  UpdateRentalPolicyRequest,
   Ward
 } from '../types/landlord.types';
 
@@ -81,14 +81,14 @@ export const landlordApi = {
     });
   },
 
-  getLeasePolicy(roomingHouseId: string) {
-    return apiClient<ApiResponse<LeasePolicy | null>>(ENDPOINTS.ROOMING_HOUSES.LEASE_POLICY(roomingHouseId), {
+  getRentalPolicy(roomingHouseId: string) {
+    return apiClient<ApiResponse<RentalPolicy | null>>(ENDPOINTS.ROOMING_HOUSES.RENTAL_POLICY(roomingHouseId), {
       auth: true
     });
   },
 
-  updateLeasePolicy(roomingHouseId: string, payload: UpdateLeasePolicyRequest) {
-    return apiClient<ApiResponse<LeasePolicy>>(ENDPOINTS.ROOMING_HOUSES.LEASE_POLICY(roomingHouseId), {
+  updateRentalPolicy(roomingHouseId: string, payload: UpdateRentalPolicyRequest) {
+    return apiClient<ApiResponse<RentalPolicy>>(ENDPOINTS.ROOMING_HOUSES.RENTAL_POLICY(roomingHouseId), {
       method: 'PUT',
       auth: true,
       body: payload

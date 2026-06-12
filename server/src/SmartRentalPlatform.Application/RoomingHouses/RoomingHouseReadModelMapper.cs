@@ -1,7 +1,7 @@
 using SmartRentalPlatform.Contracts.Amenities;
-using SmartRentalPlatform.Contracts.LeasePolicies;
 using SmartRentalPlatform.Contracts.LegalDocuments;
 using SmartRentalPlatform.Contracts.PropertyImages;
+using SmartRentalPlatform.Contracts.RentalPolicies.Responses;
 using SmartRentalPlatform.Contracts.RoomingHouses;
 using SmartRentalPlatform.Domain.Entities.Properties;
 
@@ -62,20 +62,19 @@ internal static class RoomingHouseReadModelMapper
                 CreatedAt = house.LegalDocument.CreatedAt,
                 UpdatedAt = house.LegalDocument.UpdatedAt
             },
-            LeasePolicy = house.LeasePolicy is null ? null : new LeasePolicyResponse
+            RentalPolicy = house.RentalPolicy is null ? null : new RentalPolicyResponse
             {
-                Id = house.LeasePolicy.Id,
-                RoomingHouseId = house.LeasePolicy.RoomingHouseId,
-                AllowShortTermRenewal = house.LeasePolicy.AllowShortTermRenewal,
-                RenewalNoticeDays = house.LeasePolicy.RenewalNoticeDays,
-                DepositMonths = house.LeasePolicy.DepositMonths,
-                Discount6MonthsPercent = house.LeasePolicy.Discount6MonthsPercent,
-                Discount9MonthsPercent = house.LeasePolicy.Discount9MonthsPercent,
-                Discount12MonthsPercent = house.LeasePolicy.Discount12MonthsPercent,
-                Discount24MonthsPercent = house.LeasePolicy.Discount24MonthsPercent,
-                IsActive = house.LeasePolicy.IsActive,
-                CreatedAt = house.LeasePolicy.CreatedAt,
-                UpdatedAt = house.LeasePolicy.UpdatedAt
+                Id = house.RentalPolicy.Id,
+                RoomingHouseId = house.RentalPolicy.RoomingHouseId,
+                MinRentalMonths = house.RentalPolicy.MinRentalMonths,
+                MaxRentalMonths = house.RentalPolicy.MaxRentalMonths,
+                AllowShortTermRenewal = house.RentalPolicy.AllowShortTermRenewal,
+                RenewalNoticeDays = house.RentalPolicy.RenewalNoticeDays,
+                DepositMonths = house.RentalPolicy.DepositMonths,
+                DefaultPaymentDay = house.RentalPolicy.DefaultPaymentDay,
+                IsActive = house.RentalPolicy.IsActive,
+                CreatedAt = house.RentalPolicy.CreatedAt,
+                UpdatedAt = house.RentalPolicy.UpdatedAt
             },
             Images = house.Images
                 .OrderBy(x => x.SortOrder)

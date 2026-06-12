@@ -1,4 +1,5 @@
 using SmartRentalPlatform.Domain.Entities.Properties;
+using SmartRentalPlatform.Domain.Entities.Rental;
 using SmartRentalPlatform.Domain.Enums;
 
 namespace SmartRentalPlatform.Domain.Entities.Users;
@@ -31,4 +32,5 @@ public class User
     public ICollection<KycVerification> KycVerifications { get; set; } = new List<KycVerification>();
     public ICollection<RoomingHouse> RoomingHouses { get; set; } = new List<RoomingHouse>();
     public ICollection<RoomingHouse> ReviewedRoomingHouses { get; set; } = new List<RoomingHouse>();
+    public ICollection<RentalRequest> RentalRequests { get; set; } = new List<RentalRequest>();
 }

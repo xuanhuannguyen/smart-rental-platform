@@ -77,7 +77,7 @@ export interface RoomingHouseDetail {
   createdAt: string;
   updatedAt: string;
   legalDocument?: LegalDocument | null;
-  leasePolicy?: LeasePolicy | null;
+  rentalPolicy?: RentalPolicy | null;
   images: PropertyImage[];
   amenities: Amenity[];
 }
@@ -98,27 +98,25 @@ export interface FileUploadResponse {
   url: string;
 }
 
-export interface LeasePolicy {
+export interface RentalPolicy {
   id: string;
   roomingHouseId: string;
+  minRentalMonths: number;
+  maxRentalMonths: number;
   allowShortTermRenewal: boolean;
   renewalNoticeDays: number;
   depositMonths: number;
-  discount6MonthsPercent: number;
-  discount9MonthsPercent: number;
-  discount12MonthsPercent: number;
-  discount24MonthsPercent: number;
+  defaultPaymentDay: number;
   isActive: boolean;
   createdAt: string;
   updatedAt: string;
 }
 
-export interface UpdateLeasePolicyRequest {
+export interface UpdateRentalPolicyRequest {
+  minRentalMonths: number;
+  maxRentalMonths: number;
   allowShortTermRenewal: boolean;
   renewalNoticeDays: number;
   depositMonths: number;
-  discount6MonthsPercent: number;
-  discount9MonthsPercent: number;
-  discount12MonthsPercent: number;
-  discount24MonthsPercent: number;
+  defaultPaymentDay: number;
 }

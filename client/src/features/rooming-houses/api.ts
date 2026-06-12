@@ -2,13 +2,13 @@ import { apiClient } from '../../shared/api/apiClient';
 import type { ApiResponse } from '../../shared/api/apiResponse.types';
 import type {
   Amenity,
-  LeasePolicy,
   PropertyImageRequest,
+  RentalPolicy,
   RoomingHouseBasicInfoRequest,
   RoomingHouseDetail,
   RoomingHouseOnboarding,
   RoomingHouseSummary,
-  UpdateLeasePolicyRequest,
+  UpdateRentalPolicyRequest,
   UpdateLegalDocumentRequest,
 } from './types';
 
@@ -99,20 +99,20 @@ export async function updateRoomingHouseLegalDocument(
   return data.data;
 }
 
-export async function getRoomingHouseLeasePolicy(id: string): Promise<LeasePolicy | null> {
-  const data = await apiClient<ApiResponse<LeasePolicy | null>>(
-    `/api/rooming-houses/${id}/lease-policy`,
+export async function getRoomingHouseRentalPolicy(id: string): Promise<RentalPolicy | null> {
+  const data = await apiClient<ApiResponse<RentalPolicy | null>>(
+    `/api/rooming-houses/${id}/rental-policy`,
     { auth: true }
   );
   return data.data;
 }
 
-export async function updateRoomingHouseLeasePolicy(
+export async function updateRoomingHouseRentalPolicy(
   id: string,
-  request: UpdateLeasePolicyRequest
-): Promise<LeasePolicy> {
-  const data = await apiClient<ApiResponse<LeasePolicy>>(
-    `/api/rooming-houses/${id}/lease-policy`,
+  request: UpdateRentalPolicyRequest
+): Promise<RentalPolicy> {
+  const data = await apiClient<ApiResponse<RentalPolicy>>(
+    `/api/rooming-houses/${id}/rental-policy`,
     { method: 'PUT', auth: true, body: request }
   );
   return data.data;

@@ -1,8 +1,10 @@
 using Microsoft.EntityFrameworkCore;
-using SmartRentalPlatform.Domain.Entities.Administrative;
 using SmartRentalPlatform.Domain.Entities.AdminApproval;
-using SmartRentalPlatform.Domain.Entities.Users;
+using SmartRentalPlatform.Domain.Entities.Administrative;
+using SmartRentalPlatform.Domain.Entities.RentalContracts;
 using SmartRentalPlatform.Domain.Entities.Properties;
+using SmartRentalPlatform.Domain.Entities.Rental;
+using SmartRentalPlatform.Domain.Entities.Users;
 
 namespace SmartRentalPlatform.Application.Common.Interfaces;
 
@@ -43,9 +45,27 @@ public interface IAppDbContext {
 
     DbSet<RoomPriceTier> RoomPriceTiers { get; }
 
-    DbSet<LeasePolicy> LeasePolicies { get; }
+    DbSet<RentalPolicy> RentalPolicies { get; }
 
     DbSet<ApprovalAuditLog> ApprovalAuditLogs { get; }
+    
+    DbSet<RentalRequest> RentalRequests { get; }
+
+    DbSet<RoomDeposit> RoomDeposits { get; }
+
+    DbSet<ContractOccupant> ContractOccupants { get; }
+
+    DbSet<RentalContract> RentalContracts { get; }
+
+    DbSet<ContractOccupantDocument> ContractOccupantDocuments { get; }
+
+    DbSet<ContractAppendix> ContractAppendices { get; }
+
+    DbSet<ContractAppendixChange> ContractAppendixChanges { get; }
+
+    DbSet<ContractFile> ContractFiles { get; }
+
+    DbSet<ContractSignature> ContractSignatures { get; }
 
     Task<IAppDbContextTransaction> BeginTransactionAsync(CancellationToken cancellationToken = default);
 

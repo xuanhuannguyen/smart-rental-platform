@@ -8,16 +8,28 @@ export const ROUTE_PATHS = {
     },
     ME: {
         ROOT: '/home',
-        PROFILE: '/me/profile',
-        CHANGE_PASSWORD: '/me/change-password',
         KYC: '/me/kyc',
         KYC_STATUS: '/me/kyc/status'
+    },
+    ACCOUNT: {
+        ROOT: '/account',
+        PROFILE: '/account/profile',
+        SECURITY: '/account/security',
+        RENTAL_REQUESTS: '/account/rental-requests',
+        CONTRACT_SETUP: (id: string) => `/account/contracts/${id}/setup`
     },
     LANDLORD: {
         REGISTER: '/landlord/register',
         DASHBOARD: '/landlord/dashboard',
         ROOMING_HOUSES: '/landlord/rooming-houses',
-        ROOMING_HOUSE_DETAIL: (id: string) => `/landlord/rooming-houses/${id}`
+        ROOMING_HOUSE_DETAIL: (id: string) => `/landlord/rooming-houses/${id}`,
+        RENTAL_REQUESTS: '/landlord/rental-requests'
+    },
+    TEST: {
+        RENTAL_FLOW: '/test/rental-flow'
+    },
+    RENTAL_REQUESTS: {
+        SUBMIT: '/rental-requests/submit'
     },
     ADMIN: {
         ROOT: '/admin',

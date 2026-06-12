@@ -1,7 +1,7 @@
 using SmartRentalPlatform.Contracts.Amenities;
-using SmartRentalPlatform.Contracts.LeasePolicies;
 using SmartRentalPlatform.Contracts.LegalDocuments;
 using SmartRentalPlatform.Contracts.PropertyImages;
+using SmartRentalPlatform.Contracts.RentalPolicies.Responses;
 
 namespace SmartRentalPlatform.Contracts.RoomingHouses.Responses;
 
@@ -43,7 +43,7 @@ public class RoomingHouseDetailResponse
 
     public RoomingHouseLegalDocumentResponse? LegalDocument { get; set; }
 
-    public LeasePolicyResponse? LeasePolicy { get; set; }
+    public RentalPolicyResponse? RentalPolicy { get; set; }
 
     public List<PropertyImageResponse> Images { get; set; } = new();
 

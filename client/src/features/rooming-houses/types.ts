@@ -88,32 +88,30 @@ export type RoomingHouseDetail = RoomingHouseSummary & {
   latitude?: number | null;
   longitude?: number | null;
   legalDocument?: LegalDocument | null;
-  leasePolicy?: LeasePolicy | null;
+  rentalPolicy?: RentalPolicy | null;
   images: PropertyImage[];
   amenities: Amenity[];
 };
 
-export type LeasePolicy = {
+export type RentalPolicy = {
   id: string;
   roomingHouseId: string;
+  minRentalMonths: number;
+  maxRentalMonths: number;
   allowShortTermRenewal: boolean;
   renewalNoticeDays: number;
   depositMonths: number;
-  discount6MonthsPercent: number;
-  discount9MonthsPercent: number;
-  discount12MonthsPercent: number;
-  discount24MonthsPercent: number;
+  defaultPaymentDay: number;
   isActive: boolean;
   createdAt: string;
   updatedAt: string;
 };
 
-export type UpdateLeasePolicyRequest = {
+export type UpdateRentalPolicyRequest = {
+  minRentalMonths: number;
+  maxRentalMonths: number;
   allowShortTermRenewal: boolean;
   renewalNoticeDays: number;
   depositMonths: number;
-  discount6MonthsPercent: number;
-  discount9MonthsPercent: number;
-  discount12MonthsPercent: number;
-  discount24MonthsPercent: number;
+  defaultPaymentDay: number;
 };

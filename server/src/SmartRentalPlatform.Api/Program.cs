@@ -5,8 +5,11 @@ using SmartRentalPlatform.Application.Common.Interfaces;
 using SmartRentalPlatform.Infrastructure;
 using SmartRentalPlatform.Infrastructure.Persistence;
 using SmartRentalPlatform.Infrastructure.Persistence.Seed;
+using QuestPDF.Infrastructure;
 
 var builder = WebApplication.CreateBuilder(args);
+
+QuestPDF.Settings.License = LicenseType.Community;
 
 // Đăng ký controller để dùng mô hình API Controller.
 builder.Services.AddControllers();
@@ -32,6 +35,7 @@ if (app.Environment.IsDevelopment())
     var dbContext = scope.ServiceProvider.GetRequiredService<AppDbContext>();
     var passwordService = scope.ServiceProvider.GetRequiredService<IPasswordService>();
     await DevelopmentDataSeed.SeedAdminAsync(dbContext, passwordService);
+    await DevelopmentDataSeed.SeedAsync(dbContext, passwordService);
 }
 
 // Chỉ bật Swagger ở môi trường Development.

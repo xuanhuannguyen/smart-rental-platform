@@ -134,7 +134,7 @@ export default function CreateRoomingHousePage() {
           <p style={{ margin: '14px 0 24px', color: '#64748b', lineHeight: 1.5 }}>
             Vui lòng bổ sung đầy đủ thông tin cá nhân và số điện thoại trước khi đăng ký làm chủ trọ.
           </p>
-          <Button type="button" onClick={() => navigate(ROUTE_PATHS.ME.PROFILE)}>
+          <Button type="button" onClick={() => navigate(ROUTE_PATHS.ACCOUNT.PROFILE)}>
             Cập nhật Profile
           </Button>
         </section>

@@ -9,13 +9,15 @@ namespace SmartRentalPlatform.Infrastructure.Persistence.Seed;
 public static class DevelopmentDataSeed
 {
     public const string AdminEmail = "admin.demo@example.com";
-    public const string TenantEmail = "tenant.demo@example.com";
-    public const string LandlordEmail = "landlord.demo@example.com";
+    public const string TenantEmail = "lquanglinh15@gmail.com"; // "tenant.demo@example.com";
+    public const string LandlordEmail = "lequanglinh1033@gmail.com"; // "landlord.demo@example.com";
+    public const string CoTenantEmail = "cotenant.demo@example.com";
     public const string DemoPassword = "Demo@123456";
 
     private static readonly Guid AdminUserId = Guid.Parse("10000000-0000-0000-0000-000000000099");
     private static readonly Guid TenantUserId = Guid.Parse("10000000-0000-0000-0000-000000000001");
     private static readonly Guid LandlordUserId = Guid.Parse("10000000-0000-0000-0000-000000000002");
+    private static readonly Guid CoTenantUserId = Guid.Parse("10000000-0000-0000-0000-000000000003");
     private static readonly Guid ApprovedHouseId = Guid.Parse("20000000-0000-0000-0000-000000000001");
     private static readonly Guid DraftHouseId = Guid.Parse("20000000-0000-0000-0000-000000000002");
     private static readonly Guid Room101Id = Guid.Parse("30000000-0000-0000-0000-000000000101");
@@ -35,6 +37,7 @@ public static class DevelopmentDataSeed
         }
 
         await SeedUsersAsync(context, passwordService, cancellationToken);
+        await SeedApprovedKycAsync(context, cancellationToken);
         await SeedRoomingHousesAsync(context, location, cancellationToken);
         await SeedRoomsAsync(context, cancellationToken);
     }
@@ -86,6 +89,18 @@ public static class DevelopmentDataSeed
         IPasswordService passwordService,
         CancellationToken cancellationToken)
     {
+        if (!await context.Users.AnyAsync(x => x.NormalizedEmail == CoTenantEmail.ToUpperInvariant(), cancellationToken))
+        {
+            context.Users.Add(CreateUser(CoTenantUserId, CoTenantEmail, "Lê CoTenant Demo", passwordService));
+            context.UserProfiles.Add(CreateProfile(CoTenantUserId, "Lê CoTenant Demo"));
+            context.UserRoles.Add(new UserRole
+            {
+                UserId = CoTenantUserId,
+                RoleId = RoleSeed.TenantRoleId,
+                CreatedAt = SeededAt
+            });
+        }
+
         if (!await context.Users.AnyAsync(x => x.NormalizedEmail == TenantEmail.ToUpperInvariant(), cancellationToken))
         {
             context.Users.Add(CreateUser(TenantUserId, TenantEmail, "Nguyễn Tenant Demo", passwordService));
@@ -111,6 +126,70 @@ public static class DevelopmentDataSeed
         }
 
         await context.SaveChangesAsync(cancellationToken);
+    }
+
+    private static async Task SeedApprovedKycAsync(AppDbContext context, CancellationToken cancellationToken)
+    {
+        if (!await context.KycVerifications.AnyAsync(
+                x => x.UserId == TenantUserId && x.Status == KycVerificationStatus.Approved,
+                cancellationToken))
+        {
+            context.KycVerifications.Add(CreateApprovedKyc(
+                Guid.Parse("60000000-0000-0000-0000-000000000001"),
+                TenantUserId,
+                "Nguyễn Tenant Demo",
+                "********901",
+                "demo-tenant-citizen-id-hash",
+                new DateOnly(2000, 1, 1)));
+        }
+
+        if (!await context.KycVerifications.AnyAsync(
+                x => x.UserId == CoTenantUserId && x.Status == KycVerificationStatus.Approved,
+                cancellationToken))
+        {
+            context.KycVerifications.Add(CreateApprovedKyc(
+                Guid.Parse("60000000-0000-0000-0000-000000000002"),
+                CoTenantUserId,
+                "Lê CoTenant Demo",
+                "********902",
+                "demo-cotenant-citizen-id-hash",
+                new DateOnly(2001, 2, 2)));
+        }
+
+        await context.SaveChangesAsync(cancellationToken);
+    }
+
+    private static KycVerification CreateApprovedKyc(
+        Guid id,
+        Guid userId,
+        string fullName,
+        string citizenIdMasked,
+        string citizenIdHash,
+        DateOnly dateOfBirth)
+    {
+        return new KycVerification
+        {
+            Id = id,
+            UserId = userId,
+            DocumentType = KycDocumentType.CCCD,
+            EkycProvider = EkycProvider.VNPT,
+            FrontImageObjectKey = $"demo/kyc/{userId}/front.jpg",
+            BackImageObjectKey = $"demo/kyc/{userId}/back.jpg",
+            SelfieImageObjectKey = $"demo/kyc/{userId}/selfie.jpg",
+            OcrFullName = fullName,
+            OcrCitizenIdMasked = citizenIdMasked,
+            CitizenIdHash = citizenIdHash,
+            OcrDateOfBirth = dateOfBirth,
+            OcrGender = "Male",
+            OcrAddress = "TP. Hồ Chí Minh",
+            EkycResult = EkycResult.Passed,
+            RiskLevel = KycRiskLevel.Low,
+            Status = KycVerificationStatus.Approved,
+            SubmittedAt = SeededAt,
+            ReviewedAt = SeededAt,
+            CreatedAt = SeededAt,
+            UpdatedAt = SeededAt
+        };
     }
 
     private static async Task SeedRoomingHousesAsync(
@@ -169,6 +248,24 @@ public static class DevelopmentDataSeed
                 CreatedAt = SeededAt,
                 UpdatedAt = SeededAt
             });
+        } 
+
+        if (!await context.RentalPolicies.AnyAsync(x => x.RoomingHouseId == ApprovedHouseId, cancellationToken))
+        {
+            context.RentalPolicies.Add(new RentalPolicy
+            {
+                Id = Guid.Parse("50000000-0000-0000-0000-000000000001"),
+                RoomingHouseId = ApprovedHouseId,
+                MinRentalMonths = 3,
+                MaxRentalMonths = 12,
+                AllowShortTermRenewal = true,
+                RenewalNoticeDays = 30,
+                DepositMonths = 1m,
+                DefaultPaymentDay = 5,
+                IsActive = true,
+                CreatedAt = SeededAt,
+                UpdatedAt = SeededAt
+            });
         }
 
         if (!await context.RoomingHouses.AnyAsync(x => x.Id == DraftHouseId, cancellationToken))
@@ -197,12 +294,13 @@ public static class DevelopmentDataSeed
     {
         if (await context.Rooms.AnyAsync(x => x.RoomingHouseId == ApprovedHouseId, cancellationToken))
         {
+            await EnsureSeedRoomPricingAsync(context, cancellationToken);
             return;
         }
 
         var rooms = new[]
         {
-            CreateRoom(Room101Id, "101", 1, 18m, 2, RoomStatus.Available),
+            CreateRoom(Room101Id, "101", 1, 18m, 3, RoomStatus.Available),
             CreateRoom(Room102Id, "102", 1, 20m, 2, RoomStatus.Occupied),
             CreateRoom(Room201Id, "201", 2, 24m, 3, RoomStatus.Hidden)
         };
@@ -221,6 +319,7 @@ public static class DevelopmentDataSeed
         context.RoomPriceTiers.AddRange(
             CreatePriceTier(Room101Id, 1, 2500000m),
             CreatePriceTier(Room101Id, 2, 3000000m),
+            CreatePriceTier(Room101Id, 3, 3500000m),
             CreatePriceTier(Room102Id, 1, 2800000m),
             CreatePriceTier(Room102Id, 2, 3300000m),
             CreatePriceTier(Room201Id, 1, 3500000m),
@@ -233,6 +332,30 @@ public static class DevelopmentDataSeed
             CreateRoomImage(Room201Id, "demo/rooms/201/cover.jpg", "Phòng 201"));
 
         await context.SaveChangesAsync(cancellationToken);
+    }
+
+    private static async Task EnsureSeedRoomPricingAsync(AppDbContext context, CancellationToken cancellationToken)
+    {
+        var seededRooms = await context.Rooms
+            .Where(x => x.Id == Room101Id || x.Id == Room102Id || x.Id == Room201Id)
+            .ToListAsync(cancellationToken);
+
+        foreach (var room in seededRooms)
+        {
+            room.IsTieredPricing = true;
+            room.UpdatedAt = DateTimeOffset.UtcNow;
+        }
+
+        var room101 = seededRooms.FirstOrDefault(x => x.Id == Room101Id);
+        if (room101 is not null && room101.MaxOccupants < 3)
+        {
+            room101.MaxOccupants = 3;
+        }
+
+        if (seededRooms.Count > 0)
+        {
+            await context.SaveChangesAsync(cancellationToken);
+        }
     }
 
     private static User CreateUser(
@@ -284,6 +407,7 @@ public static class DevelopmentDataSeed
             Floor = floor,
             AreaM2 = areaM2,
             MaxOccupants = maxOccupants,
+            IsTieredPricing = true,
             Status = status,
             Description = $"Phòng {roomNumber} dùng để test dashboard chủ trọ.",
             CreatedAt = SeededAt,

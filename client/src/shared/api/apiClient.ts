@@ -6,6 +6,7 @@ import { tokenStorage } from './tokenStorage';
 type RequestOptions = Omit<RequestInit, 'body'> & {
   body?: BodyInit | unknown;
   auth?: boolean;
+  responseType?: 'json' | 'blob' | 'text';
 };
 
 export async function apiClient<T>(path: string, options: RequestOptions = {}) {
@@ -34,10 +35,9 @@ export async function apiClient<T>(path: string, options: RequestOptions = {}) {
     body: requestBody
   });
 
-  const payload = await response.json().catch(() => null);
-
   if (!response.ok) {
-    const error = payload as ApiErrorResponse | null;
+    const errorPayload = await response.json().catch(() => null);
+    const error = errorPayload as ApiErrorResponse | null;
     throw new ApiClientError(getApiErrorMessage(error), {
       errorCode: error?.errorCode,
       details: error?.details,
@@ -46,5 +46,16 @@ export async function apiClient<T>(path: string, options: RequestOptions = {}) {
     });
   }
 
+  if (options.responseType === 'blob') {
+    const blob = await response.blob();
+    return blob as unknown as T;
+  }
+
+  if (options.responseType === 'text') {
+    const text = await response.text();
+    return text as unknown as T;
+  }
+
+  const payload = await response.json().catch(() => null);
   return payload as T;
 }

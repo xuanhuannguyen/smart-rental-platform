@@ -58,7 +58,32 @@ public static class ErrorCodes
     public const string ImageInvalidOwner = "IMAGE_INVALID_OWNER";
     public const string PriceTierInvalid = "PRICE_TIER_INVALID";
 
-    // Lease Policy
-    public const string LeasePolicyRequired = "LEASE_POLICY_REQUIRED";
-    public const string LeasePolicyInvalid = "LEASE_POLICY_INVALID";
+    // Rental Policy
+    public const string RentalPolicyRequired = "RENTAL_POLICY_REQUIRED";
+    public const string RentalPolicyInvalid = "RENTAL_POLICY_INVALID";
+
+    // Rental Request / Deposit
+    public const string RentalRequestNotFound = "RENTAL_REQUEST_NOT_FOUND";
+    public const string RentalRequestInvalidStatus = "RENTAL_REQUEST_INVALID_STATUS";
+    public const string RentalRequestDuplicate = "RENTAL_REQUEST_DUPLICATE";
+    public const string RentalRequestForbidden = "RENTAL_REQUEST_FORBIDDEN";
+    public const string RentalRequestInvalidDuration = "RENTAL_REQUEST_INVALID_DURATION";
+    public const string RentalRequestOccupantLimitExceeded = "RENTAL_REQUEST_OCCUPANT_LIMIT_EXCEEDED";
+    public const string RentalRequestPaymentDeadlineInvalid = "RENTAL_REQUEST_PAYMENT_DEADLINE_INVALID";
+    public const string RoomDepositAlreadyExists = "ROOM_DEPOSIT_ALREADY_EXISTS";
+    public const string RoomDepositNotFound = "ROOM_DEPOSIT_NOT_FOUND";
+    public const string RoomDepositForbidden = "ROOM_DEPOSIT_FORBIDDEN";
+    public const string RoomDepositInvalidStatus = "ROOM_DEPOSIT_INVALID_STATUS";
+    public const string RoomDepositExpired = "ROOM_DEPOSIT_EXPIRED";
+
+    // Rental Contract
+    public const string RentalContractNotFound = "RENTAL_CONTRACT_NOT_FOUND";
+    public const string RentalContractForbidden = "RENTAL_CONTRACT_FORBIDDEN";
+    public const string RentalContractInvalidStatus = "RENTAL_CONTRACT_INVALID_STATUS";
+    public const string RentalContractOccupantsRequired = "RENTAL_CONTRACT_OCCUPANTS_REQUIRED";
+    public const string RentalContractInvalidOccupant = "RENTAL_CONTRACT_INVALID_OCCUPANT";
+    public const string RentalContractAlreadySigned = "RENTAL_CONTRACT_ALREADY_SIGNED";
+    public const string ContractAppendixNotFound = "CONTRACT_APPENDIX_NOT_FOUND";
+    public const string ContractAppendixInvalidStatus = "CONTRACT_APPENDIX_INVALID_STATUS";
+    public const string ContractAppendixAlreadySigned = "CONTRACT_APPENDIX_ALREADY_SIGNED";
 }

@@ -4,9 +4,10 @@ using SmartRentalPlatform.Application.Common.Interfaces;
 using SmartRentalPlatform.Application.RoomingHouses;
 using SmartRentalPlatform.Contracts.Amenities;
 using SmartRentalPlatform.Contracts.Common;
-using SmartRentalPlatform.Contracts.LeasePolicies;
 using SmartRentalPlatform.Contracts.LegalDocuments;
 using SmartRentalPlatform.Contracts.PropertyImages;
+using SmartRentalPlatform.Contracts.RentalPolicies.Requests;
+using SmartRentalPlatform.Contracts.RentalPolicies.Responses;
 using SmartRentalPlatform.Contracts.RoomingHouses;
 
 namespace SmartRentalPlatform.Api.Controllers;
@@ -19,7 +20,7 @@ public class RoomingHousesController : ControllerBase
     private readonly IRoomingHouseDraftService roomingHouseDraftService;
     private readonly IRoomingHouseMediaService roomingHouseMediaService;
     private readonly IRoomingHouseSubmissionService roomingHouseSubmissionService;
-    private readonly IRoomingHouseLeasePolicyService roomingHouseLeasePolicyService;
+    private readonly IRoomingHouseRentalPolicyService roomingHouseRentalPolicyService;
     private readonly ICurrentUserService currentUserService;
 
     public RoomingHousesController(
@@ -27,14 +28,14 @@ public class RoomingHousesController : ControllerBase
         IRoomingHouseDraftService roomingHouseDraftService,
         IRoomingHouseMediaService roomingHouseMediaService,
         IRoomingHouseSubmissionService roomingHouseSubmissionService,
-        IRoomingHouseLeasePolicyService roomingHouseLeasePolicyService,
+        IRoomingHouseRentalPolicyService roomingHouseRentalPolicyService,
         ICurrentUserService currentUserService)
     {
         this.roomingHouseQueryService = roomingHouseQueryService;
         this.roomingHouseDraftService = roomingHouseDraftService;
         this.roomingHouseMediaService = roomingHouseMediaService;
         this.roomingHouseSubmissionService = roomingHouseSubmissionService;
-        this.roomingHouseLeasePolicyService = roomingHouseLeasePolicyService;
+        this.roomingHouseRentalPolicyService = roomingHouseRentalPolicyService;
         this.currentUserService = currentUserService;
     }
 
@@ -197,8 +198,8 @@ public class RoomingHousesController : ControllerBase
     }
 
     [Authorize]
-    [HttpGet("{id:guid}/lease-policy")]
-    public async Task<ActionResult<ApiResponse<LeasePolicyResponse>>> GetLeasePolicy(
+    [HttpGet("{id:guid}/rental-policy")]
+    public async Task<ActionResult<ApiResponse<RentalPolicyResponse>>> GetRentalPolicy(
         Guid id,
         CancellationToken cancellationToken)
     {
@@ -223,9 +224,9 @@ public class RoomingHousesController : ControllerBase
             });
         }
 
-        var result = await roomingHouseLeasePolicyService.GetLeasePolicyAsync(id, cancellationToken);
+        var result = await roomingHouseRentalPolicyService.GetRentalPolicyAsync(id, cancellationToken);
 
-        return Ok(new ApiResponse<LeasePolicyResponse>
+        return Ok(new ApiResponse<RentalPolicyResponse>
         {
             Success = true,
             Message = result is null
@@ -236,16 +237,16 @@ public class RoomingHousesController : ControllerBase
     }
 
     [Authorize]
-    [HttpPut("{id:guid}/lease-policy")]
-    public async Task<ActionResult<ApiResponse<LeasePolicyResponse>>> UpdateLeasePolicy(
+    [HttpPut("{id:guid}/rental-policy")]
+    public async Task<ActionResult<ApiResponse<RentalPolicyResponse>>> UpdateRentalPolicy(
         Guid id,
-        UpdateLeasePolicyRequest request,
+        UpdateRentalPolicyRequest request,
         CancellationToken cancellationToken)
     {
         var userId = GetCurrentUserId();
-        var result = await roomingHouseLeasePolicyService.UpdateLeasePolicyAsync(id, userId, request, cancellationToken);
+        var result = await roomingHouseRentalPolicyService.UpdateRentalPolicyAsync(id, userId, request, cancellationToken);
 
-        return Ok(new ApiResponse<LeasePolicyResponse>
+        return Ok(new ApiResponse<RentalPolicyResponse>
         {
             Success = true,
             Message = "Lưu chính sách thuê thành công.",

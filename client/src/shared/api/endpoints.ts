@@ -43,11 +43,48 @@ export const ENDPOINTS = {
     AMENITIES: (id: string) => `/api/rooming-houses/${id}/amenities`,
     IMAGES: (id: string) => `/api/rooming-houses/${id}/images`,
     LEGAL_DOCUMENT: (id: string) => `/api/rooming-houses/${id}/legal-document`,
-    LEASE_POLICY: (id: string) => `/api/rooming-houses/${id}/lease-policy`,
+    RENTAL_POLICY: (id: string) => `/api/rooming-houses/${id}/rental-policy`,
     SUBMIT: (id: string) => `/api/rooming-houses/${id}/submit`
   },
   PUBLIC: {
-    ROOMING_HOUSES: '/api/public/rooming-houses'
+    ROOMING_HOUSES: '/api/public/rooming-houses',
+    ROOMS: (houseId: string) => `/api/public/rooming-houses/${houseId}/rooms`,
+    ROOM_BY_ID: (roomId: string) => `/api/public/rooms/${roomId}`
+  },
+  RENTAL_REQUESTS: {
+    MY: '/api/rental-requests/my',
+    INCOMING: '/api/rental-requests/incoming',
+    BY_ID: (id: string) => `/api/rental-requests/${id}`,
+    CREATE: (roomId: string) => `/api/rooms/${roomId}/rental-requests`,
+    APPROVE: (id: string) => `/api/rental-requests/${id}/approve`,
+    REJECT: (id: string) => `/api/rental-requests/${id}/reject`,
+    CANCEL: (id: string) => `/api/rental-requests/${id}/cancel`
+  },
+  ROOM_DEPOSITS: {
+    MARK_PAID: (id: string) => `/api/room-deposits/${id}/mark-paid`
+  },
+  CONTRACTS: {
+    BY_ID: (id: string) => `/api/contracts/${id}`,
+    PREVIEW: (id: string) => `/api/contracts/${id}/preview`,
+    PREVIEW_PDF: (id: string) => `/api/contracts/${id}/preview/pdf`,
+    SUBMIT_OCCUPANTS: (id: string) => `/api/contracts/${id}/occupants/submit`,
+    TERMS: (id: string) => `/api/contracts/${id}/terms`,
+    LANDLORD_SIGN_OTP: (id: string) => `/api/contracts/${id}/landlord-sign/otp`,
+    LANDLORD_SIGN: (id: string) => `/api/contracts/${id}/landlord-sign`,
+    TENANT_SIGN_OTP: (id: string) => `/api/contracts/${id}/tenant-sign/otp`,
+    TENANT_SIGN: (id: string) => `/api/contracts/${id}/tenant-sign`,
+    FILES: (id: string) => `/api/contracts/${id}/files`,
+    GENERATE_FILE: (id: string) => `/api/contracts/${id}/files/generate`,
+    DOWNLOAD_FILE: (id: string, fileId: string) => `/api/contracts/${id}/files/${fileId}/download`,
+    REVISION_REQUEST: (id: string) => `/api/contracts/${id}/revision-request`,
+    REJECT: (id: string) => `/api/contracts/${id}/reject`,
+    APPENDICES: (id: string) => `/api/contracts/${id}/appendices`,
+    APPENDIX_BY_ID: (id: string, appendixId: string) => `/api/contracts/${id}/appendices/${appendixId}`,
+    APPENDIX_PREVIEW: (id: string, appendixId: string) => `/api/contracts/${id}/appendices/${appendixId}/preview/pdf`,
+    APPENDIX_SIGN_OTP: (id: string, appendixId: string) => `/api/contracts/${id}/appendices/${appendixId}/sign/otp`,
+    APPENDIX_SIGN: (id: string, appendixId: string) => `/api/contracts/${id}/appendices/${appendixId}/sign`,
+    APPENDIX_REJECT: (id: string, appendixId: string) => `/api/contracts/${id}/appendices/${appendixId}/reject`,
+    APPENDIX_REVISION_REQUEST: (id: string, appendixId: string) => `/api/contracts/${id}/appendices/${appendixId}/revision-request`
   },
   ADMIN: {
     KYC_PENDING: '/api/admin/kyc/pending',

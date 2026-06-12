@@ -32,12 +32,12 @@ public class RoomAccessService
         {
             throw new NotFoundException(
                 ErrorCodes.HouseNotFound,
-                "Không tìm thấy khu trọ.",
+                "Không tìm thấy khu trềE",
                 new { roomingHouseId });
         }
 
         EnsureRoomingHouseApproved(roomingHouse);
-        await EnsureLeasePolicyExistsAsync(roomingHouseId, cancellationToken);
+        await EnsureRentalPolicyExistsAsync(roomingHouseId, cancellationToken);
     }
 
     public async Task<Room?> GetOwnedRoomForUpdateAsync(
@@ -60,7 +60,7 @@ public class RoomAccessService
         {
             throw new ConflictException(
                 ErrorCodes.HouseNotApproved,
-                "Chỉ khu trọ đã được duyệt mới có thể quản lý phòng.",
+                "ChềEkhu trềEđã được duyệt mới có thềEquản lý phòng.",
                 new { currentStatus = roomingHouse.ApprovalStatus.ToString() });
         }
     }
@@ -83,7 +83,7 @@ public class RoomAccessService
         {
             throw new ConflictException(
                 ErrorCodes.RoomDuplicateNumber,
-                "Số phòng đã tồn tại trong khu trọ này.",
+                "SềEphòng đã tồn tại trong khu trềEnày.",
                 new { roomingHouseId, roomNumber });
         }
     }
@@ -105,24 +105,24 @@ public class RoomAccessService
         {
             throw new BadRequestException(
                 ErrorCodes.AmenityNotFound,
-                "Một hoặc nhiều mã tiện ích không hợp lệ.",
+                "Một hoặc nhiều mã tiện ích không hợp lềE",
                 new { amenityIds });
         }
 
         return amenityIds;
     }
 
-    private async Task EnsureLeasePolicyExistsAsync(
+    private async Task EnsureRentalPolicyExistsAsync(
         Guid roomingHouseId,
         CancellationToken cancellationToken)
     {
-        var hasLeasePolicy = await context.LeasePolicies
+        var hasRentalPolicy = await context.RentalPolicies
             .AnyAsync(x => x.RoomingHouseId == roomingHouseId && x.IsActive, cancellationToken);
 
-        if (!hasLeasePolicy)
+        if (!hasRentalPolicy)
         {
             throw new ConflictException(
-                ErrorCodes.LeasePolicyRequired,
+                ErrorCodes.RentalPolicyRequired,
                 "Vui lòng hoàn thành chính sách thuê trước khi tạo hoặc quản lý phòng.",
                 new { roomingHouseId });
         }

@@ -1,0 +1,61 @@
+using Microsoft.AspNetCore.Authorization;
+using Microsoft.AspNetCore.Mvc;
+using SmartRentalPlatform.Application.Common.Interfaces;
+using SmartRentalPlatform.Application.RoomDeposits;
+using SmartRentalPlatform.Contracts.Common;
+using SmartRentalPlatform.Contracts.RentalRequests.Responses;
+
+namespace SmartRentalPlatform.Api.Controllers;
+
+[ApiController]
+[Route("api/room-deposits")]
+public class RoomDepositsController : ControllerBase
+{
+    private readonly IRoomDepositService roomDepositService;
+    private readonly ICurrentUserService currentUserService;
+
+    public RoomDepositsController(
+        IRoomDepositService roomDepositService,
+        ICurrentUserService currentUserService)
+    {
+        this.roomDepositService = roomDepositService;
+        this.currentUserService = currentUserService;
+    }
+
+    [Authorize]
+    [HttpPost("{id:guid}/mark-paid")]
+    public async Task<ActionResult<ApiResponse<RoomDepositResponse>>> MarkPaid(
+        Guid id,
+        CancellationToken cancellationToken)
+    {
+        var userId = GetCurrentUserId();
+        var result = await roomDepositService.MarkPaidAsync(userId, id, cancellationToken);
+
+        if (result is null)
+        {
+            return NotFound(new ApiErrorResponse
+            {
+                Success = false,
+                ErrorCode = ErrorCodes.RoomDepositNotFound,
+                Message = "Không tìm thấy khoản cọc."
+            });
+        }
+
+        return Ok(new ApiResponse<RoomDepositResponse>
+        {
+            Success = true,
+            Message = "Thanh toán cọc thành công.",
+            Data = result
+        });
+    }
+
+    private Guid GetCurrentUserId()
+    {
+        if (!currentUserService.IsAuthenticated || currentUserService.UserId is null)
+        {
+            throw new UnauthorizedAccessException("Không tìm thấy mã người dùng đã đăng nhập.");
+        }
+
+        return currentUserService.UserId.Value;
+    }
+}

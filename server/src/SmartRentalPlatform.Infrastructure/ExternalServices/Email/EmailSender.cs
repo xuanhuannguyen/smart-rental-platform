@@ -70,6 +70,35 @@ public class EmailSender : IEmailSender
         return SendAsync(email, displayName, subject, textBody, htmlBody, cancellationToken);
     }
 
+    public Task SendContractSignatureOtpAsync(
+        string email,
+        string displayName,
+        string contractNumber,
+        string signerRole,
+        string otp,
+        CancellationToken cancellationToken = default)
+    {
+        var subject = "Ma OTP ky hop dong Smart Rental Platform";
+        var textBody = $"""
+            Xin chao {displayName},
+
+            Ma OTP ky hop dong {contractNumber} cua ban la: {otp}
+
+            Vai tro ky: {signerRole}
+
+            Neu ban khong thuc hien yeu cau ky hop dong nay, vui long bo qua email.
+
+            Smart Rental Platform
+            """;
+        var htmlBody = BuildOtpHtml(
+            displayName,
+            otp,
+            "Ky hop dong",
+            $"Dung ma OTP ben duoi de xac nhan ky hop dong {contractNumber} voi vai tro {signerRole}.");
+
+        return SendAsync(email, displayName, subject, textBody, htmlBody, cancellationToken);
+    }
+
     private async Task SendAsync(
         string toEmail,
         string toName,

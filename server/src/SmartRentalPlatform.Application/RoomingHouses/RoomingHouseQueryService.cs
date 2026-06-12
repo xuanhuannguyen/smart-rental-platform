@@ -104,7 +104,7 @@ public class RoomingHouseQueryService : IRoomingHouseQueryService
             .Include(x => x.Province)
             .Include(x => x.Ward)
             .Include(x => x.LegalDocument)
-            .Include(x => x.LeasePolicy)
+            .Include(x => x.RentalPolicy)
             .Include(x => x.Images)
             .Include(x => x.Rooms)
             .Include(x => x.RoomingHouseAmenities)

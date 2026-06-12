@@ -1,8 +1,10 @@
 using Microsoft.EntityFrameworkCore;
+using Microsoft.AspNetCore.DataProtection;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Options;
 using SmartRentalPlatform.Application.Common.Interfaces;
+using SmartRentalPlatform.Infrastructure.BackgroundServices;
 using SmartRentalPlatform.Infrastructure.ExternalServices.Ekyc;
 using SmartRentalPlatform.Infrastructure.ExternalServices.Email;
 using SmartRentalPlatform.Infrastructure.ExternalServices.Google;
@@ -37,9 +39,13 @@ public static class DependencyInjection
         services.AddScoped<ICurrentUserService, CurrentUserService>();
         services.AddScoped<IFileStorageService, LocalFileStorageService>();
         services.Configure<VnptEkycOptions>(configuration.GetSection(VnptEkycOptions.SectionName));
+        services.AddDataProtection();
         services.AddMemoryCache();
         services.AddScoped<IPrivateStorageService, LocalPrivateStorageService>();
         services.AddScoped<IHashService, Sha256HashService>();
+        services.AddScoped<ISensitiveDataProtector, DataProtectionSensitiveDataProtector>();
+        services.AddHostedService<RoomDepositExpirationWorker>();
+        services.AddHostedService<RentalContractExpirationWorker>();
         services.AddHttpClient(RealVnptEkycClient.HttpClientName, (provider, client) =>
         {
             var options = provider.GetRequiredService<IOptions<VnptEkycOptions>>().Value;
