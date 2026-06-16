@@ -35,6 +35,8 @@ export default function LandlordAppointmentsPage() {
   const [cancellingId, setCancellingId] = useState<string | null>(null);
   const [cancelReason, setCancelReason] = useState('');
   
+  const [completingId, setCompletingId] = useState<string | null>(null);
+
   const [actionLoading, setActionLoading] = useState(false);
   // Separate error state for modals so errors show inside the modal, not behind it
   const [modalError, setModalError] = useState('');
@@ -170,16 +172,27 @@ export default function LandlordAppointmentsPage() {
     }
   };
 
-  const handleCompleteClick = async (id: string) => {
-    if (!window.confirm('Đánh dấu buổi xem phòng trọ đã hoàn tất?')) return;
-    setError('');
+  const handleCompleteClick = (id: string) => {
+    setCompletingId(id);
+    setModalError('');
+  };
+
+  const handleCompleteSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!completingId) return;
+
+    setActionLoading(true);
+    setModalError('');
     try {
-      await completeViewingAppointment(id);
+      await completeViewingAppointment(completingId);
       setSuccess('Đánh dấu hoàn thành buổi xem phòng thành công.');
+      setCompletingId(null);
       void loadData();
       setTimeout(() => setSuccess(''), 5000);
     } catch (err) {
-      setError(getApiErrorMessage(err, 'Không thể đánh dấu hoàn thành.'));
+      setModalError(getApiErrorMessage(err, 'Không thể đánh dấu hoàn thành.'));
+    } finally {
+      setActionLoading(false);
     }
   };
 
@@ -495,6 +508,42 @@ export default function LandlordAppointmentsPage() {
                   disabled={actionLoading || !cancelReason.trim()}
                 >
                   {actionLoading ? 'Đang hủy...' : 'Hủy lịch hẹn'}
+                </button>
+              </footer>
+            </form>
+          </div>
+        </div>
+      )}
+      {/* Complete Modal */}
+      {completingId && (
+        <div className="viewing-modal-overlay" onClick={() => setCompletingId(null)}>
+          <div className="viewing-modal-container" onClick={(e) => e.stopPropagation()}>
+            <header className="viewing-modal-header">
+              <h2>Xác nhận hoàn tất</h2>
+              <button className="viewing-modal-close-btn" onClick={() => setCompletingId(null)}>
+                &times;
+              </button>
+            </header>
+            <form onSubmit={handleCompleteSubmit} className="viewing-modal-form">
+              {modalError && <div className="viewing-modal-error">{modalError}</div>}
+              <div className="viewing-modal-field">
+                <p>Đánh dấu buổi xem phòng trọ đã diễn ra thành công?</p>
+              </div>
+              <footer className="viewing-modal-footer">
+                <button
+                  type="button"
+                  className="viewing-modal-btn viewing-modal-btn--secondary"
+                  onClick={() => setCompletingId(null)}
+                  disabled={actionLoading}
+                >
+                  Hủy bỏ
+                </button>
+                <button
+                  type="submit"
+                  className="viewing-modal-btn viewing-modal-btn--primary"
+                  disabled={actionLoading}
+                >
+                  {actionLoading ? 'Đang cập nhật...' : 'Hoàn tất'}
                 </button>
               </footer>
             </form>
