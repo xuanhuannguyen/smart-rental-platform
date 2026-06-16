@@ -17,5 +17,10 @@ namespace SmartRentalPlatform.Contracts.ViewingAppointments.Responses
         public DateTimeOffset? RespondedAt { get; set; }
         public DateTimeOffset CreatedAt { get; set; }
         public DateTimeOffset UpdatedAt { get; set; }
+
+        // Enriched fields (populated from navigation properties)
+        public string? RoomNumber { get; set; }
+        public string? RoomingHouseName { get; set; }
+        public string? TenantDisplayName { get; set; }
     }
 }

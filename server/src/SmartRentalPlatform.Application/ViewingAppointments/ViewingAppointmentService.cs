@@ -29,11 +29,12 @@ namespace SmartRentalPlatform.Application.ViewingAppointments
             CreateViewingAppointmentRequest request,
             CancellationToken cancellationToken = default)
         {
-            if (request.ScheduledAt <= DateTimeOffset.UtcNow)
+            // Minimum advance time: phải đặt trước ít nhất 2 giờ
+            if (request.ScheduledAt < DateTimeOffset.UtcNow.AddHours(2))
             {
                 throw new BadRequestException(
                     ErrorCodes.ViewingAppointmentTimeInPast,
-                    "Không thể đặt lịch xem phòng ở thời gian trong quá khứ.");
+                    "Thời gian hẹn phải cách hiện tại ít nhất 2 giờ.");
             }
 
             var room = await _context.Rooms
@@ -76,6 +77,29 @@ namespace SmartRentalPlatform.Application.ViewingAppointments
                     "Khu trọ chứa phòng này đang ở chế độ ẩn.");
             }
 
+            // Chặn landlord tự đặt lịch xem phòng chính mình
+            if (house.LandlordUserId == tenantUserId)
+            {
+                throw new BadRequestException(
+                    ErrorCodes.ViewingAppointmentNotAllowed,
+                    "Bạn không thể đặt lịch xem phòng trọ của chính mình.");
+            }
+
+            // Chặn duplicate: tenant đã có appointment Pending/Confirmed cho cùng room
+            var existingActive = await _context.ViewingAppointments
+                .AnyAsync(x => x.RoomId == request.RoomId
+                    && x.TenantUserId == tenantUserId
+                    && (x.Status == ViewingAppointmentStatus.Pending
+                        || x.Status == ViewingAppointmentStatus.Confirmed),
+                    cancellationToken);
+
+            if (existingActive)
+            {
+                throw new ConflictException(
+                    ErrorCodes.ViewingAppointmentDuplicate,
+                    "Bạn đã có lịch hẹn đang chờ duyệt hoặc đã xác nhận cho phòng này.");
+            }
+
             int duration = request.DurationMinutes ?? 30;
             if (duration <= 0)
             {
@@ -102,17 +126,32 @@ namespace SmartRentalPlatform.Application.ViewingAppointments
             _context.ViewingAppointments.Add(appointment);
             await _context.SaveChangesAsync(cancellationToken);
 
+            // Reload entity with navigation properties for enriched response
+            var savedAppointment = await _context.ViewingAppointments
+                .Include(x => x.Room)
+                .ThenInclude(r => r.RoomingHouse)
+                .Include(x => x.TenantUser)
+                .FirstAsync(x => x.Id == appointment.Id, cancellationToken);
+
             // Stub for sending notification to Landlord (BR-VIEW-CREATE-11)
             Console.WriteLine($"[Notification Stub] Notify landlord {house.LandlordUserId} about new viewing appointment {appointment.Id}");
 
-            return ViewingAppointmentMapper.ToResponse(appointment);
+            return ViewingAppointmentMapper.ToResponse(savedAppointment);
         }
 
         public async Task<List<ViewingAppointmentResponse>> GetMyAppointmentsAsync(
             Guid tenantUserId,
             CancellationToken cancellationToken = default)
         {
+            // Auto-expire Pending appointments that are past their scheduled time
+            await AutoExpirePendingAsync(
+                _context.ViewingAppointments.Where(x => x.TenantUserId == tenantUserId),
+                cancellationToken);
+
             var appointments = await _context.ViewingAppointments
+                .Include(x => x.Room)
+                .ThenInclude(r => r.RoomingHouse)
+                .Include(x => x.TenantUser)
                 .Where(x => x.TenantUserId == tenantUserId)
                 .OrderByDescending(x => x.CreatedAt)
                 .ToListAsync(cancellationToken);
@@ -125,9 +164,18 @@ namespace SmartRentalPlatform.Application.ViewingAppointments
             string? status = null,
             CancellationToken cancellationToken = default)
         {
+            // Auto-expire Pending appointments that are past their scheduled time
+            await AutoExpirePendingAsync(
+                _context.ViewingAppointments
+                    .Include(x => x.Room)
+                    .ThenInclude(r => r.RoomingHouse)
+                    .Where(x => x.Room.RoomingHouse.LandlordUserId == landlordUserId),
+                cancellationToken);
+
             var query = _context.ViewingAppointments
                 .Include(x => x.Room)
                 .ThenInclude(r => r.RoomingHouse)
+                .Include(x => x.TenantUser)
                 .Where(x => x.Room.RoomingHouse.LandlordUserId == landlordUserId);
 
             if (!string.IsNullOrWhiteSpace(status))
@@ -218,6 +266,7 @@ namespace SmartRentalPlatform.Application.ViewingAppointments
             var appointment = await _context.ViewingAppointments
                 .Include(x => x.Room)
                 .ThenInclude(r => r.RoomingHouse)
+                .Include(x => x.TenantUser)
                 .FirstOrDefaultAsync(x => x.Id == appointmentId && x.Room.RoomingHouse.LandlordUserId == landlordUserId, cancellationToken);
 
             if (appointment == null)
@@ -272,6 +321,7 @@ namespace SmartRentalPlatform.Application.ViewingAppointments
             var appointment = await _context.ViewingAppointments
                 .Include(x => x.Room)
                 .ThenInclude(r => r.RoomingHouse)
+                .Include(x => x.TenantUser)
                 .FirstOrDefaultAsync(x => x.Id == appointmentId && x.Room.RoomingHouse.LandlordUserId == landlordUserId, cancellationToken);
 
             if (appointment == null)
@@ -297,6 +347,7 @@ namespace SmartRentalPlatform.Application.ViewingAppointments
 
             appointment.Status = ViewingAppointmentStatus.Rejected;
             appointment.RespondedAt = DateTimeOffset.UtcNow;
+            // Lưu reject reason vào CancelReason (field dùng chung cho cả reject/cancel reason)
             appointment.CancelReason = request.RejectReason.Trim();
             appointment.UpdatedAt = DateTimeOffset.UtcNow;
 
@@ -317,6 +368,7 @@ namespace SmartRentalPlatform.Application.ViewingAppointments
             var appointment = await _context.ViewingAppointments
                 .Include(x => x.Room)
                 .ThenInclude(r => r.RoomingHouse)
+                .Include(x => x.TenantUser)
                 .FirstOrDefaultAsync(x => x.Id == appointmentId && x.TenantUserId == tenantUserId, cancellationToken);
 
             if (appointment == null)
@@ -335,6 +387,7 @@ namespace SmartRentalPlatform.Application.ViewingAppointments
 
             appointment.Status = ViewingAppointmentStatus.CancelledByTenant;
             appointment.CancelReason = request.CancelReason?.Trim();
+            appointment.RespondedAt = DateTimeOffset.UtcNow;
             appointment.UpdatedAt = DateTimeOffset.UtcNow;
 
             await _context.SaveChangesAsync(cancellationToken);
@@ -354,6 +407,7 @@ namespace SmartRentalPlatform.Application.ViewingAppointments
             var appointment = await _context.ViewingAppointments
                 .Include(x => x.Room)
                 .ThenInclude(r => r.RoomingHouse)
+                .Include(x => x.TenantUser)
                 .FirstOrDefaultAsync(x => x.Id == appointmentId && x.Room.RoomingHouse.LandlordUserId == landlordUserId, cancellationToken);
 
             if (appointment == null)
@@ -379,6 +433,7 @@ namespace SmartRentalPlatform.Application.ViewingAppointments
 
             appointment.Status = ViewingAppointmentStatus.CancelledByLandlord;
             appointment.CancelReason = request.CancelReason.Trim();
+            appointment.RespondedAt = DateTimeOffset.UtcNow;
             appointment.UpdatedAt = DateTimeOffset.UtcNow;
 
             await _context.SaveChangesAsync(cancellationToken);
@@ -397,6 +452,7 @@ namespace SmartRentalPlatform.Application.ViewingAppointments
             var appointment = await _context.ViewingAppointments
                 .Include(x => x.Room)
                 .ThenInclude(r => r.RoomingHouse)
+                .Include(x => x.TenantUser)
                 .FirstOrDefaultAsync(x => x.Id == appointmentId && x.Room.RoomingHouse.LandlordUserId == landlordUserId, cancellationToken);
 
             if (appointment == null)
@@ -429,6 +485,31 @@ namespace SmartRentalPlatform.Application.ViewingAppointments
             Console.WriteLine($"[Notification Stub] Notify tenant {appointment.TenantUserId} that appointment {appointment.Id} was completed.");
 
             return ViewingAppointmentMapper.ToResponse(appointment);
+        }
+
+        /// <summary>
+        /// Auto-expire Pending appointments whose ScheduledAt has already passed.
+        /// Called inline during list queries so no background job is needed.
+        /// </summary>
+        private async Task AutoExpirePendingAsync(
+            IQueryable<ViewingAppointment> scopedQuery,
+            CancellationToken cancellationToken)
+        {
+            var now = DateTimeOffset.UtcNow;
+            var expiredList = await scopedQuery
+                .Where(x => x.Status == ViewingAppointmentStatus.Pending && x.ScheduledAt <= now)
+                .ToListAsync(cancellationToken);
+
+            if (expiredList.Count == 0)
+                return;
+
+            foreach (var appt in expiredList)
+            {
+                appt.Status = ViewingAppointmentStatus.Expired;
+                appt.UpdatedAt = now;
+            }
+
+            await _context.SaveChangesAsync(cancellationToken);
         }
     }
 }

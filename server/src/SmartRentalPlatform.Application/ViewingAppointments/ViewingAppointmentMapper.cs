@@ -21,7 +21,10 @@ namespace SmartRentalPlatform.Application.ViewingAppointments
                 CancelReason = entity.CancelReason,
                 RespondedAt = entity.RespondedAt,
                 CreatedAt = entity.CreatedAt,
-                UpdatedAt = entity.UpdatedAt
+                UpdatedAt = entity.UpdatedAt,
+                RoomNumber = entity.Room?.RoomNumber,
+                RoomingHouseName = entity.Room?.RoomingHouse?.Name,
+                TenantDisplayName = entity.TenantUser?.DisplayName
             };
         }
     }

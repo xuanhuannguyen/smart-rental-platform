@@ -21,9 +21,10 @@ export interface ViewingAppointment {
   respondedAt?: string | null;
   createdAt: string;
   updatedAt: string;
-  // UI extended info (we will map them from responses if needed, or get them if room is included)
+  // UI extended info (populated from enriched server response)
   roomNumber?: string;
   roomingHouseName?: string;
+  tenantDisplayName?: string | null;
 }
 
 export interface CreateViewingAppointmentRequest {
