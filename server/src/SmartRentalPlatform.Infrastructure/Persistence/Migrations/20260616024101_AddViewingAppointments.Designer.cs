@@ -12,7 +12,7 @@ using SmartRentalPlatform.Infrastructure.Persistence;
 namespace SmartRentalPlatform.Infrastructure.Persistence.Migrations
 {
     [DbContext(typeof(AppDbContext))]
-    [Migration("20260611143733_AddViewingAppointments")]
+    [Migration("20260616024101_AddViewingAppointments")]
     partial class AddViewingAppointments
     {
         /// <inheritdoc />

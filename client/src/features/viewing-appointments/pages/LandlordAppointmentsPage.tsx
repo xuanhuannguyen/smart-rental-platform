@@ -8,7 +8,6 @@ import {
   cancelViewingAppointmentByLandlord,
   completeViewingAppointment,
 } from '../api';
-import { getMyRoomingHouses, getRoomingHouseDetail } from '../../rooming-houses/api';
 import type { ViewingAppointment, ViewingAppointmentStatus, ConflictCheckResponse } from '../types';
 import { Alert } from '../../../shared/components/ui/Alert';
 import { getApiErrorMessage } from '../../../shared/api/apiError';
@@ -18,7 +17,6 @@ import './LandlordAppointmentsPage.css';
 export default function LandlordAppointmentsPage() {
   const navigate = useNavigate();
   const [appointments, setAppointments] = useState<ViewingAppointment[]>([]);
-  const [roomMap, setRoomMap] = useState<Record<string, { roomNumber: string; houseName: string }>>({});
   const [conflictMap, setConflictMap] = useState<Record<string, ConflictCheckResponse>>({});
   const [activeTab, setActiveTab] = useState<'all' | 'pending' | 'confirmed' | 'history'>('pending');
   const [loading, setLoading] = useState(true);
@@ -29,6 +27,7 @@ export default function LandlordAppointmentsPage() {
   const [confirmingAppointment, setConfirmingAppointment] = useState<ViewingAppointment | null>(null);
   const [landlordNote, setLandlordNote] = useState('');
   const [confirmDespiteConflict, setConfirmDespiteConflict] = useState(false);
+  const [modalConflictLoading, setModalConflictLoading] = useState(false);
   
   const [rejectingId, setRejectingId] = useState<string | null>(null);
   const [rejectReason, setRejectReason] = useState('');
@@ -36,7 +35,11 @@ export default function LandlordAppointmentsPage() {
   const [cancellingId, setCancellingId] = useState<string | null>(null);
   const [cancelReason, setCancelReason] = useState('');
   
+  const [completingId, setCompletingId] = useState<string | null>(null);
+
   const [actionLoading, setActionLoading] = useState(false);
+  // Separate error state for modals so errors show inside the modal, not behind it
+  const [modalError, setModalError] = useState('');
 
   const loadData = async () => {
     setLoading(true);
@@ -45,25 +48,7 @@ export default function LandlordAppointmentsPage() {
       const appointmentsData = await getLandlordAppointments();
       setAppointments(appointmentsData);
 
-      // Load landlord room cache
-      const summaries = await getMyRoomingHouses();
-      const detailsList = await Promise.all(
-        summaries.map((house) => getRoomingHouseDetail(house.id).catch(() => null))
-      );
-      
-      const map: Record<string, { roomNumber: string; houseName: string }> = {};
-      detailsList.forEach((house) => {
-        if (!house) return;
-        (house.rooms ?? []).forEach((room) => {
-          map[room.id] = {
-            roomNumber: room.roomNumber,
-            houseName: house.name,
-          };
-        });
-      });
-      setRoomMap(map);
-
-      // Check conflicts for Pending appointments
+      // Check conflicts for Pending appointments (for card-level warning badges)
       const pendingApps = appointmentsData.filter((a) => a.status === 'Pending');
       const conflicts: Record<string, ConflictCheckResponse> = {};
       await Promise.all(
@@ -88,10 +73,21 @@ export default function LandlordAppointmentsPage() {
     void loadData();
   }, []);
 
-  const handleConfirmClick = (app: ViewingAppointment) => {
+  // Real-time conflict check when opening confirm modal
+  const handleConfirmClick = async (app: ViewingAppointment) => {
     setConfirmingAppointment(app);
     setLandlordNote('');
     setConfirmDespiteConflict(false);
+    setModalError('');
+    setModalConflictLoading(true);
+    try {
+      const freshConflict = await checkConflict(app.id);
+      setConflictMap(prev => ({ ...prev, [app.id]: freshConflict }));
+    } catch {
+      // If check fails, still allow modal to open (server will re-check on submit)
+    } finally {
+      setModalConflictLoading(false);
+    }
   };
 
   const handleConfirmSubmit = async (e: React.FormEvent) => {
@@ -100,12 +96,12 @@ export default function LandlordAppointmentsPage() {
 
     const hasConflict = conflictMap[confirmingAppointment.id]?.hasConflict;
     if (hasConflict && !confirmDespiteConflict) {
-      setError('Bạn cần đánh dấu đồng ý xác nhận mặc dù lịch trùng giờ.');
+      setModalError('Bạn cần đánh dấu đồng ý xác nhận mặc dù lịch trùng giờ.');
       return;
     }
 
     setActionLoading(true);
-    setError('');
+    setModalError('');
     try {
       await confirmViewingAppointment(confirmingAppointment.id, {
         confirmDespiteConflict: !!hasConflict && confirmDespiteConflict,
@@ -116,7 +112,7 @@ export default function LandlordAppointmentsPage() {
       void loadData();
       setTimeout(() => setSuccess(''), 5000);
     } catch (err) {
-      setError(getApiErrorMessage(err, 'Không thể xác nhận lịch hẹn.'));
+      setModalError(getApiErrorMessage(err, 'Không thể xác nhận lịch hẹn.'));
     } finally {
       setActionLoading(false);
     }
@@ -125,6 +121,7 @@ export default function LandlordAppointmentsPage() {
   const handleRejectClick = (id: string) => {
     setRejectingId(id);
     setRejectReason('');
+    setModalError('');
   };
 
   const handleRejectSubmit = async (e: React.FormEvent) => {
@@ -132,7 +129,7 @@ export default function LandlordAppointmentsPage() {
     if (!rejectingId || !rejectReason.trim()) return;
 
     setActionLoading(true);
-    setError('');
+    setModalError('');
     try {
       await rejectViewingAppointment(rejectingId, {
         rejectReason: rejectReason.trim(),
@@ -142,7 +139,7 @@ export default function LandlordAppointmentsPage() {
       void loadData();
       setTimeout(() => setSuccess(''), 5000);
     } catch (err) {
-      setError(getApiErrorMessage(err, 'Không thể từ chối lịch hẹn.'));
+      setModalError(getApiErrorMessage(err, 'Không thể từ chối lịch hẹn.'));
     } finally {
       setActionLoading(false);
     }
@@ -151,6 +148,7 @@ export default function LandlordAppointmentsPage() {
   const handleCancelClick = (id: string) => {
     setCancellingId(id);
     setCancelReason('');
+    setModalError('');
   };
 
   const handleCancelSubmit = async (e: React.FormEvent) => {
@@ -158,7 +156,7 @@ export default function LandlordAppointmentsPage() {
     if (!cancellingId || !cancelReason.trim()) return;
 
     setActionLoading(true);
-    setError('');
+    setModalError('');
     try {
       await cancelViewingAppointmentByLandlord(cancellingId, {
         cancelReason: cancelReason.trim(),
@@ -168,22 +166,33 @@ export default function LandlordAppointmentsPage() {
       void loadData();
       setTimeout(() => setSuccess(''), 5000);
     } catch (err) {
-      setError(getApiErrorMessage(err, 'Không thể hủy lịch hẹn.'));
+      setModalError(getApiErrorMessage(err, 'Không thể hủy lịch hẹn.'));
     } finally {
       setActionLoading(false);
     }
   };
 
-  const handleCompleteClick = async (id: string) => {
-    if (!window.confirm('Đánh dấu buổi xem phòng trọ đã hoàn tất?')) return;
-    setError('');
+  const handleCompleteClick = (id: string) => {
+    setCompletingId(id);
+    setModalError('');
+  };
+
+  const handleCompleteSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!completingId) return;
+
+    setActionLoading(true);
+    setModalError('');
     try {
-      await completeViewingAppointment(id);
+      await completeViewingAppointment(completingId);
       setSuccess('Đánh dấu hoàn thành buổi xem phòng thành công.');
+      setCompletingId(null);
       void loadData();
       setTimeout(() => setSuccess(''), 5000);
     } catch (err) {
-      setError(getApiErrorMessage(err, 'Không thể đánh dấu hoàn thành.'));
+      setModalError(getApiErrorMessage(err, 'Không thể đánh dấu hoàn thành.'));
+    } finally {
+      setActionLoading(false);
     }
   };
 
@@ -271,9 +280,9 @@ export default function LandlordAppointmentsPage() {
         ) : (
           <div className="landlord-appointments-list">
             {filteredAppointments.map((item) => {
-              const details = roomMap[item.roomId];
-              const houseName = details?.houseName ?? 'Khu trọ';
-              const roomNumber = details?.roomNumber ?? 'phòng';
+              const houseName = item.roomingHouseName ?? 'Khu trọ';
+              const roomNumber = item.roomNumber ?? 'phòng';
+              const tenantName = item.tenantDisplayName ?? `Khách ${item.tenantUserId.substring(0, 8)}`;
               const conflict = conflictMap[item.id];
               const isPast = isAppointmentInPast(item.scheduledAt);
 
@@ -282,7 +291,7 @@ export default function LandlordAppointmentsPage() {
                   <div className="landlord-card__header">
                     <div>
                       <h3>{houseName} - Phòng {roomNumber}</h3>
-                      <p className="tenant-info">👤 Khách hẹn: {item.tenantUserId.substring(0, 8)}...</p>
+                      <p className="tenant-info">👤 Khách hẹn: {tenantName}</p>
                     </div>
                     <span className={`status-tag status-tag--${item.status.toLowerCase()}`}>
                       {getStatusText(item.status)}
@@ -344,7 +353,7 @@ export default function LandlordAppointmentsPage() {
         )}
       </main>
 
-      {/* Confirm Modal Dialouge */}
+      {/* Confirm Modal */}
       {confirmingAppointment && (
         <div className="viewing-modal-overlay" onClick={() => setConfirmingAppointment(null)}>
           <div className="viewing-modal-container" onClick={(e) => e.stopPropagation()}>
@@ -355,7 +364,11 @@ export default function LandlordAppointmentsPage() {
               </button>
             </header>
             <form onSubmit={handleConfirmSubmit} className="viewing-modal-form">
-              {conflictMap[confirmingAppointment.id]?.hasConflict && (
+              {modalError && <div className="viewing-modal-error">{modalError}</div>}
+
+              {modalConflictLoading ? (
+                <div className="modal-conflict-loading">Đang kiểm tra lịch trùng giờ...</div>
+              ) : conflictMap[confirmingAppointment.id]?.hasConflict && (
                 <div className="modal-conflict-alert">
                   <p>⚠️ <strong>Chú ý:</strong> Lịch hẹn này đang bị trùng giờ hẹn với lịch đã xác nhận khác của bạn.</p>
                   <label className="checkbox-field">
@@ -394,7 +407,7 @@ export default function LandlordAppointmentsPage() {
                 <button
                   type="submit"
                   className="viewing-modal-btn viewing-modal-btn--primary"
-                  disabled={actionLoading}
+                  disabled={actionLoading || modalConflictLoading}
                 >
                   {actionLoading ? 'Đang xác nhận...' : 'Xác nhận duyệt'}
                 </button>
@@ -404,7 +417,7 @@ export default function LandlordAppointmentsPage() {
         </div>
       )}
 
-      {/* Reject Modal Dialogue */}
+      {/* Reject Modal */}
       {rejectingId && (
         <div className="viewing-modal-overlay" onClick={() => setRejectingId(null)}>
           <div className="viewing-modal-container" onClick={(e) => e.stopPropagation()}>
@@ -415,6 +428,8 @@ export default function LandlordAppointmentsPage() {
               </button>
             </header>
             <form onSubmit={handleRejectSubmit} className="viewing-modal-form">
+              {modalError && <div className="viewing-modal-error">{modalError}</div>}
+
               <div className="viewing-modal-field">
                 <label htmlFor="rejectReasonInput">Lý do từ chối <span className="required">*</span></label>
                 <textarea
@@ -451,7 +466,7 @@ export default function LandlordAppointmentsPage() {
         </div>
       )}
 
-      {/* Cancel Modal Dialogue */}
+      {/* Cancel Modal */}
       {cancellingId && (
         <div className="viewing-modal-overlay" onClick={() => setCancellingId(null)}>
           <div className="viewing-modal-container" onClick={(e) => e.stopPropagation()}>
@@ -462,6 +477,8 @@ export default function LandlordAppointmentsPage() {
               </button>
             </header>
             <form onSubmit={handleCancelSubmit} className="viewing-modal-form">
+              {modalError && <div className="viewing-modal-error">{modalError}</div>}
+
               <div className="viewing-modal-field">
                 <label htmlFor="cancelReasonInput">Lý do hủy lịch <span className="required">*</span></label>
                 <textarea
@@ -491,6 +508,42 @@ export default function LandlordAppointmentsPage() {
                   disabled={actionLoading || !cancelReason.trim()}
                 >
                   {actionLoading ? 'Đang hủy...' : 'Hủy lịch hẹn'}
+                </button>
+              </footer>
+            </form>
+          </div>
+        </div>
+      )}
+      {/* Complete Modal */}
+      {completingId && (
+        <div className="viewing-modal-overlay" onClick={() => setCompletingId(null)}>
+          <div className="viewing-modal-container" onClick={(e) => e.stopPropagation()}>
+            <header className="viewing-modal-header">
+              <h2>Xác nhận hoàn tất</h2>
+              <button className="viewing-modal-close-btn" onClick={() => setCompletingId(null)}>
+                &times;
+              </button>
+            </header>
+            <form onSubmit={handleCompleteSubmit} className="viewing-modal-form">
+              {modalError && <div className="viewing-modal-error">{modalError}</div>}
+              <div className="viewing-modal-field">
+                <p>Đánh dấu buổi xem phòng trọ đã diễn ra thành công?</p>
+              </div>
+              <footer className="viewing-modal-footer">
+                <button
+                  type="button"
+                  className="viewing-modal-btn viewing-modal-btn--secondary"
+                  onClick={() => setCompletingId(null)}
+                  disabled={actionLoading}
+                >
+                  Hủy bỏ
+                </button>
+                <button
+                  type="submit"
+                  className="viewing-modal-btn viewing-modal-btn--primary"
+                  disabled={actionLoading}
+                >
+                  {actionLoading ? 'Đang cập nhật...' : 'Hoàn tất'}
                 </button>
               </footer>
             </form>
