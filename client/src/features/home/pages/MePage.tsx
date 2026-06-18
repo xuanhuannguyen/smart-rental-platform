@@ -223,137 +223,137 @@ export function MePage() {
             </form>
 
             <div className="home-header-location" ref={locationPanelRef}>
-          <button
-            type="button"
-            className={`home-location-button ${activeLocationMode ? 'is-active' : ''}`}
-            onClick={() => setActiveLocationMode((current) => (current ? null : 'area'))}
-            aria-expanded={activeLocationMode != null}
-          >
-            <span>{locationButtonLabel}</span>
-            <span>{activeLocationMode ? '▲' : '▼'}</span>
-          </button>
-
-          {activeLocationMode && (
-            <div className="home-location-panel" role="dialog" aria-label="Tùy chọn vị trí tìm kiếm">
               <button
                 type="button"
-                className="home-location-close"
-                onClick={() => setActiveLocationMode(null)}
-                aria-label="Đóng bộ lọc vị trí"
+                className={`home-location-button ${activeLocationMode ? 'is-active' : ''}`}
+                onClick={() => setActiveLocationMode((current) => (current ? null : 'area'))}
+                aria-expanded={activeLocationMode != null}
               >
-                ×
+                <span>{locationButtonLabel}</span>
+                <span>{activeLocationMode ? '▲' : '▼'}</span>
               </button>
 
-              {activeLocationMode === 'nearby' ? (
-                <>
-                  <div className="home-location-subheader">
-                    <button type="button" onClick={() => setActiveLocationMode('area')}>‹</button>
-                    <strong>Nhập vị trí quanh bạn</strong>
-                  </div>
-                  <div className="home-location-field">
-                    <label htmlFor="home-nearby-address">Vị trí tìm kiếm</label>
-                    <input
-                      id="home-nearby-address"
-                      value={nearbyAddress}
-                      onChange={(event) => {
-                        setNearbyAddress(event.target.value);
-                        setNearbyError('');
-                      }}
-                      placeholder="Nhập địa chỉ, tên trường, tên đường..."
-                    />
-                  </div>
-                  <div className="home-location-field">
-                    <label htmlFor="home-nearby-radius">Bán kính: {nearbyRadiusKm} km</label>
-                    <input
-                      id="home-nearby-radius"
-                      type="range"
-                      min="0.5"
-                      max="30"
-                      step="0.5"
-                      value={nearbyRadiusKm}
-                      onChange={(event) => setNearbyRadiusKm(Number(event.target.value))}
-                    />
-                  </div>
-                  {nearbyError && <p className="home-location-error">{nearbyError}</p>}
-                </>
-              ) : (
-                <>
-                  <section className="home-location-section">
-                    <button type="button" className="home-location-heading" onClick={() => setActiveLocationMode('nearby')}>
-                      <span>◎</span>
-                      <strong>Tìm kiếm quanh bạn</strong>
-                    </button>
-                    <button type="button" className="home-nearby-trigger" onClick={() => setActiveLocationMode('nearby')}>
-                      <span>{nearbyAddress || 'Nhập vị trí và khoảng cách tìm kiếm'}</span>
-                      <span>›</span>
-                    </button>
-                  </section>
+              {activeLocationMode && (
+                <div className="home-location-panel" role="dialog" aria-label="Tùy chọn vị trí tìm kiếm">
+                  <button
+                    type="button"
+                    className="home-location-close"
+                    onClick={() => setActiveLocationMode(null)}
+                    aria-label="Đóng bộ lọc vị trí"
+                  >
+                    ×
+                  </button>
 
-                  <section className="home-location-section">
-                    <div className="home-location-heading">
-                      <span>▦</span>
-                      <strong>Tìm theo khu vực</strong>
-                    </div>
-                    <div className="home-location-chips">
-                      {quickLocationProvinces.map((province) => (
-                        <button
-                          key={province.code}
-                          type="button"
-                          className={localProvinceCode === province.code ? 'is-selected' : ''}
-                          onClick={() => {
-                            setLocalProvinceCode(province.code);
-                            setLocalWardCode('');
+                  {activeLocationMode === 'nearby' ? (
+                    <>
+                      <div className="home-location-subheader">
+                        <button type="button" onClick={() => setActiveLocationMode('area')}>‹</button>
+                        <strong>Nhập vị trí quanh bạn</strong>
+                      </div>
+                      <div className="home-location-field">
+                        <label htmlFor="home-nearby-address">Vị trí tìm kiếm</label>
+                        <input
+                          id="home-nearby-address"
+                          value={nearbyAddress}
+                          onChange={(event) => {
+                            setNearbyAddress(event.target.value);
+                            setNearbyError('');
                           }}
-                        >
-                          {province.name}
+                          placeholder="Nhập địa chỉ, tên trường, tên đường..."
+                        />
+                      </div>
+                      <div className="home-location-field">
+                        <label htmlFor="home-nearby-radius">Bán kính: {nearbyRadiusKm} km</label>
+                        <input
+                          id="home-nearby-radius"
+                          type="range"
+                          min="0.5"
+                          max="30"
+                          step="0.5"
+                          value={nearbyRadiusKm}
+                          onChange={(event) => setNearbyRadiusKm(Number(event.target.value))}
+                        />
+                      </div>
+                      {nearbyError && <p className="home-location-error">{nearbyError}</p>}
+                    </>
+                  ) : (
+                    <>
+                      <section className="home-location-section">
+                        <button type="button" className="home-location-heading" onClick={() => setActiveLocationMode('nearby')}>
+                          <span>◎</span>
+                          <strong>Tìm kiếm quanh bạn</strong>
                         </button>
-                      ))}
-                    </div>
-                    <label className="home-location-select-card" htmlFor="home-location-province">
-                      <span>
-                        <strong>Chọn tỉnh thành</strong>
-                        <small>{selectedProvinceName || 'Tất cả tỉnh/thành phố'}</small>
-                      </span>
-                      <span>›</span>
-                      <select
-                        id="home-location-province"
-                        value={localProvinceCode}
-                        onChange={(event) => {
-                          setLocalProvinceCode(event.target.value);
-                          setLocalWardCode('');
-                        }}
-                      >
-                        <option value="">Tất cả tỉnh/thành phố</option>
-                        {provinces.map((province) => (
-                          <option key={province.code} value={province.code}>
-                            {province.name}
-                          </option>
-                        ))}
-                      </select>
-                    </label>
-                    <label className="home-location-select-card" htmlFor="home-location-ward">
-                      <span>
-                        <strong>Chọn khu vực</strong>
-                        <small>{selectedWardName || 'Tất cả khu vực trong tỉnh/thành'}</small>
-                      </span>
-                      <span>›</span>
-                      <select
-                        id="home-location-ward"
-                        value={localWardCode}
-                        disabled={!localProvinceCode}
-                        onChange={(event) => setLocalWardCode(event.target.value)}
-                      >
-                        <option value="">Tất cả khu vực trong tỉnh/thành</option>
-                        {wards.map((ward) => (
-                          <option key={ward.code} value={ward.code}>
-                            {ward.name}
-                          </option>
-                        ))}
-                      </select>
-                    </label>
-                  </section>
-                </>
-              )}
+                        <button type="button" className="home-nearby-trigger" onClick={() => setActiveLocationMode('nearby')}>
+                          <span>{nearbyAddress || 'Nhập vị trí và khoảng cách tìm kiếm'}</span>
+                          <span>›</span>
+                        </button>
+                      </section>
+
+                      <section className="home-location-section">
+                        <div className="home-location-heading">
+                          <span>▦</span>
+                          <strong>Tìm theo khu vực</strong>
+                        </div>
+                        <div className="home-location-chips">
+                          {quickLocationProvinces.map((province) => (
+                            <button
+                              key={province.code}
+                              type="button"
+                              className={localProvinceCode === province.code ? 'is-selected' : ''}
+                              onClick={() => {
+                                setLocalProvinceCode(province.code);
+                                setLocalWardCode('');
+                              }}
+                            >
+                              {province.name}
+                            </button>
+                          ))}
+                        </div>
+                        <label className="home-location-select-card" htmlFor="home-location-province">
+                          <span>
+                            <strong>Chọn tỉnh thành</strong>
+                            <small>{selectedProvinceName || 'Tất cả tỉnh/thành phố'}</small>
+                          </span>
+                          <span>›</span>
+                          <select
+                            id="home-location-province"
+                            value={localProvinceCode}
+                            onChange={(event) => {
+                              setLocalProvinceCode(event.target.value);
+                              setLocalWardCode('');
+                            }}
+                          >
+                            <option value="">Tất cả tỉnh/thành phố</option>
+                            {provinces.map((province) => (
+                              <option key={province.code} value={province.code}>
+                                {province.name}
+                              </option>
+                            ))}
+                          </select>
+                        </label>
+                        <label className="home-location-select-card" htmlFor="home-location-ward">
+                          <span>
+                            <strong>Chọn khu vực</strong>
+                            <small>{selectedWardName || 'Tất cả khu vực trong tỉnh/thành'}</small>
+                          </span>
+                          <span>›</span>
+                          <select
+                            id="home-location-ward"
+                            value={localWardCode}
+                            disabled={!localProvinceCode}
+                            onChange={(event) => setLocalWardCode(event.target.value)}
+                          >
+                            <option value="">Tất cả khu vực trong tỉnh/thành</option>
+                            {wards.map((ward) => (
+                              <option key={ward.code} value={ward.code}>
+                                {ward.name}
+                              </option>
+                            ))}
+                          </select>
+                        </label>
+                      </section>
+                    </>
+                  )}
 
                   <div className="home-location-actions">
                     <Button type="button" variant="secondary" onClick={handleClearHeaderLocation}>Xóa lọc</Button>

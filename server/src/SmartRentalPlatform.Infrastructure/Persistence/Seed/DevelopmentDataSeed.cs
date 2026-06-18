@@ -1,8 +1,12 @@
 using Microsoft.EntityFrameworkCore;
 using SmartRentalPlatform.Application.Common.Interfaces;
+using SmartRentalPlatform.Domain.Entities.Billing;
+using SmartRentalPlatform.Domain.Entities.Leasing;
 using SmartRentalPlatform.Domain.Entities.Properties;
 using SmartRentalPlatform.Domain.Entities.Users;
+using SmartRentalPlatform.Domain.Entities.Wallets;
 using SmartRentalPlatform.Domain.Enums;
+using SmartRentalPlatform.Domain.Enums.Billing;
 
 namespace SmartRentalPlatform.Infrastructure.Persistence.Seed;
 
@@ -20,9 +24,29 @@ public static class DevelopmentDataSeed
     private static readonly Guid CoTenantUserId = Guid.Parse("10000000-0000-0000-0000-000000000003");
     private static readonly Guid ApprovedHouseId = Guid.Parse("20000000-0000-0000-0000-000000000001");
     private static readonly Guid DraftHouseId = Guid.Parse("20000000-0000-0000-0000-000000000002");
+    private static readonly Guid SunriseHouseId = Guid.Parse("20000000-0000-0000-0000-000000000003");
+    private static readonly Guid GreenViewHouseId = Guid.Parse("20000000-0000-0000-0000-000000000004");
+    private static readonly Guid PendingHouseId = Guid.Parse("20000000-0000-0000-0000-000000000005");
+    private static readonly Guid RejectedHouseId = Guid.Parse("20000000-0000-0000-0000-000000000006");
     private static readonly Guid Room101Id = Guid.Parse("30000000-0000-0000-0000-000000000101");
     private static readonly Guid Room102Id = Guid.Parse("30000000-0000-0000-0000-000000000102");
     private static readonly Guid Room201Id = Guid.Parse("30000000-0000-0000-0000-000000000201");
+    private static readonly Guid Room202Id = Guid.Parse("30000000-0000-0000-0000-000000000202");
+    private static readonly Guid Room301Id = Guid.Parse("30000000-0000-0000-0000-000000000301");
+    private static readonly Guid SunriseRoomA1Id = Guid.Parse("30000000-0000-0000-0000-000000000401");
+    private static readonly Guid SunriseRoomA2Id = Guid.Parse("30000000-0000-0000-0000-000000000402");
+    private static readonly Guid SunriseRoomB1Id = Guid.Parse("30000000-0000-0000-0000-000000000403");
+    private static readonly Guid GreenViewRoom101Id = Guid.Parse("30000000-0000-0000-0000-000000000501");
+    private static readonly Guid GreenViewRoom102Id = Guid.Parse("30000000-0000-0000-0000-000000000502");
+    private static readonly Guid PendingRoomG1Id = Guid.Parse("30000000-0000-0000-0000-000000000601");
+    private static readonly Guid ActiveContractId = Guid.Parse("50000000-0000-0000-0000-000000000001");
+    private static readonly Guid LinhContractId = Guid.Parse("50000000-0000-0000-0000-000000000002");
+    private static readonly Guid MinhEndedContractId = Guid.Parse("50000000-0000-0000-0000-000000000003");
+    private static readonly Guid TenantWalletAccountId = Guid.Parse("70000000-0000-0000-0000-000000000001");
+    private static readonly Guid LandlordWalletAccountId = Guid.Parse("70000000-0000-0000-0000-000000000002");
+    private static readonly Guid TenantLinhWalletAccountId = Guid.Parse("70000000-0000-0000-0000-000000000003");
+    private static readonly Guid TenantMinhWalletAccountId = Guid.Parse("70000000-0000-0000-0000-000000000004");
+    private static readonly Guid LandlordMaiWalletAccountId = Guid.Parse("70000000-0000-0000-0000-000000000005");
     private static readonly DateTimeOffset SeededAt = new(2026, 1, 1, 0, 0, 0, TimeSpan.Zero);
 
     public static async Task SeedAsync(
@@ -40,6 +64,8 @@ public static class DevelopmentDataSeed
         await SeedApprovedKycAsync(context, cancellationToken);
         await SeedRoomingHousesAsync(context, location, cancellationToken);
         await SeedRoomsAsync(context, cancellationToken);
+        await SeedAdditionalRoomsAsync(context, cancellationToken);
+        await SeedBillingAsync(context, cancellationToken);
     }
 
     public static async Task SeedAdminAsync(
@@ -124,6 +150,33 @@ public static class DevelopmentDataSeed
                 CreatedAt = SeededAt
             });
         }
+
+        await SeedDemoUserAsync(
+            context,
+            passwordService,
+            TenantLinhUserId,
+            "linh.tenant.demo@example.com",
+            "Pham Linh",
+            RoleSeed.TenantRoleId,
+            cancellationToken);
+
+        await SeedDemoUserAsync(
+            context,
+            passwordService,
+            TenantMinhUserId,
+            "minh.tenant.demo@example.com",
+            "Le Minh",
+            RoleSeed.TenantRoleId,
+            cancellationToken);
+
+        await SeedDemoUserAsync(
+            context,
+            passwordService,
+            LandlordMaiUserId,
+            "mai.landlord.demo@example.com",
+            "Hoang Mai",
+            RoleSeed.LandlordRoleId,
+            cancellationToken);
 
         await context.SaveChangesAsync(cancellationToken);
     }
@@ -287,7 +340,148 @@ public static class DevelopmentDataSeed
             });
         }
 
+        await SeedRoomingHouseAsync(
+            context,
+            location,
+            SunriseHouseId,
+            LandlordUserId,
+            "Sunrise Mini House",
+            "Can ho mini moi, gan khu cong nghe va sieu thi, phu hop sinh vien va nhan vien van phong.",
+            "88 Duong So 7",
+            10.841021m,
+            106.809847m,
+            RoomingHouseApprovalStatus.Approved,
+            RoomingHouseVisibilityStatus.Visible,
+            "demo/houses/sunrise/cover.jpg",
+            "Mat tien Sunrise Mini House",
+            cancellationToken,
+            AmenitySeed.WifiId,
+            AmenitySeed.ParkingId,
+            AmenitySeed.SecurityCameraId,
+            AmenitySeed.AirConditionerId);
+
+        await SeedRoomingHouseAsync(
+            context,
+            location,
+            GreenViewHouseId,
+            LandlordMaiUserId,
+            "Green View Residence",
+            "Khu tro yen tinh, co ban cong, may giat chung va khu de xe rieng.",
+            "12 Pham Van Dong",
+            10.821903m,
+            106.682179m,
+            RoomingHouseApprovalStatus.Approved,
+            RoomingHouseVisibilityStatus.Visible,
+            "demo/houses/green-view/cover.jpg",
+            "Khong gian chung Green View Residence",
+            cancellationToken,
+            AmenitySeed.WifiId,
+            AmenitySeed.WashingMachineId,
+            AmenitySeed.BalconyId,
+            AmenitySeed.ParkingId);
+
+        await SeedRoomingHouseAsync(
+            context,
+            location,
+            PendingHouseId,
+            LandlordMaiUserId,
+            "Garden House Pending",
+            "Ho so nha tro dang cho admin duyet, dung de test luong kiem duyet.",
+            "36 Nguyen Huu Tho",
+            10.732681m,
+            106.702184m,
+            RoomingHouseApprovalStatus.Pending,
+            RoomingHouseVisibilityStatus.Hidden,
+            "demo/houses/garden-pending/cover.jpg",
+            "Anh tong quan Garden House Pending",
+            cancellationToken,
+            AmenitySeed.WifiId,
+            AmenitySeed.PrivateBathroomId);
+
+        await SeedRoomingHouseAsync(
+            context,
+            location,
+            RejectedHouseId,
+            LandlordUserId,
+            "Old Town Rooms",
+            "Ho so bi tu choi de test man hinh ly do va gui lai ho so.",
+            "7 Tran Hung Dao",
+            10.776901m,
+            106.700914m,
+            RoomingHouseApprovalStatus.Rejected,
+            RoomingHouseVisibilityStatus.Hidden,
+            "demo/houses/old-town/cover.jpg",
+            "Anh hien trang Old Town Rooms",
+            cancellationToken,
+            AmenitySeed.WifiId,
+            AmenitySeed.ParkingId);
+
         await context.SaveChangesAsync(cancellationToken);
+    }
+
+    private static async Task SeedRoomingHouseAsync(
+        AppDbContext context,
+        SeedLocation location,
+        Guid roomingHouseId,
+        Guid landlordUserId,
+        string name,
+        string description,
+        string addressLine,
+        decimal latitude,
+        decimal longitude,
+        RoomingHouseApprovalStatus approvalStatus,
+        RoomingHouseVisibilityStatus visibilityStatus,
+        string coverObjectKey,
+        string coverCaption,
+        CancellationToken cancellationToken,
+        params int[] amenityIds)
+    {
+        if (await context.RoomingHouses.AnyAsync(x => x.Id == roomingHouseId, cancellationToken))
+        {
+            return;
+        }
+
+        var reviewedAt = approvalStatus is RoomingHouseApprovalStatus.Approved or RoomingHouseApprovalStatus.Rejected
+            ? SeededAt
+            : (DateTimeOffset?)null;
+
+        context.RoomingHouses.Add(new RoomingHouse
+        {
+            Id = roomingHouseId,
+            LandlordUserId = landlordUserId,
+            Name = name,
+            Description = description,
+            AddressLine = addressLine,
+            ProvinceCode = location.ProvinceCode,
+            WardCode = location.WardCode,
+            AddressDisplay = $"{addressLine}, {location.WardName}, {location.ProvinceName}",
+            Latitude = latitude,
+            Longitude = longitude,
+            ApprovalStatus = approvalStatus,
+            VisibilityStatus = visibilityStatus,
+            RejectedReason = approvalStatus == RoomingHouseApprovalStatus.Rejected
+                ? "Anh giay to chua ro va dia chi chua khop voi ho so."
+                : null,
+            ReviewedByAdminId = reviewedAt.HasValue ? AdminUserId : null,
+            ReviewedAt = reviewedAt,
+            CreatedAt = SeededAt,
+            UpdatedAt = SeededAt
+        });
+
+        context.RoomingHouseAmenities.AddRange(
+            amenityIds.Distinct().Select(amenityId => CreateHouseAmenity(roomingHouseId, amenityId)));
+
+        context.PropertyImages.Add(new PropertyImage
+        {
+            Id = Guid.NewGuid(),
+            RoomingHouseId = roomingHouseId,
+            ObjectKey = coverObjectKey,
+            ImageUrl = $"/uploads/{coverObjectKey}",
+            Caption = coverCaption,
+            IsCover = true,
+            SortOrder = 1,
+            CreatedAt = SeededAt
+        });
     }
 
     private static async Task SeedRoomsAsync(AppDbContext context, CancellationToken cancellationToken)
@@ -413,6 +607,56 @@ public static class DevelopmentDataSeed
             CreatedAt = SeededAt,
             UpdatedAt = SeededAt
         };
+    }
+
+    private static Room CreateRoom(
+        Guid roomingHouseId,
+        Guid id,
+        string roomNumber,
+        int floor,
+        decimal areaM2,
+        int maxOccupants,
+        RoomStatus status)
+    {
+        var room = CreateRoom(id, roomNumber, floor, areaM2, maxOccupants, status);
+        room.RoomingHouseId = roomingHouseId;
+        room.Description = $"Phong {roomNumber} mock data cho nha tro demo.";
+        room.IsTieredPricing = maxOccupants > 1;
+        return room;
+    }
+
+    private static void AddRoomMockDetails(AppDbContext context, Room room)
+    {
+        var amenityIds = room.Id switch
+        {
+            var id when id == Room202Id => new[] { AmenitySeed.WifiId, AmenitySeed.PrivateBathroomId },
+            var id when id == Room301Id => new[] { AmenitySeed.WifiId, AmenitySeed.AirConditionerId, AmenitySeed.BalconyId },
+            var id when id == SunriseRoomA1Id => new[] { AmenitySeed.WifiId, AmenitySeed.PrivateBathroomId },
+            var id when id == SunriseRoomA2Id => new[] { AmenitySeed.WifiId, AmenitySeed.AirConditionerId },
+            var id when id == SunriseRoomB1Id => new[] { AmenitySeed.WifiId, AmenitySeed.MezzanineId, AmenitySeed.BalconyId },
+            var id when id == GreenViewRoom101Id => new[] { AmenitySeed.WifiId, AmenitySeed.WashingMachineId },
+            var id when id == GreenViewRoom102Id => new[] { AmenitySeed.WifiId, AmenitySeed.PrivateBathroomId, AmenitySeed.BalconyId },
+            _ => new[] { AmenitySeed.WifiId }
+        };
+
+        context.RoomAmenities.AddRange(
+            amenityIds.Distinct().Select(amenityId => CreateRoomAmenity(room.Id, amenityId)));
+
+        for (var occupantCount = 1; occupantCount <= room.MaxOccupants; occupantCount++)
+        {
+            var baseRent = room.RoomingHouseId == GreenViewHouseId ? 3200000m : 2600000m;
+            var areaPremium = (room.AreaM2 ?? 18m) * 35000m;
+            context.RoomPriceTiers.Add(CreatePriceTier(
+                room.Id,
+                occupantCount,
+                baseRent + areaPremium + ((occupantCount - 1) * 450000m)));
+        }
+
+        var imageSlug = room.RoomNumber.ToLowerInvariant().Replace("-", string.Empty);
+        context.PropertyImages.Add(CreateRoomImage(
+            room.Id,
+            $"demo/rooms/{imageSlug}/cover.jpg",
+            $"Phong {room.RoomNumber}"));
     }
 
     private static RoomPriceTier CreatePriceTier(Guid roomId, int occupantCount, decimal monthlyRent)

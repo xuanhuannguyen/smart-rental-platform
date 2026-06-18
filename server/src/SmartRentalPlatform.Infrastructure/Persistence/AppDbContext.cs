@@ -2,10 +2,13 @@ using Microsoft.EntityFrameworkCore;
 using SmartRentalPlatform.Application.Common.Interfaces;
 using SmartRentalPlatform.Domain.Entities.AdminApproval;
 using SmartRentalPlatform.Domain.Entities.Administrative;
+using SmartRentalPlatform.Domain.Entities.AdminApproval;
+using SmartRentalPlatform.Domain.Entities.Billing;
 using SmartRentalPlatform.Domain.Entities.RentalContracts;
 using SmartRentalPlatform.Domain.Entities.Properties;
 using SmartRentalPlatform.Domain.Entities.Rental;
 using SmartRentalPlatform.Domain.Entities.Users;
+using SmartRentalPlatform.Domain.Entities.Wallets;
 
 
 namespace SmartRentalPlatform.Infrastructure.Persistence;
@@ -40,6 +43,14 @@ public class AppDbContext : DbContext, IAppDbContext
     public DbSet<RoomingHouseRule> RoomingHouseRules => Set<RoomingHouseRule>();
     public DbSet<RentalPolicy> RentalPolicies => Set<RentalPolicy>();
     public DbSet<ApprovalAuditLog> ApprovalAuditLogs => Set<ApprovalAuditLog>();
+    // Billing
+    public DbSet<BillingServiceType> BillingServiceTypes => Set<BillingServiceType>();
+    public DbSet<RoomingHouseServicePrice> RoomingHouseServicePrices => Set<RoomingHouseServicePrice>();
+    public DbSet<MeterReading> MeterReadings => Set<MeterReading>();
+    public DbSet<Invoice> Invoices => Set<Invoice>();
+    public DbSet<InvoiceItem> InvoiceItems => Set<InvoiceItem>();
+    public DbSet<InvoicePayment> InvoicePayments => Set<InvoicePayment>();
+    // VeiwingAppointment
     public DbSet<ViewingAppointment> ViewingAppointments => Set<ViewingAppointment>();
     // Rental
     public DbSet<RentalRequest> RentalRequests => Set<RentalRequest>();
@@ -52,6 +63,7 @@ public class AppDbContext : DbContext, IAppDbContext
     public DbSet<ContractAppendixChange> ContractAppendixChanges => Set<ContractAppendixChange>();
     public DbSet<ContractFile> ContractFiles => Set<ContractFile>();
     public DbSet<ContractSignature> ContractSignatures => Set<ContractSignature>();
+
 
     public async Task<IAppDbContextTransaction> BeginTransactionAsync(CancellationToken cancellationToken = default)
     {

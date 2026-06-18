@@ -5,6 +5,8 @@ using SmartRentalPlatform.Domain.Entities.RentalContracts;
 using SmartRentalPlatform.Domain.Entities.Properties;
 using SmartRentalPlatform.Domain.Entities.Rental;
 using SmartRentalPlatform.Domain.Entities.Users;
+using SmartRentalPlatform.Domain.Entities.Billing;
+
 
 namespace SmartRentalPlatform.Application.Common.Interfaces;
 
@@ -68,6 +70,18 @@ public interface IAppDbContext {
     DbSet<ContractFile> ContractFiles { get; }
 
     DbSet<ContractSignature> ContractSignatures { get; }
+
+    DbSet<BillingServiceType> BillingServiceTypes { get; }
+
+    DbSet<RoomingHouseServicePrice> RoomingHouseServicePrices { get; }
+
+    DbSet<MeterReading> MeterReadings { get; }
+
+    DbSet<Invoice> Invoices { get; }
+
+    DbSet<InvoiceItem> InvoiceItems { get; }
+
+    DbSet<InvoicePayment> InvoicePayments { get; }
 
     DbSet<ViewingAppointment> ViewingAppointments { get; }
 

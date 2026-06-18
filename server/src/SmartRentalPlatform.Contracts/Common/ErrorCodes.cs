@@ -88,6 +88,16 @@ public static class ErrorCodes
     public const string ContractAppendixAlreadySigned = "CONTRACT_APPENDIX_ALREADY_SIGNED";
     public const string ContractAppendixCreatorMustSignFirst = "CONTRACT_APPENDIX_CREATOR_MUST_SIGN_FIRST";
 
+    // Billing
+    public const string BillingServiceInvalid = "BILLING_SERVICE_INVALID";
+    public const string BillingPriceInvalid = "BILLING_PRICE_INVALID";
+    public const string BillingPriceNotFound = "BILLING_PRICE_NOT_FOUND";
+    public const string MeterReadingInvalid = "METER_READING_INVALID";
+    public const string MeterReadingNotFound = "METER_READING_NOT_FOUND";
+    public const string InvoiceNotFound = "INVOICE_NOT_FOUND";
+    public const string InvoiceInvalidStatus = "INVOICE_INVALID_STATUS";
+    public const string InvoiceDuplicatePeriod = "INVOICE_DUPLICATE_PERIOD";
+
     // Viewing Appointment
     public const string ViewingAppointmentNotFound = "VIEWING_APPOINTMENT_NOT_FOUND";
     public const string ViewingAppointmentInvalidStatus = "VIEWING_APPOINTMENT_INVALID_STATUS";
