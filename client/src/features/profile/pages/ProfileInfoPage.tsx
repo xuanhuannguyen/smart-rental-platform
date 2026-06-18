@@ -190,18 +190,21 @@ export function ProfileInfoPage() {
   }
 
   return (
-    <section className="profile-section" style={{ padding: 0, boxShadow: 'none', background: 'transparent', minHeight: 'auto' }}>
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px' }}>
-        <h1 style={{ fontSize: '1.5rem', fontWeight: 700, margin: 0 }}>Thông tin hồ sơ</h1>
-        {!isEditingProfile && !isLoading && (
-          <Button type="button" onClick={() => setIsEditingProfile(true)}>
-            Chỉnh sửa
-          </Button>
-        )}
-      </div>
-      <p className="subtle" style={{ color: '#64748b', marginBottom: '24px' }}>
-        Cập nhật thông tin cá nhân và thông tin liên hệ của bạn bên dưới.
-      </p>
+    <div>
+      <section className="overview-band">
+        <div className="overview-left">
+          <p className="eyebrow">TÀI KHOẢN</p>
+          <h2>Thông tin hồ sơ</h2>
+          <p className="overview-description">Cập nhật thông tin cá nhân và thông tin liên hệ của bạn bên dưới.</p>
+        </div>
+        <div className="overview-right">
+          {!isEditingProfile && !isLoading && (
+            <Button type="button" onClick={() => setIsEditingProfile(true)}>
+              Chỉnh sửa
+            </Button>
+          )}
+        </div>
+      </section>
 
       {isLoading ? <LoadingState message="Đang tải hồ sơ..." /> : null}
 
@@ -484,6 +487,6 @@ export function ProfileInfoPage() {
           }}
         />
       )}
-    </section>
+    </div>
   );
 }

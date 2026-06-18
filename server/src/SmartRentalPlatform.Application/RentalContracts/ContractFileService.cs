@@ -45,7 +45,7 @@ public class ContractFileService : IContractFileService
         }
 
         EnsureCanAccess(userId, contract);
-        EnsureCanGenerateSignedFile(contract);
+        EnsureCanGenerateSignedFile(userId, contract);
 
         var now = DateTimeOffset.UtcNow;
         var rawFile = await EnsureContractFileVariantAsync(
@@ -281,6 +281,7 @@ public class ContractFileService : IContractFileService
     private static void EnsureCanAccess(Guid userId, RentalContract contract)
     {
         if (contract.Room.RoomingHouse.LandlordUserId == userId ||
+            GetCurrentMainTenantUserId(contract) == userId ||
             GetMainTenantUserIds(contract).Contains(userId) ||
             contract.Occupants.Any(x => x.UserId == userId))
         {
@@ -289,37 +290,8 @@ public class ContractFileService : IContractFileService
 
         throw new ForbiddenException(
             ErrorCodes.RentalContractForbidden,
-            "B蘯｡n khﾃｴng cﾃｳ quy盻］ truy c蘯ｭp file h盻｣p ﾄ黛ｻ渡g nﾃy.",
+            "Bạn không có quyền truy cập file hợp đồng này.",
             new { contract.Id });
-    }
-
-    private static IReadOnlyCollection<Guid> GetMainTenantUserIds(RentalContract contract)
-    {
-        var userIds = new HashSet<Guid> { contract.MainTenantUserId };
-
-        foreach (var appendix in contract.Appendices
-            .Where(x => x.Status == ContractAppendixStatus.Active)
-            .OrderBy(x => x.ActivatedAt ?? x.UpdatedAt)
-            .ThenBy(x => x.CreatedAt))
-        {
-            foreach (var change in appendix.Changes)
-            {
-                if (change.TargetType != ContractAppendixTargetType.Contract ||
-                    change.ChangeType != ContractAppendixChangeType.Update ||
-                    NormalizeFieldName(change.FieldName) != "maintenantuserid")
-                {
-                    continue;
-                }
-
-                var userId = ExtractUserId(change.NewValue);
-                if (userId.HasValue)
-                {
-                    userIds.Add(userId.Value);
-                }
-            }
-        }
-
-        return userIds;
     }
 
     private static void EnsureCanViewFile(Guid userId, RentalContract contract, ContractFile file)
@@ -331,7 +303,7 @@ public class ContractFileService : IContractFileService
 
         throw new ForbiddenException(
             ErrorCodes.RentalContractForbidden,
-            "B蘯｡n khﾃｴng cﾃｳ quy盻］ truy c蘯ｭp file h盻｣p ﾄ黛ｻ渡g nﾃy.",
+            "Bạn không có quyền truy cập file hợp đồng này.",
             new { contractId = contract.Id, fileId = file.Id });
     }
 
@@ -452,6 +424,33 @@ public class ContractFileService : IContractFileService
         return currentMainTenantUserId;
     }
 
+    private static IReadOnlyCollection<Guid> GetMainTenantUserIds(RentalContract contract)
+    {
+        var userIds = new HashSet<Guid> { contract.MainTenantUserId };
+
+        foreach (var appendix in contract.Appendices
+            .Where(x => x.Status == ContractAppendixStatus.Active)
+            .OrderBy(x => x.ActivatedAt ?? x.UpdatedAt)
+            .ThenBy(x => x.CreatedAt))
+        {
+            foreach (var change in appendix.Changes.OrderBy(x => x.SortOrder))
+            {
+                if (!IsMainTenantUserIdChange(change))
+                {
+                    continue;
+                }
+
+                var newMainTenantUserId = ExtractUserId(change.NewValue);
+                if (newMainTenantUserId.HasValue)
+                {
+                    userIds.Add(newMainTenantUserId.Value);
+                }
+            }
+        }
+
+        return userIds;
+    }
+
     private static bool IsMainTenantChangedToUser(ContractAppendix appendix, Guid userId)
     {
         return appendix.Changes.Any(change =>
@@ -524,13 +523,22 @@ public class ContractFileService : IContractFileService
             : value.Replace("_", string.Empty, StringComparison.Ordinal).Trim().ToLowerInvariant();
     }
 
-    private static void EnsureCanGenerateSignedFile(RentalContract contract)
+    private static void EnsureCanGenerateSignedFile(Guid userId, RentalContract contract)
     {
+        if (contract.Room.RoomingHouse.LandlordUserId != userId &&
+            GetCurrentMainTenantUserId(contract) != userId)
+        {
+            throw new ForbiddenException(
+                ErrorCodes.RentalContractForbidden,
+                "Chỉ chủ trọ hoặc người thuê chính hiện tại được tạo file PDF hợp đồng.",
+                new { contract.Id });
+        }
+
         if (contract.Status != RentalContractStatus.Active)
         {
             throw new ConflictException(
                 ErrorCodes.RentalContractInvalidStatus,
-                "Ch盻・cﾃｳ th盻・t蘯｡o file PDF khi h盻｣p ﾄ黛ｻ渡g ﾄ妥｣ cﾃｳ hi盻㎡ l盻ｱc.",
+                "Chỉ có thể tạo file PDF khi hợp đồng đã có hiệu lực.",
                 new { contract.Id, currentStatus = contract.Status.ToString() });
         }
 
@@ -544,7 +552,7 @@ public class ContractFileService : IContractFileService
 
         throw new ConflictException(
             ErrorCodes.RentalContractInvalidStatus,
-            "H盻｣p ﾄ黛ｻ渡g ph蘯｣i cﾃｳ ﾄ黛ｻｧ ch盻ｯ kﾃｽ c盻ｧa ch盻ｧ tr盻・vﾃ ngﾆｰ盻拱 thuﾃｪ trﾆｰ盻嫩 khi t蘯｡o file PDF.",
+            "Hợp đồng phải có đủ chữ ký của chủ trọ và người thuê trước khi tạo file PDF.",
             new { contract.Id });
     }
 

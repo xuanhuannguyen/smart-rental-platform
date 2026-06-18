@@ -1,0 +1,187 @@
+.tenant-request-detail-container {
+  padding: 24px;
+  background: #ffffff;
+  border: 1px solid #dce4ef;
+  border-radius: 12px;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.03);
+}
+
+.request-detail-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  margin-bottom: 24px;
+  padding-bottom: 16px;
+  border-bottom: 1px solid #e2e8f0;
+}
+
+.request-detail-title h1 {
+  font-size: 1.5rem;
+  color: #1e293b;
+  margin: 0 0 8px 0;
+}
+
+.request-detail-title p {
+  color: #64748b;
+  margin: 0;
+}
+
+.request-detail-body {
+  display: flex;
+  flex-direction: column;
+  gap: 24px;
+}
+
+.request-info-card {
+  background: #f8fafc;
+  padding: 20px;
+  border-radius: 8px;
+  border: 1px solid #e2e8f0;
+}
+
+.request-info-card h3 {
+  margin-top: 0;
+  margin-bottom: 16px;
+  font-size: 1.1rem;
+  color: #334155;
+  border-bottom: 1px solid #e2e8f0;
+  padding-bottom: 8px;
+}
+
+.request-info-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+  gap: 16px;
+}
+
+.info-item {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.info-item .label {
+  font-size: 0.875rem;
+  color: #64748b;
+}
+
+.info-item .value {
+  font-size: 1rem;
+  color: #0f172a;
+  font-weight: 500;
+}
+
+.reject-reason-box {
+  background: #fef2f2;
+  border: 1px solid #fecaca;
+  padding: 16px;
+  border-radius: 8px;
+  color: #991b1b;
+}
+
+.status-badge {
+  padding: 6px 12px;
+  border-radius: 9999px;
+  font-size: 0.85rem;
+  font-weight: 600;
+  white-space: nowrap;
+}
+
+.status-badge.success {
+  background: #dcfce7;
+  color: #166534;
+}
+
+.status-badge.pending,
+.status-badge.warning {
+  background: #fef3c7;
+  color: #92400e;
+}
+
+.status-badge.danger {
+  background: #fee2e2;
+  color: #991b1b;
+}
+
+.status-badge.neutral {
+  background: #ffffff;
+  color: #475569;
+  border: 1px solid #e2e8f0;
+}
+
+.info-box, .deposit-box, .contract-box {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 16px;
+  background: #fff;
+  border: 1px solid #e2e8f0;
+  padding: 16px;
+  border-radius: 8px;
+}
+
+.deposit-box.status-neutral,
+.contract-box.status-neutral {
+  border-color: #e2e8f0;
+  background: #ffffff;
+}
+
+.deposit-box.status-warning,
+.contract-box.status-warning {
+  border-color: #facc15;
+  background: #fefce8;
+}
+
+.deposit-box.status-success,
+.contract-box.status-success {
+  border-color: #86efac;
+  background: #f0fdf4;
+}
+
+.deposit-box.status-danger,
+.contract-box.status-danger {
+  border-color: #fca5a5;
+  background: #fef2f2;
+}
+
+/* --- IN PROGRESS (BLUE) --- */
+.deposit-box.PendingPayment,
+.contract-box.WaitingTenantOccupants,
+.contract-box.PendingLandlordSignature,
+.contract-box.PendingTenantSignature,
+.contract-box.LandlordRevisionRequested,
+.contract-box.TenantRevisionRequested {
+  border-color: #bfdbfe;
+  background: #eff6ff;
+}
+
+/* --- DONE (GREEN) --- */
+.deposit-box.Paid,
+.deposit-box.Refunded,
+.contract-box.Active {
+  border-color: #86efac;
+  background: #f0fdf4;
+}
+
+/* --- FAILED/REJECTED (RED) --- */
+.deposit-box.Forfeited,
+.contract-box.Rejected {
+  border-color: #fca5a5;
+  background: #fef2f2;
+}
+
+/* --- NO CONTRACT --- */
+.contract-box.NoContract {
+  border-color: #e2e8f0;
+  background: #f8fafc;
+}
+
+.action-bar {
+  margin-top: 32px;
+  display: flex;
+  gap: 16px;
+  justify-content: flex-end;
+  border-top: 1px solid #e2e8f0;
+  padding-top: 24px;
+}

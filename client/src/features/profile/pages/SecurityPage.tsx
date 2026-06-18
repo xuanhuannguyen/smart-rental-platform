@@ -233,9 +233,14 @@ export function SecurityPage() {
   }
 
   return (
-    <section className="profile-section" style={{ padding: 0, boxShadow: 'none', background: 'transparent', minHeight: 'auto' }}>
-      <h1 style={{ fontSize: '1.5rem', fontWeight: 700, margin: 0, marginBottom: '8px' }}>Quản lý bảo mật</h1>
-      <p className="subtle" style={{ color: '#64748b', marginBottom: '24px' }}>Chọn cách đổi mật khẩu phù hợp với tình trạng tài khoản của bạn.</p>
+    <div>
+      <section className="overview-band">
+        <div className="overview-left">
+          <p className="eyebrow">TÀI KHOẢN</p>
+          <h2>Quản lý bảo mật</h2>
+          <p className="overview-description">Quản lý mật khẩu và các thiết bị đã đăng nhập của bạn</p>
+        </div>
+      </section>
 
       <div className="mode-tabs" style={{ marginBottom: '24px', display: 'flex', gap: '12px' }}>
         <button
@@ -298,7 +303,7 @@ export function SecurityPage() {
       {securityMessage ? <Alert type="success">{securityMessage}</Alert> : null}
 
       {securityMode === 'current-password' && (
-        <form className="auth-form" onSubmit={handleChangeWithCurrentPassword}>
+        <form className="auth-form" style={{ maxWidth: '500px' }} onSubmit={handleChangeWithCurrentPassword}>
           <FormField label="Mật khẩu hiện tại" htmlFor="change-current-password">
             <input
               id="change-current-password"
@@ -338,7 +343,7 @@ export function SecurityPage() {
       )}
 
       {securityMode === 'email-otp' && (
-        <div className="auth-form">
+        <div className="auth-form" style={{ maxWidth: '500px' }}>
           <FormField label="Email" htmlFor="reset-email">
             <input
               id="reset-email"
@@ -471,6 +476,6 @@ export function SecurityPage() {
           )}
         </div>
       )}
-    </section>
+    </div>
   );
 }

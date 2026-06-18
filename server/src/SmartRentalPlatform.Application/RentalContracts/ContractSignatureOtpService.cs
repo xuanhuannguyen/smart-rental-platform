@@ -118,17 +118,19 @@ public class ContractSignatureOtpService : IContractSignatureOtpService
         ContractSignerRole signerRole,
         CancellationToken cancellationToken = default)
     {
+        await context.ContractAppendices
+            .Include(x => x.Changes)
+            .Where(x => x.RentalContractId == contractId && x.Status == ContractAppendixStatus.Active)
+            .LoadAsync(cancellationToken);
+
         var appendix = await context.ContractAppendices
-            .AsNoTracking()
+            .AsTracking()
             .Include(x => x.RentalContract)
                 .ThenInclude(x => x.Room)
                     .ThenInclude(x => x.RoomingHouse)
                         .ThenInclude(x => x.Landlord)
             .Include(x => x.RentalContract)
                 .ThenInclude(x => x.MainTenantUser)
-            .Include(x => x.RentalContract)
-                .ThenInclude(x => x.Appendices)
-                    .ThenInclude(x => x.Changes)
             .Include(x => x.Signatures)
             .FirstOrDefaultAsync(
                 x => x.Id == appendixId &&
@@ -206,6 +208,7 @@ public class ContractSignatureOtpService : IContractSignatureOtpService
         var now = DateTimeOffset.UtcNow;
 
         var token = await context.UserTokens
+            .AsTracking()
             .Where(x => x.UserId == userId &&
                         x.TokenType == TokenType.ContractSignatureOtp &&
                         x.TokenHash == tokenHash &&

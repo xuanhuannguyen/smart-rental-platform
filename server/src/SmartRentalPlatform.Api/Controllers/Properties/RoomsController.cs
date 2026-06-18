@@ -7,8 +7,8 @@ using SmartRentalPlatform.Contracts.Common;
 using SmartRentalPlatform.Contracts.PropertyImages;
 using SmartRentalPlatform.Contracts.RoomPriceTiers;
 using SmartRentalPlatform.Contracts.Rooms;
-
-namespace SmartRentalPlatform.Api.Controllers;
+using SmartRentalPlatform.Application.RentalContracts;
+using SmartRentalPlatform.Contracts.RentalContracts.Responses;
 
 [ApiController]
 [Route("api")]
@@ -20,6 +20,7 @@ public class RoomsController : ControllerBase
     private readonly IRoomPriceTierService roomPriceTierService;
     private readonly IRoomStatusService roomStatusService;
     private readonly ICurrentUserService currentUserService;
+    private readonly IRentalContractService rentalContractService;
 
     public RoomsController(
         IRoomQueryService roomQueryService,
@@ -27,7 +28,8 @@ public class RoomsController : ControllerBase
         IRoomMediaService roomMediaService,
         IRoomPriceTierService roomPriceTierService,
         IRoomStatusService roomStatusService,
-        ICurrentUserService currentUserService)
+        ICurrentUserService currentUserService,
+        IRentalContractService rentalContractService)
     {
         this.roomQueryService = roomQueryService;
         this.roomCommandService = roomCommandService;
@@ -35,6 +37,7 @@ public class RoomsController : ControllerBase
         this.roomPriceTierService = roomPriceTierService;
         this.roomStatusService = roomStatusService;
         this.currentUserService = currentUserService;
+        this.rentalContractService = rentalContractService;
     }
 
     [Authorize]
@@ -81,6 +84,60 @@ public class RoomsController : ControllerBase
         var userId = GetCurrentUserId();
         var result = await roomQueryService.GetByIdAsync(userId, id, cancellationToken);
         return RoomResult(result, "Tải thông tin phòng thành công.");
+    }
+
+    [Authorize]
+    [HttpGet("rooms/{id:guid}/active-contract")]
+    public async Task<ActionResult<ApiResponse<ContractDetailResponse>>> GetActiveContract(
+        Guid id,
+        CancellationToken cancellationToken)
+    {
+        var userId = GetCurrentUserId();
+        var result = await rentalContractService.GetActiveContractByRoomIdAsync(userId, id, cancellationToken);
+        
+        if (result is null)
+        {
+            return NotFound(new ApiErrorResponse
+            {
+                Success = false,
+                ErrorCode = ErrorCodes.RentalContractNotFound,
+                Message = "Không tìm thấy hợp đồng đang active của phòng này."
+            });
+        }
+
+        return Ok(new ApiResponse<ContractDetailResponse>
+        {
+            Success = true,
+            Message = "Tải thông tin hợp đồng thành công.",
+            Data = result
+        });
+    }
+
+    [Authorize]
+    [HttpGet("rooms/{id:guid}/tenants")]
+    public async Task<ActionResult<ApiResponse<IReadOnlyCollection<ContractOccupantResponse>>>> GetActiveTenants(
+        Guid id,
+        CancellationToken cancellationToken)
+    {
+        var userId = GetCurrentUserId();
+        var result = await rentalContractService.GetActiveTenantsByRoomIdAsync(userId, id, cancellationToken);
+
+        if (result is null)
+        {
+            return NotFound(new ApiErrorResponse
+            {
+                Success = false,
+                ErrorCode = ErrorCodes.RentalContractNotFound,
+                Message = "Không tìm thấy hợp đồng đang active của phòng này."
+            });
+        }
+
+        return Ok(new ApiResponse<IReadOnlyCollection<ContractOccupantResponse>>
+        {
+            Success = true,
+            Message = "Tải danh sách người ở thành công.",
+            Data = result
+        });
     }
 
     [Authorize]

@@ -86,6 +86,7 @@ public static class ErrorCodes
     public const string ContractAppendixNotFound = "CONTRACT_APPENDIX_NOT_FOUND";
     public const string ContractAppendixInvalidStatus = "CONTRACT_APPENDIX_INVALID_STATUS";
     public const string ContractAppendixAlreadySigned = "CONTRACT_APPENDIX_ALREADY_SIGNED";
+    public const string ContractAppendixCreatorMustSignFirst = "CONTRACT_APPENDIX_CREATOR_MUST_SIGN_FIRST";
 
     // Viewing Appointment
     public const string ViewingAppointmentNotFound = "VIEWING_APPOINTMENT_NOT_FOUND";

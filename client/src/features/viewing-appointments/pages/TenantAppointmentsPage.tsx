@@ -111,14 +111,13 @@ export default function TenantAppointmentsPage() {
 
   return (
     <div className="tenant-appointments-page">
-      <header className="appointments-header">
-        <div className="appointments-header__container">
-          <button className="back-btn" onClick={() => navigate('/home')}>
-            ← Quay về Trang chủ
-          </button>
-          <h1>Lịch hẹn xem phòng của tôi</h1>
+      <section className="overview-band">
+        <div className="overview-left">
+          <p className="eyebrow">QUẢN LÝ</p>
+          <h2>Lịch hẹn xem phòng của tôi</h2>
+          <p className="overview-description">Theo dõi và quản lý các lịch hẹn xem phòng của bạn</p>
         </div>
-      </header>
+      </section>
 
       <main className="appointments-container">
         {error && <Alert type="error">{error}</Alert>}

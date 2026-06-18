@@ -4,6 +4,8 @@ import { rentalRequestApi } from '../api';
 import { ROUTE_PATHS } from '../../../app/router/routePaths';
 import { Alert } from '../../../shared/components/ui/Alert';
 import { Button } from '../../../shared/components/ui/Button';
+import { ContractOccupantsSetupModal } from '../../rental-contracts/components/ContractOccupantsSetupModal';
+import { ContractPreviewModal } from '../../rental-contracts/components/ContractPreviewModal';
 import './TenantRentalRequestsPage.css';
 
 interface RoomDeposit {
@@ -24,7 +26,7 @@ interface RentalRequest {
   createdAt: string;
   rejectedReason?: string | null;
   deposit?: RoomDeposit | null;
-  contract?: { id: string; status: string; } | null;
+  contract?: { id: string; status: string; signatureDeadlineAt?: string | null; statusReason?: string | null; } | null;
 }
 
 function getStatusTone(status: string) {
@@ -56,6 +58,9 @@ export function TenantRentalRequestsPage() {
   const [requests, setRequests] = useState<RentalRequest[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
+  const [selectedContractIdForSetup, setSelectedContractIdForSetup] = useState<string | null>(null);
+  const [previewContractId, setPreviewContractId] = useState<string | null>(null);
+  const [activeTab, setActiveTab] = useState('all');
   const navigate = useNavigate();
 
   const fetchRequests = async () => {
@@ -77,7 +82,7 @@ export function TenantRentalRequestsPage() {
     if (!window.confirm('Bạn có chắc chắn muốn hủy yêu cầu thuê này?')) {
       return;
     }
-    
+
     try {
       await rentalRequestApi.cancelRentalRequest(id);
       void fetchRequests();
@@ -101,22 +106,35 @@ export function TenantRentalRequestsPage() {
       case 'Pending':
         return <span className="status-badge pending">Chờ duyệt</span>;
       case 'Accepted':
-        return <span className="status-badge accepted">Được chấp nhận</span>;
+        return <span className="status-badge accepted">Chấp nhận</span>;
       case 'Rejected':
-        return <span className="status-badge rejected">Bị từ chối</span>;
+        return <span className="status-badge rejected">Từ chối</span>;
       case 'Cancelled':
         return <span className="status-badge cancelled">Đã hủy</span>;
+      case 'Expired':
+        return <span className="status-badge neutral">Hết hạn</span>;
       default:
         return <span className="status-badge">{status}</span>;
     }
   };
 
+  const filteredRequests = requests.filter(req => {
+    if (activeTab === 'all') return true;
+    return req.status === activeTab;
+  });
+
   return (
     <div className="tenant-requests-container">
-      <h2 className="page-title">Yêu cầu thuê của bạn</h2>
-      
+      <section className="overview-band">
+        <div className="overview-left">
+          <p className="eyebrow">QUẢN LÝ</p>
+          <h2>Yêu cầu thuê phòng</h2>
+          <p className="overview-description">Theo dõi trạng thái các yêu cầu thuê phòng của bạn</p>
+        </div>
+      </section>
+
       {error && <div style={{ marginBottom: 16 }}><Alert type="error">{error}</Alert></div>}
-      
+
       {loading ? (
         <p>Đang tải dữ liệu...</p>
       ) : requests.length === 0 ? (
@@ -124,8 +142,30 @@ export function TenantRentalRequestsPage() {
           <p>Bạn chưa gửi yêu cầu thuê phòng nào.</p>
         </div>
       ) : (
-        <div className="requests-list">
-          {requests.map(req => (
+        <>
+          <div className="tabs-navigation">
+            <button className={activeTab === 'all' ? 'active' : ''} onClick={() => setActiveTab('all')}>
+              Tất cả
+            </button>
+            <button className={activeTab === 'Pending' ? 'active' : ''} onClick={() => setActiveTab('Pending')}>
+              Chờ duyệt
+            </button>
+            <button className={activeTab === 'Accepted' ? 'active' : ''} onClick={() => setActiveTab('Accepted')}>
+              Chấp nhận
+            </button>
+            <button className={activeTab === 'Rejected' ? 'active' : ''} onClick={() => setActiveTab('Rejected')}>
+              Từ chối
+            </button>
+            <button className={activeTab === 'Cancelled' ? 'active' : ''} onClick={() => setActiveTab('Cancelled')}>
+              Đã hủy
+            </button>
+            <button className={activeTab === 'Expired' ? 'active' : ''} onClick={() => setActiveTab('Expired')}>
+              Hết hạn
+            </button>
+          </div>
+          
+          <div className="requests-list">
+            {filteredRequests.map(req => (
             <div key={req.id} className="request-card">
               <div className="request-header">
                 <h3>Phòng {req.roomNumber} - {req.roomingHouseName}</h3>
@@ -135,82 +175,39 @@ export function TenantRentalRequestsPage() {
                 <p><strong>Ngày gửi:</strong> {new Date(req.createdAt).toLocaleDateString('vi-VN')}</p>
                 <p><strong>Số người ở:</strong> {req.expectedOccupantCount} người</p>
                 <p><strong>Giá thuê dự kiến:</strong> {req.monthlyRentSnapshot.toLocaleString()} đ/tháng</p>
-                
-                {req.status === 'Rejected' && req.rejectedReason && (
-                  <div className="reject-reason">
-                    <strong>Lý do từ chối:</strong> {req.rejectedReason}
-                  </div>
-                )}
-                
-                {req.deposit && (
-                  <div className={`deposit-info ${getStatusTone(req.deposit.status)}`}>
-                    <p>
-                      <strong>Trạng thái cọc:</strong>{' '}
-                      <span className={`status-badge ${getStatusTone(req.deposit.status)}`}>
-                        {formatDepositStatus(req.deposit.status)}
-                      </span>
-                    </p>
-                    <p><strong>Số tiền cọc:</strong> {req.deposit.depositAmount.toLocaleString()} đ</p>
-                    
-                    {req.deposit.status === 'PendingPayment' && req.deposit.paymentDeadlineAt && (
-                      <p><strong>Hạn thanh toán:</strong> {new Date(req.deposit.paymentDeadlineAt).toLocaleString('vi-VN')}</p>
-                    )}
-                    
-                    {req.deposit.status === 'Paid' && req.deposit.paidAt && (
-                      <p><strong>Thanh toán lúc:</strong> {new Date(req.deposit.paidAt).toLocaleString('vi-VN')}</p>
-                    )}
-                    
-                    {req.deposit.status === 'PendingPayment' && (
-                      <div style={{ marginTop: 12 }}>
-                        <Button onClick={() => void handlePayDeposit(req.deposit!.id)}>
-                          Thanh toán cọc
-                        </Button>
-                      </div>
-                    )}
-
-                    {req.deposit.status === 'Paid' && req.contract?.id && (
-                      <div style={{ marginTop: 12 }}>
-                        {['PendingLandlordSignature', 'PendingTenantSignature', 'TenantRevisionRequested', 'LandlordRevisionRequested', 'Active', 'Rejected'].includes(req.contract.status) ? (
-                          <div className={`contract-status-info ${getStatusTone(req.contract.status)}`}>
-                            <p style={{ margin: 0, fontSize: '0.9rem' }}>
-                              <strong>Hợp đồng:</strong> {
-                                req.contract.status === 'PendingLandlordSignature' ? 'Đã gửi thông tin người ở. Đang chờ chủ trọ tạo và ký hợp đồng.' :
-                                req.contract.status === 'LandlordRevisionRequested' ? 'Chủ trọ yêu cầu bạn chỉnh sửa thông tin người ở.' :
-                                req.contract.status === 'PendingTenantSignature' ? 'Chủ trọ đã ký. Bạn cần ký hợp đồng (Sắp ra mắt).' :
-                                req.contract.status === 'TenantRevisionRequested' ? 'Đã gửi yêu cầu sửa đổi đến chủ trọ.' :
-                                req.contract.status === 'Active' ? 'Hợp đồng đã có hiệu lực.' :
-                                req.contract.status === 'Rejected' ? 'Hợp đồng đã bị hủy.' : req.contract.status
-                              }
-                            </p>
-                            {req.contract.status === 'LandlordRevisionRequested' && (
-                              <div style={{ marginTop: 8 }}>
-                                <Button onClick={() => navigate(ROUTE_PATHS.ACCOUNT.CONTRACT_SETUP(req.contract!.id))}>
-                                  Chỉnh sửa thông tin người ở
-                                </Button>
-                              </div>
-                            )}
-                          </div>
-                        ) : (
-                          <Button onClick={() => navigate(ROUTE_PATHS.ACCOUNT.CONTRACT_SETUP(req.contract!.id))}>
-                            Nhập thông tin người ở để tạo hợp đồng
-                          </Button>
-                        )}
-                      </div>
-                    )}
-                  </div>
-                )}
-
-                {req.status === 'Pending' && (
-                  <div style={{ marginTop: 16 }}>
-                    <Button variant="secondary" onClick={() => void handleCancel(req.id)}>
-                      Hủy yêu cầu
-                    </Button>
-                  </div>
-                )}
+              </div>
+              <div className="request-card-footer" style={{ borderTop: '1px solid #e2e8f0', marginTop: '16px', paddingTop: '16px', display: 'flex', justifyContent: 'flex-end' }}>
+                <Button onClick={() => navigate(ROUTE_PATHS.ACCOUNT.RENTAL_REQUEST_DETAIL(req.id))}>
+                  Xem chi tiết
+                </Button>
               </div>
             </div>
           ))}
         </div>
+        </>
+      )}
+
+      {selectedContractIdForSetup && (
+        <ContractOccupantsSetupModal
+          contractId={selectedContractIdForSetup}
+          onClose={() => setSelectedContractIdForSetup(null)}
+          onSuccess={() => {
+            setSelectedContractIdForSetup(null);
+            void fetchRequests();
+          }}
+        />
+      )}
+
+      {previewContractId && (
+        <ContractPreviewModal
+          contractId={previewContractId}
+          role="tenant"
+          onClose={() => setPreviewContractId(null)}
+          onSuccess={() => {
+            setPreviewContractId(null);
+            void fetchRequests();
+          }}
+        />
       )}
     </div>
   );

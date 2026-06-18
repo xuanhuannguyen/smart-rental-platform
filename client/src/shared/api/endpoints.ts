@@ -64,6 +64,7 @@ export const ENDPOINTS = {
     MARK_PAID: (id: string) => `/api/room-deposits/${id}/mark-paid`
   },
   CONTRACTS: {
+    MY_HISTORY: '/api/contracts/my-history',
     BY_ID: (id: string) => `/api/contracts/${id}`,
     PREVIEW: (id: string) => `/api/contracts/${id}/preview`,
     PREVIEW_PDF: (id: string) => `/api/contracts/${id}/preview/pdf`,
@@ -78,6 +79,7 @@ export const ENDPOINTS = {
     DOWNLOAD_FILE: (id: string, fileId: string) => `/api/contracts/${id}/files/${fileId}/download`,
     REVISION_REQUEST: (id: string) => `/api/contracts/${id}/revision-request`,
     REJECT: (id: string) => `/api/contracts/${id}/reject`,
+    TERMINATE: (id: string) => `/api/contracts/${id}/terminate`,
     APPENDICES: (id: string) => `/api/contracts/${id}/appendices`,
     APPENDIX_BY_ID: (id: string, appendixId: string) => `/api/contracts/${id}/appendices/${appendixId}`,
     APPENDIX_PREVIEW: (id: string, appendixId: string) => `/api/contracts/${id}/appendices/${appendixId}/preview/pdf`,

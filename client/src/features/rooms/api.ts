@@ -2,6 +2,7 @@ import { apiClient } from '../../shared/api/apiClient';
 import type { ApiResponse } from '../../shared/api/apiResponse.types';
 import type { PropertyImageRequest } from '../rooming-houses/types';
 import type { CreateRoomRequest, Room, RoomPriceTierRequest } from './types';
+import type { ContractDetailResponse, ContractOccupantResponse } from '../contracts/types';
 
 export async function createRoom(
   roomingHouseId: string,
@@ -69,6 +70,22 @@ export async function submitRoom(id: string): Promise<Room> {
   const data = await apiClient<ApiResponse<Room>>(
     `/api/rooms/${id}/submit`,
     { method: 'POST', auth: true }
+  );
+  return data.data;
+}
+
+export async function getActiveContractByRoomId(id: string): Promise<ContractDetailResponse> {
+  const data = await apiClient<ApiResponse<ContractDetailResponse>>(
+    `/api/rooms/${id}/active-contract`,
+    { auth: true }
+  );
+  return data.data;
+}
+
+export async function getActiveTenantsByRoomId(id: string): Promise<ContractOccupantResponse[]> {
+  const data = await apiClient<ApiResponse<ContractOccupantResponse[]>>(
+    `/api/rooms/${id}/tenants`,
+    { auth: true }
   );
   return data.data;
 }

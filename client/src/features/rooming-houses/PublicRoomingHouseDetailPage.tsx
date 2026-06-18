@@ -6,6 +6,7 @@ import HouseImageGallery from './components/HouseImageGallery';
 import type { RoomingHouseDetail } from './types';
 import { toAssetUrl } from '../../shared/api/assets';
 import { getApiErrorMessage } from '../../shared/api/apiError';
+import { HomeHeader } from '../../shared/components/layout/HomeHeader';
 import { ROUTE_PATHS } from '../../app/router/routePaths';
 import './PublicRoomingHouseDetailPage.css';
 
@@ -51,15 +52,23 @@ export default function PublicRoomingHouseDetailPage() {
   }, [id]);
 
   if (loading) {
-    return <main className="public-house-detail public-house-detail--state">Đang tải khu trọ...</main>;
+    return (
+      <>
+        <HomeHeader />
+        <main className="public-house-detail public-house-detail--state">Đang tải khu trọ...</main>
+      </>
+    );
   }
 
   if (error || !house) {
     return (
-      <main className="public-house-detail public-house-detail--state">
-        <p>{error || 'Không tìm thấy khu trọ.'}</p>
-        <Link to={fromSearch}>Quay về danh sách</Link>
-      </main>
+      <>
+        <HomeHeader />
+        <main className="public-house-detail public-house-detail--state">
+          <p>{error || 'Không tìm thấy khu trọ.'}</p>
+          <Link to={fromSearch}>Quay về danh sách</Link>
+        </main>
+      </>
     );
   }
 
@@ -69,10 +78,12 @@ export default function PublicRoomingHouseDetailPage() {
   const coverImage = houseImages.find((image) => image.isCover) ?? houseImages[0];
 
   return (
-    <main className="public-house-detail">
-      <Link className="public-house-detail__back" to={fromSearch}>
-        Quay về danh sách
-      </Link>
+    <>
+      <HomeHeader />
+      <main className="public-house-detail">
+        <Link className="public-house-detail__back" to={fromSearch}>
+          Quay về danh sách
+        </Link>
 
       <section className="public-house-detail__hero">
         <HouseImageGallery images={houseImages} houseName={house.name} />
@@ -166,6 +177,7 @@ export default function PublicRoomingHouseDetailPage() {
         )}
       </section>
     </main>
+    </>
   );
 }
 

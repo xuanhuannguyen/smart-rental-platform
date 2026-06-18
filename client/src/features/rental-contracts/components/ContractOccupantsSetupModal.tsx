@@ -1,7 +1,5 @@
 import { useEffect, useState } from 'react';
-import { useNavigate, useParams } from 'react-router-dom';
 import { useAuth } from '../../../app/providers/AuthProvider';
-import { ROUTE_PATHS } from '../../../app/router/routePaths';
 import { getApiErrorMessage } from '../../../shared/api/apiError';
 import { toAssetUrl } from '../../../shared/api/assets';
 import { Alert } from '../../../shared/components/ui/Alert';
@@ -9,7 +7,7 @@ import { Button } from '../../../shared/components/ui/Button';
 import { uploadImage } from '../../files/api';
 import { contractApi } from '../../contracts/api';
 import type { ContractDetailResponse, ContractOccupantResponse } from '../../contracts/types';
-import './ContractOccupantsSetupPage.css';
+import './ContractOccupantsSetupModal.css';
 
 interface OccupantForm {
   id: string;
@@ -100,9 +98,13 @@ function mapOccupantToForm(
   };
 }
 
-export function ContractOccupantsSetupPage() {
-  const { id: contractId } = useParams<{ id: string }>();
-  const navigate = useNavigate();
+interface ContractOccupantsSetupModalProps {
+  contractId: string;
+  onClose: () => void;
+  onSuccess: () => void;
+}
+
+export function ContractOccupantsSetupModal({ contractId, onClose, onSuccess }: ContractOccupantsSetupModalProps) {
   const { currentUser } = useAuth();
 
   const [contract, setContract] = useState<ContractDetailResponse | null>(null);
@@ -117,8 +119,6 @@ export function ContractOccupantsSetupPage() {
 
     async function loadContract() {
       if (!contractId) {
-        setError('Không tìm thấy mã hợp đồng.');
-        setLoading(false);
         return;
       }
 
@@ -202,7 +202,7 @@ export function ContractOccupantsSetupPage() {
     setError('');
 
     try {
-      const uploaded = await uploadImage(file, 'KycDocument');
+      const uploaded = await uploadImage(file, 'LegalDocument');
       updateOccupant(occupantId, field, uploaded.objectKey);
     } catch (err) {
       setError(getApiErrorMessage(err, 'Không thể tải ảnh giấy tờ lên.'));
@@ -252,9 +252,7 @@ export function ContractOccupantsSetupPage() {
         }))
       });
 
-      navigate(ROUTE_PATHS.ACCOUNT.RENTAL_REQUESTS, {
-        state: { message: 'Đã gửi thông tin người ở thành công.' }
-      });
+      onSuccess();
     } catch (err) {
       setError(getApiErrorMessage(err, 'Không thể lưu thông tin. Vui lòng kiểm tra lại các trường bắt buộc.'));
     } finally {
@@ -263,196 +261,197 @@ export function ContractOccupantsSetupPage() {
   };
 
   return (
-    <div className="occupants-setup-container">
-      <div className="setup-header">
-        <button className="back-btn" onClick={() => navigate(ROUTE_PATHS.ACCOUNT.RENTAL_REQUESTS)}>
-          Quay lại
-        </button>
-        <h2>Nhập thông tin người ở</h2>
-        <p className="setup-subtitle">
-          Khai báo danh sách người sẽ sinh sống tại phòng thuê để chủ trọ tạo và ký hợp đồng.
-        </p>
-      </div>
+    <div className="occupants-setup-overlay" onClick={onClose}>
+      <div className="occupants-setup-container-modal" onClick={(e) => e.stopPropagation()}>
+        <header className="occupants-setup-header">
+          <h2>Nhập thông tin người ở</h2>
+          <button className="occupants-setup-close-btn" onClick={onClose} aria-label="Đóng">
+            &times;
+          </button>
+        </header>
 
-      {contract && (
-        <div style={{ marginBottom: 20 }}>
+        <div className="occupants-setup-modal-content">
+        <p style={{ color: '#475569', fontSize: '0.95rem', margin: 0, paddingBottom: 8 }}>
+          Khai báo danh sách người sẽ sinh sống tại phòng thuê để chủ trọ tạo và ký hợp đồng. Khuyến khích người ở đăng ký tài khoản và xác minh danh tính trên nền tảng.
+        </p>
+
+        {contract && (
           <Alert type="info">
             Hợp đồng {contract.contractNumber} - Phòng {contract.roomNumber}, {contract.roomingHouseName}
           </Alert>
-        </div>
-      )}
+        )}
 
-      {error && (
-        <div style={{ marginBottom: 20 }}>
+        {error && (
           <Alert type="error">{error}</Alert>
-        </div>
-      )}
+        )}
 
-      {loading ? (
-        <p>Đang tải thông tin người ở...</p>
-      ) : (
-        <form onSubmit={handleSubmit}>
-          <div className="occupants-list">
-            {occupants.map((occupant, index) => (
-              <div key={occupant.id} className="occupant-card">
-                <div className="occupant-card-header">
-                  <h3>{occupant.isMainTenant ? 'Người đại diện thuê' : `Người ở cùng #${index + 1}`}</h3>
-                  {!occupant.isMainTenant && (
-                    <button type="button" className="remove-btn" onClick={() => removeOccupant(occupant.id)}>
-                      Xóa
-                    </button>
-                  )}
-                </div>
+        {loading ? (
+          <p>Đang tải thông tin người ở...</p>
+        ) : (
+          <form onSubmit={handleSubmit} style={{ display: 'flex', flexDirection: 'column', gap: 24 }}>
+            <div className="occupants-list">
+              {occupants.map((occupant, index) => (
+                <div key={occupant.id} className="occupant-card">
+                  <div className="occupant-card-header">
+                    <h3>{occupant.isMainTenant ? 'Người đại diện thuê' : `Người ở cùng #${index + 1}`}</h3>
+                    {!occupant.isMainTenant && (
+                      <button type="button" className="remove-btn" onClick={() => removeOccupant(occupant.id)}>
+                        Xóa
+                      </button>
+                    )}
+                  </div>
 
-                <div className="occupant-grid">
-                  {!occupant.isMainTenant && (
-                    <div className="form-group full-width">
-                      <label className="checkbox-label">
+                  <div className="occupant-grid">
+                    {!occupant.isMainTenant && (
+                      <div className="form-group full-width">
+                        <label className="checkbox-label">
+                          <input
+                            type="checkbox"
+                            checked={occupant.hasAccount}
+                            onChange={(event) => updateOccupant(occupant.id, 'hasAccount', event.target.checked)}
+                          />
+                          Người này đã có tài khoản trên hệ thống
+                        </label>
+                      </div>
+                    )}
+
+                    {occupant.hasAccount ? (
+                      <div className="form-group full-width">
+                        <label>Email tài khoản *</label>
                         <input
-                          type="checkbox"
-                          checked={occupant.hasAccount}
-                          onChange={(event) => updateOccupant(occupant.id, 'hasAccount', event.target.checked)}
+                          type="email"
+                          required
+                          value={occupant.email}
+                          disabled={occupant.isMainTenant}
+                          onChange={(event) => updateOccupant(occupant.id, 'email', event.target.value)}
+                          placeholder="user@example.com"
                         />
-                        Người này đã có tài khoản trên hệ thống
-                      </label>
-                    </div>
-                  )}
+                      </div>
+                    ) : (
+                      <>
+                        <div className="form-group">
+                          <label>Họ và tên *</label>
+                          <input
+                            type="text"
+                            required
+                            value={occupant.fullName}
+                            onChange={(event) => updateOccupant(occupant.id, 'fullName', event.target.value)}
+                            placeholder="Nguyễn Văn A"
+                          />
+                        </div>
 
-                  {occupant.hasAccount ? (
-                    <div className="form-group full-width">
-                      <label>Email tài khoản *</label>
+                        <div className="form-group">
+                          <label>Số điện thoại *</label>
+                          <input
+                            type="tel"
+                            required
+                            value={occupant.phoneNumber}
+                            onChange={(event) => updateOccupant(occupant.id, 'phoneNumber', event.target.value)}
+                            placeholder="0912345678"
+                          />
+                        </div>
+
+                        <div className="form-group">
+                          <label>Ngày sinh *</label>
+                          <input
+                            type="date"
+                            required
+                            value={occupant.dateOfBirth}
+                            onChange={(event) => updateOccupant(occupant.id, 'dateOfBirth', event.target.value)}
+                          />
+                        </div>
+
+                        <div className="form-group">
+                          <label>Loại giấy tờ *</label>
+                          <select
+                            required
+                            value={occupant.documentType}
+                            onChange={(event) => updateOccupant(occupant.id, 'documentType', event.target.value)}
+                          >
+                            <option value="CCCD">Căn cước công dân</option>
+                            <option value="CMND">Chứng minh nhân dân</option>
+                            <option value="Passport">Hộ chiếu</option>
+                            <option value="BirthCertificate">Giấy khai sinh</option>
+                          </select>
+                        </div>
+
+                        <div className="form-group full-width">
+                          <label>Số giấy tờ *</label>
+                          <input
+                            type="text"
+                            required
+                            value={occupant.documentNumber}
+                            onChange={(event) => updateOccupant(occupant.id, 'documentNumber', event.target.value)}
+                            placeholder="Nhập lại số giấy tờ"
+                          />
+                        </div>
+
+                        <DocumentImageUploadField
+                          label="Ảnh mặt trước giấy tờ"
+                          required
+                          objectKey={occupant.frontImageObjectKey}
+                          uploading={uploadingField === `${occupant.id}:frontImageObjectKey`}
+                          onUpload={(file) => void uploadDocumentImage(occupant.id, 'frontImageObjectKey', file)}
+                          onRemove={() => updateOccupant(occupant.id, 'frontImageObjectKey', '')}
+                        />
+
+                        <DocumentImageUploadField
+                          label="Ảnh mặt sau giấy tờ"
+                          objectKey={occupant.backImageObjectKey}
+                          uploading={uploadingField === `${occupant.id}:backImageObjectKey`}
+                          onUpload={(file) => void uploadDocumentImage(occupant.id, 'backImageObjectKey', file)}
+                          onRemove={() => updateOccupant(occupant.id, 'backImageObjectKey', '')}
+                        />
+
+                        <DocumentImageUploadField
+                          label="Ảnh bổ sung"
+                          objectKey={occupant.extraImageObjectKey}
+                          uploading={uploadingField === `${occupant.id}:extraImageObjectKey`}
+                          onUpload={(file) => void uploadDocumentImage(occupant.id, 'extraImageObjectKey', file)}
+                          onRemove={() => updateOccupant(occupant.id, 'extraImageObjectKey', '')}
+                        />
+                      </>
+                    )}
+
+                    <div className="form-group">
+                      <label>Quan hệ với chủ hợp đồng *</label>
                       <input
-                        type="email"
+                        type="text"
                         required
-                        value={occupant.email}
+                        value={occupant.relationship}
                         disabled={occupant.isMainTenant}
-                        onChange={(event) => updateOccupant(occupant.id, 'email', event.target.value)}
-                        placeholder="user@example.com"
+                        onChange={(event) => updateOccupant(occupant.id, 'relationship', event.target.value)}
                       />
                     </div>
-                  ) : (
-                    <>
-                      <div className="form-group">
-                        <label>Họ và tên *</label>
-                        <input
-                          type="text"
-                          required
-                          value={occupant.fullName}
-                          onChange={(event) => updateOccupant(occupant.id, 'fullName', event.target.value)}
-                          placeholder="Nguyễn Văn A"
-                        />
-                      </div>
 
-                      <div className="form-group">
-                        <label>Số điện thoại *</label>
-                        <input
-                          type="tel"
-                          required
-                          value={occupant.phoneNumber}
-                          onChange={(event) => updateOccupant(occupant.id, 'phoneNumber', event.target.value)}
-                          placeholder="0912345678"
-                        />
-                      </div>
-
-                      <div className="form-group">
-                        <label>Ngày sinh *</label>
-                        <input
-                          type="date"
-                          required
-                          value={occupant.dateOfBirth}
-                          onChange={(event) => updateOccupant(occupant.id, 'dateOfBirth', event.target.value)}
-                        />
-                      </div>
-
-                      <div className="form-group">
-                        <label>Loại giấy tờ *</label>
-                        <select
-                          required
-                          value={occupant.documentType}
-                          onChange={(event) => updateOccupant(occupant.id, 'documentType', event.target.value)}
-                        >
-                          <option value="CCCD">Căn cước công dân</option>
-                          <option value="CMND">Chứng minh nhân dân</option>
-                          <option value="Passport">Hộ chiếu</option>
-                          <option value="BirthCertificate">Giấy khai sinh</option>
-                        </select>
-                      </div>
-
-                      <div className="form-group">
-                        <label>Số giấy tờ *</label>
-                        <input
-                          type="text"
-                          required
-                          value={occupant.documentNumber}
-                          onChange={(event) => updateOccupant(occupant.id, 'documentNumber', event.target.value)}
-                          placeholder="Nhập lại số giấy tờ"
-                        />
-                      </div>
-
-                      <DocumentImageUploadField
-                        label="Ảnh mặt trước giấy tờ"
+                    <div className="form-group">
+                      <label>Ngày dọn vào *</label>
+                      <input
+                        type="date"
                         required
-                        objectKey={occupant.frontImageObjectKey}
-                        uploading={uploadingField === `${occupant.id}:frontImageObjectKey`}
-                        onUpload={(file) => void uploadDocumentImage(occupant.id, 'frontImageObjectKey', file)}
-                        onRemove={() => updateOccupant(occupant.id, 'frontImageObjectKey', '')}
+                        value={occupant.moveInDate}
+                        onChange={(event) => updateOccupant(occupant.id, 'moveInDate', event.target.value)}
                       />
-
-                      <DocumentImageUploadField
-                        label="Ảnh mặt sau giấy tờ"
-                        objectKey={occupant.backImageObjectKey}
-                        uploading={uploadingField === `${occupant.id}:backImageObjectKey`}
-                        onUpload={(file) => void uploadDocumentImage(occupant.id, 'backImageObjectKey', file)}
-                        onRemove={() => updateOccupant(occupant.id, 'backImageObjectKey', '')}
-                      />
-
-                      <DocumentImageUploadField
-                        label="Ảnh bổ sung"
-                        objectKey={occupant.extraImageObjectKey}
-                        uploading={uploadingField === `${occupant.id}:extraImageObjectKey`}
-                        onUpload={(file) => void uploadDocumentImage(occupant.id, 'extraImageObjectKey', file)}
-                        onRemove={() => updateOccupant(occupant.id, 'extraImageObjectKey', '')}
-                      />
-                    </>
-                  )}
-
-                  <div className="form-group">
-                    <label>Quan hệ với chủ hợp đồng *</label>
-                    <input
-                      type="text"
-                      required
-                      value={occupant.relationship}
-                      disabled={occupant.isMainTenant}
-                      onChange={(event) => updateOccupant(occupant.id, 'relationship', event.target.value)}
-                    />
-                  </div>
-
-                  <div className="form-group">
-                    <label>Ngày dọn vào *</label>
-                    <input
-                      type="date"
-                      required
-                      value={occupant.moveInDate}
-                      onChange={(event) => updateOccupant(occupant.id, 'moveInDate', event.target.value)}
-                    />
+                    </div>
                   </div>
                 </div>
-              </div>
-            ))}
-          </div>
-
-          <div className="setup-actions">
-            <Button type="button" variant="secondary" onClick={addOccupant}>
-              + Thêm người ở cùng
-            </Button>
-            <div className="submit-wrapper">
-              <Button type="submit" disabled={submitting}>
-                {submitting ? 'Đang gửi...' : 'Hoàn tất & gửi chủ trọ'}
-              </Button>
+              ))}
             </div>
-          </div>
-        </form>
-      )}
+
+            <div className="setup-actions">
+              <Button type="button" variant="secondary" onClick={addOccupant}>
+                + Thêm người ở cùng
+              </Button>
+              <div className="submit-wrapper">
+                <Button type="submit" disabled={submitting}>
+                  {submitting ? 'Đang gửi...' : 'Hoàn tất & gửi chủ trọ'}
+                </Button>
+              </div>
+            </div>
+          </form>
+        )}
+        </div>
+      </div>
     </div>
   );
 }
@@ -510,7 +509,13 @@ function DocumentImageUploadField({
         </div>
       )}
       <div style={{ display: 'flex', gap: 8, marginTop: 8 }}>
-        <label className="back-btn" style={{ cursor: uploading ? 'wait' : 'pointer' }}>
+        <label style={{ 
+          cursor: uploading ? 'wait' : 'pointer', 
+          fontSize: '0.85rem', 
+          fontWeight: 500, 
+          color: '#2563eb',
+          textDecoration: 'underline'
+        }}>
           {uploading ? 'Đang tải...' : objectKey ? 'Thay ảnh' : 'Tải ảnh'}
           <input
             type="file"

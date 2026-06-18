@@ -1,31 +1,85 @@
-.landlord-requests-list {
+/* client/src/features/landlord/pages/LandlordRentalRequestsPage.css */
+
+.landlord-dashboard-page .dashboard-main {
+  padding: 32px;
+  background-color: #f8fafc;
+}
+
+.overview-band {
+  margin-bottom: 24px;
+}
+
+.overview-band .eyebrow {
+  font-size: 0.875rem;
+  font-weight: 600;
+  color: #475569;
+  letter-spacing: 0.05em;
+  margin: 0 0 4px 0;
+}
+
+.overview-band h2 {
+  font-size: 1.875rem;
+  color: #1e293b;
+  margin: 0 0 8px 0;
+}
+
+.overview-description {
+  color: #64748b;
+  font-size: 1rem;
+  margin: 0;
+}
+
+.landlord-tabs {
+  display: flex;
+  gap: 8px;
+  margin-bottom: 24px;
+  overflow-x: auto;
+  padding-bottom: 8px;
+}
+
+.landlord-tabs button {
+  padding: 8px 16px;
+  border: none;
+  background-color: #f1f5f9;
+  color: #475569;
+  border-radius: 8px;
+  cursor: pointer;
+  font-weight: 500;
+  transition: all 0.2s;
+  white-space: nowrap;
+}
+
+.landlord-tabs button:hover {
+  background-color: #e2e8f0;
+}
+
+.landlord-tabs button.active {
+  background-color: #3b82f6;
+  color: white;
+}
+
+.requests-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
+  gap: 24px;
+}
+
+.request-card {
+  background: white;
+  border-radius: 12px;
+  border: 1px solid #e2e8f0;
+  padding: 20px;
   display: flex;
   flex-direction: column;
-  gap: 16px;
-  max-width: 800px;
+  transition: transform 0.2s ease, box-shadow 0.2s ease;
 }
 
-.landlord-request-card {
-  background: #fff;
-  border: 1px solid #e2e8f0;
-  border-radius: 12px;
-  padding: 20px;
-  box-shadow: 0 1px 2px rgba(0,0,0,0.05);
+.request-card:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05);
 }
 
-.request-title h3 {
-  margin: 0 0 4px 0;
-  font-size: 1.1rem;
-  color: #0f172a;
-}
-
-.tenant-name {
-  margin: 0;
-  font-size: 0.95rem;
-  color: #475569;
-}
-
-.request-header {
+.request-card-header {
   display: flex;
   justify-content: space-between;
   align-items: flex-start;
@@ -34,117 +88,72 @@
   border-bottom: 1px solid #f1f5f9;
 }
 
-.request-details p {
-  margin: 8px 0;
-  font-size: 0.95rem;
-  color: #334155;
+.request-card-title h3 {
+  margin: 0 0 4px 0;
+  font-size: 1.125rem;
+  color: #0f172a;
 }
 
-.request-actions {
-  display: flex;
-  gap: 12px;
-  margin-top: 16px;
-  padding-top: 16px;
-  border-top: 1px dashed #e2e8f0;
+.tenant-name {
+  margin: 0;
+  font-size: 0.9rem;
+  color: #64748b;
 }
 
-.reject-form {
+.request-card-body {
   display: flex;
   flex-direction: column;
   gap: 12px;
-  width: 100%;
+  margin-bottom: 20px;
+  flex-grow: 1;
 }
 
-.reject-form input {
-  padding: 10px;
-  border: 1px solid #cbd5e1;
-  border-radius: 6px;
-  font-size: 0.95rem;
-  outline: none;
-  transition: border-color 0.2s;
-}
-
-.reject-form input:focus {
-  border-color: #2563eb;
-}
-
-.reject-form-buttons {
+.info-row {
   display: flex;
-  gap: 12px;
+  justify-content: space-between;
+  font-size: 0.95rem;
+}
+
+.info-row .label {
+  color: #64748b;
+}
+
+.info-row .value {
+  color: #1e293b;
+  font-weight: 500;
+}
+
+.request-card-footer {
+  display: flex;
+  justify-content: flex-end;
+  padding-top: 16px;
+  border-top: 1px solid #f1f5f9;
 }
 
 .status-badge {
   padding: 6px 12px;
-  border-radius: 999px;
+  border-radius: 9999px;
   font-size: 0.85rem;
   font-weight: 600;
-  background: #f1f5f9;
-  color: #475569;
+  white-space: nowrap;
 }
 
-.status-badge.pending,
-.status-badge.warning {
-  background: #fef3c7;
-  color: #92400e;
+.status-badge.pending {
+  background-color: #eff6ff;
+  color: #2563eb;
 }
 
-.status-badge.accepted,
-.status-badge.success {
-  background: #dcfce7;
-  color: #166534;
+.status-badge.accepted {
+  background-color: #dcfce7;
+  color: #16a34a;
 }
 
-.status-badge.rejected,
-.status-badge.danger {
-  background: #fee2e2;
-  color: #991b1b;
+.status-badge.rejected {
+  background-color: #fee2e2;
+  color: #dc2626;
 }
 
-.status-badge.cancelled,
-.status-badge.neutral {
-  background: #f1f5f9;
+.status-badge.cancelled {
+  background-color: #f1f5f9;
   color: #64748b;
-}
-
-.deposit-info {
-  margin-top: 12px;
-  padding: 12px;
-  border-left: 4px solid #f59e0b;
-  border-radius: 4px;
-  font-size: 0.9rem;
-}
-
-.contract-status-info {
-  margin-top: 12px;
-  padding: 8px 12px;
-  border-left: 4px solid #f59e0b;
-  border-radius: 4px;
-}
-
-.deposit-info.success,
-.contract-status-info.success {
-  background: #f0fdf4;
-  border-left-color: #22c55e;
-  color: #166534;
-}
-
-.deposit-info.warning,
-.contract-status-info.warning {
-  background: #fffbeb;
-  border-left-color: #f59e0b;
-  color: #92400e;
-}
-
-.deposit-info.danger,
-.contract-status-info.danger {
-  background: #fef2f2;
-  border-left-color: #ef4444;
-  color: #991b1b;
-}
-
-.deposit-info.neutral,
-.contract-status-info.neutral {
-  background: #f8fafc;
-  border-left-color: #94a3b8;
-  color: #475569;
 }

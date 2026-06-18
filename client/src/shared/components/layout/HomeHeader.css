@@ -9,7 +9,7 @@
   border-bottom: 1px solid #e2e8f0;
   position: sticky;
   top: 0;
-  z-index: 100;
+  z-index: 1200;
 }
 
 .header-logo {
@@ -18,6 +18,16 @@
   color: #246bfe;
   cursor: pointer;
   letter-spacing: -0.02em;
+  flex-shrink: 0;
+}
+
+.header-center {
+  flex: 1;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  gap: 12px;
+  margin: 0 24px;
 }
 
 .header-nav {

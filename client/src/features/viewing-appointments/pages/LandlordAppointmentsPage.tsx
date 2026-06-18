@@ -13,6 +13,7 @@ import type { ViewingAppointment, ViewingAppointmentStatus, ConflictCheckRespons
 import { Alert } from '../../../shared/components/ui/Alert';
 import { getApiErrorMessage } from '../../../shared/api/apiError';
 import { formatDateVi } from '../../../shared/utils/format';
+import '../../landlord/pages/LandlordDashboardPage.css';
 import './LandlordAppointmentsPage.css';
 
 export default function LandlordAppointmentsPage() {
@@ -221,24 +222,30 @@ export default function LandlordAppointmentsPage() {
   };
 
   return (
-    <div className="landlord-dashboard landlord-appointments-page">
+    <div className="landlord-dashboard landlord-dashboard-page landlord-appointments-page">
       <aside className="dashboard-sidebar">
         <h1>Chủ trọ</h1>
         <button className="sidebar-item" onClick={() => navigate('/landlord/dashboard')}>
           Quản lý khu trọ
         </button>
+        <button className="sidebar-item" onClick={() => navigate('/landlord/rental-requests')}>
+          Yêu cầu thuê
+        </button>
         <button className="sidebar-item active" onClick={() => navigate('/landlord/viewing-appointments')}>
           Lịch hẹn xem phòng
         </button>
+        <button className="sidebar-item" disabled style={{ opacity: 0.6, cursor: 'not-allowed' }}>
+          Quản lý doanh thu (sau này)
+        </button>
         <button className="sidebar-item sidebar-back-btn" onClick={() => navigate('/home')}>
-          ← Quay lại trang chủ
+          Quay lại trang chủ
         </button>
       </aside>
 
       <main className="dashboard-main">
         <section className="overview-band">
           <div className="overview-left">
-            <p className="eyebrow">Yêu cầu</p>
+            <p className="eyebrow">QUẢN LÝ</p>
             <h2>Lịch hẹn xem phòng</h2>
             <p className="overview-description">Duyệt và kiểm tra lịch hẹn từ khách thuê</p>
           </div>

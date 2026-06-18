@@ -63,10 +63,10 @@
 .home-header-search-form input {
   width: 100%;
   min-width: 0;
-  height: 40px;
+  height: 42px;
   border: 1px solid #cbd5e1;
-  border-radius: 8px;
-  padding: 0 12px;
+  border-radius: 999px;
+  padding: 0 20px;
   color: #0f172a;
   font: inherit;
   font-size: 14px;
@@ -82,7 +82,8 @@
 
 .home-header-search-form .ui-button {
   min-height: 40px;
-  padding-inline: 18px;
+  padding-inline: 20px;
+  border-radius: 999px;
 }
 
 .home-header-location {

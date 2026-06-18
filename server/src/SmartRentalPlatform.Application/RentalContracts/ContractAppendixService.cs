@@ -1,3 +1,4 @@
+using System.Globalization;
 using System.Security.Cryptography;
 using System.Text.Json;
 using Microsoft.EntityFrameworkCore;
@@ -66,6 +67,7 @@ public class ContractAppendixService : IContractAppendixService
             .ToList();
 
         await ValidateBusinessRulesAsync(contract, signerRole, parsedChanges, request.EffectiveDate, cancellationToken);
+        var appendixChangeRequests = await BuildAppendixChangeRequestsAsync(contract, parsedChanges, cancellationToken);
 
         var now = DateTimeOffset.UtcNow;
         var appendix = new ContractAppendix
@@ -80,9 +82,9 @@ public class ContractAppendixService : IContractAppendixService
             UpdatedAt = now
         };
 
-        for (var index = 0; index < request.Changes.Count; index++)
+        for (var index = 0; index < appendixChangeRequests.Count; index++)
         {
-            var change = request.Changes[index];
+            var change = appendixChangeRequests[index];
             var changeType = ParseEnum<ContractAppendixChangeType>(change.ChangeType, "Loại thay đổi phụ lục không hợp lệ.");
             var targetType = ParseEnum<ContractAppendixTargetType>(change.TargetType, "Đối tượng thay đổi phụ lục không hợp lệ.");
 
@@ -128,7 +130,7 @@ public class ContractAppendixService : IContractAppendixService
         EnsureCanAccess(userId, contract);
 
         var appendices = await BaseAppendixQuery()
-            .AsNoTracking()
+            .AsTracking()
             .Where(x => x.RentalContractId == contractId)
             .OrderByDescending(x => x.CreatedAt)
             .ToListAsync(cancellationToken);
@@ -146,7 +148,7 @@ public class ContractAppendixService : IContractAppendixService
         CancellationToken cancellationToken = default)
     {
         var appendix = await BaseAppendixQuery()
-            .AsNoTracking()
+            .AsTracking()
             .FirstOrDefaultAsync(x => x.Id == appendixId && x.RentalContractId == contractId, cancellationToken);
 
         if (appendix is null)
@@ -190,6 +192,7 @@ public class ContractAppendixService : IContractAppendixService
             parsedChanges,
             request.EffectiveDate,
             cancellationToken);
+        var appendixChangeRequests = await BuildAppendixChangeRequestsAsync(appendix.RentalContract, parsedChanges, cancellationToken);
 
         var now = DateTimeOffset.UtcNow;
 
@@ -210,13 +213,13 @@ public class ContractAppendixService : IContractAppendixService
             appendix.StatusReason = null;
             appendix.UpdatedAt = now;
 
-            for (var index = 0; index < request.Changes.Count; index++)
+            for (var index = 0; index < appendixChangeRequests.Count; index++)
             {
-                var change = request.Changes[index];
+                var change = appendixChangeRequests[index];
                 var changeType = ParseEnum<ContractAppendixChangeType>(change.ChangeType, "Loại thay đổi phụ lục không hợp lệ.");
                 var targetType = ParseEnum<ContractAppendixTargetType>(change.TargetType, "Đối tượng thay đổi phụ lục không hợp lệ.");
 
-                appendix.Changes.Add(new ContractAppendixChange
+                var newChange = new ContractAppendixChange
                 {
                     Id = Guid.NewGuid(),
                     RentalContractAppendixId = appendix.Id,
@@ -228,7 +231,9 @@ public class ContractAppendixService : IContractAppendixService
                     NewValue = NormalizeNewValue(change, changeType, targetType),
                     SortOrder = index + 1,
                     CreatedAt = now
-                });
+                };
+                appendix.Changes.Add(newChange);
+                context.ContractAppendixChanges.Add(newChange);
             }
 
             await context.SaveChangesAsync(cancellationToken);
@@ -250,7 +255,6 @@ public class ContractAppendixService : IContractAppendixService
         CancellationToken cancellationToken = default)
     {
         var appendix = await BaseAppendixQuery()
-            .AsNoTracking()
             .FirstOrDefaultAsync(x => x.Id == appendixId && x.RentalContractId == contractId, cancellationToken);
 
         if (appendix is null)
@@ -274,7 +278,6 @@ public class ContractAppendixService : IContractAppendixService
         CancellationToken cancellationToken = default)
     {
         var appendix = await BaseAppendixQuery()
-            .AsNoTracking()
             .FirstOrDefaultAsync(x => x.Id == appendixId && x.RentalContractId == contractId, cancellationToken);
 
         if (appendix is null)
@@ -325,7 +328,7 @@ public class ContractAppendixService : IContractAppendixService
                 request.Otp,
                 cancellationToken);
 
-            appendix.Signatures.Add(new ContractSignature
+            var signature = new ContractSignature
             {
                 Id = Guid.NewGuid(),
                 RentalContractAppendixId = appendix.Id,
@@ -337,7 +340,9 @@ public class ContractAppendixService : IContractAppendixService
                 UserAgent = NormalizeOptionalText(userAgent),
                 SignedAt = now,
                 CreatedAt = now
-            });
+            };
+            appendix.Signatures.Add(signature);
+            context.ContractSignatures.Add(signature);
 
             appendix.UpdatedAt = now;
 
@@ -440,6 +445,8 @@ public class ContractAppendixService : IContractAppendixService
                     .ThenInclude(x => x.Landlord)
                         .ThenInclude(x => x.UserProfile)
             .Include(x => x.Room)
+                .ThenInclude(x => x.PriceTiers)
+            .Include(x => x.Room)
                 .ThenInclude(x => x.RoomingHouse)
                     .ThenInclude(x => x.RentalPolicy)
             .Include(x => x.Appendices)
@@ -462,6 +469,9 @@ public class ContractAppendixService : IContractAppendixService
                     .ThenInclude(x => x.RoomingHouse)
                         .ThenInclude(x => x.Landlord)
                             .ThenInclude(x => x.UserProfile)
+            .Include(x => x.RentalContract)
+                .ThenInclude(x => x.Room)
+                    .ThenInclude(x => x.PriceTiers)
             .Include(x => x.RentalContract)
                 .ThenInclude(x => x.Occupants)
                     .ThenInclude(x => x.Documents)
@@ -510,7 +520,7 @@ public class ContractAppendixService : IContractAppendixService
             objectKey,
             cancellationToken);
 
-        appendix.Files.Add(new ContractFile
+        var newFile = new ContractFile
         {
             Id = Guid.NewGuid(),
             RentalContractId = appendix.RentalContractId,
@@ -518,7 +528,61 @@ public class ContractAppendixService : IContractAppendixService
             StorageObjectKey = storageObjectKey,
             FileVariant = fileVariant,
             CreatedAt = now
-        });
+        };
+        appendix.Files.Add(newFile);
+        context.ContractFiles.Add(newFile);
+    }
+
+    public async Task<bool> DeleteAsync(
+        Guid userId,
+        Guid contractId,
+        Guid appendixId,
+        CancellationToken cancellationToken = default)
+    {
+        await context.ContractAppendices
+            .Include(x => x.Changes)
+            .Where(x => x.RentalContractId == contractId && x.Status == ContractAppendixStatus.Active)
+            .LoadAsync(cancellationToken);
+
+        var appendix = await BaseAppendixQuery()
+            .AsTracking()
+            .FirstOrDefaultAsync(x => x.Id == appendixId && x.RentalContractId == contractId, cancellationToken);
+
+        if (appendix is null)
+        {
+            return false;
+        }
+
+        EnsureCanAccess(userId, appendix.RentalContract);
+
+        if (appendix.Status != ContractAppendixStatus.PendingSignature)
+        {
+            throw new ConflictException(
+                ErrorCodes.ContractAppendixInvalidStatus,
+                "Chỉ có thể hủy phụ lục đang chờ ký.",
+                new { appendix.Id, status = appendix.Status.ToString() });
+        }
+
+        if (appendix.CreatedByUserId != userId)
+        {
+            throw new ConflictException(
+                ErrorCodes.ContractAppendixInvalidStatus,
+                "Bạn không phải là người tạo phụ lục này, không thể hủy.",
+                new { appendix.Id });
+        }
+
+        if (appendix.Signatures.Count > 0)
+        {
+            throw new ConflictException(
+                ErrorCodes.ContractAppendixAlreadySigned,
+                "Không thể hủy phụ lục vì đã có người ký.",
+                new { appendix.Id });
+        }
+
+        context.ContractAppendices.Remove(appendix);
+        await context.SaveChangesAsync(cancellationToken);
+
+        return true;
     }
 
     private async Task ApplyAppendixChangesAsync(
@@ -528,6 +592,12 @@ public class ContractAppendixService : IContractAppendixService
     {
         foreach (var change in appendix.Changes.OrderBy(x => x.SortOrder))
         {
+            if (change.TargetType == ContractAppendixTargetType.Contract)
+            {
+                await ApplyContractChangeAsync(appendix.RentalContract, change, now, cancellationToken);
+                continue;
+            }
+
             if (change.TargetType != ContractAppendixTargetType.ContractOccupant)
             {
                 continue;
@@ -568,6 +638,81 @@ public class ContractAppendixService : IContractAppendixService
         }
     }
 
+    private async Task ApplyContractChangeAsync(
+        RentalContract contract,
+        ContractAppendixChange change,
+        DateTimeOffset now,
+        CancellationToken cancellationToken)
+    {
+        if (change.ChangeType != ContractAppendixChangeType.Update)
+        {
+            return;
+        }
+
+        var value = ExtractJsonString(change.NewValue);
+        switch (NormalizeFieldName(change.FieldName))
+        {
+            case "monthlyrent":
+                if (!decimal.TryParse(value, NumberStyles.Number, CultureInfo.InvariantCulture, out var monthlyRent) ||
+                    monthlyRent <= 0)
+                {
+                    throw new BadRequestException(
+                        ErrorCodes.ValidationError,
+                        "Giá thuê mới trong phụ lục không hợp lệ.");
+                }
+
+                contract.MonthlyRent = monthlyRent;
+                break;
+
+            case "paymentday":
+                if (!int.TryParse(value, NumberStyles.Integer, CultureInfo.InvariantCulture, out var paymentDay) ||
+                    paymentDay < 1 ||
+                    paymentDay > 28)
+                {
+                    throw new BadRequestException(
+                        ErrorCodes.ValidationError,
+                        "Ngày thanh toán mới trong phụ lục không hợp lệ.");
+                }
+
+                contract.PaymentDay = paymentDay;
+                break;
+
+            case "enddate":
+                if (!TryParseDateOnly(change.NewValue, out var endDate))
+                {
+                    throw new BadRequestException(
+                        ErrorCodes.ValidationError,
+                        "Ngày kết thúc mới trong phụ lục không hợp lệ.");
+                }
+
+                contract.EndDate = endDate;
+                break;
+
+            case "maintenantuserid":
+                var newMainTenantUserId = await ResolveUserIdReferenceAsync(change.NewValue, cancellationToken);
+                if (!newMainTenantUserId.HasValue)
+                {
+                    throw new BadRequestException(
+                        ErrorCodes.ValidationError,
+                        "Người thuê chính mới trong phụ lục không hợp lệ.");
+                }
+
+                contract.MainTenantUserId = newMainTenantUserId.Value;
+                var mainTenant = await context.Users
+                    .Include(x => x.UserProfile)
+                    .FirstOrDefaultAsync(x => x.Id == newMainTenantUserId.Value && x.DeletedAt == null, cancellationToken);
+
+                if (mainTenant is not null)
+                {
+                    contract.MainTenantUser = mainTenant;
+                }
+
+                break;
+        }
+
+        contract.UpdatedAt = now;
+    }
+
     private async Task<ContractOccupant> CreateOccupantFromAppendixChangeAsync(
         Guid contractId,
         ContractOccupantRequest occupantRequest,
@@ -600,7 +745,7 @@ public class ContractAppendixService : IContractAppendixService
         if (occupantRequest.Document is not null)
         {
             var documentRequest = occupantRequest.Document;
-            occupant.Documents.Add(new ContractOccupantDocument
+            var newDoc = new ContractOccupantDocument
             {
                 Id = Guid.NewGuid(),
                 RentalContractOccupantId = occupant.Id,
@@ -614,7 +759,9 @@ public class ContractAppendixService : IContractAppendixService
                 UploadedAt = now,
                 CreatedAt = now,
                 UpdatedAt = now
-            });
+            };
+            occupant.Documents.Add(newDoc);
+            context.ContractOccupantDocuments.Add(newDoc);
         }
 
         return occupant;
@@ -894,6 +1041,31 @@ public class ContractAppendixService : IContractAppendixService
         return currentMainTenantUserId;
     }
 
+    private static DateOnly GetCurrentContractEndDate(RentalContract contract)
+    {
+        var currentEndDate = contract.EndDate;
+
+        foreach (var appendix in GetActiveAppendicesInOrder(contract))
+        {
+            foreach (var change in appendix.Changes.OrderBy(x => x.SortOrder))
+            {
+                if (change.TargetType != ContractAppendixTargetType.Contract ||
+                    change.ChangeType != ContractAppendixChangeType.Update ||
+                    NormalizeFieldName(change.FieldName) != "enddate")
+                {
+                    continue;
+                }
+
+                if (TryParseDateOnly(change.NewValue, out var endDate))
+                {
+                    currentEndDate = endDate;
+                }
+            }
+        }
+
+        return currentEndDate;
+    }
+
     private static IReadOnlyCollection<Guid> GetMainTenantUserIds(RentalContract contract)
     {
         var userIds = new HashSet<Guid> { contract.MainTenantUserId };
@@ -1030,7 +1202,7 @@ public class ContractAppendixService : IContractAppendixService
         return NormalizeFieldName(fieldName) switch
         {
             "startdate" => contract.StartDate,
-            "enddate" => contract.EndDate,
+            "enddate" => GetCurrentContractEndDate(contract),
             "monthlyrent" => contract.MonthlyRent,
             "depositamount" => contract.DepositAmount,
             "paymentday" => contract.PaymentDay,
@@ -1141,11 +1313,12 @@ public class ContractAppendixService : IContractAppendixService
             await ValidateAddedOccupantsAsync(changes, cancellationToken);
             await ValidateMainTenantRulesAsync(contract, changes, cancellationToken);
             ValidateRenewalRules(contract, changes);
-            ValidateOccupantLimit(contract, changes);
+            await ValidateProjectedOccupantsAsync(contract, changes, cancellationToken);
             return;
         }
 
         ValidateLandlordAppendixRules(changes);
+        await ValidateProjectedOccupantsAsync(contract, changes, cancellationToken);
     }
 
     private async Task ValidateAddedOccupantsAsync(
@@ -1347,6 +1520,20 @@ public class ContractAppendixService : IContractAppendixService
 
         var changesMainTenant = changes.Any(IsMainTenantUserIdChange);
 
+        if (changes.Count(IsMainTenantUserIdChange) > 1)
+        {
+            throw new BadRequestException(
+                ErrorCodes.ValidationError,
+                "Mỗi phụ lục chỉ được chuyển người chịu trách nhiệm hợp đồng một lần.");
+        }
+
+        if (changes.Count(IsRenewalChange) > 1)
+        {
+            throw new BadRequestException(
+                ErrorCodes.ValidationError,
+                "Mỗi phụ lục chỉ được gia hạn hợp đồng một lần.");
+        }
+
         if (removedMainTenant && !changesMainTenant)
         {
             throw new BadRequestException(
@@ -1357,6 +1544,20 @@ public class ContractAppendixService : IContractAppendixService
 
     private static void ValidateLandlordAppendixRules(IReadOnlyCollection<ParsedAppendixChange> changes)
     {
+        if (changes.Count(IsMonthlyRentChange) > 1)
+        {
+            throw new BadRequestException(
+                ErrorCodes.ValidationError,
+                "Mỗi phụ lục chỉ được thay đổi giá thuê một lần.");
+        }
+
+        if (changes.Count(IsPaymentDayChange) > 1)
+        {
+            throw new BadRequestException(
+                ErrorCodes.ValidationError,
+                "Mỗi phụ lục chỉ được thay đổi ngày thanh toán một lần.");
+        }
+
         foreach (var change in changes)
         {
             var fieldName = NormalizeFieldName(change.Request.FieldName);
@@ -1419,13 +1620,16 @@ public class ContractAppendixService : IContractAppendixService
             return;
         }
 
-        var newMainTenantUserId = ExtractUserId(mainTenantChange.Request.NewValue);
+        var newMainTenantUserId = await ResolveUserIdReferenceAsync(mainTenantChange.Request.NewValue, cancellationToken);
         if (newMainTenantUserId is null)
         {
             throw new BadRequestException(
                 ErrorCodes.ValidationError,
                 "Người chịu trách nhiệm hợp đồng mới bắt buộc phải có userId.");
         }
+
+        var requestedMainTenantEmail = ExtractUserEmail(mainTenantChange.Request.NewValue);
+        mainTenantChange.Request.NewValue = newMainTenantUserId.Value.ToString();
 
         var userExists = await context.Users.AnyAsync(x => x.Id == newMainTenantUserId.Value && x.DeletedAt == null, cancellationToken);
         if (!userExists)
@@ -1460,7 +1664,9 @@ public class ContractAppendixService : IContractAppendixService
         var addedInThisAppendix = changes.Any(change =>
             change.ChangeType == ContractAppendixChangeType.Add &&
             change.TargetType == ContractAppendixTargetType.ContractOccupant &&
-            ExtractUserId(change.Request.NewValue) == newMainTenantUserId.Value);
+            (ExtractUserId(change.Request.NewValue) == newMainTenantUserId.Value ||
+             (!string.IsNullOrWhiteSpace(requestedMainTenantEmail) &&
+              string.Equals(ExtractOccupantEmail(change.Request.NewValue), requestedMainTenantEmail, StringComparison.OrdinalIgnoreCase))));
 
         if (remainsOrAlreadyOccupant || addedInThisAppendix)
         {
@@ -1493,7 +1699,8 @@ public class ContractAppendixService : IContractAppendixService
                 "Ngày kết thúc mới không hợp lệ.");
         }
 
-        if (newEndDate <= contract.EndDate)
+        var currentEndDate = GetCurrentContractEndDate(contract);
+        if (newEndDate <= currentEndDate)
         {
             throw new BadRequestException(
                 ErrorCodes.ValidationError,
@@ -1508,7 +1715,23 @@ public class ContractAppendixService : IContractAppendixService
                 "Khu trọ chưa có chính sách thuê đang hoạt động.");
         }
 
-        var extensionMonths = CountStartedMonths(contract.EndDate, newEndDate);
+        var today = DateOnly.FromDateTime(DateTime.UtcNow);
+        var daysUntilCurrentEndDate = currentEndDate.DayNumber - today.DayNumber;
+        if (daysUntilCurrentEndDate < 0 || daysUntilCurrentEndDate > rentalPolicy.RenewalNoticeDays)
+        {
+            throw new BadRequestException(
+                ErrorCodes.ValidationError,
+                "Chỉ được gia hạn hợp đồng trong thời gian thông báo gia hạn theo chính sách thuê.",
+                new
+                {
+                    currentEndDate,
+                    today,
+                    daysUntilCurrentEndDate,
+                    rentalPolicy.RenewalNoticeDays
+                });
+        }
+
+        var extensionMonths = CountStartedMonths(currentEndDate, newEndDate);
         var valid = rentalPolicy.AllowShortTermRenewal
             ? extensionMonths <= rentalPolicy.MaxRentalMonths
             : extensionMonths >= rentalPolicy.MinRentalMonths && extensionMonths <= rentalPolicy.MaxRentalMonths;
@@ -1554,6 +1777,148 @@ public class ContractAppendixService : IContractAppendixService
             ErrorCodes.RentalRequestOccupantLimitExceeded,
             "Số người ở sau phụ lục vượt quá sức chứa tối đa của phòng.",
             new { finalCount, maxOccupants });
+    }
+
+    private async Task ValidateProjectedOccupantsAsync(
+        RentalContract contract,
+        IReadOnlyCollection<ParsedAppendixChange> changes,
+        CancellationToken cancellationToken)
+    {
+        var projection = await ProjectOccupantsAsync(contract, changes, cancellationToken);
+        var finalCount = projection.FinalCount;
+        if (finalCount <= 0)
+        {
+            throw new BadRequestException(
+                ErrorCodes.ValidationError,
+                "Sau phụ lục, hợp đồng phải còn ít nhất một người ở.");
+        }
+
+        var maxOccupants = GetSnapshotMaxOccupants(contract);
+        if (finalCount > maxOccupants)
+        {
+            throw new BadRequestException(
+                ErrorCodes.RentalRequestOccupantLimitExceeded,
+                "Số người ở sau phụ lục vượt quá sức chứa tối đa của phòng.",
+                new { finalCount, maxOccupants });
+        }
+
+        var mainTenantStillOccupies = projection.Occupants.Any(x => x.UserId == projection.MainTenantUserId);
+        if (finalCount == 1 && !mainTenantStillOccupies)
+        {
+            throw new BadRequestException(
+                ErrorCodes.ValidationError,
+                "Nếu hợp đồng chỉ còn một người ở thì người đó phải là người thuê chính.");
+        }
+
+        if (!mainTenantStillOccupies)
+        {
+            throw new BadRequestException(
+                ErrorCodes.ValidationError,
+                "Người thuê chính sau phụ lục phải thuộc danh sách người ở còn lại.");
+        }
+    }
+
+    private async Task<List<ContractAppendixChangeRequest>> BuildAppendixChangeRequestsAsync(
+        RentalContract contract,
+        IReadOnlyCollection<ParsedAppendixChange> changes,
+        CancellationToken cancellationToken)
+    {
+        var result = changes
+            .OrderBy(x => x.SortOrder)
+            .Select(x => x.Request)
+            .ToList();
+
+        var projection = await ProjectOccupantsAsync(contract, changes, cancellationToken);
+        if (projection.InitialCount == projection.FinalCount)
+        {
+            return result;
+        }
+
+        var monthlyRent = ResolveMonthlyRentForOccupantCount(contract, projection.FinalCount);
+        if (monthlyRent == contract.MonthlyRent)
+        {
+            return result;
+        }
+
+        result.Add(new ContractAppendixChangeRequest
+        {
+            ChangeType = ContractAppendixChangeType.Update.ToString(),
+            TargetType = ContractAppendixTargetType.Contract.ToString(),
+            FieldName = "monthlyRent",
+            NewValue = monthlyRent.ToString(CultureInfo.InvariantCulture)
+        });
+
+        return result;
+    }
+
+    private async Task<ProjectedOccupantsResult> ProjectOccupantsAsync(
+        RentalContract contract,
+        IReadOnlyCollection<ParsedAppendixChange> changes,
+        CancellationToken cancellationToken)
+    {
+        var projectedOccupants = contract.Occupants
+            .Where(x => x.Status == ContractOccupantStatus.Active)
+            .Select(x => new ProjectedOccupant(x.Id, x.UserId))
+            .ToList();
+        var initialCount = projectedOccupants.Count;
+        var projectedMainTenantUserId = GetCurrentMainTenantUserId(contract);
+
+        foreach (var change in changes.OrderBy(x => x.SortOrder))
+        {
+            if (change.TargetType == ContractAppendixTargetType.ContractOccupant &&
+                change.ChangeType == ContractAppendixChangeType.Remove &&
+                change.Request.TargetId.HasValue)
+            {
+                projectedOccupants.RemoveAll(x => x.OccupantId == change.Request.TargetId.Value);
+                continue;
+            }
+
+            if (change.TargetType == ContractAppendixTargetType.ContractOccupant &&
+                change.ChangeType == ContractAppendixChangeType.Add)
+            {
+                var occupantRequest = ParseOccupantRequest(change.Request.NewValue);
+                Guid? userId = null;
+                if (!string.IsNullOrWhiteSpace(occupantRequest.Email))
+                {
+                    var verifiedAccount = await GetVerifiedOccupantAccountByEmailAsync(
+                        occupantRequest.Email.Trim().ToLowerInvariant(),
+                        cancellationToken);
+                    userId = verifiedAccount.UserId;
+                }
+
+                projectedOccupants.Add(new ProjectedOccupant(null, userId));
+                continue;
+            }
+
+            if (IsMainTenantUserIdChange(change))
+            {
+                var newMainTenantUserId = await ResolveUserIdReferenceAsync(change.Request.NewValue, cancellationToken);
+                if (newMainTenantUserId.HasValue)
+                {
+                    projectedMainTenantUserId = newMainTenantUserId.Value;
+                }
+            }
+        }
+
+        return new ProjectedOccupantsResult(initialCount, projectedOccupants, projectedMainTenantUserId);
+    }
+
+    private static decimal ResolveMonthlyRentForOccupantCount(RentalContract contract, int occupantCount)
+    {
+        var priceTierOccupantCount = contract.Room.IsTieredPricing ? occupantCount : 1;
+        var tier = contract.Room.PriceTiers.FirstOrDefault(x =>
+            x.IsActive &&
+            x.OccupantCount == priceTierOccupantCount);
+
+        if (tier is null)
+        {
+            throw new ConflictException(
+                ErrorCodes.PriceTierInvalid,
+                "Phòng chưa có bảng giá phù hợp với số người ở sau phụ lục.",
+                new { contract.RoomId, occupantCount = priceTierOccupantCount });
+        }
+
+        return tier.MonthlyRent;
     }
 
     private static int GetCurrentOccupantCount(RentalContract contract)
@@ -1602,6 +1967,45 @@ public class ContractAppendixService : IContractAppendixService
                NormalizeFieldName(change.Request.FieldName) == "maintenantuserid";
     }
 
+    private static bool IsRenewalChange(ParsedAppendixChange change)
+    {
+        return change.TargetType == ContractAppendixTargetType.Contract &&
+               change.ChangeType == ContractAppendixChangeType.Update &&
+               NormalizeFieldName(change.Request.FieldName) == "enddate";
+    }
+
+    private static bool IsMonthlyRentChange(ParsedAppendixChange change)
+    {
+        return change.TargetType == ContractAppendixTargetType.Contract &&
+               change.ChangeType == ContractAppendixChangeType.Update &&
+               NormalizeFieldName(change.Request.FieldName) == "monthlyrent";
+    }
+
+    private static bool IsPaymentDayChange(ParsedAppendixChange change)
+    {
+        return change.TargetType == ContractAppendixTargetType.Contract &&
+               change.ChangeType == ContractAppendixChangeType.Update &&
+               NormalizeFieldName(change.Request.FieldName) == "paymentday";
+    }
+
+    private async Task<Guid?> ResolveUserIdReferenceAsync(string? value, CancellationToken cancellationToken)
+    {
+        var userId = ExtractUserId(value);
+        if (userId.HasValue)
+        {
+            return userId.Value;
+        }
+
+        var email = ExtractUserEmail(value);
+        if (string.IsNullOrWhiteSpace(email))
+        {
+            return null;
+        }
+
+        var verifiedAccount = await GetVerifiedOccupantAccountByEmailAsync(email, cancellationToken);
+        return verifiedAccount.UserId;
+    }
+
     private static Guid? ExtractUserId(string? value)
     {
         if (string.IsNullOrWhiteSpace(value))
@@ -1642,6 +2046,60 @@ public class ContractAppendixService : IContractAppendixService
         return null;
     }
 
+    private static string? ExtractUserEmail(string? value)
+    {
+        if (string.IsNullOrWhiteSpace(value))
+        {
+            return null;
+        }
+
+        var trimmed = value.Trim().Trim('"');
+        if (trimmed.Contains('@', StringComparison.Ordinal))
+        {
+            return trimmed.ToLowerInvariant();
+        }
+
+        try
+        {
+            using var document = JsonDocument.Parse(value);
+            var root = document.RootElement;
+
+            if (root.ValueKind == JsonValueKind.String)
+            {
+                var text = root.GetString()?.Trim();
+                return !string.IsNullOrWhiteSpace(text) && text.Contains('@', StringComparison.Ordinal)
+                    ? text.ToLowerInvariant()
+                    : null;
+            }
+
+            if (root.ValueKind == JsonValueKind.Object &&
+                root.TryGetProperty("email", out var emailElement) &&
+                emailElement.ValueKind == JsonValueKind.String)
+            {
+                var email = emailElement.GetString()?.Trim();
+                return string.IsNullOrWhiteSpace(email) ? null : email.ToLowerInvariant();
+            }
+        }
+        catch (JsonException)
+        {
+            return null;
+        }
+
+        return null;
+    }
+
+    private static string? ExtractOccupantEmail(string? value)
+    {
+        try
+        {
+            return NormalizeOptionalText(ParseOccupantRequest(value).Email)?.ToLowerInvariant();
+        }
+        catch (BadRequestException)
+        {
+            return null;
+        }
+    }
+
     private static bool TryParseDateOnly(string? value, out DateOnly date)
     {
         date = default;
@@ -1651,6 +2109,26 @@ public class ContractAppendixService : IContractAppendixService
         }
 
         return DateOnly.TryParse(value.Trim().Trim('"'), out date);
+    }
+
+    private static string? ExtractJsonString(string? value)
+    {
+        if (string.IsNullOrWhiteSpace(value))
+        {
+            return null;
+        }
+
+        try
+        {
+            using var document = JsonDocument.Parse(value);
+            return document.RootElement.ValueKind == JsonValueKind.String
+                ? document.RootElement.GetString()
+                : value.Trim();
+        }
+        catch (JsonException)
+        {
+            return value.Trim().Trim('"');
+        }
     }
 
     private static int CountStartedMonths(DateOnly from, DateOnly to)
@@ -1819,6 +2297,18 @@ public class ContractAppendixService : IContractAppendixService
         ContractAppendixChangeType ChangeType,
         ContractAppendixTargetType TargetType,
         int SortOrder);
+
+    private sealed record ProjectedOccupant(
+        Guid? OccupantId,
+        Guid? UserId);
+
+    private sealed record ProjectedOccupantsResult(
+        int InitialCount,
+        IReadOnlyCollection<ProjectedOccupant> Occupants,
+        Guid MainTenantUserId)
+    {
+        public int FinalCount => Occupants.Count;
+    }
 
     private sealed record VerifiedOccupantAccount(
         Guid UserId,

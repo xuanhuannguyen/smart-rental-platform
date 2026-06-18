@@ -32,7 +32,7 @@ public class RoomAccessService
         {
             throw new NotFoundException(
                 ErrorCodes.HouseNotFound,
-                "Không tìm thấy khu trềE",
+                "Không tìm thấy khu trọ.",
                 new { roomingHouseId });
         }
 
@@ -61,7 +61,7 @@ public class RoomAccessService
         {
             throw new ConflictException(
                 ErrorCodes.HouseNotApproved,
-                "ChềEkhu trềEđã được duyệt mới có thềEquản lý phòng.",
+                "Chỉ khu trọ đã được duyệt mới có thể quản lý phòng.",
                 new { currentStatus = roomingHouse.ApprovalStatus.ToString() });
         }
     }
@@ -84,7 +84,7 @@ public class RoomAccessService
         {
             throw new ConflictException(
                 ErrorCodes.RoomDuplicateNumber,
-                "SềEphòng đã tồn tại trong khu trềEnày.",
+                "Số phòng đã tồn tại trong khu trọ này.",
                 new { roomingHouseId, roomNumber });
         }
     }
@@ -106,7 +106,7 @@ public class RoomAccessService
         {
             throw new BadRequestException(
                 ErrorCodes.AmenityNotFound,
-                "Một hoặc nhiều mã tiện ích không hợp lềE",
+                "Một hoặc nhiều mã tiện ích không hợp lệ.",
                 new { amenityIds });
         }
 

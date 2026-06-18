@@ -5,9 +5,23 @@ namespace SmartRentalPlatform.Application.RentalContracts;
 
 public interface IRentalContractService
 {
+    Task<IReadOnlyCollection<ContractHistoryItemResponse>> GetMyHistoryAsync(
+        Guid tenantUserId,
+        CancellationToken cancellationToken = default);
+
     Task<ContractDetailResponse?> GetByIdAsync(
         Guid userId,
         Guid contractId,
+        CancellationToken cancellationToken = default);
+
+    Task<ContractDetailResponse?> GetActiveContractByRoomIdAsync(
+        Guid landlordUserId,
+        Guid roomId,
+        CancellationToken cancellationToken = default);
+
+    Task<IReadOnlyCollection<ContractOccupantResponse>?> GetActiveTenantsByRoomIdAsync(
+        Guid landlordUserId,
+        Guid roomId,
         CancellationToken cancellationToken = default);
 
     Task<ContractPreviewPdfResult?> GetPreviewPdfAsync(

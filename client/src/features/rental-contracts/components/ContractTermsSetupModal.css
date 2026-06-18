@@ -1,0 +1,109 @@
+.contract-terms-modal-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background-color: rgba(0, 0, 0, 0.5);
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  z-index: 1000;
+  padding: 20px;
+}
+
+.contract-terms-modal {
+  background: white;
+  border-radius: 12px;
+  width: 100%;
+  max-width: 600px;
+  max-height: 90vh;
+  display: flex;
+  flex-direction: column;
+  box-shadow: 0 10px 25px rgba(0, 0, 0, 0.1);
+  overflow: hidden;
+}
+
+.contract-terms-modal .modal-header {
+  padding: 20px 24px;
+  border-bottom: 1px solid #e2e8f0;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.contract-terms-modal .modal-header h3 {
+  margin: 0;
+  font-size: 1.25rem;
+  color: #1e293b;
+}
+
+.contract-terms-modal .close-btn {
+  background: none;
+  border: none;
+  font-size: 1.5rem;
+  color: #64748b;
+  cursor: pointer;
+  padding: 0;
+  line-height: 1;
+}
+
+.contract-terms-modal .close-btn:hover {
+  color: #0f172a;
+}
+
+.contract-terms-modal .modal-body {
+  padding: 24px;
+  overflow-y: auto;
+  flex: 1;
+}
+
+.contract-terms-modal .form-group {
+  margin-bottom: 20px;
+}
+
+.contract-terms-modal .form-group label {
+  display: block;
+  margin-bottom: 8px;
+  font-weight: 500;
+  color: #334155;
+  font-size: 0.95rem;
+}
+
+.contract-terms-modal .form-group input {
+  width: 100%;
+  padding: 10px 12px;
+  border: 1px solid #cbd5e1;
+  border-radius: 6px;
+  font-size: 1rem;
+  color: #0f172a;
+  outline: none;
+  transition: border-color 0.2s;
+}
+
+.contract-terms-modal .form-group input:focus {
+  border-color: #3b82f6;
+  box-shadow: 0 0 0 2px rgba(59, 130, 246, 0.1);
+}
+
+.contract-terms-modal .form-group input:disabled {
+  background-color: #f1f5f9;
+  color: #64748b;
+  cursor: not-allowed;
+}
+
+.contract-terms-modal .help-text {
+  display: block;
+  margin-top: 6px;
+  font-size: 0.85rem;
+  color: #64748b;
+}
+
+.contract-terms-modal .modal-footer {
+  padding: 16px 24px;
+  border-top: 1px solid #e2e8f0;
+  display: flex;
+  justify-content: flex-end;
+  gap: 12px;
+  background-color: #f8fafc;
+}

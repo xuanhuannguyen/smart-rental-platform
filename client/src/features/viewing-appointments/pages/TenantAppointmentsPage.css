@@ -1,6 +1,4 @@
 .tenant-appointments-page {
-  min-height: 100vh;
-  background-color: #f8fafc;
   font-family: inherit;
 }
 
@@ -47,10 +45,7 @@
 }
 
 .appointments-container {
-  max-width: 1200px;
-  margin: 28px auto;
-  padding: 0 24px;
-  box-sizing: border-box;
+  width: 100%;
 }
 
 .tabs-navigation {

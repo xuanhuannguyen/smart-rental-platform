@@ -2,11 +2,11 @@ import { useEffect, useMemo, useState, useRef, type CSSProperties, type FormEven
 import { useLocation, useNavigate, useSearchParams } from 'react-router-dom';
 import L from 'leaflet';
 import 'leaflet/dist/leaflet.css';
-import { useAuth } from '../../app/providers/AuthProvider';
 import { ROUTE_PATHS } from '../../app/router/routePaths';
 import { getApiErrorMessage } from '../../shared/api/apiError';
 import { toAssetUrl } from '../../shared/api/assets';
 import { Button } from '../../shared/components/ui/Button';
+import { HomeHeader } from '../../shared/components/layout/HomeHeader';
 import { searchPublicRoomingHouses, getAmenities, searchLocationAddress, suggestLocationAddresses } from './api';
 import { getProvinces, getWardsByProvince } from '../administrative/api';
 import type { Province, Ward } from '../administrative/types';
@@ -37,35 +37,12 @@ export default function SearchRoomingHousesPage() {
   const searchCacheKey = useMemo(() => paramsToUrl(query).toString(), [query]);
   const nearbyLabelParam = searchParams.get('nearbyLabel')?.trim() ?? '';
   
-  const { currentUser, logout } = useAuth();
-  const [showDropdown, setShowDropdown] = useState(false);
-  const dropdownRef = useRef<HTMLDivElement>(null);
-  
   const [result, setResult] = useState<PagedResult<RoomingHouseSearchItem> | null>(
     () => searchResultCache.get(searchCacheKey) ?? null
   );
   const [loading, setLoading] = useState(() => !searchResultCache.has(searchCacheKey));
   const [error, setError] = useState('');
   const restoredSearchPathRef = useRef<string | null>(null);
-
-  // Click bên ngoài để đóng dropdown Avatar
-  useEffect(() => {
-    function handleClickOutside(event: MouseEvent) {
-      if (dropdownRef.current && !dropdownRef.current.contains(event.target as Node)) {
-        setShowDropdown(false);
-      }
-    }
-    document.addEventListener('mousedown', handleClickOutside);
-    return () => {
-      document.removeEventListener('mousedown', handleClickOutside);
-    };
-  }, []);
-
-  const isAdmin = currentUser?.roles.includes('Admin') || false;
-  const isLandlord = currentUser?.roles.includes('Landlord') || false;
-  const avatarInitials = currentUser?.displayName
-    ? currentUser.displayName.split(' ').map((n) => n[0]).join('').substring(0, 2).toUpperCase()
-    : 'U';
 
   // Dropdown & Checkbox source states
   const [provinces, setProvinces] = useState<Province[]>([]);
@@ -148,6 +125,22 @@ export default function SearchRoomingHousesPage() {
     query.provinceCode != null ||
     query.wardCode != null ||
     (query.centerLat != null && query.centerLng != null);
+
+  // Handle clicking outside location panel
+  const locationPanelRef = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    function handleClickOutside(event: MouseEvent) {
+      if (
+        activeLocationPanel != null &&
+        locationPanelRef.current &&
+        !locationPanelRef.current.contains(event.target as Node)
+      ) {
+        setActiveLocationPanel(null);
+      }
+    }
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, [activeLocationPanel]);
 
   // Load provinces and active amenities on mount
   useEffect(() => {
@@ -918,271 +911,219 @@ export default function SearchRoomingHousesPage() {
 
   return (
     <div className="search-page-wrapper">
-      <header className="search-header">
-        <div className="search-header__logo" onClick={() => navigate('/home')}>
-          Smart Rental
-        </div>
-        <form className="search-header__search-form" onSubmit={handleApplyFilters}>
-          <SearchSuggestionBox
-            placeholder="VD: gần đại học FPT dưới 3tr có máy lạnh"
-            value={searchQuery}
-            onChange={setSearchQuery}
-            onSearch={handleSuggestionSearch}
-          />
-          <Button type="submit">Tìm</Button>
-        </form>
-        <div className="search-location-actions">
-          <button
-            type="button"
-            className={`search-location-action ${hasAppliedLocationSearch ? 'is-active' : ''}`}
-            onClick={handleOpenLocationPanel}
-            aria-expanded={activeLocationPanel != null}
-          >
-            <span>{locationButtonLabel}</span>
-            <span className="search-location-action__chevron">⌄</span>
-          </button>
-
-          {activeLocationPanel && (
-            <div className="search-location-panel" role="dialog" aria-label="Tùy chọn vị trí tìm kiếm">
-            <button
-              type="button"
-              className="location-panel-close"
-              onClick={() => setActiveLocationPanel(null)}
-              aria-label="Đóng bộ lọc vị trí"
-            >
-              ×
-            </button>
-
-            {activeLocationPanel === 'nearby' ? (
-              <>
-                <div className="location-panel-subheader">
-                  <button type="button" className="location-back-button" onClick={() => setActiveLocationPanel('area')}>
-                    ‹
-                  </button>
-                  <strong>Nhập vị trí quanh bạn</strong>
-                </div>
-                <div className="nearby-search-details">
-                  <div className="location-panel-field">
-                    <label htmlFor="nearby-address-input">Vị trí tìm kiếm</label>
-                    <div className="nearby-address-row">
-                      <input
-                        id="nearby-address-input"
-                        value={nearbyAddress}
-                        onChange={(e) => {
-                          setNearbyAddress(e.target.value);
-                          setNearbyError('');
-                        }}
-                        onFocus={() => {
-                          if (nearbySuggestions.length > 0) {
-                            setShowNearbySuggestions(true);
-                          }
-                        }}
-                        onBlur={() => {
-                          window.setTimeout(() => setShowNearbySuggestions(false), 120);
-                        }}
-                        onKeyDown={(e) => {
-                          if (e.key === 'Enter') {
-                            e.preventDefault();
-                            void handleFindNearbyAddress();
-                          }
-                        }}
-                        placeholder="Nhập địa điểm, tên đường, khu vực muốn tìm"
-                      />
-                      <Button type="button" variant="secondary" onClick={handleFindNearbyAddress} disabled={nearbySearching}>
-                        {nearbySearching ? 'Đang tìm...' : 'Lấy vị trí'}
-                      </Button>
-                    </div>
-                    {(showNearbySuggestions || nearbySuggesting) && (
-                      <div className="nearby-suggestions" role="listbox" aria-label="Gợi ý vị trí">
-                        {nearbySuggesting && nearbySuggestions.length === 0 ? (
-                          <div className="nearby-suggestions__state">Đang tìm gợi ý...</div>
-                        ) : (
-                          nearbySuggestions.map((suggestion) => (
-                            <button
-                              key={suggestion.refId ?? suggestion.displayAddress}
-                              type="button"
-                              className="nearby-suggestion-item"
-                              onMouseDown={(event) => event.preventDefault()}
-                              onClick={() => handleSelectNearbySuggestion(suggestion)}
-                            >
-                              <span>{suggestion.name || suggestion.displayAddress}</span>
-                              {suggestion.address && <small>{suggestion.address}</small>}
-                            </button>
-                          ))
-                        )}
-                      </div>
-                    )}
-                    {nearbyError && <p className="location-panel-error">{nearbyError}</p>}
-                  </div>
-                  <Button type="button" variant="secondary" className="current-loc-btn" onClick={handleUseCurrentLocation}>
-                    Dùng vị trí hiện tại
-                  </Button>
-                  <div className="location-panel-field">
-                    <label htmlFor="nearby-radius-range">Bán kính tìm kiếm</label>
-                    <div className="radius-slider-row">
-                      <span className="radius-value">{formatRadius(localRadiusKm)}</span>
-                      <span>0.5</span>
-                      <input
-                        id="nearby-radius-range"
-                        type="range"
-                        min="0.5"
-                        max="30"
-                        step="0.5"
-                        value={localRadiusKm}
-                        onChange={(e) => setLocalRadiusKm(Number(e.target.value))}
-                      />
-                      <span>30 km</span>
-                    </div>
-                  </div>
-                  {localCenterLat != null && localCenterLng != null && (
-                    <p className="location-panel-summary">
-                      Tâm: {localCenterLat.toFixed(5)}, {localCenterLng.toFixed(5)}
-                    </p>
-                  )}
-                </div>
-              </>
-            ) : (
-              <>
-                <section className="location-panel-section">
-                  <button type="button" className="location-section-heading" onClick={() => setActiveLocationPanel('nearby')}>
-                    <span className="location-section-icon" aria-hidden="true">⌖</span>
-                    <span>Tìm kiếm quanh bạn</span>
-                  </button>
-                  <button type="button" className="nearby-search-trigger" onClick={() => setActiveLocationPanel('nearby')}>
-                    <span>{nearbyAddress || 'Nhập vị trí và khoảng cách tìm kiếm'}</span>
-                    <span>›</span>
-                  </button>
-                </section>
-
-                <section className="location-panel-section">
-                  <button type="button" className="location-section-heading" onClick={() => setActiveLocationPanel('area')}>
-                    <span className="location-section-icon" aria-hidden="true">▦</span>
-                    <span>Tìm theo khu vực</span>
-                  </button>
-                  <div className="area-quick-list">
-                    {quickLocationProvinces.map((province) => (
-                      <button
-                        key={province.code}
-                        type="button"
-                        className={localProvinceCode === province.code ? 'is-selected' : ''}
-                        onClick={() => {
-                          setActiveLocationPanel('area');
-                          setLocalProvinceCode(province.code);
-                          setLocalWardCode('');
-                        }}
-                      >
-                        {province.name}
-                      </button>
-                    ))}
-                  </div>
-                  <div className="location-select-list">
-                    <label className="location-select-card" htmlFor="location-province-select">
-                      <span>
-                        <strong>Chọn tỉnh thành</strong>
-                        <small>{selectedProvinceName || 'Tất cả tỉnh/thành phố'}</small>
-                      </span>
-                      <span>›</span>
-                      <select
-                        id="location-province-select"
-                        value={localProvinceCode}
-                        onChange={(e) => {
-                          setActiveLocationPanel('area');
-                          setLocalProvinceCode(e.target.value);
-                          setLocalWardCode('');
-                        }}
-                      >
-                        <option value="">Tất cả tỉnh/thành phố</option>
-                        {provinces.map((province) => (
-                          <option key={province.code} value={province.code}>
-                            {province.name}
-                          </option>
-                        ))}
-                      </select>
-                    </label>
-                    <label className="location-select-card" htmlFor="location-ward-select">
-                      <span>
-                        <strong>Chọn khu vực</strong>
-                        <small>{selectedWardName || 'Tất cả khu vực trong tỉnh/thành'}</small>
-                      </span>
-                      <span>›</span>
-                      <select
-                        id="location-ward-select"
-                        value={localWardCode}
-                        disabled={!localProvinceCode}
-                        onChange={(e) => {
-                          setActiveLocationPanel('area');
-                          setLocalWardCode(e.target.value);
-                        }}
-                      >
-                        <option value="">Tất cả khu vực trong tỉnh/thành</option>
-                        {wards.map((ward) => (
-                          <option key={ward.code} value={ward.code}>
-                            {ward.name}
-                          </option>
-                        ))}
-                      </select>
-                    </label>
-                  </div>
-                </section>
-              </>
-            )}
-
-            <div className="location-panel-actions">
-              <Button type="button" variant="secondary" onClick={handleClearLocationFilters}>Xóa Lọc</Button>
-              <Button type="button" onClick={handleApplyLocationPanel}>Áp dụng</Button>
-            </div>
-          </div>
-          )}
-        </div>
-
-        <div className="search-header__auth">
-          {currentUser ? (
-            <div className="avatar-wrapper" ref={dropdownRef}>
-              <button className="avatar-btn" onClick={() => setShowDropdown(!showDropdown)}>
-                {currentUser.avatarUrl && currentUser.avatarUrl.trim() !== '' ? (
-                  <img src={toAssetUrl(currentUser.avatarUrl)} alt="Avatar" className="avatar-image" />
-                ) : (
-                  <span className="avatar-initials">{avatarInitials}</span>
-                )}
-                <span className="avatar-name">{currentUser.displayName}</span>
+      <HomeHeader
+        centerContent={
+          <>
+            <form className="search-header__search-form" onSubmit={handleApplyFilters}>
+              <SearchSuggestionBox
+                placeholder="VD: gần đại học FPT dưới 3tr có máy lạnh"
+                value={searchQuery}
+                onChange={setSearchQuery}
+                onSearch={handleSuggestionSearch}
+              />
+              <Button type="submit">Tìm</Button>
+            </form>
+            <div className="search-location-actions" ref={locationPanelRef}>
+              <button
+                type="button"
+                className={`search-location-action ${hasAppliedLocationSearch ? 'is-active' : ''}`}
+                onClick={handleOpenLocationPanel}
+                aria-expanded={activeLocationPanel != null}
+              >
+                <span>{locationButtonLabel}</span>
+                <span>{activeLocationPanel ? '▲' : '▼'}</span>
               </button>
-              {showDropdown && (
-                <div className="avatar-dropdown">
-                  <div className="dropdown-info">
-                    <strong>{currentUser.displayName}</strong>
-                    <span>{currentUser.email}</span>
+
+              {activeLocationPanel && (
+                <div className="search-location-panel" role="dialog" aria-label="Tùy chọn vị trí tìm kiếm">
+                  <button
+                    type="button"
+                    className="location-panel-close"
+                    onClick={() => setActiveLocationPanel(null)}
+                    aria-label="Đóng bộ lọc vị trí"
+                  >
+                    ×
+                  </button>
+
+                  {activeLocationPanel === 'nearby' ? (
+                    <>
+                      <div className="location-panel-subheader">
+                        <button type="button" className="location-back-button" onClick={() => setActiveLocationPanel('area')}>
+                          ‹
+                        </button>
+                        <strong>Nhập vị trí quanh bạn</strong>
+                      </div>
+                      <div className="nearby-search-details">
+                        <div className="location-panel-field">
+                          <label htmlFor="nearby-address-input">Vị trí tìm kiếm</label>
+                          <div className="nearby-address-row">
+                            <input
+                              id="nearby-address-input"
+                              value={nearbyAddress}
+                              onChange={(e) => {
+                                setNearbyAddress(e.target.value);
+                                setNearbyError('');
+                              }}
+                              onFocus={() => {
+                                if (nearbySuggestions.length > 0) {
+                                  setShowNearbySuggestions(true);
+                                }
+                              }}
+                              onBlur={() => {
+                                window.setTimeout(() => setShowNearbySuggestions(false), 120);
+                              }}
+                              onKeyDown={(e) => {
+                                if (e.key === 'Enter') {
+                                  e.preventDefault();
+                                  void handleFindNearbyAddress();
+                                }
+                              }}
+                              placeholder="Nhập địa điểm, tên đường, khu vực muốn tìm"
+                            />
+                            <Button type="button" variant="secondary" onClick={handleFindNearbyAddress} disabled={nearbySearching}>
+                              {nearbySearching ? 'Đang tìm...' : 'Lấy vị trí'}
+                            </Button>
+                          </div>
+                          {(showNearbySuggestions || nearbySuggesting) && (
+                            <div className="nearby-suggestions" role="listbox" aria-label="Gợi ý vị trí">
+                              {nearbySuggesting && nearbySuggestions.length === 0 ? (
+                                <div className="nearby-suggestions__state">Đang tìm gợi ý...</div>
+                              ) : (
+                                nearbySuggestions.map((suggestion) => (
+                                  <button
+                                    key={suggestion.refId ?? suggestion.displayAddress}
+                                    type="button"
+                                    className="nearby-suggestion-item"
+                                    role="option"
+                                    aria-selected="false"
+                                    onMouseDown={(event) => event.preventDefault()}
+                                    onClick={() => handleSelectNearbySuggestion(suggestion)}
+                                  >
+                                    <strong>{suggestion.name || suggestion.displayAddress}</strong>
+                                    <small>{suggestion.address}</small>
+                                  </button>
+                                ))
+                              )}
+                            </div>
+                          )}
+                        </div>
+                        <div className="location-panel-field">
+                          <label htmlFor="nearby-radius-input">
+                            Bán kính xung quanh: {localRadiusKm} km
+                          </label>
+                          <input
+                            id="nearby-radius-input"
+                            type="range"
+                            min="0.5"
+                            max="30"
+                            step="0.5"
+                            value={localRadiusKm}
+                            onChange={(e) => setLocalRadiusKm(Number(e.target.value))}
+                          />
+                        </div>
+                        {nearbyError && <p className="nearby-error-text">{nearbyError}</p>}
+                      </div>
+                    </>
+                  ) : (
+                    <>
+                      <section className="location-panel-section">
+                        <button type="button" className="location-section-heading" onClick={() => setActiveLocationPanel('nearby')}>
+                          <span className="location-section-icon">◎</span>
+                          <strong>Tìm kiếm quanh bạn</strong>
+                        </button>
+                        <button type="button" className="nearby-search-trigger" onClick={() => setActiveLocationPanel('nearby')}>
+                          <span>
+                            {hasAppliedRadiusSearch
+                              ? nearbyAddress || `Bán kính ${localRadiusKm}km`
+                              : 'Nhập vị trí và khoảng cách tìm kiếm'}
+                          </span>
+                          <span>›</span>
+                        </button>
+                      </section>
+
+                      <section className="location-panel-section">
+                        <div className="location-section-heading">
+                          <span className="location-section-icon">▦</span>
+                          <strong>Tìm theo khu vực</strong>
+                        </div>
+                        <div className="area-quick-list">
+                          {quickLocationProvinces.map((province) => (
+                            <button
+                              key={province.code}
+                              type="button"
+                              className={localProvinceCode === province.code ? 'is-selected' : ''}
+                              onClick={() => {
+                                setActiveLocationPanel('area');
+                                setLocalProvinceCode(province.code);
+                                setLocalWardCode('');
+                              }}
+                            >
+                              {province.name}
+                            </button>
+                          ))}
+                        </div>
+                        <div className="location-select-list">
+                          <label className="location-select-card" htmlFor="location-province-select">
+                            <span>
+                              <strong>Chọn tỉnh thành</strong>
+                              <small>{selectedProvinceName || 'Tất cả tỉnh/thành phố'}</small>
+                            </span>
+                            <span>›</span>
+                            <select
+                              id="location-province-select"
+                              value={localProvinceCode}
+                              onChange={(e) => {
+                                setActiveLocationPanel('area');
+                                setLocalProvinceCode(e.target.value);
+                                setLocalWardCode('');
+                              }}
+                            >
+                              <option value="">Tất cả tỉnh/thành phố</option>
+                              {provinces.map((province) => (
+                                <option key={province.code} value={province.code}>
+                                  {province.name}
+                                </option>
+                              ))}
+                            </select>
+                          </label>
+                          <label className="location-select-card" htmlFor="location-ward-select">
+                            <span>
+                              <strong>Chọn khu vực</strong>
+                              <small>{selectedWardName || 'Tất cả khu vực trong tỉnh/thành'}</small>
+                            </span>
+                            <span>›</span>
+                            <select
+                              id="location-ward-select"
+                              value={localWardCode}
+                              disabled={!localProvinceCode}
+                              onChange={(e) => {
+                                setActiveLocationPanel('area');
+                                setLocalWardCode(e.target.value);
+                              }}
+                            >
+                              <option value="">Tất cả khu vực trong tỉnh/thành</option>
+                              {wards.map((ward) => (
+                                <option key={ward.code} value={ward.code}>
+                                  {ward.name}
+                                </option>
+                              ))}
+                            </select>
+                          </label>
+                        </div>
+                      </section>
+                    </>
+                  )}
+
+                  <div className="location-panel-actions">
+                    <Button type="button" variant="secondary" onClick={handleClearLocationFilters}>Xóa Lọc</Button>
+                    <Button type="button" onClick={handleApplyLocationPanel}>Áp dụng</Button>
                   </div>
-                  <button className="dropdown-item" onClick={() => { setShowDropdown(false); navigate(ROUTE_PATHS.ACCOUNT.PROFILE); }}>
-                    Chỉnh sửa thông tin
-                  </button>
-                  {isAdmin && (
-                    <button className="dropdown-item" onClick={() => { setShowDropdown(false); navigate(ROUTE_PATHS.ADMIN.APPROVALS); }}>
-                      Duyệt hồ sơ
-                    </button>
-                  )}
-                  {isLandlord && (
-                    <button className="dropdown-item" onClick={() => { setShowDropdown(false); navigate(ROUTE_PATHS.LANDLORD.DASHBOARD); }}>
-                      Kênh chủ trọ
-                    </button>
-                  )}
-                  <button className="dropdown-item dropdown-item--danger" onClick={() => { setShowDropdown(false); logout(); }}>
-                    Đăng xuất
-                  </button>
                 </div>
               )}
             </div>
-          ) : (
-            <div className="auth-buttons">
-              <Button type="button" variant="secondary" onClick={() => navigate(ROUTE_PATHS.AUTH.LOGIN)}>
-                Đăng nhập
-              </Button>
-              <Button type="button" onClick={() => navigate(ROUTE_PATHS.AUTH.REGISTER)}>
-                Đăng ký
-              </Button>
-            </div>
-          )}
-        </div>
-      </header>
+          </>
+        }
+      />
 
       <div className="search-page-container">
         {/* Left column: Filters Sidebar */}

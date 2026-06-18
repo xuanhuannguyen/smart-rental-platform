@@ -64,4 +64,10 @@ public interface IContractAppendixService
         Guid appendixId,
         RequestContractRevisionRequest request,
         CancellationToken cancellationToken = default);
+
+    Task<bool> DeleteAsync(
+        Guid userId,
+        Guid contractId,
+        Guid appendixId,
+        CancellationToken cancellationToken = default);
 }

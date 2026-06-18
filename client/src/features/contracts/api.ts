@@ -7,18 +7,26 @@ import { env } from '../../config/env';
 import type {
   ContractDetailResponse,
   ContractFileResponse,
+  ContractHistoryItemResponse,
   ContractPreviewResponse,
   RejectContractRequest,
   RequestContractSignatureOtpResponse,
   RequestContractRevisionRequest,
   SignContractRequest,
   SubmitContractOccupantsRequest,
+  TerminateContractRequest,
   UpdateContractTermsRequest,
   ContractAppendixResponse,
   CreateContractAppendixRequest
 } from './types';
 
 export const contractApi = {
+  getMyHistory: () =>
+    apiClient<ApiResponse<ContractHistoryItemResponse[]>>(ENDPOINTS.CONTRACTS.MY_HISTORY, {
+      method: 'GET',
+      auth: true
+    }),
+
   getContract: (id: string) =>
     apiClient<ApiResponse<ContractDetailResponse>>(ENDPOINTS.CONTRACTS.BY_ID(id), {
       method: 'GET',
@@ -118,6 +126,13 @@ export const contractApi = {
       body: payload
     }),
 
+  terminateContract: (id: string, payload: TerminateContractRequest) =>
+    apiClient<ApiResponse<ContractDetailResponse>>(ENDPOINTS.CONTRACTS.TERMINATE(id), {
+      method: 'POST',
+      auth: true,
+      body: payload
+    }),
+
   createAppendix: (id: string, payload: CreateContractAppendixRequest) =>
     apiClient<ApiResponse<ContractAppendixResponse>>(ENDPOINTS.CONTRACTS.APPENDICES(id), {
       method: 'POST',
@@ -134,6 +149,12 @@ export const contractApi = {
   getAppendix: (id: string, appendixId: string) =>
     apiClient<ApiResponse<ContractAppendixResponse>>(ENDPOINTS.CONTRACTS.APPENDIX_BY_ID(id, appendixId), {
       method: 'GET',
+      auth: true
+    }),
+
+  deleteAppendix: (id: string, appendixId: string) =>
+    apiClient<void>(ENDPOINTS.CONTRACTS.APPENDIX_BY_ID(id, appendixId), {
+      method: 'DELETE',
       auth: true
     }),
 

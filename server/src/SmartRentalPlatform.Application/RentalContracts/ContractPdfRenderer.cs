@@ -116,14 +116,14 @@ public class ContractPdfRenderer : IContractPdfRenderer
         column.Item().PaddingTop(8).Text("BÊN CHO THUÊ (BÊN A):").Bold();
         column.Item().Text($"Ông/Bà: {landlordProfile?.FullName ?? landlord.DisplayName}");
         column.Item().Text($"Ngày sinh: {FormatDate(landlordProfile?.DateOfBirth)}");
-        column.Item().Text($"CCCD/CMND số: {ResolveUserDocumentNumber(landlord.Id, landlordProfile?.VerifiedCitizenIdMasked, options)}");
+        column.Item().Text($"CCCD/Passport số: {ResolveUserDocumentNumber(landlord.Id, landlordProfile?.VerifiedCitizenIdMasked, options)}");
         column.Item().Text($"Địa chỉ thường trú: {landlordProfile?.AddressLine ?? "-"}");
         column.Item().Text($"Số điện thoại: {landlord.PhoneNumber ?? "-"}");
 
         column.Item().PaddingTop(8).Text("BÊN THUÊ (BÊN B):").Bold();
         column.Item().Text($"Ông/Bà (đại diện thuê): {tenantProfile?.FullName ?? tenant.DisplayName}");
         column.Item().Text($"Ngày sinh: {FormatDate(tenantProfile?.DateOfBirth)}");
-        column.Item().Text($"CCCD/CMND số: {ResolveUserDocumentNumber(tenant.Id, tenantProfile?.VerifiedCitizenIdMasked, options)}");
+        column.Item().Text($"CCCD/Passport số: {ResolveUserDocumentNumber(tenant.Id, tenantProfile?.VerifiedCitizenIdMasked, options)}");
         column.Item().Text($"Địa chỉ thường trú: {tenantProfile?.AddressLine ?? "-"}");
         column.Item().Text($"Số điện thoại: {tenant.PhoneNumber ?? "-"}");
 
@@ -167,7 +167,7 @@ public class ContractPdfRenderer : IContractPdfRenderer
                 HeaderCell(header.Cell(), "STT");
                 HeaderCell(header.Cell(), "Họ và tên");
                 HeaderCell(header.Cell(), "Ngày sinh");
-                HeaderCell(header.Cell(), "CCCD/CMND");
+                HeaderCell(header.Cell(), "CCCD/Passport/Giấy khai sinh");
                 HeaderCell(header.Cell(), "Quan hệ");
             });
 
@@ -284,13 +284,13 @@ public class ContractPdfRenderer : IContractPdfRenderer
 
         column.Item().PaddingTop(8).Text("BÊN CHO THUÊ (BÊN A):").Bold();
         column.Item().Text($"Ông/Bà: {landlordProfile?.FullName ?? landlord.DisplayName}    Sinh năm: {FormatBirthYear(landlordProfile?.DateOfBirth)}");
-        column.Item().Text($"CCCD số: {ResolveUserDocumentNumber(landlord.Id, landlordProfile?.VerifiedCitizenIdMasked, options)}    Cấp ngày: -    Nơi cấp: -");
+        column.Item().Text($"CCCD/Passport số: {ResolveUserDocumentNumber(landlord.Id, landlordProfile?.VerifiedCitizenIdMasked, options)}    Cấp ngày: -    Nơi cấp: -");
         column.Item().Text($"Địa chỉ thường trú: {landlordProfile?.AddressLine ?? "-"}");
         column.Item().Text($"Số điện thoại: {landlord.PhoneNumber ?? "-"}");
 
         column.Item().PaddingTop(8).Text("BÊN THUÊ (BÊN B):").Bold();
         column.Item().Text($"Ông/Bà: {tenantProfile?.FullName ?? tenant.DisplayName}    Sinh năm: {FormatBirthYear(tenantProfile?.DateOfBirth)}");
-        column.Item().Text($"CCCD số: {ResolveUserDocumentNumber(tenant.Id, tenantProfile?.VerifiedCitizenIdMasked, options)}    Cấp ngày: -    Nơi cấp: -");
+        column.Item().Text($"CCCD/Passport số: {ResolveUserDocumentNumber(tenant.Id, tenantProfile?.VerifiedCitizenIdMasked, options)}    Cấp ngày: -    Nơi cấp: -");
         column.Item().Text($"Địa chỉ thường trú: {tenantProfile?.AddressLine ?? "-"}");
         column.Item().Text($"Số điện thoại: {tenant.PhoneNumber ?? "-"}");
     }
@@ -322,9 +322,9 @@ public class ContractPdfRenderer : IContractPdfRenderer
             }
         }
 
-        column.Item().PaddingTop(8).Text("5. Điều khoản chung:").Bold();
-        column.Item().Text("5.1 Phụ lục hợp đồng được lập thành 02 bản, có nội dung và giá trị pháp lý như nhau, mỗi bên giữ 01 bản.");
-        column.Item().Text($"5.2 Phụ lục này là một phần không thể tách rời của Hợp đồng thuê nhà số {contract.ContractNumber} và có giá trị kể từ ngày {appendix.EffectiveDate:dd/MM/yyyy}.");
+        column.Item().PaddingTop(8).Text("Điều khoản chung:").Bold();
+        column.Item().Text("1 Phụ lục hợp đồng được lập thành 02 bản, có nội dung và giá trị pháp lý như nhau, mỗi bên giữ 01 bản.");
+        column.Item().Text($"2 Phụ lục này là một phần không thể tách rời của Hợp đồng thuê nhà số {contract.ContractNumber} và có giá trị kể từ ngày {appendix.EffectiveDate:dd/MM/yyyy}.");
     }
 
     private static void ComposeAppendixSignatures(ColumnDescriptor column, ContractAppendix appendix)
@@ -362,7 +362,7 @@ public class ContractPdfRenderer : IContractPdfRenderer
                 if (removedOccupant is not null)
                 {
                     var document = removedOccupant.Documents.OrderBy(x => x.UploadedAt).FirstOrDefault();
-                    return $"Ông/bà {removedOccupant.FullName}, CCCD số {ResolveOccupantDocumentNumber(removedOccupant, document, options)}, rời khỏi danh sách người ở cùng của Hợp đồng thuê phòng trọ số {appendix.RentalContract.ContractNumber}.";
+                    return $"Ông/bà {removedOccupant.FullName}, CCCD/Passport/Giấy khai sinh số {ResolveOccupantDocumentNumber(removedOccupant, document, options)}, rời khỏi danh sách người ở cùng của Hợp đồng thuê phòng trọ số {appendix.RentalContract.ContractNumber}.";
                 }
             }
 
@@ -372,7 +372,7 @@ public class ContractPdfRenderer : IContractPdfRenderer
                 if (addedOccupant is not null)
                 {
                     var document = addedOccupant.Documents.OrderBy(x => x.UploadedAt).FirstOrDefault();
-                    return $"Ông/bà {addedOccupant.FullName}, CCCD số {ResolveOccupantDocumentNumber(addedOccupant, document, options)}, được thêm vào danh sách người ở cùng của Hợp đồng thuê phòng trọ số {appendix.RentalContract.ContractNumber}.";
+                    return $"Ông/bà {addedOccupant.FullName}, CCCD/Passport/Giấy khai sinh số {ResolveOccupantDocumentNumber(addedOccupant, document, options)}, được thêm vào danh sách người ở cùng của Hợp đồng thuê phòng trọ số {appendix.RentalContract.ContractNumber}.";
                 }
 
                 var occupantRequest = TryParseOccupantRequest(change.NewValue);
@@ -380,7 +380,7 @@ public class ContractPdfRenderer : IContractPdfRenderer
                 {
                     var documentNumber = ResolveOccupantRequestDocumentNumber(occupantRequest, options);
                     var fullName = ResolveOccupantRequestName(occupantRequest);
-                    return $"Ông/bà {fullName}, CCCD số {documentNumber}, được thêm vào danh sách người ở cùng của Hợp đồng thuê phòng trọ số {appendix.RentalContract.ContractNumber}.";
+                    return $"Ông/bà {fullName}, CCCD/Passport/Giấy khai sinh số {documentNumber}, được thêm vào danh sách người ở cùng của Hợp đồng thuê phòng trọ số {appendix.RentalContract.ContractNumber}.";
                 }
             }
         }

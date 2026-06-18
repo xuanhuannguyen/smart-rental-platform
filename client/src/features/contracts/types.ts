@@ -54,6 +54,7 @@ export interface ContractFileResponse {
   rentalContractId: string;
   rentalContractAppendixId?: string | null;
   storageObjectKey: string;
+  fileVariant: string;
   fileUrl?: string | null;
   createdAt: string;
 }
@@ -64,6 +65,13 @@ export interface RequestContractRevisionRequest {
 }
 
 export interface RejectContractRequest {
+  reason: string;
+}
+
+export interface TerminateContractRequest {
+  terminationType: string;
+  terminationDate?: string | null;
+  damageFee: number;
   reason: string;
 }
 
@@ -124,6 +132,47 @@ export interface ContractDetailResponse {
   statusReason?: string | null;
   occupants: ContractOccupantResponse[];
   signatures: ContractSignatureResponse[];
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface ContractHistoryItemResponse {
+  id: string;
+  rentalRequestId: string;
+  roomId: string;
+  roomNumber: string;
+  roomingHouseId: string;
+  roomingHouseName: string;
+  mainTenantUserId: string;
+  mainTenantName: string;
+  contractNumber: string;
+  startDate: string;
+  endDate: string;
+  monthlyRent: number;
+  depositAmount: number;
+  paymentDay: number;
+  maxOccupants: number;
+  status: string;
+  statusReason?: string | null;
+  signatureDeadlineAt?: string | null;
+  activatedAt?: string | null;
+  isMainTenant: boolean;
+  wasMainTenant: boolean;
+  isFormerMainTenant: boolean;
+  isCoTenant: boolean;
+  isFormerCoTenant: boolean;
+  currentUserRelation: string;
+  currentUserOccupantId?: string | null;
+  currentUserOccupantStatus?: string | null;
+  currentUserMoveInDate?: string | null;
+  currentUserMoveOutDate?: string | null;
+  snapshotAtAppendixId?: string | null;
+  snapshotAtDate?: string | null;
+  occupants: ContractOccupantResponse[];
+  canViewRawContract: boolean;
+  canViewMaskedContract: boolean;
+  canCreateAppendix: boolean;
+  canTerminateContract: boolean;
   createdAt: string;
   updatedAt: string;
 }

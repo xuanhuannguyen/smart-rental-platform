@@ -125,17 +125,6 @@ export default function LandlordDashboardPage() {
           </div>
 
           <div className="overview-right">
-            <div className="overview-actions">
-              <button
-                className="primary-action"
-                disabled={!canCreateNew || !canEnterDashboard}
-                onClick={handleCreateNewHouse}
-                title={blockingHouse ? getCreateHouseBlockedMessage(blockingHouse.approvalStatus) : 'Tạo khu trọ mới'}
-              >
-                + Tạo khu trọ mới
-              </button>
-            </div>
-
             <div className="overview-stats">
               <div className="stat-item stat-item--total">
                 <BuildingIcon />
@@ -157,6 +146,17 @@ export default function LandlordDashboardPage() {
                 <span>Bản nháp / lỗi</span>
                 <strong className="stat-badge">{houseStats.draft + houseStats.rejected}</strong>
               </div>
+            </div>
+
+            <div className="overview-actions">
+              <button
+                className="primary-action"
+                disabled={!canCreateNew || !canEnterDashboard}
+                onClick={handleCreateNewHouse}
+                title={blockingHouse ? getCreateHouseBlockedMessage(blockingHouse.approvalStatus) : 'Tạo khu trọ mới'}
+              >
+                + Tạo khu trọ mới
+              </button>
             </div>
           </div>
         </section>

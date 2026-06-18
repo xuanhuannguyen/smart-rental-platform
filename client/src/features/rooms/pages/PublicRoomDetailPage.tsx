@@ -7,6 +7,9 @@ import { getApiErrorMessage } from '../../../shared/api/apiError';
 import { useAuth } from '../../../app/providers/AuthProvider';
 import { Alert } from '../../../shared/components/ui/Alert';
 import ViewingAppointmentModal from '../../viewing-appointments/components/ViewingAppointmentModal';
+import SubmitRentalRequestModal from '../../rental-requests/components/SubmitRentalRequestModal';
+import { ROUTE_PATHS } from '../../../app/router/routePaths';
+import { HomeHeader } from '../../../shared/components/layout/HomeHeader';
 import './PublicRoomDetailPage.css';
 
 function formatCurrency(value: number) {
@@ -27,6 +30,7 @@ export default function PublicRoomDetailPage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [isModalOpen, setIsModalOpen] = useState(false);
+  const [isRentalModalOpen, setIsRentalModalOpen] = useState(false);
   const [successMessage, setSuccessMessage] = useState('');
 
   const handleBookingClick = () => {
@@ -56,15 +60,23 @@ export default function PublicRoomDetailPage() {
   }, [houseId]);
 
   if (loading) {
-    return <main className="public-room-detail public-room-detail--state">Đang tải chi tiết phòng trọ...</main>;
+    return (
+      <>
+        <HomeHeader />
+        <main className="public-room-detail public-room-detail--state">Đang tải chi tiết phòng trọ...</main>
+      </>
+    );
   }
 
   if (error || !house) {
     return (
-      <main className="public-room-detail public-room-detail--state">
-        <p className="public-room-detail__error-text">{error || 'Không tìm thấy thông tin khu trọ.'}</p>
-        <Link to="/home" className="public-room-detail__home-link">Quay về trang chủ</Link>
-      </main>
+      <>
+        <HomeHeader />
+        <main className="public-room-detail public-room-detail--state">
+          <p className="public-room-detail__error-text">{error || 'Không tìm thấy thông tin khu trọ.'}</p>
+          <Link to="/home" className="public-room-detail__home-link">Quay về trang chủ</Link>
+        </main>
+      </>
     );
   }
 
@@ -72,10 +84,13 @@ export default function PublicRoomDetailPage() {
 
   if (!room) {
     return (
-      <main className="public-room-detail public-room-detail--state">
-        <p className="public-room-detail__error-text">Không tìm thấy thông tin phòng trọ này.</p>
-        <Link to={`/rooming-houses/${house.id}`} className="public-room-detail__home-link">Quay lại khu trọ</Link>
-      </main>
+      <>
+        <HomeHeader />
+        <main className="public-room-detail public-room-detail--state">
+          <p className="public-room-detail__error-text">Không tìm thấy thông tin phòng trọ này.</p>
+          <Link to={`/rooming-houses/${house.id}`} className="public-room-detail__home-link">Quay lại khu trọ</Link>
+        </main>
+      </>
     );
   }
 
@@ -84,8 +99,10 @@ export default function PublicRoomDetailPage() {
   const activePriceTiers = (room.priceTiers ?? []).filter((tier) => tier.isActive);
 
   return (
-    <main className="public-room-detail">
-      <Link className="public-room-detail__back" to={`/rooming-houses/${house.id}`}>
+    <>
+      <HomeHeader />
+      <main className="public-room-detail">
+        <Link className="public-room-detail__back" to={`/rooming-houses/${house.id}`}>
         ← Quay về khu trọ: {house.name}
       </Link>
 
@@ -114,8 +131,18 @@ export default function PublicRoomDetailPage() {
             <p className="public-room-detail__house-name">Khu trọ: {house.name}</p>
             <p className="public-room-detail__address">{house.addressDisplay}</p>
             <div className="public-room-detail__actions" aria-label="Thao tác với phòng">
-              <button className="public-room-detail__action public-room-detail__action--primary" type="button">
-                Đặt cọc
+              <button
+                className="public-room-detail__action public-room-detail__action--primary"
+                type="button"
+                onClick={() => {
+                  if (!currentUser) {
+                    navigate('/login', { state: { from: location.pathname } });
+                    return;
+                  }
+                  setIsRentalModalOpen(true);
+                }}
+              >
+                Gửi yêu cầu thuê
               </button>
               <button className="public-room-detail__action public-room-detail__action--secondary" type="button" onClick={handleBookingClick}>
                 Đặt lịch xem phòng
@@ -191,6 +218,21 @@ export default function PublicRoomDetailPage() {
           }}
         />
       )}
+
+      {isRentalModalOpen && (
+        <SubmitRentalRequestModal
+          roomId={room.id}
+          roomNumber={room.roomNumber}
+          houseName={house.name}
+          maxOccupants={room.maxOccupants}
+          onClose={() => setIsRentalModalOpen(false)}
+          onSuccess={(msg) => {
+            setSuccessMessage(msg);
+            setTimeout(() => setSuccessMessage(''), 5000);
+          }}
+        />
+      )}
     </main>
+    </>
   );
 }

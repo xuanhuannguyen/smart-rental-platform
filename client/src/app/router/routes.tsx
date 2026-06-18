@@ -14,9 +14,9 @@ import PublicRoomDetailPage from '../../features/rooms/pages/PublicRoomDetailPag
 import LandlordDashboardPage from '../../features/landlord/pages/LandlordDashboardPage';
 import { LandlordRentalRequestsPage } from '../../features/landlord/pages/LandlordRentalRequestsPage';
 import RoomingHouseDetailPage from '../../features/landlord/pages/RoomingHouseDetailPage';
+import RoomDetailPage from '../../features/landlord/pages/RoomDetailPage';
 import TenantAppointmentsPage from '../../features/viewing-appointments/pages/TenantAppointmentsPage';
 import LandlordAppointmentsPage from '../../features/viewing-appointments/pages/LandlordAppointmentsPage';
-import { RentalFlowTestPage } from '../../features/rental/pages/RentalFlowTestPage';
 import { AdminHomePage } from '../../features/admin/pages/AdminHomePage';
 import { OnboardingGuard } from './OnboardingGuard';
 import { ProtectedRoute } from './ProtectedRoute';
@@ -25,9 +25,11 @@ import { ROUTE_PATHS } from './routePaths';
 import { AccountLayout } from '../../shared/components/layout/AccountLayout';
 import { ProfileInfoPage } from '../../features/profile/pages/ProfileInfoPage';
 import { SecurityPage } from '../../features/profile/pages/SecurityPage';
-import { SubmitRentalRequestPage } from '../../features/rental-requests/pages/SubmitRentalRequestPage';
 import { TenantRentalRequestsPage } from '../../features/rental-requests/pages/TenantRentalRequestsPage';
-import { ContractOccupantsSetupPage } from '../../features/rental-contracts/pages/ContractOccupantsSetupPage';
+import { TenantRentalRequestDetailPage } from '../../features/rental-requests/pages/TenantRentalRequestDetailPage';
+import { TenantRentalHistoryPage } from '../../features/rental-history/pages/TenantRentalHistoryPage';
+import { TenantRentalHistoryDetailPage } from '../../features/rental-history/pages/TenantRentalHistoryDetailPage';
+import { LandlordRentalRequestDetailPage } from '../../features/landlord/pages/LandlordRentalRequestDetailPage';
 
 export const router = createBrowserRouter([
     {
@@ -101,9 +103,22 @@ export const router = createBrowserRouter([
                                 element: <TenantRentalRequestsPage />
                             },
                             {
-                                path: ROUTE_PATHS.ACCOUNT.CONTRACT_SETUP(':id'),
-                                element: <ContractOccupantsSetupPage />
-                            }
+                                path: '/account/rental-requests/:id',
+                                element: <TenantRentalRequestDetailPage />
+                            },
+                            {
+                                path: ROUTE_PATHS.ACCOUNT.RENTAL_HISTORY,
+                                element: <TenantRentalHistoryPage />
+                            },
+                            {
+                                path: '/account/rental-history/:id',
+                                element: <TenantRentalHistoryDetailPage />
+                            },
+                            {
+                                path: ROUTE_PATHS.ACCOUNT.VIEWING_APPOINTMENTS,
+                                element: <TenantAppointmentsPage />
+                            },
+
                         ]
                     },
                     {
@@ -135,6 +150,10 @@ export const router = createBrowserRouter([
                         element: <RoomingHouseDetailPage />
                     },
                     {
+                        path: '/landlord/rooming-houses/:id/rooms/:roomId',
+                        element: <RoomDetailPage />
+                    },
+                    {
                         path: ROUTE_PATHS.LANDLORD.VIEWING_APPOINTMENTS,
                         element: <LandlordAppointmentsPage />
                     },
@@ -143,13 +162,11 @@ export const router = createBrowserRouter([
                         element: <LandlordRentalRequestsPage />
                     },
                     {
-                        path: ROUTE_PATHS.TEST.RENTAL_FLOW,
-                        element: <RentalFlowTestPage />
+                        path: '/landlord/rental-requests/:id',
+                        element: <LandlordRentalRequestDetailPage />
                     },
-                    {
-                        path: ROUTE_PATHS.RENTAL_REQUESTS.SUBMIT,
-                        element: <SubmitRentalRequestPage />
-                    },
+
+
                     {
                         element: <RoleGuard allowedRoles={['Admin']} />,
                         children: [

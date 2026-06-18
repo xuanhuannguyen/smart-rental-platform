@@ -1,4 +1,4 @@
-﻿import { useState, useEffect, useMemo, ReactNode } from 'react';
+import { useState, useEffect, useMemo, ReactNode } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { useAuth } from '../../../app/providers/AuthProvider';
 import { ROUTE_PATHS } from '../../../app/router/routePaths';
@@ -15,14 +15,8 @@ import {
   updateRoomingHouseRentalPolicy,
 } from '../../rooming-houses/api';
 import {
-  createRoom,
-  getRoomDetail,
   getRoomsByRoomingHouse,
-  submitRoom,
-  updateRoom,
-  updateRoomAmenities,
-  updateRoomImages,
-  updateRoomPriceTiers,
+  createRoom,
 } from '../../rooms/api';
 import type {
   RoomingHouseDetail,
@@ -31,7 +25,7 @@ import type {
   RoomingHouseBasicInfoRequest,
   UpdateRentalPolicyRequest,
 } from '../../rooming-houses/types';
-import type { Room, CreateRoomRequest, RoomPriceTierRequest } from '../../rooms/types';
+import type { Room, CreateRoomRequest } from '../../rooms/types';
 import { getProvinces, getWardsByProvince } from '../../administrative/api';
 import type { Province, Ward } from '../../administrative/types';
 import PropertyImageEditor from '../../rooming-houses/components/PropertyImageEditor';
@@ -40,8 +34,7 @@ import RoomingHouseRuleEditor from '../../rooming-houses/components/RoomingHouse
 import { cleanImages, toImageRequests } from '../../rooming-houses/utils/imageRequests';
 import './RoomingHouseDetailPage.css';
 
-type MainTab = 'basic' | 'images' | 'amenities' | 'legal' | 'house-rule' | 'rental-policy' | 'rooms';
-type RoomTab = 'basic' | 'images' | 'amenities' | 'price';
+type MainTab = 'basic' | 'images' | 'amenities' | 'legal' | 'house-rule' | 'rental-policy' | 'rooms' | 'create-room';
 
 const emptyRoomForm: CreateRoomRequest = {
   roomNumber: '',
@@ -72,6 +65,8 @@ export default function RoomingHouseDetailPage() {
   const [actionLoading, setActionLoading] = useState(false);
   const [message, setMessage] = useState('');
   const [activeTab, setActiveTab] = useState<MainTab>('rooms');
+  const [newRoomForm, setNewRoomForm] = useState<CreateRoomRequest>(emptyRoomForm);
+
 
   // Lease Policy
   const [rentalPolicyForm, setRentalPolicyForm] = useState<UpdateRentalPolicyRequest>(emptyRentalPolicyForm);
@@ -99,17 +94,6 @@ export default function RoomingHouseDetailPage() {
 
   // States của Quản lý Phòng (Tab 5)
   const [rooms, setRooms] = useState<Room[]>([]);
-  const [selectedRoom, setSelectedRoom] = useState<Room | null>(null);
-  const [roomAmenities, setRoomAmenities] = useState<Amenity[]>([]);
-  const [roomEditorMode, setRoomEditorMode] = useState<'list' | 'edit' | 'create'>('list');
-  const [roomActiveTab, setRoomActiveTab] = useState<RoomTab>('basic');
-
-  // Form phòng
-  const [roomForm, setRoomForm] = useState<CreateRoomRequest>(emptyRoomForm);
-  const [roomImages, setRoomImages] = useState<PropertyImageRequest[]>([]);
-  const [roomAmenityIds, setRoomAmenityIds] = useState<number[]>([]);
-  const [priceTiers, setPriceTiers] = useState<RoomPriceTierRequest[]>([]);
-
   // Tải thông tin khu trọ
   useEffect(() => {
     if (!id) return;
@@ -294,48 +278,9 @@ export default function RoomingHouseDetailPage() {
     setMessage('Đã cập nhật luật khu trọ thành công.');
   }
 
-  // ─── Tab 5: Logic Quản lý phòng ──────────────────────────────────────────
-  async function openRoom(roomId: string) {
-    setActionLoading(true);
-    setMessage('');
-    try {
-      const roomDetail = await getRoomDetail(roomId);
-      setSelectedRoom(roomDetail);
-      setRoomEditorMode('edit');
-      setRoomActiveTab('basic');
-
-      // Fill form phòng
-      setRoomForm({
-        roomNumber: roomDetail.roomNumber,
-        floor: roomDetail.floor,
-        areaM2: roomDetail.areaM2 ?? null,
-        maxOccupants: roomDetail.maxOccupants,
-        isTieredPricing: roomDetail.isTieredPricing,
-        description: roomDetail.description ?? '',
-      });
-      setRoomImages(toImageRequests(roomDetail.images));
-      setRoomAmenityIds(roomDetail.amenities.map((amenity) => amenity.id));
-      setPriceTiers(
-        roomDetail.priceTiers.map((tier) => ({
-          occupantCount: tier.occupantCount,
-          monthlyRent: tier.monthlyRent,
-          isActive: tier.isActive,
-        }))
-      );
-
-      // Load tiện ích phòng
-      if (roomAmenities.length === 0) {
-        const amenitiesList = await getAmenities('Room');
-        setRoomAmenities(amenitiesList);
-      }
-    } catch (err) {
-      setMessage(getApiErrorMessage(err, 'Không thể tải thông tin phòng.'));
-    } finally {
-      setActionLoading(false);
-    }
-  }
-
-  async function openCreateRoom() {
+  
+  
+  function handleCreateRoomClick() {
     if (!house?.rentalPolicy) {
       setMessage('Vui lòng hoàn thành chính sách cho thuê trước khi tạo phòng.');
       setActiveTab('rental-policy');
@@ -347,119 +292,29 @@ export default function RoomingHouseDetailPage() {
       setActiveTab('house-rule');
       return;
     }
-
-    setSelectedRoom(null);
-    setRoomEditorMode('create');
-    setRoomActiveTab('basic');
-    setRoomForm(emptyRoomForm);
-    setRoomImages([]);
-    setRoomAmenityIds([]);
-    setPriceTiers([{ occupantCount: 1, monthlyRent: 0, isActive: true }]);
-    setMessage('');
-
-    try {
-      if (roomAmenities.length === 0) {
-        const amenitiesList = await getAmenities('Room');
-        setRoomAmenities(amenitiesList);
-      }
-    } catch (err) {
-      setMessage(getApiErrorMessage(err, 'Không thể tải tiện ích phòng.'));
-    }
+    setActiveTab('create-room');
+    setNewRoomForm(emptyRoomForm);
   }
 
-  async function handleSaveRoomBasic() {
+  async function handleCreateRoomSubmit() {
     if (!house) return;
     setActionLoading(true);
     setMessage('');
     try {
-      if (selectedRoom) {
-        const updated = await updateRoom(selectedRoom.id, roomForm);
-        setSelectedRoom(updated);
-        setRooms(current => current.map(r => r.id === updated.id ? updated : r));
-        setMessage('Đã lưu thông tin cơ bản phòng.');
-      } else {
-        const created = await createRoom(house.id, roomForm);
-        setSelectedRoom(created);
-        setRooms(current => [...current, created]);
-        setRoomEditorMode('edit');
-        setRoomActiveTab('images'); // chuyển sang tab ảnh
-        setMessage('Tạo phòng thành công. Hãy tải lên ảnh minh họa cho phòng.');
-      }
+      const createdRoom = await createRoom(house.id, newRoomForm);
+      setMessage('Tạo phòng mới thành công. Hãy tiếp tục cập nhật các thông tin khác.');
+      setNewRoomForm(emptyRoomForm);
+      // Chuyển hướng sang trang chi tiết phòng vừa tạo để có thể edit Ảnh, Tiện ích, Bảng giá
+      navigate(ROUTE_PATHS.LANDLORD.ROOM_DETAIL(house.id, createdRoom.id), { state: { initialTab: 'images' } });
     } catch (err) {
-      setMessage(getApiErrorMessage(err, 'Không thể lưu thông tin phòng.'));
+      setMessage(getApiErrorMessage(err, 'Không thể tạo phòng.'));
     } finally {
       setActionLoading(false);
     }
   }
 
-  async function handleSaveRoomImages() {
-    if (!selectedRoom) return;
-    setActionLoading(true);
-    setMessage('');
-    try {
-      const updated = await updateRoomImages(selectedRoom.id, cleanImages(roomImages));
-      setSelectedRoom(updated);
-      setRoomImages(toImageRequests(updated.images));
-      setRooms(current => current.map(r => r.id === updated.id ? updated : r));
-      setMessage('Đã lưu ảnh phòng thành công.');
-    } catch (err) {
-      setMessage(getApiErrorMessage(err, 'Không thể lưu ảnh phòng.'));
-    } finally {
-      setActionLoading(false);
-    }
-  }
 
-  async function handleSaveRoomAmenities() {
-    if (!selectedRoom) return;
-    setActionLoading(true);
-    setMessage('');
-    try {
-      const updated = await updateRoomAmenities(selectedRoom.id, roomAmenityIds);
-      setSelectedRoom(updated);
-      setRoomAmenityIds(updated.amenities.map(a => a.id));
-      setRooms(current => current.map(r => r.id === updated.id ? updated : r));
-      setMessage('Đã cập nhật tiện ích phòng thành công.');
-    } catch (err) {
-      setMessage(getApiErrorMessage(err, 'Không thể lưu tiện ích phòng.'));
-    } finally {
-      setActionLoading(false);
-    }
-  }
-
-  async function handleSaveRoomPrice() {
-    if (!selectedRoom) return;
-    setActionLoading(true);
-    setMessage('');
-    try {
-      const updated = await updateRoomPriceTiers(selectedRoom.id, priceTiers);
-      setSelectedRoom(updated);
-      setPriceTiers(updated.priceTiers.map(t => ({ occupantCount: t.occupantCount, monthlyRent: t.monthlyRent, isActive: t.isActive })));
-      setRooms(current => current.map(r => r.id === updated.id ? updated : r));
-      setMessage('Đã cập nhật bảng giá phòng thành công.');
-    } catch (err) {
-      setMessage(getApiErrorMessage(err, 'Không thể lưu bảng giá phòng.'));
-    } finally {
-      setActionLoading(false);
-    }
-  }
-
-  async function handlePublishRoom() {
-    if (!selectedRoom) return;
-    setActionLoading(true);
-    setMessage('');
-    try {
-      const updated = await submitRoom(selectedRoom.id);
-      setSelectedRoom(updated);
-      setRooms(current => current.map(r => r.id === updated.id ? updated : r));
-      setMessage('Phòng đã được hiển thị hoạt động và sẵn sàng cho thuê.');
-    } catch (err) {
-      setMessage(getApiErrorMessage(err, 'Không thể hiển thị hoạt động phòng.'));
-    } finally {
-      setActionLoading(false);
-    }
-  }
-
-  // ─── Renders ─────────────────────────────────────────────────────────────
+// ─── Renders ─────────────────────────────────────────────────────────────
   const formatDate = formatDateVi;
 
   if (loading) {
@@ -507,6 +362,12 @@ export default function RoomingHouseDetailPage() {
         </button>
         <button
           className="sidebar-item"
+          onClick={() => navigate(ROUTE_PATHS.LANDLORD.RENTAL_REQUESTS)}
+        >
+          Yêu cầu thuê
+        </button>
+        <button
+          className="sidebar-item"
           onClick={() => navigate(ROUTE_PATHS.LANDLORD.VIEWING_APPOINTMENTS)}
         >
           Lịch hẹn xem phòng
@@ -521,87 +382,99 @@ export default function RoomingHouseDetailPage() {
 
       <main className="dashboard-main">
         {/* Banner Tổng quan */}
-        {activeTab === 'rooms' && (
-          <section className="overview-band">
-            <div className="overview-header-title-area">
-              <button
-                type="button"
-                className="back-icon-btn"
-                onClick={() => navigate(ROUTE_PATHS.LANDLORD.DASHBOARD)}
-                title="Quay về quản lý khu trọ"
-              >
-                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
-                  <line x1="19" y1="12" x2="5" y2="12" />
-                  <polyline points="12 19 5 12 12 5" />
-                </svg>
-              </button>
-              <div className="overview-left">
-                <p className="eyebrow">{house.addressDisplay}</p>
-                <h2>{house.name}</h2>
-                <p className="overview-description">
-                  Thời gian duyệt: {house.createdAt ? formatDate(house.createdAt) : ''}
-                </p>
+        {/* Banner Tổng quan */}
+        <section className="overview-band">
+          <div className="overview-header-title-area">
+            <button
+              type="button"
+              className="back-icon-btn"
+              onClick={() => navigate(ROUTE_PATHS.LANDLORD.DASHBOARD)}
+              title="Quay về quản lý khu trọ"
+            >
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                <line x1="19" y1="12" x2="5" y2="12" />
+                <polyline points="12 19 5 12 12 5" />
+              </svg>
+            </button>
+            <div className="overview-left">
+              <p className="eyebrow">{house.addressDisplay}</p>
+              <h2>
+                {house.name}
+              </h2>
+              <p className="overview-description">
+                Thời gian duyệt: {house.createdAt ? formatDate(house.createdAt) : ''}
+              </p>
+            </div>
+          </div>
+          
+          <div className="overview-right" style={{ display: 'flex', flexDirection: 'column', gap: '16px', alignItems: 'flex-end' }}>
+            <div className="overview-stats">
+              <div className="stat-item stat-item--total">
+                <HomeIcon />
+                <span>Tổng số phòng</span>
+                <strong className="stat-badge">{roomStats.total}</strong>
+              </div>
+              <div className="stat-item stat-item--approved">
+                <CheckCircleIcon />
+                <span>Số phòng trống</span>
+                <strong className="stat-badge">{roomStats.available}</strong>
+              </div>
+              <div className="stat-item stat-item--pending">
+                <UserCheckIcon />
+                <span>Đang thuê</span>
+                <strong className="stat-badge">{roomStats.occupied}</strong>
+              </div>
+              <div className="stat-item stat-item--rejected">
+                <EyeOffIcon />
+                <span>Đang ẩn</span>
+                <strong className="stat-badge">{roomStats.hidden}</strong>
               </div>
             </div>
             
-            <div className="overview-right">
-              <div className="overview-actions">
-                {roomEditorMode === 'list' && (
-                  <>
-                    <button
-                      type="button"
-                      className="secondary-action"
-                      onClick={() => setActiveTab('basic')}
-                    >
-                      Xem thông tin khu trọ
-                    </button>
-                    <button
-                      className="primary-action"
-                      onClick={openCreateRoom}
-                      disabled={!canCreateRoom}
-                      title={!canCreateRoom ? "Vui lòng cấu hình chính sách thuê và Luật khu trọ trước khi tạo phòng." : undefined}
-                      style={!canCreateRoom ? { opacity: 0.5, cursor: 'not-allowed' } : undefined}
-                    >
-                      Tạo phòng mới
-                    </button>
-                  </>
-                )}
-              </div>
-              
-              <div className="overview-stats">
-                <div className="stat-item stat-item--total">
-                  <HomeIcon />
-                  <span>Tổng số phòng</span>
-                  <strong className="stat-badge">{roomStats.total}</strong>
-                </div>
-                <div className="stat-item stat-item--approved">
-                  <CheckCircleIcon />
-                  <span>Số phòng trống</span>
-                  <strong className="stat-badge">{roomStats.available}</strong>
-                </div>
-                <div className="stat-item stat-item--pending">
-                  <UserCheckIcon />
-                  <span>Đang thuê</span>
-                  <strong className="stat-badge">{roomStats.occupied}</strong>
-                </div>
-                <div className="stat-item stat-item--rejected">
-                  <EyeOffIcon />
-                  <span>Đang ẩn</span>
-                  <strong className="stat-badge">{roomStats.hidden}</strong>
-                </div>
-              </div>
+            <div className="overview-actions" style={{ display: 'flex', gap: '12px' }}>
+              <button
+                className="secondary-action"
+                onClick={() => setActiveTab('rooms')}
+                style={{
+                  borderColor: activeTab === 'rooms' ? '#2563eb' : undefined,
+                  color: activeTab === 'rooms' ? '#2563eb' : undefined,
+                  backgroundColor: activeTab === 'rooms' ? '#f0f9ff' : undefined
+                }}
+              >
+                Danh sách phòng
+              </button>
+              <button
+                className="secondary-action"
+                onClick={() => {
+                  if (activeTab === 'rooms' || activeTab === 'create-room') setActiveTab('basic');
+                }}
+                style={{
+                  borderColor: (activeTab !== 'rooms' && activeTab !== 'create-room') ? '#2563eb' : undefined,
+                  color: (activeTab !== 'rooms' && activeTab !== 'create-room') ? '#2563eb' : undefined,
+                  backgroundColor: (activeTab !== 'rooms' && activeTab !== 'create-room') ? '#f0f9ff' : undefined
+                }}
+              >
+                Thông tin khu trọ
+              </button>
+              <button
+                className="primary-action"
+                onClick={handleCreateRoomClick}
+                disabled={!canCreateRoom}
+                title={!canCreateRoom ? "Vui lòng cấu hình chính sách thuê và Luật khu trọ trước khi tạo phòng." : "Tạo phòng mới"}
+                style={!canCreateRoom ? { opacity: 0.5, cursor: 'not-allowed' } : undefined}
+              >
+                + Tạo phòng mới
+              </button>
             </div>
-          </section>
-        )}
+          </div>
+        </section>
 
         {message && <p className="dashboard-message">{message}</p>}
         {actionLoading && <p className="dashboard-message" style={{ background: '#dbeafe', color: '#1e40af' }}>Đang lưu thay đổi...</p>}
 
-
-
         {/* Hệ thống Tab Cấp 2 */}
-        {activeTab !== 'rooms' && (
-          <div className="tabs" style={{ display: 'flex', alignItems: 'center' }}>
+        {(activeTab !== 'rooms' && activeTab !== 'create-room') && (
+          <div className="tabs" style={{ display: 'flex', alignItems: 'center', marginTop: '16px' }}>
             <button className={activeTab === 'basic' ? 'active' : ''} onClick={() => setActiveTab('basic')}>
               Thông tin cơ bản
             </button>
@@ -619,17 +492,6 @@ export default function RoomingHouseDetailPage() {
             </button>
             <button className={activeTab === 'rental-policy' ? 'active' : ''} onClick={() => setActiveTab('rental-policy')}>
               Chính sách thuê
-            </button>
-            <button
-              type="button"
-              className="primary-action"
-              style={{ marginLeft: 'auto', minHeight: '38px', padding: '8px 14px' }}
-              onClick={() => {
-                setActiveTab('rooms');
-                setRoomEditorMode('list');
-              }}
-            >
-              Quay lại danh sách phòng
             </button>
           </div>
         )}
@@ -902,198 +764,101 @@ export default function RoomingHouseDetailPage() {
             </div>
           )}
 
+          {/* TAB: TẠO PHÒNG MỚI */}
+          {activeTab === 'create-room' && (
+            <div className="editor-panel" style={{ marginTop: '20px', background: '#f8fafc', border: '1px solid #cbd5e1' }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px' }}>
+                <h3 style={{ margin: 0, fontSize: '18px', color: '#1e293b' }}>Tạo phòng mới</h3>
+              </div>
+
+              <div className="tabs" style={{ marginBottom: '16px', display: 'flex', alignItems: 'center' }}>
+                <button className="active" style={{ fontWeight: 600 }}>Thông tin cơ bản</button>
+                <button disabled style={{ opacity: 0.5, cursor: 'not-allowed' }}>Ảnh phòng</button>
+                <button disabled style={{ opacity: 0.5, cursor: 'not-allowed' }}>Tiện ích phòng</button>
+                <button disabled style={{ opacity: 0.5, cursor: 'not-allowed' }}>Bảng giá</button>
+              </div>
+
+              <div className="form-grid">
+                <label className="field">
+                  <span>Số phòng / Tên phòng</span>
+                  <input value={newRoomForm.roomNumber} onChange={e => setNewRoomForm({ ...newRoomForm, roomNumber: e.target.value })} placeholder="VD: 101" />
+                </label>
+
+                <label className="field">
+                  <span>Tầng</span>
+                  <input type="number" value={newRoomForm.floor} onChange={e => setNewRoomForm({ ...newRoomForm, floor: Number(e.target.value) || 1 })} />
+                </label>
+
+                <label className="field">
+                  <span>Diện tích (m²)</span>
+                  <input type="number" value={newRoomForm.areaM2 ?? ''} onChange={e => setNewRoomForm({ ...newRoomForm, areaM2: e.target.value === '' ? null : Number(e.target.value) })} placeholder="VD: 25" />
+                </label>
+
+                <label className="field">
+                  <span>Số khách tối đa</span>
+                  <input type="number" value={newRoomForm.maxOccupants} onChange={e => setNewRoomForm({ ...newRoomForm, maxOccupants: Number(e.target.value) || 1 })} />
+                </label>
+
+                <label className="field checkbox-field" style={{ gridColumn: '1 / -1', display: 'flex', alignItems: 'center', gap: '8px', marginTop: '8px' }}>
+                  <input type="checkbox" checked={newRoomForm.isTieredPricing} onChange={e => setNewRoomForm({ ...newRoomForm, isTieredPricing: e.target.checked })} style={{ width: '18px', height: '18px', margin: 0, cursor: 'pointer' }} />
+                  <span style={{ fontSize: '14px', fontWeight: 600, color: '#475569' }}>Áp dụng giá thuê theo số lượng người ở (bảng giá thay đổi)</span>
+                </label>
+
+                <label className="field" style={{ gridColumn: '1 / -1' }}>
+                  <span>Mô tả phòng</span>
+                  <textarea style={{ width: '100%', minHeight: '80px', padding: '10px', border: '1px solid #cbd5e1', borderRadius: '6px', font: 'inherit' }} value={newRoomForm.description ?? ''} onChange={e => setNewRoomForm({ ...newRoomForm, description: e.target.value })} placeholder="Mô tả thêm về phòng..." />
+                </label>
+
+                <div className="save-row">
+                  <button className="primary-action" onClick={handleCreateRoomSubmit}>Lưu thông tin</button>
+                </div>
+              </div>
+            </div>
+          )}
+
           {/* TAB 5: QUẢN LÝ PHÒNG */}
           {activeTab === 'rooms' && (
             <div>
-              {roomEditorMode === 'list' && (
-                <>
-                  {!house.rentalPolicy ? (
-                    <div className="empty-panel">
-                      <h2>Chưa có chính sách cho thuê</h2>
-                      <p>Vui lòng hoàn thành cấu hình chính sách cho thuê trước khi bắt đầu tạo phòng.</p>
-                      <button className="primary-action" onClick={() => setActiveTab('rental-policy')}>
-                        Cấu hình chính sách cho thuê
-                      </button>
-                    </div>
-                  ) : !house.houseRule ? (
-                    <div className="empty-panel">
-                      <h2>Chưa có Luật khu trọ</h2>
-                      <p>Vui lòng hoàn thành Luật khu trọ trước khi bắt đầu tạo phòng.</p>
-                      <button className="primary-action" onClick={() => setActiveTab('house-rule')}>
-                        Cấu hình Luật khu trọ
-                      </button>
-                    </div>
-                  ) : rooms.length === 0 ? (
-                    <div className="empty-panel">
-                      <h2>Chưa có phòng nào</h2>
-                      <p>Khu trọ của bạn chưa có phòng nào. Hãy tạo phòng mới bằng nút "Tạo phòng mới" ở góc phải phía trên.</p>
-                    </div>
-                  ) : (
-                    <div className="card-grid">
-                      {rooms.map(room => (
-                        <button key={room.id} className="dashboard-card" onClick={() => openRoom(room.id)}>
-                          <div className="card-header">
-                            <h3>Phòng {room.roomNumber}</h3>
-                            <span>Cập nhật: {formatDate(room.updatedAt)}</span>
-                          </div>
-                          <p style={{ margin: '8px 0 4px' }}>Tầng: {room.floor}</p>
-                          <p style={{ margin: '0 0 8px' }}>
-                            {room.areaM2 ? `${room.areaM2} m²` : 'Chưa nhập diện tích'} - Tối đa: {room.maxOccupants} người
-                          </p>
-                          <span className={`status-pill ${getStatusToneClass(room.status)}`}>
-                            {formatStatus(room.status)}
-                          </span>
-                        </button>
-                      ))}
-                    </div>
-                  )}
-                </>
-              )}
 
-              {(roomEditorMode === 'edit' || roomEditorMode === 'create') && (
-                <div className="editor-panel">
-                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px' }}>
-                    <button className="back-link" style={{ margin: 0 }} onClick={() => setRoomEditorMode('list')}>
-                      ← Quay lại danh sách phòng
-                    </button>
-                    {roomEditorMode === 'edit' && selectedRoom && (
-                      <div style={{ display: 'flex', gap: '8px' }}>
-                        {selectedRoom.status === 'Hidden' && (
-                          <button className="primary-action" onClick={handlePublishRoom}>
-                            Hiển thị phòng (Hoạt động)
-                          </button>
-                        )}
-                        <span className={`status-pill ${getStatusToneClass(selectedRoom.status)}`} style={{ padding: '8px 16px', fontSize: '13px' }}>
-                          Trạng thái: {formatStatus(selectedRoom.status)}
-                        </span>
+
+              {!house.rentalPolicy ? (
+                <div className="empty-panel">
+                  <h2>Chưa có chính sách cho thuê</h2>
+                  <p>Vui lòng hoàn thành cấu hình chính sách cho thuê trước khi bắt đầu tạo phòng.</p>
+                  <button className="primary-action" onClick={() => setActiveTab('rental-policy')}>
+                    Cấu hình chính sách cho thuê
+                  </button>
+                </div>
+              ) : !house.houseRule ? (
+                <div className="empty-panel">
+                  <h2>Chưa có Luật khu trọ</h2>
+                  <p>Vui lòng hoàn thành Luật khu trọ trước khi bắt đầu tạo phòng.</p>
+                  <button className="primary-action" onClick={() => setActiveTab('house-rule')}>
+                    Cấu hình Luật khu trọ
+                  </button>
+                </div>
+              ) : rooms.length === 0 ? (
+                <div className="empty-panel">
+                  <h2>Chưa có phòng nào</h2>
+                  <p>Khu trọ của bạn chưa có phòng nào. Hãy tạo phòng mới bằng nút "Tạo phòng mới" ở góc phải phía trên.</p>
+                </div>
+              ) : (
+                <div className="card-grid">
+                  {rooms.map(room => (
+                    <button key={room.id} className="dashboard-card" onClick={() => navigate(ROUTE_PATHS.LANDLORD.ROOM_DETAIL(id!, room.id))}>
+                      <div className="card-header">
+                        <h3>Phòng {room.roomNumber}</h3>
+                        <span>Cập nhật: {formatDate(room.updatedAt)}</span>
                       </div>
-                    )}
-                  </div>
-
-                  <h3 style={{ marginBottom: '16px' }}>
-                    {roomEditorMode === 'create' ? 'Tạo phòng mới' : `Chỉnh sửa Phòng ${selectedRoom?.roomNumber}`}
-                  </h3>
-
-                  <div className="tabs" style={{ marginBottom: '16px' }}>
-                    <button className={roomActiveTab === 'basic' ? 'active' : ''} onClick={() => setRoomActiveTab('basic')}>
-                      Thông tin cơ bản
+                      <p style={{ margin: '8px 0 4px' }}>Tầng: {room.floor}</p>
+                      <p style={{ margin: '0 0 8px' }}>
+                        {room.areaM2 ? `${room.areaM2} m²` : 'Chưa nhập diện tích'} - Tối đa: {room.maxOccupants} người
+                      </p>
+                      <span className={`status-pill ${getStatusToneClass(room.status)}`}>
+                        {formatStatus(room.status)}
+                      </span>
                     </button>
-                    <button
-                      className={roomActiveTab === 'images' ? 'active' : ''}
-                      onClick={() => setRoomActiveTab('images')}
-                      disabled={roomEditorMode === 'create' && !selectedRoom}
-                    >
-                      Ảnh phòng
-                    </button>
-                    <button
-                      className={roomActiveTab === 'amenities' ? 'active' : ''}
-                      onClick={() => setRoomActiveTab('amenities')}
-                      disabled={roomEditorMode === 'create' && !selectedRoom}
-                    >
-                      Tiện ích phòng
-                    </button>
-                    <button
-                      className={roomActiveTab === 'price' ? 'active' : ''}
-                      onClick={() => setRoomActiveTab('price')}
-                      disabled={roomEditorMode === 'create' && !selectedRoom}
-                    >
-                      Bảng giá
-                    </button>
-                  </div>
-
-                  {/* ROOM TAB 1: THÔNG TIN CƠ BẢN PHÒNG */}
-                  {roomActiveTab === 'basic' && (
-                    <div className="form-grid">
-                      <label className="field">
-                        <span>Số phòng / Tên phòng</span>
-                        <input value={roomForm.roomNumber} onChange={e => setRoomForm({ ...roomForm, roomNumber: e.target.value })} />
-                      </label>
-
-                      <label className="field">
-                        <span>Tầng</span>
-                        <input
-                          type="number"
-                          value={roomForm.floor}
-                          onChange={e => setRoomForm({ ...roomForm, floor: Number(e.target.value) || 1 })}
-                        />
-                      </label>
-
-                      <label className="field">
-                        <span>Diện tích (m²)</span>
-                        <input
-                          type="number"
-                          value={roomForm.areaM2 ?? ''}
-                          onChange={e => setRoomForm({ ...roomForm, areaM2: e.target.value === '' ? null : Number(e.target.value) })}
-                        />
-                      </label>
-
-                      <label className="field">
-                        <span>Số khách tối đa</span>
-                        <input
-                          type="number"
-                          value={roomForm.maxOccupants}
-                          onChange={e => setRoomForm({ ...roomForm, maxOccupants: Number(e.target.value) || 1 })}
-                        />
-                      </label>
-
-                      <label className="field checkbox-field" style={{ gridColumn: '1 / -1', display: 'flex', alignItems: 'center', gap: '8px', marginTop: '8px' }}>
-                        <input
-                          type="checkbox"
-                          checked={roomForm.isTieredPricing}
-                          onChange={e => setRoomForm({ ...roomForm, isTieredPricing: e.target.checked })}
-                          style={{ width: '18px', height: '18px', margin: 0, cursor: 'pointer' }}
-                        />
-                        <span style={{ fontSize: '14px', fontWeight: 600, color: '#475569' }}>
-                          Áp dụng giá thuê theo số lượng người ở (bảng giá thay đổi)
-                        </span>
-                      </label>
-
-                      <label className="field" style={{ gridColumn: '1 / -1' }}>
-                        <span>Mô tả phòng</span>
-                        <textarea
-                          style={{ width: '100%', minHeight: '80px', padding: '10px', border: '1px solid #cbd5e1', borderRadius: '6px', font: 'inherit' }}
-                          value={roomForm.description ?? ''}
-                          onChange={e => setRoomForm({ ...roomForm, description: e.target.value })}
-                        />
-                      </label>
-
-                      <div className="save-row">
-                        <button className="primary-action" onClick={handleSaveRoomBasic}>Lưu thông tin</button>
-                      </div>
-                    </div>
-                  )}
-
-                  {/* ROOM TAB 2: ẢNH PHÒNG */}
-                  {roomActiveTab === 'images' && selectedRoom && (
-                    <PropertyImageEditor
-                      images={roomImages}
-                      scope="Room"
-                      onChange={setRoomImages}
-                      onSave={handleSaveRoomImages}
-                    />
-                  )}
-
-                  {/* ROOM TAB 3: TIỆN NGHI PHÒNG */}
-                  {roomActiveTab === 'amenities' && selectedRoom && (
-                    <AmenityEditor
-                      amenities={roomAmenities}
-                      selectedIds={roomAmenityIds}
-                      onChange={setRoomAmenityIds}
-                      onSave={handleSaveRoomAmenities}
-                    />
-                  )}
-
-                  {/* ROOM TAB 4: BẢNG GIÁ PHÒNG */}
-                  {roomActiveTab === 'price' && selectedRoom && (
-                    <PriceTierEditor
-                      priceTiers={priceTiers}
-                      isTieredPricing={selectedRoom.isTieredPricing}
-                      maxOccupants={selectedRoom.maxOccupants}
-                      onChange={setPriceTiers}
-                      onSave={handleSaveRoomPrice}
-                      depositMonths={house?.rentalPolicy?.depositMonths}
-                    />
-                  )}
+                  ))}
                 </div>
               )}
             </div>
@@ -1140,88 +905,6 @@ function AmenityEditor({
       <div className="save-row">
         <button className="primary-action" onClick={onSave}>
           Lưu tiện ích
-        </button>
-      </div>
-    </div>
-  );
-}
-
-function PriceTierEditor({
-  priceTiers,
-  isTieredPricing,
-  maxOccupants,
-  onChange,
-  onSave,
-  depositMonths = 0,
-}: {
-  priceTiers: RoomPriceTierRequest[];
-  isTieredPricing: boolean;
-  maxOccupants: number;
-  onChange: (tiers: RoomPriceTierRequest[]) => void;
-  onSave: () => void;
-  depositMonths?: number;
-}) {
-  const structureKey = priceTiers.map(t => t.occupantCount).join(',');
-
-  useEffect(() => {
-    const targetCount = isTieredPricing ? (maxOccupants || 1) : 1;
-    const expectedStructure = Array.from({ length: targetCount }, (_, i) => i + 1).join(',');
-
-    if (structureKey !== expectedStructure) {
-      const finalTiers: RoomPriceTierRequest[] = [];
-      const firstTier = priceTiers.find(t => t.occupantCount === 1) || priceTiers[0];
-      const basePrice = firstTier?.monthlyRent || 0;
-
-      for (let i = 1; i <= targetCount; i++) {
-        const existing = priceTiers.find(t => t.occupantCount === i);
-        finalTiers.push({
-          occupantCount: i,
-          monthlyRent: existing ? existing.monthlyRent : basePrice,
-          isActive: true
-        });
-      }
-      onChange(finalTiers);
-    }
-  }, [isTieredPricing, maxOccupants, structureKey, onChange]);
-
-  function updateTier(index: number, tier: RoomPriceTierRequest) {
-    onChange(priceTiers.map((t, i) => (i === index ? tier : t)));
-  }
-
-  return (
-    <div className="stack-panel">
-      {priceTiers.map((tier, index) => (
-        <div className="inline-editor" key={index} style={{ gridTemplateColumns: '1fr 1fr', alignItems: 'center' }}>
-          <label className="field">
-            <span>
-              {isTieredPricing
-                ? `Giá thuê cho ${tier.occupantCount} người (VND/tháng)`
-                : 'Giá thuê cố định (VND/tháng)'}
-            </span>
-            <input
-              type="text"
-              value={formatMoneyString(tier.monthlyRent)}
-              onChange={(e) =>
-                updateTier(index, { ...tier, monthlyRent: parseMoneyString(e.target.value) })
-              }
-              placeholder="0"
-            />
-          </label>
-          <label className="field">
-            <span>Đặt cọc (tháng)</span>
-            <input
-              type="number"
-              min={0}
-              value={depositMonths}
-              readOnly
-              style={{ background: '#f1f5f9' }}
-            />
-          </label>
-        </div>
-      ))}
-      <div className="save-row" style={{ marginTop: '8px' }}>
-        <button className="primary-action" onClick={onSave}>
-          Lưu bảng giá
         </button>
       </div>
     </div>

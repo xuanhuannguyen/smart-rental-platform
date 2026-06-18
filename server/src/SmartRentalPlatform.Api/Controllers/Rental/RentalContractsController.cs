@@ -33,6 +33,22 @@ public class RentalContractsController : ControllerBase
     }
 
     [Authorize]
+    [HttpGet("my-history")]
+    public async Task<ActionResult<ApiResponse<IReadOnlyCollection<ContractHistoryItemResponse>>>> GetMyHistory(
+        CancellationToken cancellationToken)
+    {
+        var userId = GetCurrentUserId();
+        var result = await rentalContractService.GetMyHistoryAsync(userId, cancellationToken);
+
+        return Ok(new ApiResponse<IReadOnlyCollection<ContractHistoryItemResponse>>
+        {
+            Success = true,
+            Message = "Tải lịch sử hợp đồng thuê thành công.",
+            Data = result
+        });
+    }
+
+    [Authorize]
     [HttpGet("{id:guid}")]
     public async Task<ActionResult<ApiResponse<ContractDetailResponse>>> GetById(
         Guid id,
@@ -387,6 +403,26 @@ public class RentalContractsController : ControllerBase
         var userId = GetCurrentUserId();
         var result = await contractAppendixService.RequestRevisionAsync(userId, id, appendixId, request, cancellationToken);
         return AppendixResult(result, "Yêu cầu sửa phụ lục hợp đồng thành công.");
+    }
+
+    [Authorize]
+    [HttpDelete("{id:guid}/appendices/{appendixId:guid}")]
+    [ProducesResponseType(StatusCodes.Status204NoContent)]
+    [ProducesResponseType(StatusCodes.Status404NotFound)]
+    public async Task<IActionResult> DeleteAppendix(
+        [FromRoute] Guid id,
+        [FromRoute] Guid appendixId,
+        CancellationToken cancellationToken)
+    {
+        var userId = GetCurrentUserId();
+        var success = await contractAppendixService.DeleteAsync(userId, id, appendixId, cancellationToken);
+
+        if (!success)
+        {
+            return NotFound();
+        }
+
+        return NoContent();
     }
 
     [Authorize]

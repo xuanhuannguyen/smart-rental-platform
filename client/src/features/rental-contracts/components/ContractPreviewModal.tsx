@@ -4,27 +4,32 @@ import 'react-pdf/dist/Page/AnnotationLayer.css';
 import 'react-pdf/dist/Page/TextLayer.css';
 import { ENDPOINTS } from '../../../shared/api/endpoints';
 import { apiClient } from '../../../shared/api/apiClient';
+import { getApiErrorMessage } from '../../../shared/api/apiError';
 import { Alert } from '../../../shared/components/ui/Alert';
 import { Button } from '../../../shared/components/ui/Button';
+import { OtpInput } from '../../../shared/components/ui/OtpInput';
 import './ContractPreviewModal.css';
 
 pdfjs.GlobalWorkerOptions.workerSrc = `//unpkg.com/pdfjs-dist@${pdfjs.version}/build/pdf.worker.min.mjs`;
 
 interface ContractPreviewModalProps {
   contractId: string;
+  role: 'landlord' | 'tenant';
   onClose: () => void;
   onSuccess: () => void;
 }
 
-export function ContractPreviewModal({ contractId, onClose, onSuccess }: ContractPreviewModalProps) {
+export function ContractPreviewModal({ contractId, role, onClose, onSuccess }: ContractPreviewModalProps) {
   const [pdfUrl, setPdfUrl] = useState<string | null>(null);
   const [numPages, setNumPages] = useState<number | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [agreed, setAgreed] = useState(false);
   const [submitting, setSubmitting] = useState(false);
-  const [dialogType, setDialogType] = useState<'revision' | 'reject' | null>(null);
+  const [dialogType, setDialogType] = useState<'revision' | 'reject' | 'otp' | null>(null);
   const [reason, setReason] = useState('');
+  const [revisionType, setRevisionType] = useState<'Occupants' | 'ContractTerms'>('ContractTerms');
+  const [otp, setOtp] = useState('');
 
   const containerRef = useRef<HTMLDivElement>(null);
   const [containerWidth, setContainerWidth] = useState(800);
@@ -77,19 +82,24 @@ export function ContractPreviewModal({ contractId, onClose, onSuccess }: Contrac
       return;
     }
 
+    setDialogType('otp');
+    setOtp('');
+
     try {
       setSubmitting(true);
       setError('');
 
-      await apiClient(ENDPOINTS.CONTRACTS.LANDLORD_SIGN(contractId), {
-        method: 'POST',
-        auth: true,
-        body: { otp: '000000' }
-      });
+      const endpoint = role === 'landlord'
+        ? ENDPOINTS.CONTRACTS.LANDLORD_SIGN_OTP(contractId)
+        : ENDPOINTS.CONTRACTS.TENANT_SIGN_OTP(contractId);
 
-      onSuccess();
+      await apiClient(endpoint, {
+        method: 'POST',
+        auth: true
+      });
     } catch (err: any) {
-      setError(err?.response?.data?.message || 'Có lỗi xảy ra khi ký hợp đồng.');
+      setError(getApiErrorMessage(err, 'Không thể gửi mã OTP. Vui lòng thử lại.'));
+      setDialogType(null);
     } finally {
       setSubmitting(false);
     }
@@ -98,6 +108,10 @@ export function ContractPreviewModal({ contractId, onClose, onSuccess }: Contrac
   const handleDialogSubmit = async () => {
     if ((dialogType === 'revision' || dialogType === 'reject') && !reason.trim()) {
       setError('Vui lòng nhập lý do.');
+      return;
+    }
+    if (dialogType === 'otp' && otp.length !== 6) {
+      setError('Vui lòng nhập đủ 6 số OTP.');
       return;
     }
 
@@ -109,7 +123,10 @@ export function ContractPreviewModal({ contractId, onClose, onSuccess }: Contrac
         await apiClient(ENDPOINTS.CONTRACTS.REVISION_REQUEST(contractId), {
           method: 'POST',
           auth: true,
-          body: { reason: reason.trim(), revisionType: 'Occupants' }
+          body: { 
+            reason: reason.trim(), 
+            revisionType: role === 'tenant' ? revisionType : 'Occupants' 
+          }
         });
       }
 
@@ -121,10 +138,24 @@ export function ContractPreviewModal({ contractId, onClose, onSuccess }: Contrac
         });
       }
 
+      if (dialogType === 'otp') {
+        const endpoint = role === 'landlord'
+          ? ENDPOINTS.CONTRACTS.LANDLORD_SIGN(contractId)
+          : ENDPOINTS.CONTRACTS.TENANT_SIGN(contractId);
+
+        await apiClient(endpoint, {
+          method: 'POST',
+          auth: true,
+          body: { otp }
+        });
+      }
+
       onSuccess();
     } catch (err: any) {
-      setError(err?.response?.data?.message || 'Có lỗi xảy ra. Vui lòng thử lại.');
-      setDialogType(null);
+      setError(getApiErrorMessage(err, 'Có lỗi xảy ra. Vui lòng thử lại.'));
+      if (dialogType !== 'otp') {
+        setDialogType(null);
+      }
     } finally {
       setSubmitting(false);
     }
@@ -181,19 +212,53 @@ export function ContractPreviewModal({ contractId, onClose, onSuccess }: Contrac
           {dialogType && (
             <div className="reason-dialog-overlay">
               <div className="reason-dialog">
-                <h4>{dialogType === 'revision' ? 'Yêu cầu sửa đổi hợp đồng' : 'Hủy hợp đồng'}</h4>
+                <h4>
+                  {dialogType === 'revision'
+                    ? 'Yêu cầu sửa đổi hợp đồng'
+                    : dialogType === 'reject'
+                    ? 'Hủy hợp đồng'
+                    : 'Nhập mã OTP'}
+                </h4>
                 {dialogType === 'revision' ? (
-                  <textarea
-                    placeholder="Nhập lý do chi tiết..."
-                    value={reason}
-                    onChange={(event) => setReason(event.target.value)}
-                    disabled={submitting}
-                  />
-                ) : (
+                  <>
+                    {role === 'tenant' && (
+                      <div className="revision-type-options" style={{ marginBottom: '16px', display: 'flex', flexDirection: 'column', gap: '8px', textAlign: 'left' }}>
+                        <label style={{ display: 'flex', alignItems: 'center', gap: '8px', cursor: 'pointer' }}>
+                          <input 
+                            type="radio" 
+                            name="revisionType" 
+                            value="Occupants" 
+                            checked={revisionType === 'Occupants'} 
+                            onChange={() => setRevisionType('Occupants')} 
+                          /> 
+                          <span>Sửa thông tin người ở</span>
+                        </label>
+                        <label style={{ display: 'flex', alignItems: 'center', gap: '8px', cursor: 'pointer' }}>
+                          <input 
+                            type="radio" 
+                            name="revisionType" 
+                            value="ContractTerms" 
+                            checked={revisionType === 'ContractTerms'} 
+                            onChange={() => setRevisionType('ContractTerms')} 
+                          /> 
+                          <span>Yêu cầu chủ trọ sửa điều khoản (ngày bắt đầu, kết thúc, ngày thanh toán...)</span>
+                        </label>
+                      </div>
+                    )}
+                    <textarea
+                      placeholder="Nhập lý do chi tiết..."
+                      value={reason}
+                      onChange={(event) => setReason(event.target.value)}
+                      disabled={submitting}
+                    />
+                  </>
+                ) : dialogType === 'reject' ? (
                   <>
                     <p className="reject-contract-warning">
-                      Bạn bắt buộc phải hoàn cọc cho khách nếu như muốn hủy hợp đồng.
-                      Bạn có chắc chắn muốn hủy hợp đồng không?
+                      {role === 'landlord' 
+                        ? 'Bạn bắt buộc phải hoàn cọc cho khách nếu như muốn hủy hợp đồng. Bạn có chắc chắn muốn hủy hợp đồng không?'
+                        : 'Việc hủy hợp đồng ở bước này sẽ khiến bạn mất toàn bộ tiền cọc phòng. Bạn có chắc chắn muốn từ chối ký và hủy hợp đồng không?'
+                      }
                     </p>
                     <textarea
                       placeholder="Nhập lý do hủy hợp đồng..."
@@ -201,6 +266,15 @@ export function ContractPreviewModal({ contractId, onClose, onSuccess }: Contrac
                       onChange={(event) => setReason(event.target.value)}
                       disabled={submitting}
                     />
+                  </>
+                ) : (
+                  <>
+                    <p className="subtle" style={{ marginTop: 0 }}>
+                      Mã OTP đã được gửi đến email của bạn. Vui lòng kiểm tra và nhập vào bên dưới.
+                    </p>
+                    <div style={{ display: 'flex', justifyContent: 'center', margin: '20px 0' }}>
+                      <OtpInput value={otp} onChange={setOtp} disabled={submitting} />
+                    </div>
                   </>
                 )}
                 <div className="reason-actions">

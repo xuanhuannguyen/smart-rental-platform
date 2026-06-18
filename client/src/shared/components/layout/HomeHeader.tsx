@@ -3,14 +3,21 @@ import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../../../app/providers/AuthProvider';
 import { ROUTE_PATHS } from '../../../app/router/routePaths';
 import { Button } from '../ui/Button';
+import { Toast } from '../ui/Toast';
 import { toAssetUrl } from '../../api/assets';
+import { getMyRoomingHouseOnboarding } from '../../../features/rooming-houses/api';
 import './HomeHeader.css';
 
-export function HomeHeader() {
+interface HomeHeaderProps {
+  centerContent?: React.ReactNode;
+}
+
+export function HomeHeader({ centerContent }: HomeHeaderProps) {
   const { currentUser, logout } = useAuth();
   const navigate = useNavigate();
   const [isCheckingLandlord, setIsCheckingLandlord] = useState(false);
   const [showDropdown, setShowDropdown] = useState(false);
+  const [toastMessage, setToastMessage] = useState<string | null>(null);
   const dropdownRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -28,11 +35,32 @@ export function HomeHeader() {
   const isAdmin = currentUser?.roles.includes('Admin') || false;
   const isLandlord = currentUser?.roles.includes('Landlord') || false;
 
-  function handleLandlordRegister() {
+  async function handleLandlordRegister() {
     setIsCheckingLandlord(true);
-    // Here we can just navigate or check something. Since MePage had it simple:
-    navigate(ROUTE_PATHS.LANDLORD.REGISTER);
-    setIsCheckingLandlord(false);
+    try {
+      const onboarding = await getMyRoomingHouseOnboarding();
+
+      if (onboarding.canEnterLandlordDashboard) {
+        navigate(ROUTE_PATHS.LANDLORD.DASHBOARD);
+        return;
+      }
+
+      if ((onboarding.status === 'Draft' || onboarding.status === 'Rejected') && onboarding.roomingHouseId) {
+        navigate(`${ROUTE_PATHS.LANDLORD.REGISTER}?id=${onboarding.roomingHouseId}`);
+        return;
+      }
+
+      if (onboarding.status === 'Pending') {
+        setToastMessage('Hồ sơ chủ trọ của bạn đang chờ duyệt.');
+        return;
+      }
+
+      navigate(ROUTE_PATHS.LANDLORD.REGISTER);
+    } catch {
+      setToastMessage('Không thể kiểm tra trạng thái đăng ký chủ trọ.');
+    } finally {
+      setIsCheckingLandlord(false);
+    }
   }
 
   const avatarInitials = currentUser?.displayName
@@ -44,6 +72,13 @@ export function HomeHeader() {
       <div className="header-logo" onClick={() => navigate(ROUTE_PATHS.ME.ROOT)}>
         Smart Rental
       </div>
+
+      {centerContent && (
+        <div className="header-center">
+          {centerContent}
+        </div>
+      )}
+
       <div className="header-auth" style={{ display: 'flex', alignItems: 'center', gap: '16px' }}>
         {currentUser && (
           <div className="header-role-action">
@@ -89,22 +124,21 @@ export function HomeHeader() {
                 <button className="dropdown-item" onClick={() => { setShowDropdown(false); navigate(ROUTE_PATHS.ACCOUNT.SECURITY); }}>
                   Quản lý bảo mật
                 </button>
-                <button className="dropdown-item" onClick={() => { setShowDropdown(false); alert('Tính năng Lịch sử thuê đang được phát triển.'); }}>
-                  Lịch sử thuê
+                <button className="dropdown-item" onClick={() => { setShowDropdown(false); navigate(ROUTE_PATHS.ACCOUNT.VIEWING_APPOINTMENTS); }}>
+                  Lịch hẹn xem phòng
                 </button>
                 <button className="dropdown-item" onClick={() => { setShowDropdown(false); navigate(ROUTE_PATHS.ACCOUNT.RENTAL_REQUESTS); }}>
-                  Yêu cầu thuê
+                  Yêu cầu thuê phòng
+                </button>
+                <button className="dropdown-item" onClick={() => { setShowDropdown(false); navigate(ROUTE_PATHS.ACCOUNT.RENTAL_HISTORY); }}>
+                  Lịch sử thuê phòng
                 </button>
                 {isAdmin && (
                   <button className="dropdown-item" onClick={() => { setShowDropdown(false); navigate(ROUTE_PATHS.ADMIN.APPROVALS); }}>
                     Duyệt hồ sơ
                   </button>
                 )}
-                {isLandlord && (
-                  <button className="dropdown-item" onClick={() => { setShowDropdown(false); navigate(ROUTE_PATHS.LANDLORD.DASHBOARD); }}>
-                    Kênh chủ trọ
-                  </button>
-                )}
+
                 <button className="dropdown-item dropdown-item--danger" onClick={() => { setShowDropdown(false); logout(); }}>
                   Đăng xuất
                 </button>
@@ -122,6 +156,7 @@ export function HomeHeader() {
           </div>
         )}
       </div>
+      {toastMessage && <Toast message={toastMessage} onClose={() => setToastMessage(null)} />}
     </header>
   );
 }

@@ -13,56 +13,56 @@ export function AccountLayout() {
 
   return (
     <div className="account-container">
-      <div className="account-layout">
-        {/* Sidebar */}
-        <aside className="account-sidebar">
-          <h2>Cài đặt tài khoản</h2>
-          
-          <NavLink
-            to={ROUTE_PATHS.ACCOUNT.PROFILE}
-            className={({ isActive }) => `account-sidebar-item ${isActive ? 'active' : ''}`}
-          >
-            Chỉnh sửa thông tin
-          </NavLink>
-          
-          <NavLink
-            to={ROUTE_PATHS.ACCOUNT.SECURITY}
-            className={({ isActive }) => `account-sidebar-item ${isActive ? 'active' : ''}`}
-          >
-            Quản lý bảo mật
-          </NavLink>
-          
-          {/* Lịch sử thuê can be added here later */}
-          <button
-            type="button"
-            className="account-sidebar-item"
-            onClick={() => alert('Tính năng Lịch sử thuê đang được phát triển.')}
-          >
-            Lịch sử thuê
-          </button>
-          
-          <NavLink
-            to={ROUTE_PATHS.ACCOUNT.RENTAL_REQUESTS}
-            className={({ isActive }) => `account-sidebar-item ${isActive ? 'active' : ''}`}
-          >
-            Yêu cầu thuê
-          </NavLink>
+      <aside className="account-sidebar">
+        <h2>Quản lý tài khoản</h2>
+        
+        <NavLink
+          to={ROUTE_PATHS.ACCOUNT.PROFILE}
+          className={({ isActive }) => `account-sidebar-item ${isActive ? 'active' : ''}`}
+        >
+          Chỉnh sửa thông tin
+        </NavLink>
+        
+        <NavLink
+          to={ROUTE_PATHS.ACCOUNT.SECURITY}
+          className={({ isActive }) => `account-sidebar-item ${isActive ? 'active' : ''}`}
+        >
+          Quản lý bảo mật
+        </NavLink>
+        
+        <NavLink
+          to={ROUTE_PATHS.ACCOUNT.VIEWING_APPOINTMENTS}
+          className={({ isActive }) => `account-sidebar-item ${isActive ? 'active' : ''}`}
+        >
+          Lịch hẹn xem phòng
+        </NavLink>
+        
+        <NavLink 
+          to={ROUTE_PATHS.ACCOUNT.RENTAL_REQUESTS}
+          className={({ isActive }) => `account-sidebar-item ${isActive ? 'active' : ''}`}
+        >
+          Yêu cầu thuê phòng
+        </NavLink>
 
-          <button
-            type="button"
-            className="account-sidebar-item sidebar-back-btn"
-            onClick={() => navigate(ROUTE_PATHS.ME.ROOT)}
-            style={{ marginTop: 'auto' }}
-          >
-            ← Quay lại trang chủ
-          </button>
-        </aside>
+        <NavLink 
+          to={ROUTE_PATHS.ACCOUNT.RENTAL_HISTORY}
+          className={({ isActive }) => `account-sidebar-item ${isActive ? 'active' : ''}`}
+        >
+          Lịch sử thuê phòng
+        </NavLink>
 
-        {/* Content Area */}
-        <main className="account-content">
-          <Outlet />
-        </main>
-      </div>
+        <button
+          type="button"
+          className="account-sidebar-item sidebar-back-btn"
+          onClick={() => navigate(ROUTE_PATHS.ME.ROOT)}
+        >
+          Quay lại trang chủ
+        </button>
+      </aside>
+
+      <main className="account-content">
+        <Outlet />
+      </main>
     </div>
   );
 }

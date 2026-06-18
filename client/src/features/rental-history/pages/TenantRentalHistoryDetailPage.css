@@ -1,0 +1,233 @@
+/* client/src/features/rental-history/pages/TenantRentalHistoryDetailPage.css */
+
+.history-detail-page {
+  width: 100%;
+}
+
+.history-detail-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 24px;
+}
+
+.history-detail-header h1 {
+  font-size: 1.5rem;
+  color: #1e293b;
+  margin: 0 0 8px 0;
+}
+
+.history-detail-header-left p {
+  color: #64748b;
+  margin: 0;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.history-detail-tabs {
+  display: flex;
+  gap: 8px;
+  margin-bottom: 24px;
+  border-bottom: 1px solid #e2e8f0;
+  padding-bottom: 8px;
+}
+
+.history-detail-tab {
+  padding: 8px 16px;
+  border: none;
+  background: none;
+  font-size: 1rem;
+  color: #64748b;
+  cursor: pointer;
+  border-radius: 6px;
+  font-weight: 500;
+  transition: all 0.2s;
+}
+
+.history-detail-tab:hover {
+  background-color: #f1f5f9;
+  color: #1e293b;
+}
+
+.history-detail-tab.active {
+  background-color: #e0e7ff;
+  color: #4f46e5;
+}
+
+.history-detail-content {
+  background: white;
+  border-radius: 12px;
+  border: 1px solid #e2e8f0;
+  padding: 24px;
+}
+
+/* Occupants Tab */
+.occupants-filter {
+  display: flex;
+  gap: 12px;
+  margin-bottom: 20px;
+}
+
+.occupant-filter-btn {
+  padding: 6px 12px;
+  border: 1px solid #cbd5e1;
+  background: white;
+  border-radius: 6px;
+  cursor: pointer;
+  color: #475569;
+}
+
+.occupant-filter-btn.active {
+  background: #246bfe;
+  color: white;
+  border-color: #246bfe;
+}
+
+.occupant-list {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.occupant-item {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 16px;
+  border: 1px solid #e2e8f0;
+  border-radius: 8px;
+}
+
+.occupant-info h4 {
+  margin: 0 0 4px 0;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.occupant-me-badge {
+  background-color: #dbeafe;
+  color: #1e40af;
+  padding: 2px 6px;
+  border-radius: 4px;
+  font-size: 0.75rem;
+}
+
+.occupant-role {
+  color: #64748b;
+  font-size: 0.9rem;
+}
+
+.occupant-dates {
+  text-align: right;
+  font-size: 0.9rem;
+  color: #475569;
+}
+
+/* Contract Tab */
+.contract-info-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 24px;
+  margin-bottom: 32px;
+}
+
+.contract-info-block {
+  background: #f8fafc;
+  padding: 16px;
+  border-radius: 8px;
+  border: 1px solid #f1f5f9;
+}
+
+.contract-info-block h3 {
+  margin: 0 0 16px 0;
+  font-size: 1.1rem;
+  color: #1e293b;
+  border-bottom: 1px solid #e2e8f0;
+  padding-bottom: 8px;
+}
+
+.contract-info-item {
+  display: flex;
+  justify-content: space-between;
+  margin-bottom: 12px;
+}
+
+.contract-info-item:last-child {
+  margin-bottom: 0;
+}
+
+.contract-info-item .label {
+  color: #64748b;
+}
+
+.contract-info-item .value {
+  font-weight: 500;
+  color: #0f172a;
+}
+
+.contract-actions {
+  display: flex;
+  gap: 12px;
+  flex-wrap: wrap;
+  padding-top: 24px;
+  border-top: 1px solid #e2e8f0;
+}
+
+/* Coming soon placeholder */
+.coming-soon-placeholder {
+  text-align: center;
+  padding: 60px 20px;
+  color: #64748b;
+}
+
+.coming-soon-placeholder h2 {
+  color: #1e293b;
+  margin-bottom: 8px;
+}
+
+/* Appendices Tab */
+.appendices-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 20px;
+}
+
+.appendices-header h3 {
+  margin: 0;
+  font-size: 1.25rem;
+  color: #1e293b;
+  border-bottom: 2px solid #e2e8f0;
+  padding-bottom: 8px;
+  width: 100%;
+}
+
+.appendices-list {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.appendix-item {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  padding: 16px;
+  border: 1px solid #e2e8f0;
+  border-radius: 8px;
+  background-color: #f8fafc;
+}
+
+.appendix-info h4 {
+  margin: 0 0 8px 0;
+  color: #1e293b;
+  font-size: 1.1rem;
+}
+
+.appendix-dates {
+  text-align: right;
+  font-size: 0.95rem;
+  color: #475569;
+}

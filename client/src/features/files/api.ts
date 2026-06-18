@@ -1,7 +1,6 @@
 import { apiClient } from '../../shared/api/apiClient';
 import type { ApiResponse } from '../../shared/api/apiResponse.types';
-
-export type FileUploadScope = 'RoomingHouse' | 'LegalDocument' | 'Room' | 'KycDocument' | 'Avatar' | 'HouseRule';
+export type FileUploadScope = 'RoomingHouse' | 'LegalDocument' | 'Room' | 'Avatar' | 'HouseRule';
 
 export interface FileUploadResponse {
   objectKey: string;

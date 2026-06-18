@@ -9,12 +9,12 @@ import { toAssetUrl } from '../../../shared/api/assets';
 import { getProvinces, getWardsByProvince } from '../../administrative/api';
 import type { Province, Ward } from '../../administrative/types';
 import {
-  getMyRoomingHouseOnboarding,
   getPublicRoomingHouses,
   searchLocationAddress,
 } from '../../rooming-houses/api';
 import { saveRecentSearch } from '../../rooming-houses/searchRecentStorage';
 import type { RoomingHouseDetail } from '../../rooming-houses/types';
+import { HomeHeader } from '../../../shared/components/layout/HomeHeader';
 import './MePage.css';
 
 type HeaderLocationMode = 'area' | 'nearby' | null;
@@ -29,8 +29,6 @@ export function MePage() {
   const [publicHouses, setPublicHouses] = useState<RoomingHouseDetail[]>([]);
   const [searchQuery, setSearchQuery] = useState('');
   const [loadingHouses, setLoadingHouses] = useState(false);
-  const [isCheckingLandlord, setIsCheckingLandlord] = useState(false);
-  const [showDropdown, setShowDropdown] = useState(false);
   const [activeLocationMode, setActiveLocationMode] = useState<HeaderLocationMode>(null);
   const [provinces, setProvinces] = useState<Province[]>([]);
   const [wards, setWards] = useState<Ward[]>([]);
@@ -40,8 +38,21 @@ export function MePage() {
   const [nearbyRadiusKm, setNearbyRadiusKm] = useState(3);
   const [nearbySearching, setNearbySearching] = useState(false);
   const [nearbyError, setNearbyError] = useState('');
-  const dropdownRef = useRef<HTMLDivElement>(null);
+  const locationPanelRef = useRef<HTMLDivElement>(null);
 
+  useEffect(() => {
+    function handleClickOutside(event: MouseEvent) {
+      if (
+        activeLocationMode != null &&
+        locationPanelRef.current &&
+        !locationPanelRef.current.contains(event.target as Node)
+      ) {
+        setActiveLocationMode(null);
+      }
+    }
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, [activeLocationMode]);
   useEffect(() => {
     const state = location.state as { message?: string } | null;
     if (state?.message) {
@@ -101,19 +112,6 @@ export function MePage() {
     void loadWards();
   }, [localProvinceCode]);
 
-  useEffect(() => {
-    function handleClickOutside(event: MouseEvent) {
-      if (dropdownRef.current && !dropdownRef.current.contains(event.target as Node)) {
-        setShowDropdown(false);
-      }
-    }
-
-    document.addEventListener('mousedown', handleClickOutside);
-    return () => document.removeEventListener('mousedown', handleClickOutside);
-  }, []);
-
-  const isAdmin = currentUser?.roles.includes('Admin') ?? false;
-  const isLandlord = currentUser?.roles.includes('Landlord') ?? false;
 
   const selectedProvinceName = useMemo(
     () => provinces.find((province) => province.code === localProvinceCode)?.name ?? '',
@@ -136,48 +134,7 @@ export function MePage() {
     (selectedWardName && selectedProvinceName ? `${selectedWardName}, ${selectedProvinceName}` : selectedProvinceName) ||
     'Khu vực / xung quanh';
 
-  const avatarInitials = currentUser?.displayName
-    ? currentUser.displayName
-        .split(' ')
-        .map((part) => part[0])
-        .join('')
-        .substring(0, 2)
-        .toUpperCase()
-    : 'U';
 
-  async function handleLandlordRegister() {
-    if (!currentUser) {
-      navigate(ROUTE_PATHS.AUTH.LOGIN);
-      return;
-    }
-
-    setIsCheckingLandlord(true);
-    setError('');
-    try {
-      const onboarding = await getMyRoomingHouseOnboarding();
-
-      if (onboarding.canEnterLandlordDashboard) {
-        navigate(ROUTE_PATHS.LANDLORD.DASHBOARD);
-        return;
-      }
-
-      if ((onboarding.status === 'Draft' || onboarding.status === 'Rejected') && onboarding.roomingHouseId) {
-        navigate(`${ROUTE_PATHS.LANDLORD.REGISTER}?id=${onboarding.roomingHouseId}`);
-        return;
-      }
-
-      if (onboarding.status === 'Pending') {
-        setToastMessage('Hồ sơ chủ trọ của bạn đang chờ duyệt.');
-        return;
-      }
-
-      navigate(ROUTE_PATHS.LANDLORD.REGISTER);
-    } catch {
-      setError('Không thể kiểm tra trạng thái đăng ký chủ trọ.');
-    } finally {
-      setIsCheckingLandlord(false);
-    }
-  }
 
   function buildSearchUrl(params: Record<string, string | number | undefined>) {
     const searchParams = new URLSearchParams();
@@ -252,22 +209,20 @@ export function MePage() {
     <div className="home-container">
       {toastMessage && <Toast message={toastMessage} onClose={() => setToastMessage(null)} />}
 
-      <header className="home-header">
-        <div className="header-logo" onClick={() => navigate(ROUTE_PATHS.ME.ROOT)}>
-          Smart Rental
-        </div>
+      <HomeHeader
+        centerContent={
+          <>
+            <form className="home-header-search-form" onSubmit={handleSearchSubmit}>
+              <input
+                aria-label="Tìm kiếm khu trọ"
+                placeholder="Tìm khu vực, trường, giá thuê..."
+                value={searchQuery}
+                onChange={(event) => setSearchQuery(event.target.value)}
+              />
+              <Button type="submit">Tìm</Button>
+            </form>
 
-        <form className="home-header-search-form" onSubmit={handleSearchSubmit}>
-          <input
-            aria-label="Tìm kiếm khu trọ"
-            placeholder="Tìm khu vực, trường, giá thuê..."
-            value={searchQuery}
-            onChange={(event) => setSearchQuery(event.target.value)}
-          />
-          <Button type="submit">Tìm</Button>
-        </form>
-
-        <div className="home-header-location">
+            <div className="home-header-location" ref={locationPanelRef}>
           <button
             type="button"
             className={`home-location-button ${activeLocationMode ? 'is-active' : ''}`}
@@ -400,96 +355,22 @@ export function MePage() {
                 </>
               )}
 
-              <div className="home-location-actions">
-                <Button type="button" variant="secondary" onClick={handleClearHeaderLocation}>Xóa lọc</Button>
-                <Button
-                  type="button"
-                  disabled={nearbySearching}
-                  onClick={activeLocationMode === 'nearby' ? handleApplyNearbySearch : handleApplyAreaSearch}
-                >
-                  {nearbySearching ? 'Đang tìm...' : 'Áp dụng'}
-                </Button>
-              </div>
-            </div>
-          )}
-        </div>
-
-        <div className="header-auth">
-          {currentUser && (
-            <div className="header-role-action">
-              {isAdmin ? (
-                <Button type="button" variant="secondary" onClick={() => navigate(ROUTE_PATHS.ADMIN.APPROVALS)}>
-                  Duyệt hồ sơ
-                </Button>
-              ) : isLandlord ? (
-                <Button type="button" variant="secondary" onClick={() => navigate(ROUTE_PATHS.LANDLORD.DASHBOARD)}>
-                  Kênh chủ trọ
-                </Button>
-              ) : (
-                <Button
-                  type="button"
-                  disabled={isCheckingLandlord}
-                  onClick={() => void handleLandlordRegister()}
-                >
-                  {isCheckingLandlord ? 'Đang xử lý...' : 'Đăng ký làm chủ trọ'}
-                </Button>
-              )}
-            </div>
-          )}
-
-          {currentUser ? (
-            <div className="avatar-wrapper" ref={dropdownRef}>
-              <button className="avatar-btn" onClick={() => setShowDropdown(!showDropdown)}>
-                {currentUser.avatarUrl && currentUser.avatarUrl.trim() !== '' ? (
-                  <img src={toAssetUrl(currentUser.avatarUrl)} alt="Avatar" className="avatar-image" />
-                ) : (
-                  <span className="avatar-initials">{avatarInitials}</span>
-                )}
-                <span className="avatar-name">{currentUser.displayName}</span>
-              </button>
-              {showDropdown && (
-                <div className="avatar-dropdown">
-                  <div className="dropdown-info">
-                    <strong>{currentUser.displayName}</strong>
-                    <span>{currentUser.email}</span>
+                  <div className="home-location-actions">
+                    <Button type="button" variant="secondary" onClick={handleClearHeaderLocation}>Xóa lọc</Button>
+                    <Button
+                      type="button"
+                      disabled={nearbySearching}
+                      onClick={activeLocationMode === 'nearby' ? handleApplyNearbySearch : handleApplyAreaSearch}
+                    >
+                      {nearbySearching ? 'Đang tìm...' : 'Áp dụng'}
+                    </Button>
                   </div>
-                  <button className="dropdown-item" onClick={() => { setShowDropdown(false); navigate(ROUTE_PATHS.ACCOUNT.PROFILE); }}>
-                    Chỉnh sửa thông tin
-                  </button>
-                  <button className="dropdown-item" onClick={() => { setShowDropdown(false); navigate(ROUTE_PATHS.ME.VIEWING_APPOINTMENTS); }}>
-                    Lịch hẹn của tôi
-                  </button>
-                  <button className="dropdown-item" onClick={() => { setShowDropdown(false); navigate(ROUTE_PATHS.ACCOUNT.RENTAL_REQUESTS); }}>
-                    Yêu cầu thuê của tôi
-                  </button>
-                  {isAdmin && (
-                    <button className="dropdown-item" onClick={() => { setShowDropdown(false); navigate(ROUTE_PATHS.ADMIN.APPROVALS); }}>
-                      Duyệt hồ sơ
-                    </button>
-                  )}
-                  {isLandlord && (
-                    <button className="dropdown-item" onClick={() => { setShowDropdown(false); navigate(ROUTE_PATHS.LANDLORD.DASHBOARD); }}>
-                      Kênh chủ trọ
-                    </button>
-                  )}
-                  <button className="dropdown-item dropdown-item--danger" onClick={() => { setShowDropdown(false); logout(); }}>
-                    Đăng xuất
-                  </button>
                 </div>
               )}
             </div>
-          ) : (
-            <div className="auth-buttons">
-              <Button type="button" variant="secondary" onClick={() => navigate(ROUTE_PATHS.AUTH.LOGIN)}>
-                Đăng nhập
-              </Button>
-              <Button type="button" onClick={() => navigate(ROUTE_PATHS.AUTH.REGISTER)}>
-                Đăng ký
-              </Button>
-            </div>
-          )}
-        </div>
-      </header>
+          </>
+        }
+      />
 
       <section className="home-listings-section">
         {error && <Alert type="error">{error}</Alert>}
