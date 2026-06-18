@@ -3,6 +3,9 @@ using SmartRentalPlatform.Domain.Entities.Administrative;
 using SmartRentalPlatform.Domain.Entities.AdminApproval;
 using SmartRentalPlatform.Domain.Entities.Users;
 using SmartRentalPlatform.Domain.Entities.Properties;
+using SmartRentalPlatform.Domain.Entities.Billing;
+using SmartRentalPlatform.Domain.Entities.Leasing;
+using SmartRentalPlatform.Domain.Entities.Wallets;
 
 namespace SmartRentalPlatform.Application.Common.Interfaces;
 
@@ -48,6 +51,18 @@ public interface IAppDbContext {
     DbSet<RoomingHouseRule> RoomingHouseRules { get; }
 
     DbSet<ApprovalAuditLog> ApprovalAuditLogs { get; }
+
+    DbSet<BillingServiceType> BillingServiceTypes { get; }
+
+    DbSet<RoomingHouseServicePrice> RoomingHouseServicePrices { get; }
+
+    DbSet<MeterReading> MeterReadings { get; }
+
+    DbSet<Invoice> Invoices { get; }
+
+    DbSet<InvoiceItem> InvoiceItems { get; }
+
+    DbSet<InvoicePayment> InvoicePayments { get; }
 
     DbSet<ViewingAppointment> ViewingAppointments { get; }
 

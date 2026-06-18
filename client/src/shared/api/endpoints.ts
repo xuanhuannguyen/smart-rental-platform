@@ -46,6 +46,19 @@ export const ENDPOINTS = {
     LEASE_POLICY: (id: string) => `/api/rooming-houses/${id}/lease-policy`,
     SUBMIT: (id: string) => `/api/rooming-houses/${id}/submit`
   },
+  BILLING: {
+    SERVICE_PRICES: (roomingHouseId: string) => `/api/landlord/rooming-houses/${roomingHouseId}/service-prices`,
+    ROOM_BILLING_CONTEXT: (roomId: string) => `/api/landlord/rooms/${roomId}/billing-context`,
+    METER_READINGS: '/api/landlord/meter-readings',
+    LANDLORD_INVOICES: '/api/landlord/invoices',
+    GENERATE_DRAFT: '/api/landlord/invoices/generate-draft',
+    LANDLORD_INVOICE: (id: string) => `/api/landlord/invoices/${id}`,
+    ISSUE_INVOICE: (id: string) => `/api/landlord/invoices/${id}/issue`,
+    CANCEL_INVOICE: (id: string) => `/api/landlord/invoices/${id}/cancel`,
+    MY_INVOICES: '/api/me/invoices',
+    MY_INVOICE: (id: string) => `/api/me/invoices/${id}`,
+    PAY_INVOICE: (id: string) => `/api/me/invoices/${id}/pay`
+  },
   PUBLIC: {
     ROOMING_HOUSES: '/api/public/rooming-houses'
   },

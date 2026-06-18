@@ -381,17 +381,21 @@ export function MePage() {
                   Duyệt hồ sơ
                 </Button>
               ) : isLandlord ? (
-                <Button type="button" variant="secondary" onClick={() => navigate(ROUTE_PATHS.LANDLORD.DASHBOARD)}>
-                  Kênh chủ trọ
-                </Button>
+                <>
+                  <Button type="button" variant="secondary" onClick={() => navigate(ROUTE_PATHS.LANDLORD.DASHBOARD)}>
+                    Kênh chủ trọ
+                  </Button>
+                </>
               ) : (
-                <Button
-                  type="button"
-                  disabled={isCheckingLandlord}
-                  onClick={() => void handleLandlordRegister()}
-                >
-                  {isCheckingLandlord ? 'Đang xử lý...' : 'Đăng ký làm chủ trọ'}
-                </Button>
+                <>
+                  <Button
+                    type="button"
+                    disabled={isCheckingLandlord}
+                    onClick={() => void handleLandlordRegister()}
+                  >
+                    {isCheckingLandlord ? 'Đang xử lý...' : 'Đăng ký làm chủ trọ'}
+                  </Button>
+                </>
               )}
             </div>
           )}
