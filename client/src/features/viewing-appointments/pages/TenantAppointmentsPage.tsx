@@ -1,7 +1,6 @@
 import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { getTenantAppointments, cancelViewingAppointmentByTenant } from '../api';
-import { getPublicRoomingHouses } from '../../rooming-houses/api';
 import type { ViewingAppointment, ViewingAppointmentStatus } from '../types';
 import { Alert } from '../../../shared/components/ui/Alert';
 import { getApiErrorMessage } from '../../../shared/api/apiError';
@@ -11,7 +10,6 @@ import './TenantAppointmentsPage.css';
 export default function TenantAppointmentsPage() {
   const navigate = useNavigate();
   const [appointments, setAppointments] = useState<ViewingAppointment[]>([]);
-  const [roomMap, setRoomMap] = useState<Record<string, { roomNumber: string; houseName: string }>>({});
   const [activeTab, setActiveTab] = useState<'all' | 'pending' | 'confirmed' | 'history'>('all');
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
@@ -26,23 +24,7 @@ export default function TenantAppointmentsPage() {
     setLoading(true);
     setError('');
     try {
-      const [appointmentsData, housesData] = await Promise.all([
-        getTenantAppointments(),
-        getPublicRoomingHouses(),
-      ]);
-
-      // Map unique room ids
-      const map: Record<string, { roomNumber: string; houseName: string }> = {};
-      housesData.forEach((house) => {
-        (house.rooms ?? []).forEach((room) => {
-          map[room.id] = {
-            roomNumber: room.roomNumber,
-            houseName: house.name,
-          };
-        });
-      });
-      
-      setRoomMap(map);
+      const appointmentsData = await getTenantAppointments();
       setAppointments(appointmentsData);
     } catch (err) {
       setError(getApiErrorMessage(err, 'Không thể tải danh sách lịch hẹn.'));
@@ -147,9 +129,8 @@ export default function TenantAppointmentsPage() {
         ) : (
           <div className="appointments-grid">
             {filteredAppointments.map((item) => {
-              const details = roomMap[item.roomId];
-              const houseName = details?.houseName ?? 'Khu trọ';
-              const roomNumber = details?.roomNumber ?? 'phòng';
+              const houseName = item.roomingHouseName ?? 'Khu trọ';
+              const roomNumber = item.roomNumber ?? 'phòng';
               const isCancellable = item.status === 'Pending' || item.status === 'Confirmed';
 
               return (
