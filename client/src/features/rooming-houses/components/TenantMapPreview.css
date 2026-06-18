@@ -1,0 +1,304 @@
+/* Small Map Preview Box */
+.tenant-map-preview-card {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 16px;
+  background: #ffffff;
+  border: 1px solid #e2e8f0;
+  border-radius: 8px;
+  padding: 16px;
+  margin-top: 12px;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05);
+}
+
+.tenant-map-preview-card__info {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 8px;
+  flex: 1;
+}
+
+.tenant-map-preview-card__address {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  color: #334155;
+  font-size: 14px;
+  line-height: 1.5;
+}
+
+.tenant-map-preview-card__icon {
+  color: #fa6819;
+  flex-shrink: 0;
+  margin-top: 2px;
+}
+
+.tenant-map-preview-card__address-text {
+  font-weight: 500;
+}
+
+.tenant-map-preview-card__link {
+  background: none;
+  border: none;
+  color: #246bfe;
+  font-weight: 600;
+  font-size: 14px;
+  padding: 0;
+  cursor: pointer;
+  text-decoration: underline;
+}
+
+.tenant-map-preview-card__link:hover {
+  color: #1d4ed8;
+}
+
+.tenant-map-preview-card__map-button {
+  position: relative;
+  width: 120px;
+  height: 90px;
+  border: 1px solid #cbd5e1;
+  border-radius: 6px;
+  overflow: hidden;
+  background: #f8fafc;
+  cursor: pointer;
+  padding: 0;
+  flex-shrink: 0;
+}
+
+.tenant-map-preview-card__map-button:hover .tenant-map-preview-card__overlay {
+  background: rgba(0, 0, 0, 0.05);
+}
+
+.tenant-map-preview-card__canvas {
+  width: 100%;
+  height: 100%;
+  pointer-events: none; /* Make Leaflet non-interactive inside button */
+}
+
+.tenant-map-preview-card__overlay {
+  position: absolute;
+  inset: 0;
+  background: transparent;
+  transition: background-color 0.2s ease;
+  z-index: 400; /* overlay above leaflet tiles */
+}
+
+/* Empty State */
+.tenant-map-preview--empty {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 14px 16px;
+  border: 1px dashed #cbd5e1;
+  border-radius: 8px;
+  background: #f8fafc;
+  color: #64748b;
+  font-size: 14px;
+}
+
+.tenant-map-preview--empty svg {
+  color: #94a3b8;
+  flex-shrink: 0;
+}
+
+/* Fullscreen Map Modal */
+.tenant-map-modal-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 9999;
+  background: rgba(15, 23, 42, 0.45);
+  backdrop-filter: blur(4px);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 16px;
+}
+
+.tenant-map-modal {
+  background: #ffffff;
+  border-radius: 8px;
+  width: 100%;
+  max-width: 900px;
+  max-height: 90vh;
+  display: flex;
+  flex-direction: column;
+  box-shadow: 0 25px 50px -12px rgba(15, 23, 42, 0.25);
+  overflow: hidden;
+  animation: tenant-map-scale-up 0.2s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+}
+
+@keyframes tenant-map-scale-up {
+  from {
+    transform: scale(0.96);
+    opacity: 0;
+  }
+  to {
+    transform: scale(1);
+    opacity: 1;
+  }
+}
+
+.tenant-map-modal__header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 16px 20px;
+  border-bottom: 1px solid #f1f5f9;
+}
+
+.tenant-map-modal__title {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  font-size: 16px;
+  font-weight: 600;
+  color: #0f172a;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  padding-right: 12px;
+}
+
+.tenant-map-modal__icon {
+  color: #fa6819;
+  flex-shrink: 0;
+}
+
+.tenant-map-modal__close-btn {
+  background: none;
+  border: none;
+  color: #64748b;
+  cursor: pointer;
+  padding: 4px;
+  border-radius: 6px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: all 0.2s ease;
+}
+
+.tenant-map-modal__close-btn:hover {
+  background: #f1f5f9;
+  color: #0f172a;
+}
+
+.tenant-map-modal__body {
+  position: relative;
+  flex: 1;
+  min-height: 400px;
+  height: 55vh;
+  background: #e2e8f0;
+}
+
+.tenant-map-modal__canvas {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+}
+
+.tenant-map-modal__controls {
+  position: absolute;
+  right: 18px;
+  bottom: 18px;
+  z-index: 1000;
+  display: grid;
+  gap: 10px;
+}
+
+.tenant-map-modal__controls button {
+  width: 44px;
+  height: 44px;
+  display: grid;
+  place-items: center;
+  border: 1px solid #e2e8f0;
+  border-radius: 6px;
+  background: #ffffff;
+  color: #0f172a;
+  box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -4px rgba(0, 0, 0, 0.1);
+  cursor: pointer;
+  font-size: 20px;
+  font-weight: bold;
+  transition: all 0.2s ease;
+}
+
+.tenant-map-modal__controls button:hover {
+  background: #f8fafc;
+  color: #246bfe;
+  transform: translateY(-1px);
+}
+
+.tenant-map-modal__controls svg {
+  width: 20px;
+  height: 20px;
+}
+
+.tenant-map-modal__footer {
+  padding: 16px 20px;
+  border-top: 1px solid #f1f5f9;
+  background: #f8fafc;
+  display: flex;
+  justify-content: flex-end;
+}
+
+.tenant-map-modal__directions-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 6px;
+  padding: 10px 16px;
+  background: #fa6819;
+  color: #ffffff;
+  font-weight: 600;
+  text-decoration: none;
+  font-size: 14px;
+  transition: background-color 0.2s ease;
+  box-shadow: 0 4px 6px -1px rgba(250, 104, 25, 0.2);
+}
+
+.tenant-map-modal__directions-btn:hover {
+  background: #e05307;
+}
+
+/* Custom Marker Styling */
+.tenant-map-preview__marker {
+  border: 0;
+  background: transparent;
+}
+
+.tenant-map-preview__marker span {
+  display: block;
+  width: 48px;
+  height: 48px;
+  background: url("data:image/svg+xml,%3Csvg width='48' height='48' viewBox='0 0 24 36' fill='none' xmlns='http://www.w3.org/2000/svg'%3E%3Cpath d='M12 0C5.373 0 0 5.2 0 11.6C0 20.3 12 36 12 36S24 20.3 24 11.6C24 5.2 18.627 0 12 0Z' fill='%23FA6819'/%3E%3Ccircle cx='12' cy='11' r='4' fill='white'/%3E%3C/svg%3E") center top / 48px 48px no-repeat;
+  filter: drop-shadow(0 8px 14px rgba(15, 23, 42, 0.22));
+}
+
+/* Responsive adjustments */
+@media (max-width: 640px) {
+  .tenant-map-preview-card {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .tenant-map-preview-card__map-button {
+    width: 100%;
+    height: 120px;
+  }
+
+  .tenant-map-modal {
+    max-height: 100vh;
+    height: 100%;
+    border-radius: 0;
+  }
+
+  .tenant-map-modal-overlay {
+    padding: 0;
+  }
+
+  .tenant-map-modal__body {
+    height: auto;
+  }
+}

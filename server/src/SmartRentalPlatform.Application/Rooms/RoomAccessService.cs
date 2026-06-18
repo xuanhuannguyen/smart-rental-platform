@@ -38,6 +38,7 @@ public class RoomAccessService
 
         EnsureRoomingHouseApproved(roomingHouse);
         await EnsureLeasePolicyExistsAsync(roomingHouseId, cancellationToken);
+        await EnsureHouseRuleExistsAsync(roomingHouseId, cancellationToken);
     }
 
     public async Task<Room?> GetOwnedRoomForUpdateAsync(
@@ -124,6 +125,25 @@ public class RoomAccessService
             throw new ConflictException(
                 ErrorCodes.LeasePolicyRequired,
                 "Vui lòng hoàn thành chính sách thuê trước khi tạo hoặc quản lý phòng.",
+                new { roomingHouseId });
+        }
+    }
+
+    private async Task EnsureHouseRuleExistsAsync(
+        Guid roomingHouseId,
+        CancellationToken cancellationToken)
+    {
+        var hasHouseRule = await context.RoomingHouseRules
+            .AnyAsync(
+                x => x.RoomingHouseId == roomingHouseId &&
+                     x.PdfObjectKey != string.Empty,
+                cancellationToken);
+
+        if (!hasHouseRule)
+        {
+            throw new ConflictException(
+                ErrorCodes.HouseRuleRequired,
+                "Vui lòng hoàn thành luật khu trọ trước khi tạo phòng đầu tiên.",
                 new { roomingHouseId });
         }
     }

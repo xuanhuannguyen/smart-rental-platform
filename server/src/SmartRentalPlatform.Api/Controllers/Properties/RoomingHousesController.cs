@@ -8,6 +8,8 @@ using SmartRentalPlatform.Contracts.LeasePolicies;
 using SmartRentalPlatform.Contracts.LegalDocuments;
 using SmartRentalPlatform.Contracts.PropertyImages;
 using SmartRentalPlatform.Contracts.RoomingHouses;
+using SmartRentalPlatform.Contracts.RoomingHouseRules.Requests;
+using SmartRentalPlatform.Contracts.RoomingHouseRules.Responses;
 
 namespace SmartRentalPlatform.Api.Controllers;
 
@@ -20,6 +22,7 @@ public class RoomingHousesController : ControllerBase
     private readonly IRoomingHouseMediaService roomingHouseMediaService;
     private readonly IRoomingHouseSubmissionService roomingHouseSubmissionService;
     private readonly IRoomingHouseLeasePolicyService roomingHouseLeasePolicyService;
+    private readonly IRoomingHouseRuleService roomingHouseRuleService;
     private readonly ICurrentUserService currentUserService;
 
     public RoomingHousesController(
@@ -28,6 +31,7 @@ public class RoomingHousesController : ControllerBase
         IRoomingHouseMediaService roomingHouseMediaService,
         IRoomingHouseSubmissionService roomingHouseSubmissionService,
         IRoomingHouseLeasePolicyService roomingHouseLeasePolicyService,
+        IRoomingHouseRuleService roomingHouseRuleService,
         ICurrentUserService currentUserService)
     {
         this.roomingHouseQueryService = roomingHouseQueryService;
@@ -35,6 +39,7 @@ public class RoomingHousesController : ControllerBase
         this.roomingHouseMediaService = roomingHouseMediaService;
         this.roomingHouseSubmissionService = roomingHouseSubmissionService;
         this.roomingHouseLeasePolicyService = roomingHouseLeasePolicyService;
+        this.roomingHouseRuleService = roomingHouseRuleService;
         this.currentUserService = currentUserService;
     }
 
@@ -249,6 +254,43 @@ public class RoomingHousesController : ControllerBase
         {
             Success = true,
             Message = "Lưu chính sách thuê thành công.",
+            Data = result
+        });
+    }
+
+    [Authorize]
+    [HttpGet("{id:guid}/rule")]
+    public async Task<ActionResult<ApiResponse<RoomingHouseRuleResponse>>> GetRule(
+        Guid id,
+        CancellationToken cancellationToken)
+    {
+        var userId = GetCurrentUserId();
+        var result = await roomingHouseRuleService.GetRuleAsync(id, userId, cancellationToken);
+
+        return Ok(new ApiResponse<RoomingHouseRuleResponse>
+        {
+            Success = true,
+            Message = result is null
+                ? "Khu trọ chưa có luật khu trọ."
+                : "Tải luật khu trọ thành công.",
+            Data = result
+        });
+    }
+
+    [Authorize]
+    [HttpPut("{id:guid}/rule")]
+    public async Task<ActionResult<ApiResponse<RoomingHouseRuleResponse>>> UpsertRule(
+        Guid id,
+        UpsertRoomingHouseRuleRequest request,
+        CancellationToken cancellationToken)
+    {
+        var userId = GetCurrentUserId();
+        var result = await roomingHouseRuleService.UpsertRuleAsync(id, userId, request, cancellationToken);
+
+        return Ok(new ApiResponse<RoomingHouseRuleResponse>
+        {
+            Success = true,
+            Message = "Lưu luật khu trọ thành công.",
             Data = result
         });
     }

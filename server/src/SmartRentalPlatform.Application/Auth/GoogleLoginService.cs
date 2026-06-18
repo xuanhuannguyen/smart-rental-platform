@@ -134,7 +134,8 @@ public class GoogleLoginService : IGoogleLoginService
             OnboardingStatus = OnboardingStatus.NeedProfileUpdate,
             EmailConfirmed = true,
             PhoneConfirmed = false,
-            CreatedAt = now
+            CreatedAt = now,
+            UpdatedAt = now
         };
 
         var tenantRole = await dbContext.Roles.FirstAsync(x => x.Name == RoleName.Tenant, cancellationToken);

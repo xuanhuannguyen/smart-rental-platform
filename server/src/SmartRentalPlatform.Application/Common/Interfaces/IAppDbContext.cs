@@ -48,13 +48,9 @@ public interface IAppDbContext {
 
     DbSet<LeasePolicy> LeasePolicies { get; }
 
+    DbSet<RoomingHouseRule> RoomingHouseRules { get; }
+
     DbSet<ApprovalAuditLog> ApprovalAuditLogs { get; }
-
-    DbSet<Contract> Contracts { get; }
-
-    DbSet<WalletAccount> WalletAccounts { get; }
-
-    DbSet<WalletTransaction> WalletTransactions { get; }
 
     DbSet<BillingServiceType> BillingServiceTypes { get; }
 
@@ -67,6 +63,8 @@ public interface IAppDbContext {
     DbSet<InvoiceItem> InvoiceItems { get; }
 
     DbSet<InvoicePayment> InvoicePayments { get; }
+
+    DbSet<ViewingAppointment> ViewingAppointments { get; }
 
     Task<IAppDbContextTransaction> BeginTransactionAsync(CancellationToken cancellationToken = default);
 

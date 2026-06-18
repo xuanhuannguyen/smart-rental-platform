@@ -9,10 +9,13 @@ import { MyProfilePage } from '../../features/profile/pages/MyProfilePage';
 import { KycSubmitPage } from '../../features/kyc/pages/KycSubmitPage';
 import { KycStatusPage } from '../../features/kyc/pages/KycStatusPage';
 import CreateRoomingHousePage from '../../features/rooming-houses/CreateRoomingHousePage';
+import PublicRoomingHouseDetailPage from '../../features/rooming-houses/PublicRoomingHouseDetailPage';
+import SearchRoomingHousesPage from '../../features/rooming-houses/SearchRoomingHousesPage';
+import PublicRoomDetailPage from '../../features/rooms/pages/PublicRoomDetailPage';
 import LandlordDashboardPage from '../../features/landlord/pages/LandlordDashboardPage';
 import RoomingHouseDetailPage from '../../features/landlord/pages/RoomingHouseDetailPage';
-import LandlordBillingPage from '../../features/billing/pages/LandlordBillingPage';
-import TenantInvoicesPage from '../../features/billing/pages/TenantInvoicesPage';
+import TenantAppointmentsPage from '../../features/viewing-appointments/pages/TenantAppointmentsPage';
+import LandlordAppointmentsPage from '../../features/viewing-appointments/pages/LandlordAppointmentsPage';
 import { AdminHomePage } from '../../features/admin/pages/AdminHomePage';
 import { OnboardingGuard } from './OnboardingGuard';
 import { ProtectedRoute } from './ProtectedRoute';
@@ -27,6 +30,18 @@ export const router = createBrowserRouter([
     {
         path: ROUTE_PATHS.ME.ROOT,
         element: <MePage />
+    },
+    {
+        path: '/search',
+        element: <SearchRoomingHousesPage />
+    },
+    {
+        path: '/rooming-houses/:id',
+        element: <PublicRoomingHouseDetailPage />
+    },
+    {
+        path: '/rooming-houses/:houseId/rooms/:roomId',
+        element: <PublicRoomDetailPage />
     },
     {
         path: ROUTE_PATHS.AUTH.LOGIN,
@@ -75,8 +90,8 @@ export const router = createBrowserRouter([
                         element: <KycStatusPage />
                     },
                     {
-                        path: ROUTE_PATHS.ME.INVOICES,
-                        element: <TenantInvoicesPage />
+                        path: ROUTE_PATHS.ME.VIEWING_APPOINTMENTS,
+                        element: <TenantAppointmentsPage />
                     },
                     {
                         path: ROUTE_PATHS.LANDLORD.REGISTER,
@@ -95,32 +110,8 @@ export const router = createBrowserRouter([
                         element: <RoomingHouseDetailPage />
                     },
                     {
-                        path: '/landlord/rooming-houses/:id/billing',
-                        element: <LandlordBillingPage />
-                    },
-                    {
-                        path: '/landlord/rooming-houses/:id/service-prices',
-                        element: <LandlordBillingPage />
-                    },
-                    {
-                        path: ROUTE_PATHS.LANDLORD.METER_READINGS,
-                        element: <LandlordBillingPage />
-                    },
-                    {
-                        path: ROUTE_PATHS.LANDLORD.INVOICES,
-                        element: <LandlordBillingPage />
-                    },
-                    {
-                        path: ROUTE_PATHS.LANDLORD.INVOICE_CREATE,
-                        element: <LandlordBillingPage />
-                    },
-                    {
-                        path: '/landlord/invoices/:invoiceId',
-                        element: <LandlordBillingPage />
-                    },
-                    {
-                        path: '/me/invoices/:invoiceId',
-                        element: <TenantInvoicesPage />
+                        path: ROUTE_PATHS.LANDLORD.VIEWING_APPOINTMENTS,
+                        element: <LandlordAppointmentsPage />
                     },
                     {
                         element: <RoleGuard allowedRoles={['Admin']} />,

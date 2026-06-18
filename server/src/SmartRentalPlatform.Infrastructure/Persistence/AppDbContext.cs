@@ -39,12 +39,8 @@ public class AppDbContext : DbContext, IAppDbContext
     public DbSet<PropertyImage> PropertyImages => Set<PropertyImage>();
     public DbSet<RoomingHouseLegalDocument> RoomingHouseLegalDocuments => Set<RoomingHouseLegalDocument>();
     public DbSet<LeasePolicy> LeasePolicies => Set<LeasePolicy>();
+    public DbSet<RoomingHouseRule> RoomingHouseRules => Set<RoomingHouseRule>();
     public DbSet<ApprovalAuditLog> ApprovalAuditLogs => Set<ApprovalAuditLog>();
-    // Leasing minimal read model
-    public DbSet<Contract> Contracts => Set<Contract>();
-    // Wallet minimal read model
-    public DbSet<WalletAccount> WalletAccounts => Set<WalletAccount>();
-    public DbSet<WalletTransaction> WalletTransactions => Set<WalletTransaction>();
     // Billing
     public DbSet<BillingServiceType> BillingServiceTypes => Set<BillingServiceType>();
     public DbSet<RoomingHouseServicePrice> RoomingHouseServicePrices => Set<RoomingHouseServicePrice>();
@@ -52,6 +48,9 @@ public class AppDbContext : DbContext, IAppDbContext
     public DbSet<Invoice> Invoices => Set<Invoice>();
     public DbSet<InvoiceItem> InvoiceItems => Set<InvoiceItem>();
     public DbSet<InvoicePayment> InvoicePayments => Set<InvoicePayment>();
+    // VeiwingAppointment
+    public DbSet<ViewingAppointment> ViewingAppointments => Set<ViewingAppointment>();
+
 
     public async Task<IAppDbContextTransaction> BeginTransactionAsync(CancellationToken cancellationToken = default)
     {

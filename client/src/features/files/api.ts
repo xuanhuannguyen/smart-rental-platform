@@ -1,7 +1,7 @@
 import { apiClient } from '../../shared/api/apiClient';
 import type { ApiResponse } from '../../shared/api/apiResponse.types';
 
-export type FileUploadScope = 'RoomingHouse' | 'LegalDocument' | 'Room' | 'KycDocument' | 'Avatar';
+export type FileUploadScope = 'RoomingHouse' | 'LegalDocument' | 'Room' | 'KycDocument' | 'Avatar' | 'HouseRule';
 
 export interface FileUploadResponse {
   objectKey: string;
@@ -15,6 +15,18 @@ export async function uploadImage(file: File, scope: FileUploadScope): Promise<F
 
   const data = await apiClient<ApiResponse<FileUploadResponse>>(
     '/api/files/images',
+    { method: 'POST', auth: true, body: formData }
+  );
+  return data.data;
+}
+
+export async function uploadPdf(file: File, scope: FileUploadScope): Promise<FileUploadResponse> {
+  const formData = new FormData();
+  formData.append('file', file);
+  formData.append('scope', scope);
+
+  const data = await apiClient<ApiResponse<FileUploadResponse>>(
+    '/api/files/pdfs',
     { method: 'POST', auth: true, body: formData }
   );
   return data.data;
