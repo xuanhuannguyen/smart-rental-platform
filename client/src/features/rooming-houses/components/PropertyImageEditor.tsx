@@ -44,28 +44,43 @@ export default function PropertyImageEditor({
     );
   }
 
-  async function uploadSelectedImage(file: File | null) {
-    if (!file) return;
+  async function uploadSelectedImages(fileList: FileList | null) {
+    const selectedFiles = Array.from(fileList ?? []);
+    if (selectedFiles.length === 0) return;
 
     setUploading(true);
     setUploadMessage('');
 
     try {
-      const uploaded = await uploadImage(file, scope);
-      onChange([
-        ...images,
-        {
-          objectKey: uploaded.objectKey,
-          imageUrl: uploaded.url,
-          caption: '',
-          isCover: images.length === 0,
-          sortOrder: images.length + 1,
-        },
-      ]);
-    } catch (error) {
-      setUploadMessage(
-        getApiErrorMessage(error, 'Không thể tải ảnh lên. Vui lòng kiểm tra định dạng và dung lượng ảnh.')
+      const uploadResults = await Promise.allSettled(
+        selectedFiles.map((file) => uploadImage(file, scope))
       );
+
+      const uploadedImages: PropertyImageRequest[] = [];
+      uploadResults.forEach((result, index) => {
+        if (result.status !== 'fulfilled') return;
+
+        uploadedImages.push({
+          objectKey: result.value.objectKey,
+          imageUrl: result.value.url,
+          caption: '',
+          isCover: images.length === 0 && index === 0,
+          sortOrder: images.length + index + 1,
+        });
+      });
+
+      if (uploadedImages.length > 0) {
+        onChange([...images, ...uploadedImages]);
+      }
+
+      const failedCount = uploadResults.length - uploadedImages.length;
+      if (failedCount > 0) {
+        setUploadMessage(
+          `${failedCount} ảnh chưa tải lên được. Vui lòng kiểm tra định dạng và dung lượng ảnh.`
+        );
+      }
+    } catch (error) {
+      setUploadMessage(getApiErrorMessage(error, 'Không thể tải ảnh lên.'));
     } finally {
       setUploading(false);
     }
@@ -79,9 +94,10 @@ export default function PropertyImageEditor({
           <input
             accept="image/jpeg,image/png,image/webp"
             disabled={uploading}
+            multiple
             type="file"
             onChange={(event) => {
-              void uploadSelectedImage(event.target.files?.[0] ?? null);
+              void uploadSelectedImages(event.target.files);
               event.target.value = '';
             }}
           />

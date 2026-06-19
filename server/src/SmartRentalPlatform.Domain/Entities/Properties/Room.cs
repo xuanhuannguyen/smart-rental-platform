@@ -24,5 +24,6 @@ namespace SmartRentalPlatform.Domain.Entities.Properties
         public ICollection<RoomPriceTier> PriceTiers { get; set; } = new List<RoomPriceTier>();
         public ICollection<RoomAmenity> RoomAmenities { get; set; } = new List<RoomAmenity>();
         public ICollection<PropertyImage> Images { get; set; } = new List<PropertyImage>();
+        public ICollection<ViewingAppointment> ViewingAppointments { get; set; } = new List<ViewingAppointment>();
     }
 }

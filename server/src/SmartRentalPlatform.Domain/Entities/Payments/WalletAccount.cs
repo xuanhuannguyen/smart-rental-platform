@@ -1,5 +1,6 @@
 using SmartRentalPlatform.Domain.Entities.Users;
 using SmartRentalPlatform.Domain.Enums.Payments;
+using WalletAccountStatus = SmartRentalPlatform.Domain.Enums.Payments.WalletAccountStatus;
 
 namespace SmartRentalPlatform.Domain.Entities.Payments;
 

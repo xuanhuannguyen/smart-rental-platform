@@ -27,6 +27,7 @@ import type {
 import { getProvinces, getWardsByProvince } from '../../administrative/api';
 import type { Province, Ward } from '../../administrative/types';
 import PropertyImageEditor from './PropertyImageEditor';
+import LeafletLocationPicker from './LeafletLocationPicker';
 import { cleanImages, toImageRequests } from '../utils/imageRequests';
 import './RoomingHouseEditor.css';
 
@@ -55,6 +56,7 @@ const emptyHouseForm: RoomingHouseBasicInfoRequest = {
   wardCode: '',
   latitude: null,
   longitude: null,
+  googleMapUrl: '',
 };
 
 const emptyLegalForm: UpdateLegalDocumentRequest = {
@@ -85,6 +87,7 @@ function buildBasicForm(detail: RoomingHouseDetail | null): RoomingHouseBasicInf
     wardCode: detail.wardCode,
     latitude: detail.latitude ?? null,
     longitude: detail.longitude ?? null,
+    googleMapUrl: detail.googleMapUrl ?? '',
   };
 }
 
@@ -164,6 +167,10 @@ export default function RoomingHouseEditor({
     hasDraft &&
     (roomingHouse?.approvalStatus === 'Draft' ||
       roomingHouse?.approvalStatus === 'Rejected');
+  const selectedProvinceName =
+    provinces.find((province) => province.code === basicForm.provinceCode)?.name ?? '';
+  const selectedWardName =
+    wards.find((ward) => ward.code === basicForm.wardCode)?.name ?? '';
 
   useEffect(() => {
     setRoomingHouse(initialRoomingHouse ?? null);
@@ -423,15 +430,22 @@ export default function RoomingHouseEditor({
                 </option>
               ))}
             </SelectField>
-            <NumberField
-              label="Vĩ độ"
-              value={basicForm.latitude}
-              onChange={(value) => setBasicForm({ ...basicForm, latitude: value })}
-            />
-            <NumberField
-              label="Kinh độ"
-              value={basicForm.longitude}
-              onChange={(value) => setBasicForm({ ...basicForm, longitude: value })}
+            <LeafletLocationPicker
+              addressLine={basicForm.addressLine}
+              provinceName={selectedProvinceName}
+              wardName={selectedWardName}
+              latitude={basicForm.latitude}
+              longitude={basicForm.longitude}
+              googleMapUrl={basicForm.googleMapUrl}
+              onAddressChange={(addressLine) =>
+                setBasicForm((current) => ({ ...current, addressLine }))
+              }
+              onLocationChange={(latitude, longitude) =>
+                setBasicForm((current) => ({ ...current, latitude, longitude }))
+              }
+              onGoogleMapUrlChange={(googleMapUrl) =>
+                setBasicForm((current) => ({ ...current, googleMapUrl }))
+              }
             />
             <ActionRow>
               <button className="rooming-house-editor__primary" disabled={saving} onClick={saveBasicInfo}>

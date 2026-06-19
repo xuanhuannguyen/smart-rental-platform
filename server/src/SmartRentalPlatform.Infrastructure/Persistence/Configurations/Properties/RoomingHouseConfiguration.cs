@@ -24,6 +24,7 @@ namespace SmartRentalPlatform.Infrastructure.Persistence.Configurations.Properti
             builder.Property(x => x.AddressDisplay).HasColumnName("address_display").HasColumnType("text").IsRequired();
             builder.Property(x => x.Latitude).HasColumnName("latitude").HasPrecision(10, 7);
             builder.Property(x => x.Longitude).HasColumnName("longitude").HasPrecision(10, 7);
+            builder.Property(x => x.GoogleMapUrl).HasColumnName("google_map_url").HasColumnType("text");
             builder.Property(x => x.ApprovalStatus).HasColumnName("approval_status")
                 .HasConversion<string>().HasMaxLength(30).IsRequired();
             builder.Property(x => x.VisibilityStatus).HasColumnName("visibility_status")

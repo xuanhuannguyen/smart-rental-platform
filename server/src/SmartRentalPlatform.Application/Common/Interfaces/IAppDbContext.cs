@@ -4,6 +4,8 @@ using SmartRentalPlatform.Domain.Entities.AdminApproval;
 using SmartRentalPlatform.Domain.Entities.Users;
 using SmartRentalPlatform.Domain.Entities.Properties;
 using SmartRentalPlatform.Domain.Entities.Payments;
+using SmartRentalPlatform.Domain.Entities.Billing;
+using SmartRentalPlatform.Domain.Entities.Leasing;
 
 namespace SmartRentalPlatform.Application.Common.Interfaces;
 
@@ -46,6 +48,8 @@ public interface IAppDbContext {
 
     DbSet<LeasePolicy> LeasePolicies { get; }
 
+    DbSet<RoomingHouseRule> RoomingHouseRules { get; }
+
     DbSet<ApprovalAuditLog> ApprovalAuditLogs { get; }
 
     DbSet<WalletAccount> WalletAccounts { get; }
@@ -55,6 +59,22 @@ public interface IAppDbContext {
     DbSet<PaymentTransaction> PaymentTransactions { get; }
 
     DbSet<PaymentWebhookLog> PaymentWebhookLogs { get; }
+
+    DbSet<BillingServiceType> BillingServiceTypes { get; }
+
+    DbSet<RoomingHouseServicePrice> RoomingHouseServicePrices { get; }
+
+    DbSet<MeterReading> MeterReadings { get; }
+
+    DbSet<Invoice> Invoices { get; }
+
+    DbSet<InvoiceItem> InvoiceItems { get; }
+
+    DbSet<InvoicePayment> InvoicePayments { get; }
+
+    DbSet<Contract> Contracts { get; }
+
+    DbSet<ViewingAppointment> ViewingAppointments { get; }
 
     Task<IAppDbContextTransaction> BeginTransactionAsync(CancellationToken cancellationToken = default);
 

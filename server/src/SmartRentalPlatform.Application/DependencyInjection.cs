@@ -3,13 +3,16 @@ using SmartRentalPlatform.Application.AdminApproval;
 using SmartRentalPlatform.Application.Administrative;
 using SmartRentalPlatform.Application.Amenities;
 using SmartRentalPlatform.Application.Auth;
+using SmartRentalPlatform.Application.Billing;
 using SmartRentalPlatform.Application.Common.Interfaces;
 using SmartRentalPlatform.Application.Kyc;
 using SmartRentalPlatform.Application.Payments;
 using SmartRentalPlatform.Application.RoomingHouses;
+using SmartRentalPlatform.Application.RoomingHouses.Search;
 using SmartRentalPlatform.Application.Rooms;
 using SmartRentalPlatform.Application.Users;
 using SmartRentalPlatform.Application.Wallets;
+using SmartRentalPlatform.Application.ViewingAppointments;
 
 namespace SmartRentalPlatform.Application;
 
@@ -25,7 +28,9 @@ public static class DependencyInjection
         services.AddScoped<IGoogleLoginService, GoogleLoginService>();
         services.AddScoped<IKycService, KycService>();
         services.AddScoped<IRoomingHouseQueryService, RoomingHouseQueryService>();
+        services.AddScoped<IRoomingHouseSearchParser, RoomingHouseSearchParser>();
         services.AddScoped<IRoomingHouseLeasePolicyService, RoomingHouseLeasePolicyService>();
+        services.AddScoped<IRoomingHouseRuleService, RoomingHouseRuleService>();
         services.AddScoped<IRoomingHouseDraftService, RoomingHouseDraftService>();
         services.AddScoped<IRoomingHouseMediaService, RoomingHouseMediaService>();
         services.AddScoped<IRoomingHouseSubmissionService, RoomingHouseSubmissionService>();
@@ -44,6 +49,10 @@ public static class DependencyInjection
         services.AddScoped<IPayOSTopUpService, PayOSTopUpService>();
         services.AddScoped<IPaymentWebhookService, PaymentWebhookService>();
         services.AddScoped<IMockPaymentService, MockPaymentService>();
+        services.AddScoped<IBillingContractReadService, ContractBillingReadService>();
+        services.AddScoped<IInvoiceWalletPaymentService, PendingInvoiceWalletPaymentService>();
+        services.AddScoped<IBillingService, BillingService>();
+        services.AddScoped<IViewingAppointmentService, ViewingAppointmentService>();
         return services;
     }
 }

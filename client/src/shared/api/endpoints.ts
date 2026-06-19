@@ -46,6 +46,19 @@ export const ENDPOINTS = {
     LEASE_POLICY: (id: string) => `/api/rooming-houses/${id}/lease-policy`,
     SUBMIT: (id: string) => `/api/rooming-houses/${id}/submit`
   },
+  BILLING: {
+    SERVICE_PRICES: (roomingHouseId: string) => `/api/landlord/rooming-houses/${roomingHouseId}/service-prices`,
+    ROOM_BILLING_CONTEXT: (roomId: string) => `/api/landlord/rooms/${roomId}/billing-context`,
+    METER_READINGS: '/api/landlord/meter-readings',
+    LANDLORD_INVOICES: '/api/landlord/invoices',
+    GENERATE_DRAFT: '/api/landlord/invoices/generate-draft',
+    LANDLORD_INVOICE: (id: string) => `/api/landlord/invoices/${id}`,
+    ISSUE_INVOICE: (id: string) => `/api/landlord/invoices/${id}/issue`,
+    CANCEL_INVOICE: (id: string) => `/api/landlord/invoices/${id}/cancel`,
+    MY_INVOICES: '/api/me/invoices',
+    MY_INVOICE: (id: string) => `/api/me/invoices/${id}`,
+    PAY_INVOICE: (id: string) => `/api/me/invoices/${id}/pay`
+  },
   PUBLIC: {
     ROOMING_HOUSES: '/api/public/rooming-houses'
   },
@@ -63,13 +76,15 @@ export const ENDPOINTS = {
     USERS: '/api/admin/users',
     USER_DETAIL: (id: string) => `/api/admin/users/${id}`
   },
-  WALLET: {
-    ME: '/api/me/wallet',
-    TRANSACTIONS: '/api/me/wallet/transactions',
-    TOPUP_PAYOS: '/api/me/wallet/topups/payos'
-  },
-  MOCK_PAYMENTS: {
-    SUCCESS: (paymentTransactionId: string) => `/api/dev/mock-payments/${paymentTransactionId}/success`,
-    FAILED: (paymentTransactionId: string) => `/api/dev/mock-payments/${paymentTransactionId}/failed`
+  VIEWING_APPOINTMENTS: {
+    CREATE: '/api/viewing-appointments',
+    MY_APPOINTMENTS: '/api/me/viewing-appointments',
+    LANDLORD_APPOINTMENTS: '/api/landlord/viewing-appointments',
+    CONFLICT_CHECK: (id: string) => `/api/landlord/viewing-appointments/${id}/conflict-check`,
+    CONFIRM: (id: string) => `/api/landlord/viewing-appointments/${id}/confirm`,
+    REJECT: (id: string) => `/api/landlord/viewing-appointments/${id}/reject`,
+    CANCEL_BY_TENANT: (id: string) => `/api/viewing-appointments/${id}/cancel`,
+    CANCEL_BY_LANDLORD: (id: string) => `/api/landlord/viewing-appointments/${id}/cancel`,
+    COMPLETE: (id: string) => `/api/landlord/viewing-appointments/${id}/complete`
   }
 } as const;

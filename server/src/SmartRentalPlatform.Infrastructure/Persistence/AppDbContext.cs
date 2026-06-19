@@ -3,6 +3,8 @@ using SmartRentalPlatform.Application.Common.Interfaces;
 using SmartRentalPlatform.Domain.Entities.Administrative;
 using SmartRentalPlatform.Domain.Entities.AdminApproval;
 using SmartRentalPlatform.Domain.Entities.Payments;
+using SmartRentalPlatform.Domain.Entities.Billing;
+using SmartRentalPlatform.Domain.Entities.Leasing;
 using SmartRentalPlatform.Domain.Entities.Properties;
 using SmartRentalPlatform.Domain.Entities.Users;
 
@@ -37,12 +39,24 @@ public class AppDbContext : DbContext, IAppDbContext
     public DbSet<PropertyImage> PropertyImages => Set<PropertyImage>();
     public DbSet<RoomingHouseLegalDocument> RoomingHouseLegalDocuments => Set<RoomingHouseLegalDocument>();
     public DbSet<LeasePolicy> LeasePolicies => Set<LeasePolicy>();
+    public DbSet<RoomingHouseRule> RoomingHouseRules => Set<RoomingHouseRule>();
     public DbSet<ApprovalAuditLog> ApprovalAuditLogs => Set<ApprovalAuditLog>();
     // Payments
     public DbSet<WalletAccount> WalletAccounts => Set<WalletAccount>();
     public DbSet<WalletTransaction> WalletTransactions => Set<WalletTransaction>();
     public DbSet<PaymentTransaction> PaymentTransactions => Set<PaymentTransaction>();
     public DbSet<PaymentWebhookLog> PaymentWebhookLogs => Set<PaymentWebhookLog>();
+    // Billing
+    public DbSet<BillingServiceType> BillingServiceTypes => Set<BillingServiceType>();
+    public DbSet<RoomingHouseServicePrice> RoomingHouseServicePrices => Set<RoomingHouseServicePrice>();
+    public DbSet<MeterReading> MeterReadings => Set<MeterReading>();
+    public DbSet<Invoice> Invoices => Set<Invoice>();
+    public DbSet<InvoiceItem> InvoiceItems => Set<InvoiceItem>();
+    public DbSet<InvoicePayment> InvoicePayments => Set<InvoicePayment>();
+    // Leasing
+    public DbSet<Contract> Contracts => Set<Contract>();
+    // Viewing appointments
+    public DbSet<ViewingAppointment> ViewingAppointments => Set<ViewingAppointment>();
 
     public async Task<IAppDbContextTransaction> BeginTransactionAsync(CancellationToken cancellationToken = default)
     {

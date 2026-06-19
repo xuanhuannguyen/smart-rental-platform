@@ -7,6 +7,7 @@ using SmartRentalPlatform.Infrastructure.ExternalServices.Ekyc;
 using SmartRentalPlatform.Infrastructure.ExternalServices.Email;
 using SmartRentalPlatform.Infrastructure.ExternalServices.Google;
 using SmartRentalPlatform.Infrastructure.ExternalServices.PayOS;
+using SmartRentalPlatform.Infrastructure.ExternalServices.VietMap;
 using SmartRentalPlatform.Infrastructure.Identity;
 using SmartRentalPlatform.Infrastructure.Options;
 using SmartRentalPlatform.Infrastructure.Persistence;
@@ -37,6 +38,13 @@ public static class DependencyInjection
         services.AddHttpContextAccessor();
         services.AddScoped<ICurrentUserService, CurrentUserService>();
         services.AddScoped<IFileStorageService, LocalFileStorageService>();
+        services.Configure<VietMapOptions>(configuration.GetSection(VietMapOptions.SectionName));
+        services.AddHttpClient<IVietMapService, VietMapService>((provider, client) =>
+        {
+            var options = provider.GetRequiredService<IOptions<VietMapOptions>>().Value;
+            client.BaseAddress = new Uri(options.BaseUrl.TrimEnd('/') + "/");
+            client.Timeout = TimeSpan.FromSeconds(options.TimeoutSeconds);
+        });
         services.Configure<VnptEkycOptions>(configuration.GetSection(VnptEkycOptions.SectionName));
         services.AddMemoryCache();
         services.AddScoped<IPrivateStorageService, LocalPrivateStorageService>();

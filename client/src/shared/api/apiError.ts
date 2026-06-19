@@ -12,6 +12,7 @@ const ERROR_MESSAGES: Record<string, string> = {
   OTP_INVALID: 'Mã OTP không đúng.',
   OTP_EXPIRED: 'Mã OTP đã hết hạn.',
   OTP_RESEND_TOO_SOON: 'Bạn vừa yêu cầu OTP. Vui lòng thử lại sau.',
+  INVOICE_DUPLICATE_PERIOD: 'Hợp đồng đã có hóa đơn trong kỳ này.',
 };
 
 export class ApiClientError extends Error {

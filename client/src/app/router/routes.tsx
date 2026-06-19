@@ -9,14 +9,14 @@ import { MyProfilePage } from '../../features/profile/pages/MyProfilePage';
 import { KycSubmitPage } from '../../features/kyc/pages/KycSubmitPage';
 import { KycStatusPage } from '../../features/kyc/pages/KycStatusPage';
 import CreateRoomingHousePage from '../../features/rooming-houses/CreateRoomingHousePage';
+import PublicRoomingHouseDetailPage from '../../features/rooming-houses/PublicRoomingHouseDetailPage';
+import SearchRoomingHousesPage from '../../features/rooming-houses/SearchRoomingHousesPage';
+import PublicRoomDetailPage from '../../features/rooms/pages/PublicRoomDetailPage';
 import LandlordDashboardPage from '../../features/landlord/pages/LandlordDashboardPage';
 import RoomingHouseDetailPage from '../../features/landlord/pages/RoomingHouseDetailPage';
+import TenantAppointmentsPage from '../../features/viewing-appointments/pages/TenantAppointmentsPage';
+import LandlordAppointmentsPage from '../../features/viewing-appointments/pages/LandlordAppointmentsPage';
 import { AdminHomePage } from '../../features/admin/pages/AdminHomePage';
-import { WalletPage } from '../../features/wallet/pages/WalletPage';
-import { WalletTopUpPage } from '../../features/wallet/pages/WalletTopUpPage';
-import { PayOSTopUpReturnPage } from '../../features/wallet/pages/PayOSTopUpReturnPage';
-import { WalletTransactionsPage } from '../../features/wallet/pages/WalletTransactionsPage';
-import { DevMockPaymentPage } from '../../features/wallet/pages/DevMockPaymentPage';
 import { OnboardingGuard } from './OnboardingGuard';
 import { ProtectedRoute } from './ProtectedRoute';
 import { RoleGuard } from './RoleGuard';
@@ -30,6 +30,18 @@ export const router = createBrowserRouter([
     {
         path: ROUTE_PATHS.ME.ROOT,
         element: <MePage />
+    },
+    {
+        path: '/search',
+        element: <SearchRoomingHousesPage />
+    },
+    {
+        path: '/rooming-houses/:id',
+        element: <PublicRoomingHouseDetailPage />
+    },
+    {
+        path: '/rooming-houses/:houseId/rooms/:roomId',
+        element: <PublicRoomDetailPage />
     },
     {
         path: ROUTE_PATHS.AUTH.LOGIN,
@@ -50,10 +62,6 @@ export const router = createBrowserRouter([
     {
         path: ROUTE_PATHS.AUTH.RESET_PASSWORD,
         element: <ResetPasswordPage />
-    },
-    {
-        path: ROUTE_PATHS.DEV.MOCK_PAYMENT,
-        element: <DevMockPaymentPage />
     },
     {
         element: <ProtectedRoute />,
@@ -82,20 +90,8 @@ export const router = createBrowserRouter([
                         element: <KycStatusPage />
                     },
                     {
-                        path: ROUTE_PATHS.ME.WALLET,
-                        element: <WalletPage />
-                    },
-                    {
-                        path: ROUTE_PATHS.ME.WALLET_TOPUP,
-                        element: <WalletTopUpPage />
-                    },
-                    {
-                        path: ROUTE_PATHS.ME.WALLET_TOPUP_RETURN,
-                        element: <PayOSTopUpReturnPage />
-                    },
-                    {
-                        path: ROUTE_PATHS.ME.WALLET_TRANSACTIONS,
-                        element: <WalletTransactionsPage />
+                        path: ROUTE_PATHS.ME.VIEWING_APPOINTMENTS,
+                        element: <TenantAppointmentsPage />
                     },
                     {
                         path: ROUTE_PATHS.LANDLORD.REGISTER,
@@ -112,6 +108,10 @@ export const router = createBrowserRouter([
                     {
                         path: '/landlord/rooming-houses/:id',
                         element: <RoomingHouseDetailPage />
+                    },
+                    {
+                        path: ROUTE_PATHS.LANDLORD.VIEWING_APPOINTMENTS,
+                        element: <LandlordAppointmentsPage />
                     },
                     {
                         element: <RoleGuard allowedRoles={['Admin']} />,

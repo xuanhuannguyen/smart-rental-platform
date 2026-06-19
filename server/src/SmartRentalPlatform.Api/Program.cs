@@ -33,6 +33,7 @@ if (app.Environment.IsDevelopment())
     var dbContext = scope.ServiceProvider.GetRequiredService<AppDbContext>();
     var passwordService = scope.ServiceProvider.GetRequiredService<IPasswordService>();
     await DevelopmentDataSeed.SeedAdminAsync(dbContext, passwordService);
+    await DevelopmentDataSeed.SeedAsync(dbContext, passwordService);
 }
 
 if (app.Environment.IsDevelopment()
@@ -111,3 +112,5 @@ app.MapControllers();
 app.Run();
 
 public sealed record TestEmailOtpRequest(string Email, string? DisplayName);
+
+public partial class Program;
