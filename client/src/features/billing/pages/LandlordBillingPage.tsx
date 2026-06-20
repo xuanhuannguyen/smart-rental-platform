@@ -3,33 +3,62 @@ import type { Dispatch, FormEvent, ReactNode, SetStateAction } from 'react';
 import { useLocation, useNavigate, useParams } from 'react-router-dom';
 import { ROUTE_PATHS } from '../../../app/router/routePaths';
 import { getApiErrorMessage } from '../../../shared/api/apiError';
+import { contractApi } from '../../contracts/api';
 import { billingApi } from '../api';
+import type { ContractAppendixResponse, ContractHistoryItemResponse } from '../../contracts/types';
 import type {
-  BillingServiceCode,
-  CreateMeterReadingRequest,
+  BillingServiceType,
   CreateServicePriceRequest,
-  GenerateInvoiceDraftRequest,
+  FixedServicePreview,
   Invoice,
-  MeterReading,
+  LatestMeterReading,
+  MeteredServicePreview,
+  MeterReadingInput,
+  PricingUnit,
   RoomBillingContext,
+  RoomInvoicePreview,
   ServicePrice
 } from '../types';
 import './BillingPages.css';
+import '../../landlord/pages/LandlordDashboardPage.css';
+import '../../rental-history/pages/HistoryModals.css';
 
-const serviceOptions: Array<{ code: BillingServiceCode; label: string; method: 'Metered' | 'Fixed'; unit: string }> = [
-  { code: 'Electric', label: 'Điện', method: 'Metered', unit: 'kWh' },
-  { code: 'Water', label: 'Nước', method: 'Metered', unit: 'm3' },
-  { code: 'Wifi', label: 'Wifi', method: 'Fixed', unit: 'tháng' },
-  { code: 'Trash', label: 'Rác', method: 'Fixed', unit: 'tháng' }
-];
-
-const invoiceStatuses = ['Draft', 'Issued', 'PartiallyPaid', 'Paid', 'Overdue', 'Cancelled'];
+const invoiceStatuses = ['Draft', 'Issued', 'Paid', 'Overdue', 'Cancelled'];
 const today = formatDateInput(new Date());
 const defaultBillingMonth = getDefaultBillingMonth(new Date());
 const monthStart = getMonthStart(defaultBillingMonth);
 const monthEnd = getMonthEnd(defaultBillingMonth);
 
 type LandlordTab = 'prices' | 'readings' | 'invoices' | 'create' | 'detail';
+
+type CreateMeterReadingRequest = {
+  roomId: string;
+  contractId: string;
+  serviceTypeId: string;
+  billingPeriodStart: string;
+  billingPeriodEnd: string;
+  previousReading: number;
+  currentReading: number;
+  proofImageObjectKey?: string | null;
+};
+
+type MeterReading = {
+  serviceTypeId: string;
+  serviceName: string;
+  billingPeriodStart: string;
+  billingPeriodEnd: string;
+  previousReading: number;
+  currentReading: number;
+  consumption: number;
+};
+
+type GenerateInvoiceDraftRequest = {
+  contractId: string;
+  billingPeriodStart: string;
+  billingPeriodEnd: string;
+  discountAmount: number;
+  note?: string | null;
+};
 
 export default function LandlordBillingPage() {
   const { id, invoiceId } = useParams();
@@ -41,53 +70,60 @@ export default function LandlordBillingPage() {
   const tab = getTab(location.pathname, invoiceId);
 
   const [prices, setPrices] = useState<ServicePrice[]>([]);
+  const [preview, setPreview] = useState<RoomInvoicePreview | null>(null);
+  const [serviceTypes, setServiceTypes] = useState<BillingServiceType[]>([]);
   const [roomContext, setRoomContext] = useState<RoomBillingContext | null>(null);
   const [invoices, setInvoices] = useState<Invoice[]>([]);
   const [selectedInvoice, setSelectedInvoice] = useState<Invoice | null>(null);
-  const [createdReading, setCreatedReading] = useState<MeterReading | null>(null);
   const [loadingPrices, setLoadingPrices] = useState(false);
   const [loadingInvoices, setLoadingInvoices] = useState(false);
   const [busy, setBusy] = useState('');
   const [message, setMessage] = useState('');
   const [error, setError] = useState('');
-  const [statusFilter, setStatusFilter] = useState('');
-  const [search, setSearch] = useState('');
+  const [statusFilter, setStatusFilter] = useState('all');
+  const [selectedHouseId, setSelectedHouseId] = useState('');
+  const [selectedRoomId, setSelectedRoomId] = useState('');
+  const [isCreateInvoiceModalOpen, setIsCreateInvoiceModalOpen] = useState(false);
   const [confirmAction, setConfirmAction] = useState<{ title: string; body: string; onConfirm: () => void } | null>(null);
 
   const [priceForm, setPriceForm] = useState<CreateServicePriceRequest>({
-    serviceCode: 'Electric',
-    billingMethod: 'Metered',
-    unitName: 'kWh',
+    serviceTypeId: '',
+    pricingUnit: 'PerMonth',
     unitPrice: 4000,
     effectiveFrom: today,
     note: ''
   });
 
-  const [readingForm, setReadingForm] = useState<CreateMeterReadingRequest>({
-    roomId: '',
-    contractId: '',
-    serviceCode: 'Electric',
-    billingPeriodStart: monthStart,
-    billingPeriodEnd: monthEnd,
-    previousReading: 0,
-    currentReading: 0,
-    proofImageObjectKey: ''
-  });
-
-  const [invoiceForm, setInvoiceForm] = useState<GenerateInvoiceDraftRequest>({
-    contractId: '',
-    billingPeriodStart: monthStart,
-    billingPeriodEnd: monthEnd,
-    discountAmount: 0,
-    note: ''
-  });
-
   const activePrices = useMemo(() => prices.filter((price) => price.isActive), [prices]);
   const priceHistory = useMemo(() => prices.filter((price) => !price.isActive), [prices]);
-  const consumption = Number(readingForm.currentReading) - Number(readingForm.previousReading);
-  const readingInvalid = consumption < 0;
-  const readingDateError = getMeterReadingDateError(readingForm, roomContext);
-  const previewTotals = useMemo(() => buildDraftPreview(activePrices, invoiceForm.discountAmount), [activePrices, invoiceForm.discountAmount]);
+  const invoiceHouses = useMemo(() => {
+    const map = new Map<string, string>();
+    invoices.forEach((invoice) => {
+      map.set(invoice.roomingHouseId, invoice.roomingHouseName);
+    });
+    return Array.from(map.entries()).map(([id, name]) => ({ id, name }));
+  }, [invoices]);
+  const invoiceRooms = useMemo(() => {
+    if (!selectedHouseId) {
+      return [];
+    }
+
+    const map = new Map<string, string>();
+    invoices
+      .filter((invoice) => invoice.roomingHouseId === selectedHouseId)
+      .forEach((invoice) => {
+        map.set(invoice.roomId, invoice.roomNumber);
+      });
+
+    return Array.from(map.entries()).map(([id, name]) => ({ id, name }));
+  }, [invoices, selectedHouseId]);
+  const filteredInvoices = useMemo(() => {
+    return invoices.filter((invoice) => {
+      if (selectedHouseId && invoice.roomingHouseId !== selectedHouseId) return false;
+      if (selectedRoomId && invoice.roomId !== selectedRoomId) return false;
+      return true;
+    });
+  }, [invoices, selectedHouseId, selectedRoomId]);
 
   useEffect(() => {
     if (roomingHouseId) {
@@ -114,6 +150,10 @@ export default function LandlordBillingPage() {
   }, [tab, statusFilter]);
 
   useEffect(() => {
+    setSelectedRoomId('');
+  }, [selectedHouseId]);
+
+  useEffect(() => {
     if (invoiceId) {
       void loadInvoiceDetail(invoiceId);
     }
@@ -127,8 +167,24 @@ export default function LandlordBillingPage() {
     setLoadingPrices(true);
     setError('');
     try {
-      const response = await billingApi.getServicePrices(targetRoomingHouseId);
-      setPrices(response.data);
+      const [typeResponse, priceResponse] = await Promise.all([
+        billingApi.getServiceTypes(),
+        billingApi.getServicePrices(targetRoomingHouseId)
+      ]);
+      setServiceTypes(typeResponse.data);
+      setPrices(priceResponse.data);
+      setPriceForm((prev) => {
+        if (prev.serviceTypeId || typeResponse.data.length === 0) {
+          return prev;
+        }
+
+        const first = typeResponse.data[0];
+        return {
+          ...prev,
+          serviceTypeId: first.id,
+          pricingUnit: getDefaultPricingUnit(first)
+        };
+      });
     } catch (err) {
       setError(getApiErrorMessage(err, 'Không tải được bảng giá dịch vụ.'));
     } finally {
@@ -141,26 +197,19 @@ export default function LandlordBillingPage() {
     try {
       const response = await billingApi.getRoomBillingContext(roomId);
       setRoomContext(response.data);
-      setReadingForm((prev) => ({
-        ...prev,
-        roomId: response.data.roomId,
-        contractId: response.data.contractId
-      }));
-      setInvoiceForm((prev) => ({
-        ...prev,
-        contractId: response.data.contractId
-      }));
     } catch (err) {
       setRoomContext(null);
       setError(getApiErrorMessage(err, 'Phòng này chưa có hợp đồng đang hiệu lực để nhập chỉ số hoặc tạo hóa đơn.'));
     }
   }
 
-  async function loadInvoices(nextSearch = search) {
+  async function loadInvoices() {
     setLoadingInvoices(true);
     setError('');
     try {
-      const response = await billingApi.getLandlordInvoices({ status: statusFilter, search: nextSearch });
+      const response = await billingApi.getLandlordInvoices({
+        status: statusFilter === 'all' ? '' : statusFilter
+      });
       setInvoices(response.data);
     } catch (err) {
       setError(getApiErrorMessage(err, 'Không tải được danh sách hóa đơn.'));
@@ -182,17 +231,16 @@ export default function LandlordBillingPage() {
     }
   }
 
-  function selectService(code: BillingServiceCode) {
-    const option = serviceOptions.find((item) => item.code === code);
-    if (!option) {
+  function selectService(serviceTypeId: string) {
+    const serviceType = serviceTypes.find((item) => item.id === serviceTypeId);
+    if (!serviceType) {
       return;
     }
 
     setPriceForm((prev) => ({
       ...prev,
-      serviceCode: option.code,
-      billingMethod: option.method,
-      unitName: option.unit
+      serviceTypeId,
+      pricingUnit: getDefaultPricingUnit(serviceType)
     }));
   }
 
@@ -207,70 +255,10 @@ export default function LandlordBillingPage() {
         unitPrice: Number(priceForm.unitPrice),
         note: priceForm.note?.trim() || null
       });
-      setMessage(`Đã tạo giá mới cho ${getServiceLabel(response.data.serviceCode)}. Giá cũ đã được lưu vào lịch sử.`);
+      setMessage(`Đã tạo giá mới cho ${response.data.serviceName}. Giá cũ đã được lưu vào lịch sử.`);
       await loadPrices();
     } catch (err) {
       setError(getApiErrorMessage(err, 'Không tạo được bảng giá dịch vụ.'));
-    } finally {
-      setBusy('');
-    }
-  }
-
-  async function handleCreateReading(event: FormEvent) {
-    event.preventDefault();
-    const dateError = getMeterReadingDateError(readingForm, roomContext);
-    if (dateError) {
-      setError(dateError);
-      return;
-    }
-
-    if (readingInvalid) {
-      setError('Chỉ số cuối không được nhỏ hơn chỉ số đầu.');
-      return;
-    }
-
-    setBusy('reading');
-    setError('');
-    setMessage('');
-    try {
-      const response = await billingApi.createMeterReading({
-        ...readingForm,
-        previousReading: Number(readingForm.previousReading),
-        currentReading: Number(readingForm.currentReading),
-        proofImageObjectKey: readingForm.proofImageObjectKey?.trim() || null
-      });
-      setCreatedReading(response.data);
-      setInvoiceForm((prev) => ({
-        ...prev,
-        contractId: response.data.contractId
-      }));
-      setMessage(`Đã ghi chỉ số ${getServiceLabel(response.data.serviceCode)}. Tiêu thụ: ${response.data.consumption}.`);
-    } catch (err) {
-      setError(getApiErrorMessage(err, 'Không ghi được chỉ số dịch vụ.'));
-    } finally {
-      setBusy('');
-    }
-  }
-
-  async function handleGenerateDraft(event: FormEvent) {
-    event.preventDefault();
-    setBusy('invoice');
-    setError('');
-    setMessage('');
-    try {
-      const invoiceMonth = toMonthValue(invoiceForm.billingPeriodStart);
-      const response = await billingApi.generateDraft({
-        ...invoiceForm,
-        billingPeriodStart: getMonthStart(invoiceMonth),
-        billingPeriodEnd: getMonthEnd(invoiceMonth),
-        discountAmount: Number(invoiceForm.discountAmount),
-        note: invoiceForm.note?.trim() || null
-      });
-      setSelectedInvoice(response.data);
-      setMessage(`Đã tạo hóa đơn nháp ${response.data.invoiceNo}.`);
-      navigate(ROUTE_PATHS.LANDLORD.INVOICE_DETAIL(response.data.id));
-    } catch (err) {
-      setError(getApiErrorMessage(err, 'Không tạo được hóa đơn nháp.'));
     } finally {
       setBusy('');
     }
@@ -311,51 +299,27 @@ export default function LandlordBillingPage() {
   }
 
   return (
-    <div className="billing-shell">
-      <aside className="billing-sidebar">
-        <div>
-          <span className="billing-kicker">Chủ trọ</span>
-          <h1>Quản lý thu phí</h1>
-        </div>
-        <NavButton active={tab === 'prices'} onClick={() => navigate(roomingHouseId ? ROUTE_PATHS.LANDLORD.SERVICE_PRICES(roomingHouseId) : ROUTE_PATHS.LANDLORD.DASHBOARD)}>
-          Giá dịch vụ
-        </NavButton>
-        <NavButton active={tab === 'readings'} onClick={() => navigate(ROUTE_PATHS.LANDLORD.METER_READINGS)}>
-          Chỉ số điện nước
-        </NavButton>
-        <NavButton active={tab === 'invoices'} onClick={() => navigate(ROUTE_PATHS.LANDLORD.INVOICES)}>
-          Hóa đơn
-        </NavButton>
-        <NavButton active={tab === 'create'} onClick={() => navigate(ROUTE_PATHS.LANDLORD.INVOICE_CREATE)}>
-          Tạo hóa đơn
-        </NavButton>
-        <button type="button" className="billing-nav" onClick={() => navigate(ROUTE_PATHS.LANDLORD.DASHBOARD)}>
-          Về bảng điều khiển
-        </button>
-      </aside>
+    <div className="billing-shell" style={{ display: 'contents' }}>
 
       <main className="billing-main">
-        <section className="billing-header">
-          <div>
-            <span className="billing-kicker">Nền tảng quản lý thuê trọ</span>
-            <h2>{getTitle(tab)}</h2>
-            <p>{getSubtitle(tab)}</p>
-          </div>
-          <div className="header-actions">
-            {(tab === 'prices' || tab === 'create') && roomingHouseId && (
-              <button type="button" className="billing-button secondary" onClick={() => void loadPrices()}>
-                Tải lại giá
-              </button>
-            )}
-            {(tab === 'invoices' || tab === 'detail') && (
-              <button type="button" className="billing-button secondary" onClick={() => void loadInvoices()}>
-                Tải lại hóa đơn
-              </button>
-            )}
-          </div>
-        </section>
+        {tab !== 'invoices' && (
+          <section className="billing-header">
+            <div>
+              <span className="billing-kicker">Nền tảng quản lý thuê trọ</span>
+              <h2>{getTitle(tab)}</h2>
+              <p>{getSubtitle(tab)}</p>
+            </div>
+            <div className="header-actions">
+              {tab === 'prices' && roomingHouseId && (
+                <button type="button" className="billing-button secondary" onClick={() => void loadPrices()}>
+                  Tải lại giá
+                </button>
+              )}
+            </div>
+          </section>
+        )}
 
-        <NotificationStrip invoices={invoices} />
+        {tab !== 'invoices' && <NotificationStrip invoices={invoices} />}
         {message && <div className="billing-alert success">{message}</div>}
         {error && <div className="billing-alert error">{error}</div>}
 
@@ -364,6 +328,7 @@ export default function LandlordBillingPage() {
             prices={prices}
             activePrices={activePrices}
             priceHistory={priceHistory}
+            serviceTypes={serviceTypes}
             loading={loadingPrices}
             priceForm={priceForm}
             busy={busy}
@@ -373,42 +338,20 @@ export default function LandlordBillingPage() {
           />
         )}
 
-        {tab === 'readings' && (
-          <MeterReadingsSection
-            roomContext={roomContext}
-            form={readingForm}
-            busy={busy}
-            consumption={consumption}
-            invalid={readingInvalid}
-            dateError={readingDateError}
-            createdReading={createdReading}
-            onChangeForm={setReadingForm}
-            onSubmit={handleCreateReading}
-          />
-        )}
-
         {tab === 'invoices' && (
           <InvoiceListSection
-            invoices={invoices}
+            invoices={filteredInvoices}
             loading={loadingInvoices}
             statusFilter={statusFilter}
-            search={search}
+            houses={invoiceHouses}
+            rooms={invoiceRooms}
+            selectedHouseId={selectedHouseId}
+            selectedRoomId={selectedRoomId}
             onStatusChange={setStatusFilter}
-            onSearchChange={setSearch}
-            onSearch={() => void loadInvoices()}
+            onHouseChange={setSelectedHouseId}
+            onRoomChange={setSelectedRoomId}
             onOpen={(invoice) => navigate(ROUTE_PATHS.LANDLORD.INVOICE_DETAIL(invoice.id))}
-            onCreate={() => navigate(ROUTE_PATHS.LANDLORD.INVOICE_CREATE)}
-          />
-        )}
-
-        {tab === 'create' && (
-          <InvoiceCreateSection
-            roomContext={roomContext}
-            form={invoiceForm}
-            busy={busy}
-            previewTotals={previewTotals}
-            onChangeForm={setInvoiceForm}
-            onSubmit={handleGenerateDraft}
+            onCreate={() => setIsCreateInvoiceModalOpen(true)}
           />
         )}
 
@@ -440,6 +383,17 @@ export default function LandlordBillingPage() {
           onConfirm={confirmAction.onConfirm}
         />
       )}
+
+      {isCreateInvoiceModalOpen && (
+        <CentralCreateInvoiceModal
+          onClose={() => setIsCreateInvoiceModalOpen(false)}
+          onCreated={(invoice) => {
+            setIsCreateInvoiceModalOpen(false);
+            setMessage(`Đã tạo hóa đơn nháp ${invoice.invoiceNo}.`);
+            void loadInvoices();
+          }}
+        />
+      )}
     </div>
   );
 }
@@ -447,6 +401,7 @@ export default function LandlordBillingPage() {
 function ServicePricesSection({
   activePrices,
   priceHistory,
+  serviceTypes,
   loading,
   priceForm,
   busy,
@@ -457,10 +412,11 @@ function ServicePricesSection({
   prices: ServicePrice[];
   activePrices: ServicePrice[];
   priceHistory: ServicePrice[];
+  serviceTypes: BillingServiceType[];
   loading: boolean;
   priceForm: CreateServicePriceRequest;
   busy: string;
-  onSelectService: (code: BillingServiceCode) => void;
+  onSelectService: (serviceTypeId: string) => void;
   onChangeForm: Dispatch<SetStateAction<CreateServicePriceRequest>>;
   onSubmit: (event: FormEvent) => void;
 }) {
@@ -472,7 +428,7 @@ function ServicePricesSection({
             <span className="billing-kicker">Hiện tại</span>
             <h3>Giá đang áp dụng</h3>
           </div>
-          <span className="count-pill">{activePrices.length}/4 đang áp dụng</span>
+          <span className="count-pill">{activePrices.length}/{serviceTypes.length || 0} đang áp dụng</span>
         </div>
 
         <div className="service-price-list">
@@ -497,20 +453,27 @@ function ServicePricesSection({
         <form className="billing-form" onSubmit={onSubmit}>
           <label>
             Dịch vụ
-            <select value={priceForm.serviceCode} onChange={(event) => onSelectService(event.target.value as BillingServiceCode)}>
-              {serviceOptions.map((service) => (
-                <option key={service.code} value={service.code}>{service.label}</option>
+            <select value={priceForm.serviceTypeId} onChange={(event) => onSelectService(event.target.value)}>
+              {serviceTypes.map((service) => (
+                <option key={service.id} value={service.id}>{service.name}</option>
               ))}
             </select>
           </label>
           <div className="form-row">
             <label>
               Cách tính
-              <input value={getBillingMethodLabel(priceForm.billingMethod)} readOnly />
+              <select
+                value={priceForm.pricingUnit}
+                onChange={(event) => onChangeForm((prev) => ({ ...prev, pricingUnit: event.target.value as PricingUnit }))}
+              >
+                {getPricingUnitOptions(serviceTypes.find((service) => service.id === priceForm.serviceTypeId)).map((unit) => (
+                  <option key={unit} value={unit}>{getPricingUnitLabel(unit)}</option>
+                ))}
+              </select>
             </label>
             <label>
               Đơn vị
-              <input value={priceForm.unitName} onChange={(event) => onChangeForm((prev) => ({ ...prev, unitName: event.target.value }))} />
+              <input value={getPricingUnitDisplayUnit(priceForm.pricingUnit ?? 'PerMonth', serviceTypes.find((service) => service.id === priceForm.serviceTypeId))} readOnly />
             </label>
           </div>
           <div className="form-row">
@@ -549,7 +512,7 @@ function ServicePricesSection({
             </div>
             {priceHistory.map((price) => (
               <div key={price.id} className="table-row">
-                <span>{getServiceLabel(price.serviceCode)}</span><span>{formatMoney(price.unitPrice)}</span><span>{price.unitName}</span><span>{price.effectiveFrom}</span><span>{price.effectiveTo ?? 'Hiện tại'}</span>
+                <span>{price.serviceName}</span><span>{formatMoney(price.unitPrice)}</span><span>{price.displayUnitName}</span><span>{price.effectiveFrom}</span><span>{price.effectiveTo ?? 'Hiện tại'}</span>
               </div>
             ))}
           </div>
@@ -598,10 +561,7 @@ function MeterReadingsSection({
           <div className="form-row">
             <label>
               Dịch vụ
-              <select value={form.serviceCode} onChange={(event) => onChangeForm((prev) => ({ ...prev, serviceCode: event.target.value as 'Electric' | 'Water' }))}>
-                <option value="Electric">Điện</option>
-                <option value="Water">Nước</option>
-              </select>
+              <input value={form.serviceTypeId} onChange={(event) => onChangeForm((prev) => ({ ...prev, serviceTypeId: event.target.value }))} />
             </label>
             <label>
               Ảnh minh chứng
@@ -660,7 +620,7 @@ function MeterReadingsSection({
         </div>
         {createdReading ? (
           <div className="result-box">
-            <strong>{getServiceLabel(createdReading.serviceCode)}</strong>
+            <strong>{createdReading.serviceName}</strong>
             <span>{createdReading.billingPeriodStart} - {createdReading.billingPeriodEnd}</span>
             <span>{createdReading.previousReading} - {createdReading.currentReading}</span>
             <span>Tiêu thụ: {createdReading.consumption}</span>
@@ -674,6 +634,668 @@ function MeterReadingsSection({
 }
 
 function InvoiceListSection({
+  invoices,
+  loading,
+  statusFilter,
+  houses,
+  rooms,
+  selectedHouseId,
+  selectedRoomId,
+  onStatusChange,
+  onHouseChange,
+  onRoomChange,
+  onOpen,
+  onCreate
+}: {
+  invoices: Invoice[];
+  loading: boolean;
+  statusFilter: string;
+  houses: Array<{ id: string; name: string }>;
+  rooms: Array<{ id: string; name: string }>;
+  selectedHouseId: string;
+  selectedRoomId: string;
+  onStatusChange: (value: string) => void;
+  onHouseChange: (value: string) => void;
+  onRoomChange: (value: string) => void;
+  onOpen: (invoice: Invoice) => void;
+  onCreate: () => void;
+}) {
+  return (
+    <>
+      <section className="overview-band">
+        <div className="overview-left">
+          <p className="eyebrow">Quản lý</p>
+          <h2>Hóa đơn cho thuê</h2>
+          <p className="overview-description">Xem và lọc hóa đơn theo khu trọ, phòng và trạng thái thanh toán.</p>
+        </div>
+
+        <div className="overview-right" style={{ flexDirection: 'column', alignItems: 'flex-end', gap: '0.5rem' }}>
+          <div className="filter-group" style={{ display: 'flex', gap: '1rem', background: '#fff', padding: '0.75rem', borderRadius: '0.5rem', boxShadow: '0 1px 3px rgba(0,0,0,0.1)' }}>
+            <div>
+              <label style={{ display: 'block', fontSize: '0.85rem', color: '#6b7280', marginBottom: '0.25rem' }}>Khu trọ</label>
+              <select
+                value={selectedHouseId}
+                onChange={(event) => onHouseChange(event.target.value)}
+                style={{ padding: '0.5rem', borderRadius: '0.25rem', border: '1px solid #d1d5db', outline: 'none' }}
+              >
+                <option value="">Tất cả khu trọ</option>
+                {houses.map((house) => (
+                  <option key={house.id} value={house.id}>{house.name}</option>
+                ))}
+              </select>
+            </div>
+            <div>
+              <label style={{ display: 'block', fontSize: '0.85rem', color: '#6b7280', marginBottom: '0.25rem' }}>Phòng</label>
+              <select
+                value={selectedRoomId}
+                onChange={(event) => onRoomChange(event.target.value)}
+                disabled={!selectedHouseId}
+                style={{ padding: '0.5rem', borderRadius: '0.25rem', border: '1px solid #d1d5db', outline: 'none', background: !selectedHouseId ? '#f3f4f6' : '#fff' }}
+              >
+                <option value="">Tất cả phòng</option>
+                {rooms.map((room) => (
+                  <option key={room.id} value={room.id}>Phòng {room.name}</option>
+                ))}
+              </select>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '1rem', margin: '0 0 16px 0', borderBottom: '1px solid #e5e7eb' }}>
+        <div className="tabs" style={{ display: 'flex', alignItems: 'center', overflowX: 'auto', gap: '8px', flex: 1 }}>
+          <InvoiceStatusTab status="all" activeStatus={statusFilter} onClick={onStatusChange}>Tất cả</InvoiceStatusTab>
+          {invoiceStatuses.map((status) => (
+            <InvoiceStatusTab key={status} status={status} activeStatus={statusFilter} onClick={onStatusChange}>
+              {getInvoiceStatusLabel(status)}
+            </InvoiceStatusTab>
+          ))}
+        </div>
+        <button type="button" className="billing-button" onClick={onCreate} style={{ flexShrink: 0 }}>
+          Tạo hóa đơn
+        </button>
+      </div>
+
+      {loading ? (
+        <div className="empty-panel">Đang tải dữ liệu hóa đơn...</div>
+      ) : invoices.length === 0 ? (
+        <div className="empty-panel">
+          <h2>Không tìm thấy hóa đơn</h2>
+          <p>Chưa có hóa đơn nào phù hợp với bộ lọc hiện tại.</p>
+        </div>
+      ) : (
+        <section className="card-grid">
+          {invoices.map((invoice) => (
+            <div
+              className="dashboard-card"
+              key={invoice.id}
+              onClick={() => onOpen(invoice)}
+              style={{ textAlign: 'left', cursor: 'pointer' }}
+            >
+              <div className="card-body-content" style={{ padding: '1rem', width: '100%', boxSizing: 'border-box' }}>
+                <div className="card-title-row" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '0.75rem' }}>
+                  <h3 style={{ margin: 0, fontSize: '1.125rem' }}>{invoice.invoiceNo}</h3>
+                  <span className={`status-chip ${invoice.status.toLowerCase()}`}>{getInvoiceStatusLabel(invoice.status)}</span>
+                </div>
+
+                <div className="card-location" style={{ marginTop: '0.5rem', color: '#6b7280', fontSize: '0.875rem', display: 'flex', alignItems: 'center' }}>
+                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ marginRight: '0.25rem', flexShrink: 0 }}>
+                    <path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"></path>
+                    <polyline points="9 22 9 12 15 12 15 22"></polyline>
+                  </svg>
+                  <span>{invoice.roomingHouseName} - Phòng {invoice.roomNumber}</span>
+                </div>
+
+                <hr className="card-divider" style={{ margin: '1rem 0', borderColor: '#e5e7eb' }} />
+
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem', fontSize: '0.875rem' }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', gap: '1rem' }}>
+                    <span style={{ color: '#6b7280' }}>Người thuê:</span>
+                    <strong>{invoice.tenantName || invoice.tenantEmail}</strong>
+                  </div>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', gap: '1rem' }}>
+                    <span style={{ color: '#6b7280' }}>Kỳ hóa đơn:</span>
+                    <span>{invoice.billingPeriodStart} - {invoice.billingPeriodEnd}</span>
+                  </div>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', gap: '1rem' }}>
+                    <span style={{ color: '#6b7280' }}>Hạn thanh toán:</span>
+                    <span>{invoice.dueDate}</span>
+                  </div>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', gap: '1rem' }}>
+                    <span style={{ color: '#6b7280' }}>Tổng tiền:</span>
+                    <strong style={{ color: '#10b981' }}>{formatMoney(invoice.totalAmount)}</strong>
+                  </div>
+                </div>
+              </div>
+            </div>
+          ))}
+        </section>
+      )}
+    </>
+  );
+}
+
+type ActiveInvoiceContract = Pick<
+  ContractHistoryItemResponse,
+  'id' | 'roomId' | 'roomNumber' | 'roomingHouseId' | 'roomingHouseName' | 'mainTenantName' | 'startDate' | 'endDate' | 'monthlyRent' | 'paymentDay' | 'occupants'
+>;
+
+type ReadingDraft = {
+  previousReading: number;
+  currentReading: number;
+  proofImageObjectKey: string;
+};
+
+function CentralCreateInvoiceModal({
+  onClose,
+  onCreated
+}: {
+  onClose: () => void;
+  onCreated: (invoice: Invoice) => void;
+}) {
+  const [contracts, setContracts] = useState<ActiveInvoiceContract[]>([]);
+  const [selectedHouseId, setSelectedHouseId] = useState('');
+  const [selectedContractId, setSelectedContractId] = useState('');
+  const [billingMonth, setBillingMonth] = useState('');
+  const [prices, setPrices] = useState<ServicePrice[]>([]);
+  const [preview, setPreview] = useState<RoomInvoicePreview | null>(null);
+  const [serviceTypes, setServiceTypes] = useState<BillingServiceType[]>([]);
+  const [appendices, setAppendices] = useState<ContractAppendixResponse[]>([]);
+  const [existingInvoices, setExistingInvoices] = useState<Invoice[]>([]);
+  const [latestReadingByServiceType, setLatestReadingByServiceType] = useState<Record<string, LatestMeterReading>>({});
+  const [readings, setReadings] = useState<Record<string, ReadingDraft>>({});
+  const [discountAmount, setDiscountAmount] = useState(0);
+  const [note, setNote] = useState('');
+  const [loadingContracts, setLoadingContracts] = useState(true);
+  const [loadingDetails, setLoadingDetails] = useState(false);
+  const [submitting, setSubmitting] = useState(false);
+  const [error, setError] = useState('');
+
+  const houses = useMemo(() => {
+    const map = new Map<string, string>();
+    contracts.forEach((contract) => {
+      map.set(contract.roomingHouseId, contract.roomingHouseName);
+    });
+    return Array.from(map.entries()).map(([id, name]) => ({ id, name }));
+  }, [contracts]);
+  const rooms = useMemo(
+    () => contracts.filter((contract) => contract.roomingHouseId === selectedHouseId),
+    [contracts, selectedHouseId]
+  );
+  const selectedContract = useMemo(
+    () => contracts.find((contract) => contract.id === selectedContractId) ?? null,
+    [contracts, selectedContractId]
+  );
+
+  useEffect(() => {
+    let cancelled = false;
+
+    async function loadContracts() {
+      setLoadingContracts(true);
+      setError('');
+      try {
+        const response = await contractApi.getLandlordContracts();
+        if (cancelled) return;
+        setContracts((response.data ?? []).filter((contract) => contract.status === 'Active'));
+      } catch (err) {
+        if (!cancelled) {
+          setError(getApiErrorMessage(err, 'Không thể tải danh sách phòng đang có hợp đồng active.'));
+        }
+      } finally {
+        if (!cancelled) {
+          setLoadingContracts(false);
+        }
+      }
+    }
+
+    void loadContracts();
+
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  useEffect(() => {
+    setSelectedContractId('');
+  }, [selectedHouseId]);
+
+  useEffect(() => {
+    if (!selectedContract) {
+      setBillingMonth('');
+      setPrices([]);
+      setPreview(null);
+      setAppendices([]);
+      setExistingInvoices([]);
+      setLatestReadingByServiceType({});
+      setReadings({});
+      return;
+    }
+
+    setBillingMonth(getCentralDefaultInvoiceMonth(selectedContract));
+  }, [selectedContract]);
+
+  useEffect(() => {
+    if (!selectedContract) return;
+
+    let cancelled = false;
+
+    async function loadInvoiceContext(contract: ActiveInvoiceContract) {
+      setLoadingDetails(true);
+      setError('');
+      try {
+        const [priceResponse, invoiceResponse, appendixResponse, contextResponse] = await Promise.all([
+          billingApi.getServicePrices(contract.roomingHouseId),
+          billingApi.getLandlordInvoices({ contractId: contract.id }),
+          contractApi.getAppendices(contract.id),
+          billingApi.getRoomBillingContext(contract.roomId)
+        ]);
+        if (cancelled) return;
+
+        setPrices(priceResponse.data);
+        setExistingInvoices(invoiceResponse.data);
+        setAppendices(appendixResponse.data ?? []);
+        const latestReadings = contextResponse.data.latestReadingByServiceType ?? {};
+        setLatestReadingByServiceType(latestReadings);
+
+        const nextReadings: Record<string, ReadingDraft> = {};
+        priceResponse.data
+          .filter((price) => price.isActive && isCentralMeteredServicePrice(price))
+          .forEach((price) => {
+            const latestReading = latestReadings[price.serviceTypeId];
+            nextReadings[price.serviceTypeId] = {
+              previousReading: latestReading?.currentReading ?? 0,
+              currentReading: latestReading?.currentReading ?? 0,
+              proofImageObjectKey: ''
+            };
+          });
+        setReadings(nextReadings);
+      } catch (err) {
+        if (!cancelled) {
+          setError(getApiErrorMessage(err, 'Không thể tải thông tin tạo hóa đơn cho phòng đã chọn.'));
+        }
+      } finally {
+        if (!cancelled) {
+          setLoadingDetails(false);
+        }
+      }
+    }
+
+    void loadInvoiceContext(selectedContract);
+
+    return () => {
+      cancelled = true;
+    };
+  }, [selectedContract]);
+
+  const period = useMemo(
+    () => selectedContract && billingMonth ? resolveCentralInvoicePeriodForContract(billingMonth, selectedContract) : null,
+    [billingMonth, selectedContract]
+  );
+  const effectivePrices = useMemo(
+    () => period ? getCentralEffectiveServicePrices(prices, period.start) : [],
+    [prices, period]
+  );
+  const fixedPrices = useMemo(
+    () => preview?.fixedServices ?? [],
+    [preview]
+  );
+  const meteredPrices = useMemo(
+    () => preview?.meteredServices ?? [],
+    [preview]
+  );
+  const todayDateString = centralToDateOnlyString(getCentralTodayDateOnly());
+  const periodIsFuture = period ? compareCentralDateOnly(period.end, todayDateString) > 0 : false;
+  const periodValidationMessage = !selectedContract
+    ? ''
+    : !period
+      ? 'Tháng hóa đơn không nằm trong thời hạn hợp đồng.'
+      : '';
+  const previewBlockReason = preview && !preview.canGenerate
+    ? preview.blockReason || 'Chưa thể tạo hóa đơn cho kỳ này.'
+    : '';
+  useEffect(() => {
+    if (!selectedContract || !period) {
+      setPreview(null);
+      return;
+    }
+
+    let cancelled = false;
+
+    async function loadPreview() {
+      setLoadingDetails(true);
+      setError('');
+      try {
+        const response = await billingApi.getRoomInvoicePreview(selectedContract!.roomId, {
+          billingPeriodStart: period!.start,
+          billingPeriodEnd: period!.end
+        });
+        if (cancelled) return;
+
+        setPreview(response.data);
+        const latestReadings: Record<string, LatestMeterReading> = {};
+        const nextReadings: Record<string, ReadingDraft> = {};
+        response.data.meteredServices.forEach((service) => {
+          if (service.latestReading) {
+            latestReadings[service.serviceTypeId] = service.latestReading;
+          }
+          nextReadings[service.serviceTypeId] = {
+            previousReading: service.latestReading?.currentReading ?? 0,
+            currentReading: service.latestReading?.currentReading ?? 0,
+            proofImageObjectKey: ''
+          };
+        });
+        setLatestReadingByServiceType(latestReadings);
+        setReadings(nextReadings);
+      } catch (err) {
+        if (!cancelled) {
+          setPreview(null);
+          setError(getApiErrorMessage(err, 'Không thể tải thông tin xem trước hóa đơn.'));
+        }
+      } finally {
+        if (!cancelled) {
+          setLoadingDetails(false);
+        }
+      }
+    }
+
+    void loadPreview();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [selectedContract, period?.start, period?.end]);
+
+  const resolvedMonthlyRent = selectedContract && period
+    ? preview?.monthlyRent ?? resolveCentralMonthlyRentFromAppendices(selectedContract.monthlyRent, appendices, period.start)
+    : selectedContract?.monthlyRent ?? 0;
+  const occupantCount = fixedPrices[0]?.occupantCount ?? (selectedContract && period
+    ? getCentralActiveOccupantCount(selectedContract, period)
+    : 1);
+  const rentPreview = preview?.rentAmount ?? (selectedContract && period ? calculateCentralPeriodAmount(resolvedMonthlyRent, period) : 0);
+  const fixedTotal = preview?.fixedServiceAmount ?? 0;
+  const utilityPreview = meteredPrices.reduce((sum, price) => {
+    const draft = readings[price.serviceTypeId];
+    if (!draft) return sum;
+    const latestReading = price.latestReading;
+    const previousReading = latestReading?.currentReading ?? Number(draft.previousReading);
+    const consumption = Math.max(0, Number(draft.currentReading) - previousReading);
+    return sum + consumption * price.unitPrice;
+  }, 0);
+  const previewTotal = Math.max(0, rentPreview + fixedTotal + utilityPreview - discountAmount);
+
+  function updateReading(serviceTypeId: string, patch: Partial<ReadingDraft>) {
+    setReadings((current) => ({
+      ...current,
+      [serviceTypeId]: {
+        ...(current[serviceTypeId] ?? { previousReading: 0, currentReading: 0, proofImageObjectKey: '' }),
+        ...patch
+      }
+    }));
+  }
+
+  async function handleSubmit(event: FormEvent) {
+    event.preventDefault();
+    setError('');
+
+    if (!selectedContract) {
+      setError('Vui lòng chọn phòng cần tạo hóa đơn.');
+      return;
+    }
+
+    if (!period) {
+      setError(periodValidationMessage || 'Kỳ hóa đơn không hợp lệ.');
+      return;
+    }
+
+    if (previewBlockReason) {
+      setError(previewBlockReason);
+      return;
+    }
+
+    const meterReadings: MeterReadingInput[] = meteredPrices.map((price) => {
+      const draft = readings[price.serviceTypeId] ?? { previousReading: 0, currentReading: 0, proofImageObjectKey: '' };
+      const latestReading = latestReadingByServiceType[price.serviceTypeId];
+      return {
+        serviceTypeId: price.serviceTypeId,
+        previousReading: latestReading ? null : Number(draft.previousReading),
+        currentReading: Number(draft.currentReading),
+        proofImageObjectKey: draft.proofImageObjectKey.trim() || null
+      };
+    });
+
+    for (const reading of meterReadings) {
+      const latestReading = latestReadingByServiceType[reading.serviceTypeId];
+      const previousReading = latestReading?.currentReading ?? reading.previousReading;
+      if (previousReading !== null && previousReading !== undefined && reading.currentReading < previousReading) {
+        setError('Chỉ số mới không được nhỏ hơn chỉ số cũ.');
+        return;
+      }
+    }
+
+    setSubmitting(true);
+    try {
+      const response = await billingApi.generateWithReadings({
+        contractId: selectedContract.id,
+        billingPeriodStart: period.start,
+        billingPeriodEnd: period.end,
+        discountAmount: Number(discountAmount) || 0,
+        note: note.trim() || null,
+        meterReadings
+      });
+      onCreated(response.data);
+    } catch (err) {
+      setError(getApiErrorMessage(err, 'Không thể tạo hóa đơn.'));
+    } finally {
+      setSubmitting(false);
+    }
+  }
+
+  return (
+    <div className="history-modal-overlay">
+      <div className="history-modal-content invoice-create-modal">
+        <div className="history-modal-header">
+          <h2>Tạo hóa đơn</h2>
+          <button className="history-modal-close" onClick={onClose} type="button">&times;</button>
+        </div>
+
+        <form onSubmit={handleSubmit}>
+          <div className="history-modal-body">
+            {error && <div className="billing-alert error" style={{ marginBottom: '12px' }}>{error}</div>}
+
+            <div className="invoice-create-selector">
+              <label className="invoice-create-field">
+                <span className="label">Khu trọ</span>
+                <select
+                  value={selectedHouseId}
+                  onChange={(event) => setSelectedHouseId(event.target.value)}
+                  disabled={loadingContracts}
+                >
+                  <option value="">Chọn khu trọ</option>
+                  {houses.map((house) => (
+                    <option key={house.id} value={house.id}>{house.name}</option>
+                  ))}
+                </select>
+              </label>
+              <label className="invoice-create-field">
+                <span className="label">Phòng</span>
+                <select
+                  value={selectedContractId}
+                  onChange={(event) => setSelectedContractId(event.target.value)}
+                  disabled={!selectedHouseId || loadingContracts}
+                >
+                  <option value="">Chọn phòng đang có hợp đồng active</option>
+                  {rooms.map((contract) => (
+                    <option key={contract.id} value={contract.id}>
+                      Phòng {contract.roomNumber} - {contract.mainTenantName}
+                    </option>
+                  ))}
+                </select>
+              </label>
+            </div>
+
+            {loadingContracts ? (
+              <p>Đang tải danh sách phòng...</p>
+            ) : contracts.length === 0 ? (
+              <p>Chưa có phòng nào đang có hợp đồng active.</p>
+            ) : !selectedContract ? (
+              <div className="invoice-create-placeholder">Chọn khu trọ và phòng để xem thông tin tạo hóa đơn.</div>
+            ) : loadingDetails ? (
+              <p>Đang tải dữ liệu hóa đơn...</p>
+            ) : (
+              <div className="invoice-create-stack">
+                {periodValidationMessage && <div className="billing-alert error" style={{ marginTop: '16px', marginBottom: '-4px' }}>{periodValidationMessage}</div>}
+                {previewBlockReason && <div className="billing-alert error" style={{ marginTop: '16px', marginBottom: '-4px' }}>{previewBlockReason}</div>}
+                <div className="invoice-create-grid">
+                  <div className="invoice-create-field">
+                    <span className="label">Phòng</span>
+                    <span className="value">{selectedContract.roomNumber}</span>
+                  </div>
+                  <div className="invoice-create-field">
+                    <span className="label">Người thuê</span>
+                    <span className="value">{selectedContract.mainTenantName}</span>
+                  </div>
+                  <div className="invoice-create-field">
+                    <span className="label">Tiền phòng</span>
+                    <span className="value">{formatMoney(resolvedMonthlyRent)}</span>
+                  </div>
+                  <label className="invoice-create-field">
+                    <span className="label">Kỳ hóa đơn</span>
+                    <input type="month" value={billingMonth} onChange={(event) => setBillingMonth(event.target.value)} />
+                  </label>
+                  <div className="invoice-create-field">
+                    <span className="label">Kỳ thực tế</span>
+                    <span className="value">{period ? `${period.start} - ${period.end}` : '--'}</span>
+                  </div>
+                  <div className="invoice-create-field">
+                    <span className="label">Tiền phòng kỳ này</span>
+                    <span className="value">{formatMoney(rentPreview)}</span>
+                  </div>
+                </div>
+
+                <section className="invoice-create-section">
+                  <h3>Dịch vụ cố định</h3>
+                  {fixedPrices.length === 0 ? (
+                    <p className="invoice-create-empty">Chưa có dịch vụ cố định được cấu hình.</p>
+                  ) : (
+                    <div className="invoice-create-stack">
+                      {fixedPrices.map((price) => (
+                        <div key={price.serviceTypeId} className="invoice-create-line">
+                          <span>{price.serviceName} / {price.displayUnitName}</span>
+                          <strong>{formatCentralFixedPreviewLine(price)}</strong>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </section>
+
+                <section className="invoice-create-section">
+                  <h3>Chỉ số điện nước</h3>
+                  {meteredPrices.length === 0 ? (
+                    <p className="invoice-create-empty">Không có dịch vụ điện/nước nào đang cấu hình theo chỉ số.</p>
+                  ) : (
+                    <div className="invoice-create-meter-list">
+                      {meteredPrices.map((price) => {
+                        const draft = readings[price.serviceTypeId] ?? { previousReading: 0, currentReading: 0, proofImageObjectKey: '' };
+                        const latestReading = latestReadingByServiceType[price.serviceTypeId];
+                        const previousReading = latestReading?.currentReading ?? Number(draft.previousReading);
+                        const consumption = Math.max(0, Number(draft.currentReading) - previousReading);
+                        const amount = Math.round(consumption * price.unitPrice);
+                        return (
+                          <div key={price.serviceTypeId} className="invoice-create-meter-card">
+                            <strong>{price.serviceName} ({formatMoney(price.unitPrice)} / {price.meterUnitName})</strong>
+                            <div className="invoice-create-grid">
+                              {latestReading ? (
+                                <div className="invoice-create-field">
+                                  <span className="label">Chỉ số cũ</span>
+                                  <strong>{latestReading.currentReading}</strong>
+                                </div>
+                              ) : (
+                                <label className="invoice-create-field">
+                                  <span className="label">Chỉ số cũ</span>
+                                  <input
+                                    type="number"
+                                    min="0"
+                                    value={draft.previousReading}
+                                    onChange={(event) => updateReading(price.serviceTypeId, { previousReading: Number(event.target.value) })}
+                                  />
+                                </label>
+                              )}
+                              <label className="invoice-create-field">
+                                <span className="label">Chỉ số mới</span>
+                                <input
+                                  type="number"
+                                  min="0"
+                                  value={draft.currentReading}
+                                  onChange={(event) => updateReading(price.serviceTypeId, { currentReading: Number(event.target.value) })}
+                                />
+                              </label>
+                              <div className="invoice-create-field invoice-create-total">
+                                <span className="label">Tạm tính</span>
+                                <strong>{formatNumber(consumption)} x {formatMoney(price.unitPrice)} = {formatMoney(amount)}</strong>
+                              </div>
+                            </div>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  )}
+                </section>
+
+                <div className="invoice-create-summary">
+                  <label className="invoice-create-field">
+                    <span className="label">Giảm trừ</span>
+                    <input type="number" min="0" value={discountAmount} onChange={(event) => setDiscountAmount(Number(event.target.value))} />
+                  </label>
+                  <label className="invoice-create-field">
+                    <span className="label">Ghi chú</span>
+                    <input value={note} onChange={(event) => setNote(event.target.value)} />
+                  </label>
+                  <div className="invoice-create-field invoice-create-total">
+                    <span className="label">Tạm tính</span>
+                    <span className="value">{formatMoney(previewTotal)}</span>
+                  </div>
+                </div>
+              </div>
+            )}
+          </div>
+
+          <div className="history-modal-footer">
+            <button type="button" className="billing-button secondary" onClick={onClose} disabled={submitting}>Đóng</button>
+            <button type="submit" className="billing-button" disabled={loadingContracts || loadingDetails || submitting || !selectedContract || !period || !preview || Boolean(previewBlockReason)}>
+              {submitting ? 'Đang tạo...' : 'Tạo hóa đơn nháp'}
+            </button>
+          </div>
+        </form>
+      </div>
+    </div>
+  );
+}
+
+function InvoiceStatusTab({
+  status,
+  activeStatus,
+  onClick,
+  children
+}: {
+  status: string;
+  activeStatus: string;
+  onClick: (value: string) => void;
+  children: ReactNode;
+}) {
+  const active = activeStatus === status;
+
+  return (
+    <button
+      type="button"
+      onClick={() => onClick(status)}
+      style={{ padding: '12px 16px', background: 'none', border: 'none', borderBottom: active ? '2px solid #2563eb' : '2px solid transparent', color: active ? '#2563eb' : '#6b7280', fontWeight: active ? 600 : 500, cursor: 'pointer', whiteSpace: 'nowrap', transition: 'all 0.2s' }}
+    >
+      {children}
+    </button>
+  );
+}
+
+function LegacyInvoiceListSection({
   invoices,
   loading,
   statusFilter,
@@ -932,8 +1554,8 @@ function PriceRow({ price }: { price: ServicePrice }) {
   return (
     <div className="price-row">
       <div>
-        <strong>{getServiceLabel(price.serviceCode)}</strong>
-        <span>{getBillingMethodLabel(price.billingMethod)} / {price.unitName}</span>
+        <strong>{price.serviceName}</strong>
+        <span>{getPricingUnitLabel(price.pricingUnit)} / {price.displayUnitName}</span>
       </div>
       <div>
         <strong>{formatMoney(price.unitPrice)}</strong>
@@ -970,9 +1592,249 @@ function EmptyBlock({ title, text }: { title: string; text: string }) {
   return <div className="state-block empty-state"><h3>{title}</h3><p>{text}</p></div>;
 }
 
+type CentralResolvedInvoicePeriod = {
+  start: string;
+  end: string;
+  billableDays: number;
+  daysInMonth: number;
+  isFullMonth: boolean;
+};
+
+function normalizeCentralPricingUnit(unit: PricingUnit | string) {
+  if (unit === 'Metered' || unit === 'MeterBased') {
+    return 'MeterReading';
+  }
+
+  if (unit === 'Fixed' || unit === 'PerMonth') {
+    return 'PerMonth';
+  }
+
+  if (unit === 'PerPerson' || unit === 'PerPersonPerMonth') {
+    return 'PerPersonPerMonth';
+  }
+
+  return unit;
+}
+
+function isCentralMeteredServicePrice(price: ServicePrice) {
+  return normalizeCentralPricingUnit(price.pricingUnit) === 'MeterReading';
+}
+
+function calculateCentralFixedServiceAmount(
+  price: ServicePrice,
+  period: CentralResolvedInvoicePeriod,
+  occupantCount: number
+) {
+  const unitCount = normalizeCentralPricingUnit(price.pricingUnit) === 'PerPersonPerMonth'
+    ? occupantCount
+    : 1;
+
+  return Math.round(price.unitPrice * unitCount * getCentralPeriodQuantity(period));
+}
+
+function formatCentralFixedServicePreview(
+  price: ServicePrice,
+  period: CentralResolvedInvoicePeriod | null,
+  occupantCount: number
+) {
+  if (!period) {
+    return formatMoney(0);
+  }
+
+  const amount = calculateCentralFixedServiceAmount(price, period, occupantCount);
+
+  if (normalizeCentralPricingUnit(price.pricingUnit) !== 'PerPersonPerMonth') {
+    return formatMoney(amount);
+  }
+
+  const unitAmount = Math.round(price.unitPrice * getCentralPeriodQuantity(period));
+  return `${formatMoney(unitAmount)} x ${occupantCount} = ${formatMoney(amount)}`;
+}
+
+function formatCentralFixedPreviewLine(price: FixedServicePreview) {
+  if (normalizeCentralPricingUnit(price.pricingUnit) !== 'PerPersonPerMonth') {
+    return formatMoney(price.amount);
+  }
+
+  const unitAmount = price.occupantCount > 0
+    ? Math.round(price.amount / price.occupantCount)
+    : price.unitPrice;
+
+  return `${formatMoney(unitAmount)} x ${price.occupantCount} = ${formatMoney(price.amount)}`;
+}
+
+function getCentralPeriodQuantity(period: CentralResolvedInvoicePeriod) {
+  return period.isFullMonth ? 1 : period.billableDays / period.daysInMonth;
+}
+
+function getCentralActiveOccupantCount(contract: ActiveInvoiceContract, period: CentralResolvedInvoicePeriod) {
+  const count = contract.occupants.filter((occupant) =>
+    occupant.status === 'Active' &&
+    occupant.moveInDate <= period.end &&
+    (!occupant.moveOutDate || occupant.moveOutDate >= period.start)
+  ).length;
+
+  return Math.max(count, 1);
+}
+
+function getCentralEffectiveServicePrices(prices: ServicePrice[], effectiveOn: string) {
+  const latestByServiceType = new Map<string, ServicePrice>();
+
+  prices
+    .filter((price) => price.effectiveFrom <= effectiveOn && (!price.effectiveTo || price.effectiveTo >= effectiveOn))
+    .sort((left, right) => right.effectiveFrom.localeCompare(left.effectiveFrom))
+    .forEach((price) => {
+      if (!latestByServiceType.has(price.serviceTypeId)) {
+        latestByServiceType.set(price.serviceTypeId, price);
+      }
+    });
+
+  return Array.from(latestByServiceType.values());
+}
+
+function resolveCentralMonthlyRentFromAppendices(
+  baseMonthlyRent: number,
+  appendices: ContractAppendixResponse[],
+  effectiveOn: string
+) {
+  const rentChanges = appendices
+    .filter((appendix) => appendix.status === 'Active')
+    .flatMap((appendix) =>
+      appendix.changes
+        .filter((change) =>
+          change.changeType === 'Update' &&
+          change.targetType === 'Contract' &&
+          change.fieldName?.toLowerCase() === 'monthlyrent'
+        )
+        .map((change) => ({
+          effectiveDate: appendix.effectiveDate,
+          oldValue: change.oldValue,
+          newValue: change.newValue
+        }))
+    )
+    .sort((left, right) => left.effectiveDate.localeCompare(right.effectiveDate));
+
+  if (rentChanges.length === 0) {
+    return baseMonthlyRent;
+  }
+
+  const latestAppliedChange = [...rentChanges]
+    .filter((change) => change.effectiveDate <= effectiveOn)
+    .sort((left, right) => right.effectiveDate.localeCompare(left.effectiveDate))[0];
+  const appliedRent = parseAppendixMoney(latestAppliedChange?.newValue);
+  if (appliedRent !== null) {
+    return appliedRent;
+  }
+
+  const firstChange = rentChanges[0];
+  const oldRent = effectiveOn < firstChange.effectiveDate
+    ? parseAppendixMoney(firstChange.oldValue)
+    : null;
+
+  return oldRent ?? baseMonthlyRent;
+}
+
+function parseAppendixMoney(value?: string | null) {
+  if (!value?.trim()) {
+    return null;
+  }
+
+  const parsed = Number.parseFloat(value.trim().replace(/^"|"$/g, '').replace(/,/g, ''));
+  return Number.isFinite(parsed) ? parsed : null;
+}
+
+function getCentralDefaultInvoiceMonth(contract: ActiveInvoiceContract) {
+  const today = getCentralTodayDateOnly();
+  const contractStart = parseCentralDateOnly(contract.startDate);
+  let cursor = new Date(today.getFullYear(), today.getMonth(), 1);
+
+  for (let index = 0; index < 240; index += 1) {
+    const monthValue = centralToMonthValue(cursor);
+    const period = resolveCentralInvoicePeriodForContract(monthValue, contract);
+    if (period && compareCentralDateOnly(period.end, centralToDateOnlyString(today)) <= 0) {
+      return monthValue;
+    }
+
+    cursor = new Date(cursor.getFullYear(), cursor.getMonth() - 1, 1);
+  }
+
+  return centralToMonthValue(contractStart);
+}
+
+function resolveCentralInvoicePeriodForContract(monthValue: string, contract: ActiveInvoiceContract): CentralResolvedInvoicePeriod | null {
+  const [year, month] = monthValue.split('-').map(Number);
+  if (!year || !month) {
+    return null;
+  }
+
+  const monthStart = new Date(year, month - 1, 1);
+  const monthEnd = new Date(year, month, 0);
+  const contractStart = parseCentralDateOnly(contract.startDate);
+  const contractEnd = parseCentralDateOnly(contract.endDate);
+  const startDate = compareCentralDates(contractStart, monthStart) > 0 ? contractStart : monthStart;
+  const endDate = compareCentralDates(contractEnd, monthEnd) < 0 ? contractEnd : monthEnd;
+
+  if (compareCentralDates(startDate, endDate) > 0) {
+    return null;
+  }
+
+  const billableDays = countCentralInclusiveDays(startDate, endDate);
+  const daysInMonth = countCentralInclusiveDays(monthStart, monthEnd);
+
+  return {
+    start: centralToDateOnlyString(startDate),
+    end: centralToDateOnlyString(endDate),
+    billableDays,
+    daysInMonth,
+    isFullMonth: compareCentralDates(startDate, monthStart) === 0 && compareCentralDates(endDate, monthEnd) === 0
+  };
+}
+
+function calculateCentralPeriodAmount(monthlyAmount: number, period: CentralResolvedInvoicePeriod) {
+  if (period.isFullMonth) {
+    return monthlyAmount;
+  }
+
+  return Math.round(monthlyAmount * period.billableDays / period.daysInMonth);
+}
+
+function getCentralTodayDateOnly() {
+  const today = new Date();
+  return new Date(today.getFullYear(), today.getMonth(), today.getDate());
+}
+
+function parseCentralDateOnly(value: string) {
+  const [year, month, day] = value.split('-').map(Number);
+  return new Date(year, month - 1, day);
+}
+
+function centralToDateOnlyString(date: Date) {
+  return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`;
+}
+
+function centralToMonthValue(date: Date) {
+  return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}`;
+}
+
+function compareCentralDateOnly(left: string, right: string) {
+  return compareCentralDates(parseCentralDateOnly(left), parseCentralDateOnly(right));
+}
+
+function compareCentralDates(left: Date, right: Date) {
+  return getCentralDayNumber(left) - getCentralDayNumber(right);
+}
+
+function countCentralInclusiveDays(start: Date, end: Date) {
+  return getCentralDayNumber(end) - getCentralDayNumber(start) + 1;
+}
+
+function getCentralDayNumber(date: Date) {
+  return Math.floor(Date.UTC(date.getFullYear(), date.getMonth(), date.getDate()) / 86400000);
+}
+
 function buildDraftPreview(prices: ServicePrice[], discount: number) {
   const fixedServices = prices
-    .filter((price) => price.serviceCode === 'Wifi' || price.serviceCode === 'Trash')
+    .filter((price) => normalizeCentralPricingUnit(price.pricingUnit) !== 'MeterReading')
     .reduce((sum, price) => sum + price.unitPrice, 0);
 
   return {
@@ -1052,10 +1914,10 @@ function getTab(pathname: string, invoiceId?: string): LandlordTab {
     return 'prices';
   }
   if (pathname.includes('/meter-readings')) {
-    return 'readings';
+    return 'invoices';
   }
   if (pathname.includes('/invoices/create')) {
-    return 'create';
+    return 'invoices';
   }
   return 'invoices';
 }
@@ -1090,21 +1952,48 @@ function formatMoney(value: number) {
   }).format(value);
 }
 
-function getServiceLabel(code: BillingServiceCode | string) {
-  const service = serviceOptions.find((item) => item.code === code);
-  return service?.label ?? code;
+function formatNumber(value: number) {
+  return new Intl.NumberFormat('vi-VN', {
+    maximumFractionDigits: 2
+  }).format(value);
 }
 
-function getBillingMethodLabel(method: string) {
+function getDefaultPricingUnit(serviceType: BillingServiceType): PricingUnit {
+  return serviceType.supportsMeterReading ? 'MeterReading' : 'PerMonth';
+}
+
+function getPricingUnitOptions(serviceType?: BillingServiceType): PricingUnit[] {
+  if (!serviceType) {
+    return ['PerMonth', 'PerPersonPerMonth'];
+  }
+
+  return serviceType.supportsMeterReading
+    ? ['MeterReading', 'PerMonth', 'PerPersonPerMonth']
+    : ['PerMonth', 'PerPersonPerMonth'];
+}
+
+function getPricingUnitDisplayUnit(unit: PricingUnit | string, serviceType?: BillingServiceType) {
+  const normalized = normalizeCentralPricingUnit(unit);
+  if (normalized === 'MeterReading') {
+    return serviceType?.meterUnitName ?? '';
+  }
+
+  if (normalized === 'PerPersonPerMonth') {
+    return 'người/tháng';
+  }
+
+  return 'tháng';
+}
+
+function getPricingUnitLabel(unit: string) {
+  const normalized = normalizeCentralPricingUnit(unit);
   const labels: Record<string, string> = {
-    Metered: 'Theo chỉ số',
-    MeterBased: 'Theo chỉ số',
-    Fixed: 'Cố định',
+    MeterReading: 'Theo chỉ số',
     PerMonth: 'Theo tháng',
-    PerPerson: 'Theo người'
+    PerPersonPerMonth: 'Theo người/tháng'
   };
 
-  return labels[method] ?? method;
+  return labels[normalized] ?? unit;
 }
 
 function getInvoiceStatusLabel(status: string) {
@@ -1113,8 +2002,7 @@ function getInvoiceStatusLabel(status: string) {
     Issued: 'Đã phát hành',
     Paid: 'Đã thanh toán',
     Overdue: 'Quá hạn',
-    Cancelled: 'Đã hủy',
-    PartiallyPaid: 'Thanh toán một phần'
+    Cancelled: 'Đã hủy'
   };
 
   return labels[status] ?? status;

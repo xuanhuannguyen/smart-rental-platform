@@ -40,6 +40,12 @@ public class ContractDetailResponse
 
     public DateTimeOffset? ActivatedAt { get; set; }
 
+    public DateOnly? TerminationDate { get; set; }
+
+    public string? TerminationType { get; set; }
+
+    public bool IsAwaitingFinalInvoice { get; set; }
+
     public string? StatusReason { get; set; }
 
     public List<ContractOccupantResponse> Occupants { get; set; } = [];

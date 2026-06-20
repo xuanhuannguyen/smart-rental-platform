@@ -11,6 +11,10 @@ import { rentalRequestApi } from '../api';
 import type { RentalRequestResponse, RoomDepositResponse } from '../types';
 import './TenantRentalRequestDetailPage.css';
 
+function toDateInput(date: Date) {
+  return date.toISOString().slice(0, 10);
+}
+
 export const TenantRentalRequestDetailPage = () => {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
@@ -248,7 +252,8 @@ function ContractProgressBlock({
   const tone = getContractTone(contract?.status);
   const canSetupOccupants = contract?.status === 'WaitingTenantOccupants';
   const canEditOccupants = contract?.status === 'LandlordRevisionRequested';
-  const canSignContract = contract?.status === 'PendingTenantSignature';
+  const isPastContractStartDate = Boolean(contract?.startDate && toDateInput(new Date()) > contract.startDate);
+  const canSignContract = contract?.status === 'PendingTenantSignature' && !isPastContractStartDate;
 
   return (
     <div className="request-info-card">
@@ -266,6 +271,10 @@ function ContractProgressBlock({
             <InfoItem label="Lý do" value={contract.statusReason} />
           )}
         </div>
+
+        {contract?.status === 'PendingTenantSignature' && isPastContractStartDate && (
+          <Alert type="error">Hợp đồng đã quá ngày bắt đầu thuê nên không thể ký.</Alert>
+        )}
 
         {contract && (canSetupOccupants || canEditOccupants || canSignContract) && (
           <div style={{ display: 'flex', gap: 12, flexWrap: 'wrap' }}>

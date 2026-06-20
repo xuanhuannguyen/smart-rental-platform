@@ -1,10 +1,10 @@
 using Microsoft.EntityFrameworkCore;
 using SmartRentalPlatform.Application.Common.Interfaces;
 using SmartRentalPlatform.Domain.Entities.Billing;
-using SmartRentalPlatform.Domain.Entities.Leasing;
+
 using SmartRentalPlatform.Domain.Entities.Properties;
 using SmartRentalPlatform.Domain.Entities.Users;
-using SmartRentalPlatform.Domain.Entities.Wallets;
+
 using SmartRentalPlatform.Domain.Enums;
 using SmartRentalPlatform.Domain.Enums.Billing;
 
@@ -47,6 +47,10 @@ public static class DevelopmentDataSeed
     private static readonly Guid TenantLinhWalletAccountId = Guid.Parse("70000000-0000-0000-0000-000000000003");
     private static readonly Guid TenantMinhWalletAccountId = Guid.Parse("70000000-0000-0000-0000-000000000004");
     private static readonly Guid LandlordMaiWalletAccountId = Guid.Parse("70000000-0000-0000-0000-000000000005");
+    private static readonly Guid ElectricServiceTypeId = Guid.Parse("80000000-0000-0000-0000-000000000001");
+    private static readonly Guid WaterServiceTypeId = Guid.Parse("80000000-0000-0000-0000-000000000002");
+    private static readonly Guid InternetServiceTypeId = Guid.Parse("80000000-0000-0000-0000-000000000003");
+    private static readonly Guid TrashServiceTypeId = Guid.Parse("80000000-0000-0000-0000-000000000004");
     private static readonly DateTimeOffset SeededAt = new(2026, 1, 1, 0, 0, 0, TimeSpan.Zero);
 
     public static async Task SeedAsync(
@@ -62,10 +66,11 @@ public static class DevelopmentDataSeed
 
         await SeedUsersAsync(context, passwordService, cancellationToken);
         await SeedApprovedKycAsync(context, cancellationToken);
+        await SeedBillingServiceTypesAsync(context, cancellationToken);
         await SeedRoomingHousesAsync(context, location, cancellationToken);
         await SeedRoomsAsync(context, cancellationToken);
-        await SeedAdditionalRoomsAsync(context, cancellationToken);
-        await SeedBillingAsync(context, cancellationToken);
+        // await SeedAdditionalRoomsAsync(context, cancellationToken);
+        // await SeedBillingAsync(context, cancellationToken);
     }
 
     public static async Task SeedAdminAsync(
@@ -151,32 +156,114 @@ public static class DevelopmentDataSeed
             });
         }
 
-        await SeedDemoUserAsync(
-            context,
-            passwordService,
-            TenantLinhUserId,
-            "linh.tenant.demo@example.com",
-            "Pham Linh",
-            RoleSeed.TenantRoleId,
-            cancellationToken);
+        // await SeedDemoUserAsync(
+        //     context,
+        //     passwordService,
+        //     TenantLinhUserId,
+        //     "linh.tenant.demo@example.com",
+        //     "Pham Linh",
+        //     RoleSeed.TenantRoleId,
+        //     cancellationToken);
 
-        await SeedDemoUserAsync(
-            context,
-            passwordService,
-            TenantMinhUserId,
-            "minh.tenant.demo@example.com",
-            "Le Minh",
-            RoleSeed.TenantRoleId,
-            cancellationToken);
+        // await SeedDemoUserAsync(
+        //     context,
+        //     passwordService,
+        //     TenantMinhUserId,
+        //     "minh.tenant.demo@example.com",
+        //     "Le Minh",
+        //     RoleSeed.TenantRoleId,
+        //     cancellationToken);
 
-        await SeedDemoUserAsync(
-            context,
-            passwordService,
-            LandlordMaiUserId,
-            "mai.landlord.demo@example.com",
-            "Hoang Mai",
-            RoleSeed.LandlordRoleId,
-            cancellationToken);
+        // await SeedDemoUserAsync(
+        //     context,
+        //     passwordService,
+        //     LandlordMaiUserId,
+        //     "mai.landlord.demo@example.com",
+        //     "Hoang Mai",
+        //     RoleSeed.LandlordRoleId,
+        //     cancellationToken);
+
+        await context.SaveChangesAsync(cancellationToken);
+    }
+
+    private static async Task SeedBillingServiceTypesAsync(AppDbContext context, CancellationToken cancellationToken)
+    {
+        var now = DateTimeOffset.UtcNow;
+        var serviceTypes = new[]
+        {
+            new BillingServiceType
+            {
+                Id = ElectricServiceTypeId,
+                Name = "Điện",
+                SupportsMeterReading = true,
+                MeterUnitName = "kWh",
+                IsActive = true,
+                CreatedAt = now
+            },
+            new BillingServiceType
+            {
+                Id = WaterServiceTypeId,
+                Name = "Nước",
+                SupportsMeterReading = true,
+                MeterUnitName = "m3",
+                IsActive = true,
+                CreatedAt = now
+            },
+            new BillingServiceType
+            {
+                Id = InternetServiceTypeId,
+                Name = "Internet",
+                SupportsMeterReading = false,
+                MeterUnitName = null,
+                IsActive = true,
+                CreatedAt = now
+            },
+            new BillingServiceType
+            {
+                Id = TrashServiceTypeId,
+                Name = "Rác",
+                SupportsMeterReading = false,
+                MeterUnitName = null,
+                IsActive = true,
+                CreatedAt = now
+            }
+        };
+
+        var legacyInternetServiceName = "Wifi";
+        var serviceTypeNames = serviceTypes
+            .Select(x => x.Name)
+            .Append(legacyInternetServiceName)
+            .ToArray();
+        var existingServiceTypes = await context.BillingServiceTypes
+            .Where(x => serviceTypeNames.Contains(x.Name))
+            .ToListAsync(cancellationToken);
+
+        foreach (var serviceType in serviceTypes)
+        {
+            var existingServiceType = existingServiceTypes
+                .FirstOrDefault(x => x.Name == serviceType.Name);
+
+            if (serviceType.Id == InternetServiceTypeId && existingServiceType is null)
+            {
+                existingServiceType = existingServiceTypes
+                    .FirstOrDefault(x => x.Name == legacyInternetServiceName);
+            }
+
+            if (existingServiceType is null)
+            {
+                context.BillingServiceTypes.Add(serviceType);
+                continue;
+            }
+
+            existingServiceType.SupportsMeterReading = serviceType.SupportsMeterReading;
+            existingServiceType.MeterUnitName = serviceType.MeterUnitName;
+            existingServiceType.IsActive = serviceType.IsActive;
+
+            if (existingServiceType.Name == legacyInternetServiceName)
+            {
+                existingServiceType.Name = serviceType.Name;
+            }
+        }
 
         await context.SaveChangesAsync(cancellationToken);
     }
@@ -364,7 +451,7 @@ public static class DevelopmentDataSeed
             context,
             location,
             GreenViewHouseId,
-            LandlordMaiUserId,
+            LandlordUserId,
             "Green View Residence",
             "Khu tro yen tinh, co ban cong, may giat chung va khu de xe rieng.",
             "12 Pham Van Dong",
@@ -384,7 +471,7 @@ public static class DevelopmentDataSeed
             context,
             location,
             PendingHouseId,
-            LandlordMaiUserId,
+            LandlordUserId,
             "Garden House Pending",
             "Ho so nha tro dang cho admin duyet, dung de test luong kiem duyet.",
             "36 Nguyen Huu Tho",

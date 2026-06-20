@@ -1,16 +1,20 @@
 import React, { useCallback, useEffect, useState, useMemo } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { ROUTE_PATHS } from '../../../app/router/routePaths';
+import { getApiErrorMessage } from '../../../shared/api/apiError';
 import { Button } from '../../../shared/components/ui/Button';
 import { useAuth } from '../../../app/providers/AuthProvider';
 import { contractApi } from '../../contracts/api';
 import type { ContractFileResponse, ContractHistoryItemResponse, ContractAppendixResponse } from '../../contracts/types';
+import { billingApi } from '../../billing/api';
+import type { Invoice } from '../../billing/types';
 import './TenantRentalHistoryDetailPage.css';
 import { CreateAppendixModal } from './CreateAppendixModal';
 import { TerminateContractModal } from './TerminateContractModal';
 import { AppendixPreviewModal } from '../components/AppendixPreviewModal';
 
 type Tab = 'occupants' | 'contract' | 'invoices' | 'issues' | 'appendices';
+const invoiceStatusTabs = ['', 'Issued', 'Paid', 'Overdue', 'Cancelled'];
 
 export const TenantRentalHistoryDetailPage: React.FC = () => {
   const { id } = useParams();
@@ -29,6 +33,12 @@ export const TenantRentalHistoryDetailPage: React.FC = () => {
   const [error, setError] = useState<string | null>(null);
   const [actionError, setActionError] = useState<string | null>(null);
   const [isFileActionLoading, setIsFileActionLoading] = useState(false);
+  const [contractInvoices, setContractInvoices] = useState<Invoice[]>([]);
+  const [invoiceStatusFilter, setInvoiceStatusFilter] = useState('');
+  const [invoicesLoading, setInvoicesLoading] = useState(false);
+  const [invoiceActionBusy, setInvoiceActionBusy] = useState('');
+  const [invoiceError, setInvoiceError] = useState<string | null>(null);
+  const [invoiceMessage, setInvoiceMessage] = useState<string | null>(null);
 
   const visibleAppendices = useMemo(() => {
     if (!appendices || !currentUser) return null;
@@ -88,6 +98,30 @@ export const TenantRentalHistoryDetailPage: React.FC = () => {
     };
   }, [loadContract]);
 
+  const loadContractInvoices = useCallback(async () => {
+    if (!contract) return;
+
+    setInvoicesLoading(true);
+    setInvoiceError(null);
+    try {
+      const response = await billingApi.getMyContractInvoices(
+        contract.id,
+        invoiceStatusFilter ? { status: invoiceStatusFilter } : undefined
+      );
+      setContractInvoices(response.data);
+    } catch (err) {
+      setInvoiceError(getApiErrorMessage(err, 'Không thể tải danh sách hóa đơn.'));
+      setContractInvoices([]);
+    } finally {
+      setInvoicesLoading(false);
+    }
+  }, [contract, invoiceStatusFilter]);
+
+  useEffect(() => {
+    if (activeTab !== 'invoices') return;
+    void loadContractInvoices();
+  }, [activeTab, loadContractInvoices]);
+
   if (isLoading) return <div>Đang tải dữ liệu...</div>;
   if (error) return <div>{error}</div>;
   if (!contract) return <div>Không tìm thấy hợp đồng.</div>;
@@ -135,6 +169,21 @@ export const TenantRentalHistoryDetailPage: React.FC = () => {
       setActionError(err instanceof Error ? err.message : 'Không thể tải file hợp đồng.');
     } finally {
       setIsFileActionLoading(false);
+    }
+  };
+
+  const handlePayInvoice = async (invoice: Invoice) => {
+    setInvoiceActionBusy(invoice.id);
+    setInvoiceError(null);
+    setInvoiceMessage(null);
+    try {
+      const response = await billingApi.payInvoice(invoice.id);
+      setContractInvoices((current) => current.map((item) => item.id === invoice.id ? response.data : item));
+      setInvoiceMessage(`Đã thanh toán hóa đơn ${response.data.invoiceNo}.`);
+    } catch (err) {
+      setInvoiceError(getApiErrorMessage(err, 'Thanh toán hóa đơn thất bại.'));
+    } finally {
+      setInvoiceActionBusy('');
     }
   };
 
@@ -383,9 +432,78 @@ export const TenantRentalHistoryDetailPage: React.FC = () => {
         )}
 
         {activeTab === 'invoices' && (
-          <div className="coming-soon-placeholder">
-            <h2>Hóa đơn hằng tháng</h2>
-            <p>Tính năng đang được phát triển.</p>
+          <div className="contract-invoices-section">
+            <div className="contract-invoices-header">
+              <div>
+                <h2>Hóa đơn hằng tháng</h2>
+                <p>Danh sách hóa đơn thuộc hợp đồng này trong thời gian bạn ở phòng.</p>
+              </div>
+            </div>
+
+            <div className="invoice-status-tabs">
+              {invoiceStatusTabs.map((status) => (
+                <button
+                  key={status || 'all'}
+                  type="button"
+                  className={invoiceStatusFilter === status ? 'active' : ''}
+                  onClick={() => setInvoiceStatusFilter(status)}
+                >
+                  {status ? getInvoiceStatusLabel(status) : 'Tất cả'}
+                </button>
+              ))}
+            </div>
+
+            {invoiceMessage && <div className="invoice-inline-message success">{invoiceMessage}</div>}
+            {invoiceError && <div className="invoice-inline-message error">{invoiceError}</div>}
+
+            {invoicesLoading ? (
+              <div className="coming-soon-placeholder">
+                <p>Đang tải danh sách hóa đơn...</p>
+              </div>
+            ) : contractInvoices.length === 0 ? (
+              <div className="coming-soon-placeholder">
+                <h2>Chưa có hóa đơn</h2>
+                <p>Chưa có hóa đơn nào phù hợp với bộ lọc hiện tại.</p>
+              </div>
+            ) : (
+              <div className="contract-invoice-list">
+                {contractInvoices.map((invoice) => {
+                  const canPayNow = invoice.status === 'Issued' && invoice.tenantUserId === currentUser?.userId;
+
+                  return (
+                    <div
+                      key={invoice.id}
+                      className={`contract-invoice-card ${invoice.status === 'Cancelled' ? 'muted' : ''}`}
+                    >
+                      <div>
+                        <div className="contract-invoice-title">
+                          <strong>{invoice.invoiceNo}</strong>
+                          <span className={`status-badge ${getInvoiceStatusClass(invoice.status)}`}>
+                            {getInvoiceStatusLabel(invoice.status)}
+                          </span>
+                        </div>
+                        <div className="contract-invoice-meta">
+                          <span>Kỳ: {formatDate(invoice.billingPeriodStart)} - {formatDate(invoice.billingPeriodEnd)}</span>
+                          <span>Hạn thanh toán: {formatDate(invoice.dueDate)}</span>
+                          <span>Người đứng tên: {invoice.tenantName}</span>
+                        </div>
+                      </div>
+                      <div className="contract-invoice-actions">
+                        <strong>{formatCurrency(invoice.totalAmount)} đ</strong>
+                        {canPayNow && (
+                          <Button
+                            onClick={() => void handlePayInvoice(invoice)}
+                            disabled={invoiceActionBusy === invoice.id}
+                          >
+                            {invoiceActionBusy === invoice.id ? 'Đang thanh toán...' : 'Thanh toán ngay'}
+                          </Button>
+                        )}
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            )}
           </div>
         )}
 
@@ -424,7 +542,14 @@ export const TenantRentalHistoryDetailPage: React.FC = () => {
           contract={contract}
           onClose={() => setIsTerminateModalOpen(false)}
           onTerminated={(updatedContract) => {
-            setContract((current) => current ? { ...current, status: updatedContract.status, statusReason: updatedContract.statusReason } : current);
+            setContract((current) => current ? {
+              ...current,
+              status: updatedContract.status,
+              statusReason: updatedContract.statusReason,
+              terminationDate: updatedContract.terminationDate,
+              terminationType: updatedContract.terminationType,
+              isAwaitingFinalInvoice: updatedContract.isAwaitingFinalInvoice
+            } : current);
             setIsTerminateModalOpen(false);
           }}
         />
@@ -515,6 +640,36 @@ function getStatusClass(status: string) {
       return 'active';
     case 'Expired':
       return 'completed';
+    case 'Cancelled':
+      return 'terminated';
+    default:
+      return '';
+  }
+}
+
+function getInvoiceStatusLabel(status: string) {
+  switch (status) {
+    case 'Issued':
+      return 'Đã phát hành';
+    case 'Paid':
+      return 'Đã thanh toán';
+    case 'Overdue':
+      return 'Quá hạn';
+    case 'Cancelled':
+      return 'Đã hủy';
+    default:
+      return status;
+  }
+}
+
+function getInvoiceStatusClass(status: string) {
+  switch (status) {
+    case 'Issued':
+      return 'pending';
+    case 'Paid':
+      return 'success';
+    case 'Overdue':
+      return 'danger';
     case 'Cancelled':
       return 'terminated';
     default:

@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { ROUTE_PATHS } from '../../../app/router/routePaths';
+import { getApiErrorMessage } from '../../../shared/api/apiError';
 import { Alert } from '../../../shared/components/ui/Alert';
 import { Button } from '../../../shared/components/ui/Button';
 import { Toast } from '../../../shared/components/ui/Toast';
@@ -10,6 +11,16 @@ import { ContractTermsSetupModal } from '../../rental-contracts/components/Contr
 import { rentalRequestApi } from '../../rental-requests/api';
 import type { RentalRequestResponse, RoomDepositResponse } from '../../rental-requests/types';
 import './LandlordRentalRequestDetailPage.css';
+
+function toDateInput(date: Date) {
+  return date.toISOString().slice(0, 10);
+}
+
+function addDays(days: number) {
+  const date = new Date();
+  date.setDate(date.getDate() + days);
+  return toDateInput(date);
+}
 
 export function LandlordRentalRequestDetailPage() {
   const { id } = useParams<{ id: string }>();
@@ -23,6 +34,8 @@ export function LandlordRentalRequestDetailPage() {
   const [previewContractId, setPreviewContractId] = useState<string | null>(null);
   const [termsContractId, setTermsContractId] = useState<string | null>(null);
   const [toast, setToast] = useState<{ message: string; type: 'success' | 'error' } | null>(null);
+  const minimumApproveStartDate = addDays(2);
+  const canApproveByStartDate = !request || request.desiredStartDate >= minimumApproveStartDate;
 
   useEffect(() => {
     async function fetchRequest() {
@@ -43,6 +56,13 @@ export function LandlordRentalRequestDetailPage() {
 
   const handleApproveConfirm = async () => {
     if (!request) return;
+    if (!canApproveByStartDate) {
+      setToast({
+        message: 'Ngày bắt đầu thuê phải còn cách hôm nay ít nhất 2 ngày để hai bên có thời gian hoàn tất hợp đồng.',
+        type: 'error'
+      });
+      return;
+    }
 
     try {
       const deadline = new Date();
@@ -53,8 +73,8 @@ export function LandlordRentalRequestDetailPage() {
       setRequest(response.data);
       setShowApproveForm(false);
       setToast({ message: 'Đã duyệt yêu cầu thành công.', type: 'success' });
-    } catch {
-      setToast({ message: 'Không thể duyệt yêu cầu thuê.', type: 'error' });
+    } catch (err) {
+      setToast({ message: getApiErrorMessage(err, 'Không thể duyệt yêu cầu thuê.'), type: 'error' });
     }
   };
 
@@ -79,8 +99,7 @@ export function LandlordRentalRequestDetailPage() {
 
   if (loading) {
     return (
-      <div className="landlord-dashboard">
-        <LandlordSidebar navigate={navigate} />
+      <div className="landlord-dashboard-page" style={{ display: 'contents' }}>
         <main className="dashboard-main">
           <div className="empty-panel">Đang tải yêu cầu thuê...</div>
         </main>
@@ -90,8 +109,7 @@ export function LandlordRentalRequestDetailPage() {
 
   if (error || !request) {
     return (
-      <div className="landlord-dashboard">
-        <LandlordSidebar navigate={navigate} />
+      <div className="landlord-dashboard-page" style={{ display: 'contents' }}>
         <main className="dashboard-main">
           <Alert type="error">{error || 'Có lỗi xảy ra.'}</Alert>
         </main>
@@ -100,8 +118,7 @@ export function LandlordRentalRequestDetailPage() {
   }
 
   return (
-    <div className="landlord-dashboard landlord-dashboard-page">
-      <LandlordSidebar navigate={navigate} />
+    <div className="landlord-dashboard-page" style={{ display: 'contents' }}>
 
       <main className="dashboard-main">
         <div className="landlord-request-detail-page">
@@ -134,7 +151,7 @@ export function LandlordRentalRequestDetailPage() {
               {request.status === 'Pending' && !showApproveForm && !showRejectForm && (
                 <div style={{ display: 'flex', gap: '8px' }}>
                   <Button variant="danger" onClick={() => setShowRejectForm(true)}>Từ chối</Button>
-                  <Button variant="primary" onClick={() => setShowApproveForm(true)}>Duyệt yêu cầu</Button>
+                  <Button variant="primary" onClick={() => setShowApproveForm(true)} disabled={!canApproveByStartDate}>Duyệt yêu cầu</Button>
                 </div>
               )}
             </div>
@@ -174,9 +191,14 @@ export function LandlordRentalRequestDetailPage() {
             <p style={{ color: '#475569', fontSize: '1rem', marginBottom: '24px', lineHeight: '1.5' }}>
               Hệ thống sẽ tạo yêu cầu cọc với thời hạn thanh toán 24 giờ kể từ thời điểm này. Bạn có chắc chắn muốn duyệt?
             </p>
+            {!canApproveByStartDate && (
+              <Alert type="error">
+                Ngày bắt đầu thuê phải còn cách hôm nay ít nhất 2 ngày để hai bên có thời gian hoàn tất hợp đồng.
+              </Alert>
+            )}
             <div className="form-actions" style={{ display: 'flex', justifyContent: 'flex-end', gap: '12px' }}>
               <Button variant="outline" onClick={() => setShowApproveForm(false)}>Hủy</Button>
-              <Button variant="primary" onClick={handleApproveConfirm}>Đồng ý duyệt</Button>
+              <Button variant="primary" onClick={handleApproveConfirm} disabled={!canApproveByStartDate}>Đồng ý duyệt</Button>
             </div>
           </div>
         </div>
@@ -243,7 +265,7 @@ function LandlordSidebar({ navigate }: { navigate: ReturnType<typeof useNavigate
   return (
     <aside className="dashboard-sidebar">
       <h1>Chủ trọ</h1>
-      <button className="sidebar-item" onClick={() => navigate(ROUTE_PATHS.LANDLORD.DASHBOARD)}>
+      <button className="sidebar-item" onClick={() => navigate(ROUTE_PATHS.LANDLORD.ROOMING_HOUSES)}>
         Quản lý khu trọ
       </button>
       <button className="sidebar-item active" onClick={() => navigate(ROUTE_PATHS.LANDLORD.RENTAL_REQUESTS)}>
@@ -319,7 +341,8 @@ function ContractProgressBlock({
 }) {
   const tone = getContractTone(contract?.status);
   const canEditTerms = contract?.status === 'TenantRevisionRequested';
-  const canSignContract = contract?.status === 'PendingLandlordSignature';
+  const canSignByStartDate = !contract?.startDate || contract.startDate >= addDays(2);
+  const canSignContract = contract?.status === 'PendingLandlordSignature' && canSignByStartDate;
 
   return (
     <div className="request-info-card">
@@ -337,6 +360,12 @@ function ContractProgressBlock({
             <InfoItem label="Lý do" value={contract.statusReason} />
           )}
         </div>
+
+        {contract?.status === 'PendingLandlordSignature' && !canSignByStartDate && (
+          <Alert type="error">
+            Ngày bắt đầu hợp đồng phải còn cách hôm nay ít nhất 2 ngày để người thuê có thời gian ký hợp đồng.
+          </Alert>
+        )}
 
         {contract && (canEditTerms || canSignContract) && (
           <div style={{ display: 'flex', gap: 12, flexWrap: 'wrap', marginTop: 0 }}>

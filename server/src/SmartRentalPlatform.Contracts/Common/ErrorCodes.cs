@@ -70,6 +70,8 @@ public static class ErrorCodes
     public const string RentalRequestInvalidDuration = "RENTAL_REQUEST_INVALID_DURATION";
     public const string RentalRequestOccupantLimitExceeded = "RENTAL_REQUEST_OCCUPANT_LIMIT_EXCEEDED";
     public const string RentalRequestPaymentDeadlineInvalid = "RENTAL_REQUEST_PAYMENT_DEADLINE_INVALID";
+    public const string TenantOutstandingInvoice = "TENANT_OUTSTANDING_INVOICE";
+    public const string TenantFinalInvoicePending = "TENANT_FINAL_INVOICE_PENDING";
     public const string RoomDepositAlreadyExists = "ROOM_DEPOSIT_ALREADY_EXISTS";
     public const string RoomDepositNotFound = "ROOM_DEPOSIT_NOT_FOUND";
     public const string RoomDepositForbidden = "ROOM_DEPOSIT_FORBIDDEN";
@@ -97,6 +99,8 @@ public static class ErrorCodes
     public const string InvoiceNotFound = "INVOICE_NOT_FOUND";
     public const string InvoiceInvalidStatus = "INVOICE_INVALID_STATUS";
     public const string InvoiceDuplicatePeriod = "INVOICE_DUPLICATE_PERIOD";
+    public const string FinalInvoiceNotAllowed = "FINAL_INVOICE_NOT_ALLOWED";
+    public const string WalletPaymentFailed = "WALLET_PAYMENT_FAILED";
 
     // Viewing Appointment
     public const string ViewingAppointmentNotFound = "VIEWING_APPOINTMENT_NOT_FOUND";

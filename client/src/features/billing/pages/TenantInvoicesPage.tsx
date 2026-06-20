@@ -10,7 +10,7 @@ import type { Invoice } from '../types';
 import '../../home/pages/MePage.css';
 import './BillingPages.css';
 
-const tenantStatuses = ['Issued', 'PartiallyPaid', 'Paid', 'Overdue'];
+const tenantStatuses = ['Issued', 'Paid', 'Overdue', 'Cancelled'];
 
 type TenantInvoicesPanelProps = {
   invoiceId?: string;
@@ -109,9 +109,6 @@ export function TenantInvoicesPanel({ invoiceId: controlledInvoiceId, onOpenInvo
           <h2>Theo dõi và thanh toán</h2>
           <p>Bạn chỉ nhìn thấy hóa đơn đã phát hành và có thể thanh toán các khoản còn nợ qua ví nội bộ.</p>
         </div>
-        <button type="button" className="billing-button secondary" onClick={() => void loadInvoices()}>
-          Tải lại
-        </button>
       </section>
 
       <TenantNotification invoices={invoices} />
@@ -146,12 +143,12 @@ export function TenantInvoicesPanel({ invoiceId: controlledInvoiceId, onOpenInvo
                   if (onOpenInvoice) {
                     onOpenInvoice(invoice.id);
                   } else {
-                    navigate(`/me/invoices/${invoice.id}`);
+                    navigate(ROUTE_PATHS.ACCOUNT.INVOICE_DETAIL(invoice.id));
                   }
                 }}
               >
                 <span>{invoice.invoiceNo}</span>
-                <strong>{formatMoney(invoice.remainingAmount)}</strong>
+                <strong>{formatMoney(getPayableAmount(invoice))}</strong>
                 <small>{invoice.billingPeriodStart} - {invoice.billingPeriodEnd}</small>
                 <em className={`status-chip ${invoice.status.toLowerCase()}`}>{getInvoiceStatusLabel(invoice.status)}</em>
               </button>
@@ -171,8 +168,8 @@ export function TenantInvoicesPanel({ invoiceId: controlledInvoiceId, onOpenInvo
               <div className="invoice-summary">
                 <span>Hạn thanh toán <strong>{selectedInvoice.dueDate}</strong></span>
                 <span>Tổng tiền <strong>{formatMoney(selectedInvoice.totalAmount)}</strong></span>
-                <span>Đã thanh toán <strong>{formatMoney(selectedInvoice.paidAmount)}</strong></span>
-                <span>Còn lại <strong>{formatMoney(selectedInvoice.remainingAmount)}</strong></span>
+                <span>Đã thanh toán <strong>{formatMoney(getPaidAmount(selectedInvoice))}</strong></span>
+                <span>Còn lại <strong>{formatMoney(getPayableAmount(selectedInvoice))}</strong></span>
               </div>
 
               <div className="data-table">
@@ -207,7 +204,7 @@ export function TenantInvoicesPanel({ invoiceId: controlledInvoiceId, onOpenInvo
         <div className="modal-backdrop">
           <div className="confirm-dialog">
             <h3>Xác nhận thanh toán</h3>
-            <p>Thanh toán {formatMoney(confirmPay.remainingAmount)} từ ví nội bộ?</p>
+            <p>Thanh toán {formatMoney(getPayableAmount(confirmPay))} từ ví nội bộ?</p>
             <div className="action-row">
               <button type="button" className="billing-button secondary" onClick={() => setConfirmPay(null)} disabled={Boolean(busy)}>Đóng</button>
               <button type="button" className="billing-button" onClick={() => void handlePay(confirmPay)} disabled={Boolean(busy)}>Thanh toán</button>
@@ -216,6 +213,16 @@ export function TenantInvoicesPanel({ invoiceId: controlledInvoiceId, onOpenInvo
         </div>
       )}
     </>
+  );
+}
+
+export function AccountTenantInvoicesPage() {
+  const navigate = useNavigate();
+
+  return (
+    <div className="profile-invoices-section">
+      <TenantInvoicesPanel onOpenInvoice={(invoiceId) => navigate(ROUTE_PATHS.ACCOUNT.INVOICE_DETAIL(invoiceId))} />
+    </div>
   );
 }
 
@@ -258,7 +265,7 @@ export default function TenantInvoicesPage() {
               Duyệt hồ sơ
             </Button>
           ) : isLandlord ? (
-            <Button type="button" variant="secondary" onClick={() => navigate(ROUTE_PATHS.LANDLORD.DASHBOARD)}>
+            <Button type="button" variant="secondary" onClick={() => navigate(ROUTE_PATHS.LANDLORD.ROOMING_HOUSES)}>
               Kênh chủ trọ
             </Button>
           ) : (
@@ -282,8 +289,11 @@ export default function TenantInvoicesPage() {
                   <strong>{currentUser.displayName}</strong>
                   <span>{currentUser.email}</span>
                 </div>
-                <button className="dropdown-item" onClick={() => { setShowDropdown(false); navigate(ROUTE_PATHS.ME.PROFILE); }}>
+                <button className="dropdown-item" onClick={() => { setShowDropdown(false); navigate(ROUTE_PATHS.ACCOUNT.PROFILE); }}>
                   Chỉnh sửa thông tin
+                </button>
+                <button className="dropdown-item" onClick={() => { setShowDropdown(false); navigate(ROUTE_PATHS.ACCOUNT.INVOICES); }}>
+                  Hóa đơn của tôi
                 </button>
                 {isAdmin && (
                   <button className="dropdown-item" onClick={() => { setShowDropdown(false); navigate(ROUTE_PATHS.ADMIN.APPROVALS); }}>
@@ -291,7 +301,7 @@ export default function TenantInvoicesPage() {
                   </button>
                 )}
                 {isLandlord && (
-                  <button className="dropdown-item" onClick={() => { setShowDropdown(false); navigate(ROUTE_PATHS.LANDLORD.DASHBOARD); }}>
+                  <button className="dropdown-item" onClick={() => { setShowDropdown(false); navigate(ROUTE_PATHS.LANDLORD.ROOMING_HOUSES); }}>
                     Kênh chủ trọ
                   </button>
                 )}
@@ -318,7 +328,7 @@ export default function TenantInvoicesPage() {
 function TenantNotification({ invoices }: { invoices: Invoice[] }) {
   const dueSoon = invoices.filter((invoice) => {
     const diffDays = Math.ceil((new Date(invoice.dueDate).getTime() - Date.now()) / 86400000);
-    return (invoice.status === 'Issued' || invoice.status === 'PartiallyPaid') && diffDays >= 0 && diffDays <= 3;
+    return invoice.status === 'Issued' && diffDays >= 0 && diffDays <= 3;
   }).length;
   const payable = invoices.filter((invoice) => canPay(invoice)).length;
 
@@ -335,14 +345,21 @@ function TenantNotification({ invoices }: { invoices: Invoice[] }) {
 }
 
 function canPay(invoice: Invoice) {
-  return invoice.remainingAmount > 0 && (invoice.status === 'Issued' || invoice.status === 'PartiallyPaid' || invoice.status === 'Overdue');
+  return invoice.totalAmount > 0 && (invoice.status === 'Issued' || invoice.status === 'Overdue');
+}
+
+function getPaidAmount(invoice: Invoice) {
+  return invoice.status === 'Paid' ? invoice.totalAmount : 0;
+}
+
+function getPayableAmount(invoice: Invoice) {
+  return invoice.status === 'Paid' ? 0 : invoice.totalAmount;
 }
 
 function getInvoiceStatusLabel(status: string) {
   const labels: Record<string, string> = {
     Draft: 'Nháp',
     Issued: 'Đã phát hành',
-    PartiallyPaid: 'Thanh toán một phần',
     Paid: 'Đã thanh toán',
     Overdue: 'Quá hạn',
     Cancelled: 'Đã hủy'

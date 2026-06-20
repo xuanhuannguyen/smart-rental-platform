@@ -49,6 +49,22 @@ public class RentalContractsController : ControllerBase
     }
 
     [Authorize]
+    [HttpGet("landlord")]
+    public async Task<ActionResult<ApiResponse<IReadOnlyCollection<ContractHistoryItemResponse>>>> GetLandlordContracts(
+        CancellationToken cancellationToken)
+    {
+        var userId = GetCurrentUserId();
+        var result = await rentalContractService.GetLandlordContractsAsync(userId, cancellationToken);
+
+        return Ok(new ApiResponse<IReadOnlyCollection<ContractHistoryItemResponse>>
+        {
+            Success = true,
+            Message = "Tải danh sách hợp đồng cho thuê thành công.",
+            Data = result
+        });
+    }
+
+    [Authorize]
     [HttpGet("{id:guid}")]
     public async Task<ActionResult<ApiResponse<ContractDetailResponse>>> GetById(
         Guid id,

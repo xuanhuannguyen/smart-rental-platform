@@ -51,6 +51,13 @@ export function AccountLayout() {
           Lịch sử thuê phòng
         </NavLink>
 
+        <NavLink
+          to={ROUTE_PATHS.ACCOUNT.INVOICES}
+          className={({ isActive }) => `account-sidebar-item ${isActive ? 'active' : ''}`}
+        >
+          Hóa đơn của tôi
+        </NavLink>
+
         <button
           type="button"
           className="account-sidebar-item sidebar-back-btn"

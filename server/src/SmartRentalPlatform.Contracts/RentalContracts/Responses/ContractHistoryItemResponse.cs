@@ -40,6 +40,12 @@ public class ContractHistoryItemResponse
 
     public DateTimeOffset? ActivatedAt { get; set; }
 
+    public DateOnly? TerminationDate { get; set; }
+
+    public string? TerminationType { get; set; }
+
+    public bool IsAwaitingFinalInvoice { get; set; }
+
     public bool IsMainTenant { get; set; }
 
     public bool WasMainTenant { get; set; }

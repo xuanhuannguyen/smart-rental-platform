@@ -187,6 +187,123 @@
   margin-bottom: 8px;
 }
 
+.contract-invoices-section {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.contract-invoices-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 16px;
+}
+
+.contract-invoices-header h2 {
+  margin: 0 0 6px 0;
+  color: #1e293b;
+}
+
+.contract-invoices-header p {
+  margin: 0;
+  color: #64748b;
+}
+
+.invoice-status-tabs {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  padding-bottom: 12px;
+  border-bottom: 1px solid #e2e8f0;
+}
+
+.invoice-status-tabs button {
+  min-height: 36px;
+  padding: 8px 14px;
+  border: none;
+  border-radius: 6px;
+  background: #f1f5f9;
+  color: #475569;
+  font: inherit;
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.invoice-status-tabs button.active {
+  background: #162033;
+  color: #ffffff;
+}
+
+.invoice-inline-message {
+  border-radius: 8px;
+  padding: 12px 14px;
+  font-weight: 600;
+}
+
+.invoice-inline-message.success {
+  background: #e8f7ee;
+  color: #17683c;
+  border: 1px solid #bbe6cc;
+}
+
+.invoice-inline-message.error {
+  background: #fff0ed;
+  color: #a33124;
+  border: 1px solid #f4c1b8;
+}
+
+.contract-invoice-list {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.contract-invoice-card {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 16px;
+  align-items: center;
+  padding: 16px;
+  border: 1px solid #e2e8f0;
+  border-radius: 8px;
+  background: #ffffff;
+}
+
+.contract-invoice-card.muted {
+  opacity: 0.62;
+  background: #f8fafc;
+}
+
+.contract-invoice-title {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+  margin-bottom: 8px;
+}
+
+.contract-invoice-meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px 16px;
+  color: #64748b;
+  font-size: 0.9rem;
+}
+
+.contract-invoice-actions {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 12px;
+}
+
+.contract-invoice-actions > strong {
+  white-space: nowrap;
+  color: #0f172a;
+}
+
 /* Appendices Tab */
 .appendices-header {
   display: flex;

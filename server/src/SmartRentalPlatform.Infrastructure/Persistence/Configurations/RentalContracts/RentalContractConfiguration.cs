@@ -27,6 +27,8 @@ public class RentalContractConfiguration : IEntityTypeConfiguration<RentalContra
         builder.Property(x => x.RoomSnapshot).HasColumnName("room_snapshot").HasColumnType("jsonb");
         builder.Property(x => x.SignatureDeadlineAt).HasColumnName("signature_deadline_at");
         builder.Property(x => x.ActivatedAt).HasColumnName("activated_at");
+        builder.Property(x => x.TerminationDate).HasColumnName("termination_date");
+        builder.Property(x => x.TerminationType).HasColumnName("termination_type").HasConversion<string>().HasMaxLength(30);
         builder.Property(x => x.StatusReason).HasColumnName("status_reason").HasColumnType("text");
         builder.Property(x => x.CreatedAt).HasColumnName("created_at").IsRequired();
         builder.Property(x => x.UpdatedAt).HasColumnName("updated_at").IsRequired();

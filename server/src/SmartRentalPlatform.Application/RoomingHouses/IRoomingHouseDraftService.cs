@@ -13,4 +13,9 @@ public interface IRoomingHouseDraftService
         Guid roomingHouseId,
         UpdateRoomingHouseRequest request,
         CancellationToken cancellationToken = default);
+
+    Task<RoomingHouseDetailResponse?> UpdateVisibilityAsync(
+        Guid roomingHouseId,
+        UpdateRoomingHouseVisibilityRequest request,
+        CancellationToken cancellationToken = default);
 }

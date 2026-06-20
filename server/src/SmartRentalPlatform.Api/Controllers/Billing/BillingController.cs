@@ -24,6 +24,21 @@ public class BillingController : ControllerBase
     }
 
     [Authorize]
+    [HttpGet("billing/service-types")]
+    public async Task<ActionResult<ApiResponse<List<BillingServiceTypeResponse>>>> GetBillingServiceTypes(
+        CancellationToken cancellationToken)
+    {
+        var result = await billingService.GetBillingServiceTypesAsync(cancellationToken);
+
+        return Ok(new ApiResponse<List<BillingServiceTypeResponse>>
+        {
+            Success = true,
+            Message = "Tải danh sách loại dịch vụ thành công.",
+            Data = result
+        });
+    }
+
+    [Authorize]
     [HttpGet("landlord/rooming-houses/{id:guid}/service-prices")]
     public async Task<ActionResult<ApiResponse<List<ServicePriceResponse>>>> GetServicePrices(
         Guid id,
@@ -73,6 +88,49 @@ public class BillingController : ControllerBase
     }
 
     [Authorize]
+    [HttpGet("landlord/rooms/{roomId:guid}/invoice-preview")]
+    public async Task<ActionResult<ApiResponse<RoomInvoicePreviewResponse>>> GetRoomInvoicePreview(
+        Guid roomId,
+        [FromQuery] DateOnly billingPeriodStart,
+        [FromQuery] DateOnly? billingPeriodEnd,
+        CancellationToken cancellationToken)
+    {
+        var result = await billingService.GetRoomInvoicePreviewAsync(
+            GetCurrentUserId(),
+            roomId,
+            billingPeriodStart,
+            billingPeriodEnd,
+            cancellationToken);
+
+        return Ok(new ApiResponse<RoomInvoicePreviewResponse>
+        {
+            Success = true,
+            Message = "Tai thong tin xem truoc hoa don thanh cong.",
+            Data = result
+        });
+    }
+
+    [Authorize]
+    [HttpGet("landlord/contracts/{contractId:guid}/termination-invoice-preview")]
+    public async Task<ActionResult<ApiResponse<RoomInvoicePreviewResponse>>> GetTerminationInvoicePreview(
+        Guid contractId,
+        CancellationToken cancellationToken)
+    {
+        var result = await billingService.GetTerminationInvoicePreviewAsync(
+            GetCurrentUserId(),
+            contractId,
+            cancellationToken);
+
+        return Ok(new ApiResponse<RoomInvoicePreviewResponse>
+        {
+            Success = true,
+            Message = "Tải thông tin hóa đơn cần tạo thành công.",
+            Data = result
+        });
+    }
+
+#if false
+    [Authorize]
     [HttpPost("landlord/meter-readings")]
     public async Task<ActionResult<ApiResponse<MeterReadingResponse>>> CreateMeterReading(
         CreateMeterReadingRequest request,
@@ -99,7 +157,31 @@ public class BillingController : ControllerBase
         return Ok(new ApiResponse<InvoiceResponse>
         {
             Success = true,
-            Message = "Tao hoa don nhap thanh cong.",
+            Message = "Tạo hóa đơn nháp thành công.",
+            Data = result
+        });
+    }
+
+#endif
+
+    /// <summary>
+    /// Tạo hóa đơn kết hợp nhập chỉ số điện/nước trong một bước.
+    /// Các dịch vụ MeterReading có giá hiệu lực trong kỳ bắt buộc phải có chỉ số.
+    /// MeterReading và Invoice được tạo atomic trong cùng một transaction.
+    /// </summary>
+    [Authorize]
+    [HttpPost("landlord/invoices/generate-with-readings")]
+    public async Task<ActionResult<ApiResponse<InvoiceResponse>>> GenerateInvoiceWithReadings(
+        GenerateInvoiceWithReadingsRequest request,
+        CancellationToken cancellationToken)
+    {
+        var result = await billingService.GenerateInvoiceWithReadingsAsync(
+            GetCurrentUserId(), request, cancellationToken);
+
+        return Ok(new ApiResponse<InvoiceResponse>
+        {
+            Success = true,
+            Message = "Tạo hóa đơn thành công.",
             Data = result
         });
     }
@@ -109,9 +191,10 @@ public class BillingController : ControllerBase
     public async Task<ActionResult<ApiResponse<List<InvoiceResponse>>>> GetLandlordInvoices(
         [FromQuery] string? status,
         [FromQuery] string? search,
+        [FromQuery] Guid? contractId,
         CancellationToken cancellationToken)
     {
-        var result = await billingService.GetLandlordInvoicesAsync(GetCurrentUserId(), status, search, cancellationToken);
+        var result = await billingService.GetLandlordInvoicesAsync(GetCurrentUserId(), status, search, contractId, cancellationToken);
 
         return Ok(new ApiResponse<List<InvoiceResponse>>
         {
@@ -181,6 +264,44 @@ public class BillingController : ControllerBase
         {
             Success = true,
             Message = "Tai danh sach hoa don thanh cong.",
+            Data = result
+        });
+    }
+
+    [Authorize]
+    [HttpPost("landlord/contracts/{contractId:guid}/termination-invoices")]
+    public async Task<ActionResult<ApiResponse<InvoiceResponse>>> CreateNextTerminationInvoice(
+        Guid contractId,
+        CreateTerminationInvoiceRequest request,
+        CancellationToken cancellationToken)
+    {
+        var result = await billingService.CreateNextTerminationInvoiceAsync(
+            GetCurrentUserId(),
+            contractId,
+            request,
+            cancellationToken);
+
+        return Ok(new ApiResponse<InvoiceResponse>
+        {
+            Success = true,
+            Message = "Tạo hóa đơn thành công.",
+            Data = result
+        });
+    }
+
+    [Authorize]
+    [HttpGet("me/contracts/{contractId:guid}/invoices")]
+    public async Task<ActionResult<ApiResponse<List<InvoiceResponse>>>> GetMyContractInvoices(
+        Guid contractId,
+        [FromQuery] string? status,
+        CancellationToken cancellationToken)
+    {
+        var result = await billingService.GetMyContractInvoicesAsync(GetCurrentUserId(), contractId, status, cancellationToken);
+
+        return Ok(new ApiResponse<List<InvoiceResponse>>
+        {
+            Success = true,
+            Message = "Tải danh sách hóa đơn hợp đồng thành công.",
             Data = result
         });
     }

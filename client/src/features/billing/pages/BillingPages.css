@@ -553,6 +553,159 @@
   background: rgba(23, 33, 31, 0.42);
 }
 
+.invoice-create-modal {
+  width: min(1000px, calc(100vw - 48px));
+  max-width: 1000px;
+  max-height: min(900px, calc(100vh - 48px));
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+.invoice-create-modal form {
+  min-height: 0;
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+}
+
+.invoice-create-modal .history-modal-body {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  background: #f8fafc;
+}
+
+.invoice-create-stack {
+  display: grid;
+  gap: 16px;
+}
+
+.invoice-create-selector,
+.invoice-create-grid,
+.invoice-create-section,
+.invoice-create-summary {
+  border: 1px solid #dbe3ef;
+  border-radius: 8px;
+  background: #ffffff;
+  padding: 16px;
+}
+
+.invoice-create-selector {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  gap: 12px;
+}
+
+.invoice-create-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+  gap: 12px;
+}
+
+.invoice-create-field {
+  min-height: 78px;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  gap: 7px;
+}
+
+.invoice-create-field .label,
+.invoice-create-label {
+  color: #64748b;
+  font-size: 12px;
+  font-weight: 800;
+  text-transform: uppercase;
+}
+
+.invoice-create-field .value,
+.invoice-create-field strong {
+  color: #0f172a;
+  font-weight: 800;
+}
+
+.invoice-create-field input,
+.invoice-create-field select {
+  width: 100%;
+  min-height: 42px;
+  border: 1px solid #cbd5e1;
+  border-radius: 8px;
+  padding: 9px 11px;
+  background: #ffffff;
+  color: #0f172a;
+}
+
+.invoice-create-field input:focus,
+.invoice-create-field select:focus {
+  outline: 2px solid rgba(36, 107, 254, 0.18);
+  border-color: #246bfe;
+}
+
+.invoice-create-section {
+  display: grid;
+  gap: 12px;
+}
+
+.invoice-create-section h3 {
+  margin: 0;
+  color: #0f172a;
+  font-size: 16px;
+}
+
+.invoice-create-empty {
+  margin: 0;
+  color: #64748b;
+}
+
+.invoice-create-line {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  border: 1px solid #e2e8f0;
+  border-radius: 8px;
+  padding: 12px;
+  background: #f8fafc;
+}
+
+.invoice-create-meter-list {
+  display: grid;
+  gap: 12px;
+}
+
+.invoice-create-meter-card {
+  display: grid;
+  gap: 12px;
+  border: 1px solid #dbe3ef;
+  border-radius: 8px;
+  padding: 14px;
+  background: #ffffff;
+}
+
+.invoice-create-meter-card > strong {
+  color: #0f172a;
+}
+
+.invoice-create-summary {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+  gap: 12px;
+}
+
+.invoice-create-total {
+  background: #eff6ff;
+  border-color: #bfdbfe;
+}
+
+.invoice-create-placeholder {
+  border: 1px dashed #cbd5e1;
+  border-radius: 8px;
+  padding: 20px;
+  color: #64748b;
+  background: #ffffff;
+}
+
 .confirm-dialog {
   width: min(440px, 100%);
   border-radius: 8px;

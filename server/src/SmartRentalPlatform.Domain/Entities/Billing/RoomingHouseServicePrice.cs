@@ -7,8 +7,7 @@ public class RoomingHouseServicePrice
     public Guid Id { get; set; }
     public Guid RoomingHouseId { get; set; }
     public Guid ServiceTypeId { get; set; }
-    public BillingMethod BillingMethod { get; set; }
-    public string UnitName { get; set; } = string.Empty;
+    public PricingUnit PricingUnit { get; set; }
     public decimal UnitPrice { get; set; }
     public DateOnly EffectiveFrom { get; set; }
     public DateOnly? EffectiveTo { get; set; }

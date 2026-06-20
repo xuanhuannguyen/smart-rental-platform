@@ -1,8 +1,11 @@
+using SmartRentalPlatform.Domain.Enums.RentalContracts;
+
 namespace SmartRentalPlatform.Application.Billing;
 
 public interface IBillingContractReadService
 {
     Task<BillingContractSnapshot?> GetActiveContractAsync(Guid contractId, CancellationToken cancellationToken = default);
+    Task<BillingContractSnapshot?> GetContractAsync(Guid contractId, CancellationToken cancellationToken = default);
 }
 
 public sealed record BillingContractSnapshot(
@@ -15,4 +18,6 @@ public sealed record BillingContractSnapshot(
     int PaymentDay,
     DateOnly StartDate,
     DateOnly EndDate,
-    string Status);
+    RentalContractStatus Status,
+    DateOnly? TerminationDate,
+    ContractTerminationType? TerminationType);

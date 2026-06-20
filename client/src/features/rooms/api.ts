@@ -74,6 +74,14 @@ export async function submitRoom(id: string): Promise<Room> {
   return data.data;
 }
 
+export async function updateRoomStatus(id: string, status: string): Promise<Room> {
+  const data = await apiClient<ApiResponse<Room>>(
+    `/api/rooms/${id}/status`,
+    { method: 'PUT', auth: true, body: { status } }
+  );
+  return data.data;
+}
+
 export async function getActiveContractByRoomId(id: string): Promise<ContractDetailResponse> {
   const data = await apiClient<ApiResponse<ContractDetailResponse>>(
     `/api/rooms/${id}/active-contract`,

@@ -8,8 +8,10 @@ using System.Threading;
 using System.Threading.Tasks;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Query;
+using SmartRentalPlatform.Application.Billing;
 using SmartRentalPlatform.Application.Common.Exceptions;
 using SmartRentalPlatform.Application.Common.Interfaces;
+using SmartRentalPlatform.Contracts.Common;
 using SmartRentalPlatform.Contracts.RentalContracts;
 using SmartRentalPlatform.Contracts.RentalContracts.Requests;
 using SmartRentalPlatform.Contracts.RentalContracts.Responses;
@@ -17,6 +19,7 @@ using SmartRentalPlatform.Domain.Entities.Properties;
 using SmartRentalPlatform.Domain.Entities.Rental;
 using SmartRentalPlatform.Domain.Entities.RentalContracts;
 using SmartRentalPlatform.Domain.Entities.Users;
+using SmartRentalPlatform.Domain.Enums.Billing;
 using SmartRentalPlatform.Domain.Enums.Properties;
 using SmartRentalPlatform.Domain.Enums.Rental;
 using SmartRentalPlatform.Domain.Enums.RentalContracts;
@@ -31,6 +34,8 @@ public class RentalContractService : IRentalContractService
 
 	private static readonly TimeSpan TenantSignatureTtl = TimeSpan.FromHours(48);
 
+	private const int LandlordSignatureMinimumStartOffsetDays = 2;
+
 	private readonly IAppDbContext context;
 
 	private readonly IHashService hashService;
@@ -43,7 +48,9 @@ public class RentalContractService : IRentalContractService
 
 	private readonly ISensitiveDataProtector sensitiveDataProtector;
 
-	public RentalContractService(IAppDbContext context, IHashService hashService, IContractPdfRenderer contractPdfRenderer, IContractSignatureOtpService contractSignatureOtpService, IContractFileService contractFileService, ISensitiveDataProtector sensitiveDataProtector)
+	private readonly IBillingService billingService;
+
+	public RentalContractService(IAppDbContext context, IHashService hashService, IContractPdfRenderer contractPdfRenderer, IContractSignatureOtpService contractSignatureOtpService, IContractFileService contractFileService, ISensitiveDataProtector sensitiveDataProtector, IBillingService billingService)
 	{
 		this.context = context;
 		this.hashService = hashService;
@@ -51,6 +58,7 @@ public class RentalContractService : IRentalContractService
 		this.contractSignatureOtpService = contractSignatureOtpService;
 		this.contractFileService = contractFileService;
 		this.sensitiveDataProtector = sensitiveDataProtector;
+		this.billingService = billingService;
 	}
 
 	public async Task<ContractDetailResponse?> GetByIdAsync(Guid userId, Guid contractId, CancellationToken cancellationToken = default(CancellationToken))
@@ -61,7 +69,9 @@ public class RentalContractService : IRentalContractService
 			return null;
 		}
 		EnsureCanView(userId, contract);
-		return MapToDetailResponse(contract);
+		ContractDetailResponse response = MapToDetailResponse(contract);
+		response.IsAwaitingFinalInvoice = await IsAwaitingFinalInvoiceAsync(contract, cancellationToken);
+		return response;
 	}
 
 	public async Task<ContractDetailResponse?> GetActiveContractByRoomIdAsync(Guid landlordUserId, Guid roomId, CancellationToken cancellationToken = default(CancellationToken))
@@ -89,10 +99,32 @@ public class RentalContractService : IRentalContractService
 
 	public async Task<IReadOnlyCollection<ContractHistoryItemResponse>> GetMyHistoryAsync(Guid tenantUserId, CancellationToken cancellationToken = default(CancellationToken))
 	{
-		return (await (from x in BaseQuery().AsNoTracking()
+		List<RentalContract> contracts = await (from x in BaseQuery().AsNoTracking()
 			where x.DeletedAt == null && x.ActivatedAt != null && ((int)x.Status == 9 || (int)x.Status == 8 || (int)x.Status == 7) && (x.MainTenantUserId == tenantUserId || x.Occupants.Any((ContractOccupant occupant) => occupant.UserId == tenantUserId))
 			orderby x.ActivatedAt ?? x.UpdatedAt descending, x.CreatedAt descending
-			select x).ToListAsync(cancellationToken)).Select((RentalContract contract) => MapToHistoryItemResponse(contract, tenantUserId)).ToList();
+			select x).ToListAsync(cancellationToken);
+		HashSet<Guid> awaitingIds = await GetAwaitingFinalInvoiceContractIdsAsync(contracts, cancellationToken);
+		return contracts.Select(contract =>
+		{
+			ContractHistoryItemResponse response = MapToHistoryItemResponse(contract, tenantUserId);
+			response.IsAwaitingFinalInvoice = awaitingIds.Contains(contract.Id);
+			return response;
+		}).ToList();
+	}
+
+	public async Task<IReadOnlyCollection<ContractHistoryItemResponse>> GetLandlordContractsAsync(Guid landlordUserId, CancellationToken cancellationToken = default(CancellationToken))
+	{
+		List<RentalContract> contracts = await (from x in BaseQuery().AsNoTracking()
+			where x.DeletedAt == null && x.ActivatedAt != null && ((int)x.Status == 9 || (int)x.Status == 8 || (int)x.Status == 7) && x.Room.RoomingHouse.LandlordUserId == landlordUserId
+			orderby x.ActivatedAt ?? x.UpdatedAt descending, x.CreatedAt descending
+			select x).ToListAsync(cancellationToken);
+		HashSet<Guid> awaitingIds = await GetAwaitingFinalInvoiceContractIdsAsync(contracts, cancellationToken);
+		return contracts.Select(contract =>
+		{
+			ContractHistoryItemResponse response = MapToHistoryItemResponse(contract, landlordUserId);
+			response.IsAwaitingFinalInvoice = awaitingIds.Contains(contract.Id);
+			return response;
+		}).ToList();
 	}
 
 	public async Task<ContractPreviewPdfResult?> GetPreviewPdfAsync(Guid userId, Guid contractId, CancellationToken cancellationToken = default(CancellationToken))
@@ -131,6 +163,7 @@ public class RentalContractService : IRentalContractService
 			try
 			{
 				DateTimeOffset now = DateTimeOffset.UtcNow;
+				DateOnly today = DateOnly.FromDateTime(now.UtcDateTime);
 				context.ContractOccupantDocuments.RemoveRange(contract.Occupants.SelectMany((ContractOccupant x) => x.Documents));
 				context.ContractOccupants.RemoveRange(contract.Occupants);
 				Dictionary<string, ContractOccupant> createdByClientReference = new Dictionary<string, ContractOccupant>(StringComparer.OrdinalIgnoreCase);
@@ -151,7 +184,7 @@ public class RentalContractService : IRentalContractService
 						RelationshipToMainTenant = NormalizeOptionalText(occupantRequest.RelationshipToMainTenant),
 						MoveInDate = occupantRequest.MoveInDate,
 						MoveOutDate = occupantRequest.MoveOutDate,
-						Status = ContractOccupantStatus.Active,
+						Status = ResolveMoveInStatus(occupantRequest.MoveInDate, today),
 						CreatedAt = now,
 						UpdatedAt = now
 					};
@@ -255,6 +288,7 @@ public class RentalContractService : IRentalContractService
 		EnsureCanLandlordSign(contract);
 		EnsureNotSigned(contract, ContractSignerRole.Landlord);
 		DateTimeOffset now = DateTimeOffset.UtcNow;
+		EnsureContractStartDateAllowsLandlordSignature(contract.StartDate, now);
 		ContractDetailResponse result;
 		await using (IAppDbContextTransaction transaction = await context.BeginTransactionAsync(cancellationToken))
 		{
@@ -294,6 +328,10 @@ public class RentalContractService : IRentalContractService
 		EnsureStatus(contract, RentalContractStatus.PendingTenantSignature);
 		EnsureNotSigned(contract, ContractSignerRole.Tenant);
 		DateTimeOffset now = DateTimeOffset.UtcNow;
+		DateOnly today = DateOnly.FromDateTime(now.UtcDateTime);
+		EnsureTenantCanSignBeforeStartDate(contract.StartDate, today);
+		EnsureTenantSignatureDeadlineNotExpired(contract, now);
+		RoomStatus roomStatusAfterSigning = contract.StartDate <= today ? RoomStatus.Occupied : RoomStatus.Reserved;
 		ContractDetailResponse result;
 		await using (IAppDbContextTransaction transaction = await context.BeginTransactionAsync(cancellationToken))
 		{
@@ -312,8 +350,22 @@ public class RentalContractService : IRentalContractService
 				}
 				await context.Rooms.Where((Room x) => x.Id == contract.RoomId).ExecuteUpdateAsync(delegate(UpdateSettersBuilder<Room> setters)
 				{
-					setters.SetProperty((Room x) => x.Status, RoomStatus.Occupied).SetProperty((Room x) => x.UpdatedAt, now);
+					setters.SetProperty((Room x) => x.Status, roomStatusAfterSigning).SetProperty((Room x) => x.UpdatedAt, now);
 				}, cancellationToken);
+				await context.ContractOccupants
+					.Where((ContractOccupant x) => x.RentalContractId == contractId && x.Status != ContractOccupantStatus.MoveOut && x.Status != ContractOccupantStatus.Voided && x.MoveInDate <= today)
+					.ExecuteUpdateAsync(delegate(UpdateSettersBuilder<ContractOccupant> setters)
+					{
+						setters.SetProperty((ContractOccupant x) => x.Status, ContractOccupantStatus.Active)
+							.SetProperty((ContractOccupant x) => x.UpdatedAt, now);
+					}, cancellationToken);
+				await context.ContractOccupants
+					.Where((ContractOccupant x) => x.RentalContractId == contractId && x.Status != ContractOccupantStatus.MoveOut && x.Status != ContractOccupantStatus.Voided && x.MoveInDate > today)
+					.ExecuteUpdateAsync(delegate(UpdateSettersBuilder<ContractOccupant> setters)
+					{
+						setters.SetProperty((ContractOccupant x) => x.Status, ContractOccupantStatus.PendingMoveIn)
+							.SetProperty((ContractOccupant x) => x.UpdatedAt, now);
+					}, cancellationToken);
 				await context.SaveChangesAsync(cancellationToken);
 				await transaction.CommitAsync(cancellationToken);
 				await contractFileService.GenerateSignedContractFileAsync(tenantUserId, contract.Id, cancellationToken);
@@ -444,10 +496,68 @@ public class RentalContractService : IRentalContractService
 			throw new ForbiddenException("RENTAL_CONTRACT_FORBIDDEN", "Bạn không có quyền thao tác với hợp đồng này.", new { contractId });
 		}
 		EnsureStatus(contract, RentalContractStatus.Active);
+		if (isTenant && request.TerminationType != ContractTerminationType.TenantUnilateral)
+		{
+			throw new ForbiddenException(
+				ErrorCodes.RentalContractForbidden,
+				"Người thuê chỉ có thể đơn phương chấm dứt hợp đồng.");
+		}
+		if (isLandlord && request.TerminationType == ContractTerminationType.TenantUnilateral)
+		{
+			throw new ForbiddenException(
+				ErrorCodes.RentalContractForbidden,
+				"Chủ trọ không thể chấm dứt hợp đồng thay cho người thuê.");
+		}
+		if (isTenant)
+		{
+			bool hasOutstandingInvoices = await context.Invoices.AsNoTracking().AnyAsync(
+				x => x.ContractId == contract.Id &&
+					 (x.Status == InvoiceStatus.Issued || x.Status == InvoiceStatus.Overdue),
+				cancellationToken);
+			if (hasOutstandingInvoices)
+			{
+				throw new ConflictException(
+					ErrorCodes.TenantOutstandingInvoice,
+					"Bạn phải thanh toán tất cả hóa đơn đã phát hành hoặc quá hạn trước khi chấm dứt hợp đồng.");
+			}
+		}
 		DateTimeOffset now = DateTimeOffset.UtcNow;
-		DateOnly terminationDate = request.TerminationDate ?? DateOnly.FromDateTime(now.UtcDateTime);
+		DateOnly today = DateOnly.FromDateTime(now.UtcDateTime);
+		var currentTerms = ResolveCurrentContractTermValues(contract);
+		DateOnly terminationDate = request.TerminationType == ContractTerminationType.NormalExpiration
+			? currentTerms.EndDate
+			: today;
+		bool isBeforeContractStart = today < contract.StartDate;
+		if (request.TerminationType == ContractTerminationType.NormalExpiration && today < currentTerms.EndDate)
+		{
+			throw new BadRequestException(
+				"VALIDATION_ERROR",
+				$"Hợp đồng còn hạn đến ngày {currentTerms.EndDate:dd/MM/yyyy} nên không thể đáo hạn.");
+		}
+		if (request.CreateFinalInvoice && !isLandlord)
+		{
+			throw new ForbiddenException("RENTAL_CONTRACT_FORBIDDEN", "Chỉ chủ trọ mới có quyền tạo hóa đơn kỳ cuối khi chấm dứt hợp đồng.");
+		}
+		if (request.CreateFinalInvoice && isBeforeContractStart)
+		{
+			throw new BadRequestException(
+				"VALIDATION_ERROR",
+				"Hợp đồng chưa đến ngày bắt đầu thuê nên không thể tạo hóa đơn kỳ cuối.");
+		}
 		RoomDeposit deposit = contract.RoomDeposit;
 		string reasonText = (string.IsNullOrWhiteSpace(request.Reason) ? string.Empty : request.Reason.Trim());
+		await using IAppDbContextTransaction transaction = await context.BeginTransactionAsync(cancellationToken);
+		if (request.CreateFinalInvoice)
+		{
+			await billingService.CreateFinalInvoiceForTerminationAsync(
+				userId,
+				contract.Id,
+				terminationDate,
+				request.FinalInvoiceDiscountAmount,
+				request.FinalInvoiceNote,
+				request.FinalInvoiceMeterReadings,
+				cancellationToken);
+		}
 		switch (request.TerminationType)
 		{
 		case ContractTerminationType.LandlordUnilateral:
@@ -499,15 +609,18 @@ public class RentalContractService : IRentalContractService
 			throw new BadRequestException("VALIDATION_ERROR", "Loại thanh lý không hợp lệ.");
 		}
 		contract.UpdatedAt = now;
+		contract.TerminationDate = terminationDate;
+		contract.TerminationType = request.TerminationType;
 		deposit.UpdatedAt = now;
 		CancelOpenAppendices(contract, now);
-		MoveOutActiveOccupants(contract, terminationDate, now);
-		if (contract.Room.Status == RoomStatus.Occupied)
+		CloseContractOccupants(contract, terminationDate, today, now);
+		if (contract.Room.Status is RoomStatus.Occupied or RoomStatus.Reserved)
 		{
 			contract.Room.Status = RoomStatus.Available;
 			contract.Room.UpdatedAt = now;
 		}
 		await context.SaveChangesAsync(cancellationToken);
+		await transaction.CommitAsync(cancellationToken);
 		return await GetByIdAsync(userId, contract.Id, cancellationToken);
 	}
 
@@ -521,12 +634,21 @@ public class RentalContractService : IRentalContractService
 		}
 	}
 
-	private static void MoveOutActiveOccupants(RentalContract contract, DateOnly terminationDate, DateTimeOffset now)
+	private static void CloseContractOccupants(RentalContract contract, DateOnly terminationDate, DateOnly today, DateTimeOffset now)
 	{
-		foreach (ContractOccupant occupant in contract.Occupants.Where((ContractOccupant x) => x.Status == ContractOccupantStatus.Active))
+		bool isBeforeContractStart = today < contract.StartDate;
+		foreach (ContractOccupant occupant in contract.Occupants.Where((ContractOccupant x) => x.Status is ContractOccupantStatus.Active or ContractOccupantStatus.PendingMoveIn))
 		{
-			occupant.Status = ContractOccupantStatus.MoveOut;
-			occupant.MoveOutDate = terminationDate;
+			if (isBeforeContractStart || occupant.Status == ContractOccupantStatus.PendingMoveIn)
+			{
+				occupant.Status = ContractOccupantStatus.Voided;
+				occupant.MoveOutDate = null;
+			}
+			else
+			{
+				occupant.Status = ContractOccupantStatus.MoveOut;
+				occupant.MoveOutDate = terminationDate;
+			}
 			occupant.UpdatedAt = now;
 		}
 	}
@@ -571,6 +693,58 @@ public class RentalContractService : IRentalContractService
 				throw;
 			}
 		}
+		return count;
+	}
+
+	public async Task<int> ActivatePendingMoveInsAsync(CancellationToken cancellationToken = default(CancellationToken))
+	{
+		DateTimeOffset now = DateTimeOffset.UtcNow;
+		DateOnly today = DateOnly.FromDateTime(now.UtcDateTime);
+		int count;
+		await using (IAppDbContextTransaction transaction = await context.BeginTransactionAsync(cancellationToken))
+		{
+			try
+			{
+				List<RentalContract> contracts = await BaseQuery()
+					.Where((RentalContract x) => x.DeletedAt == null &&
+						x.Status == RentalContractStatus.Active &&
+						x.StartDate <= today &&
+						(x.Room.Status == RoomStatus.Reserved ||
+							x.Occupants.Any((ContractOccupant occupant) =>
+								occupant.Status == ContractOccupantStatus.PendingMoveIn &&
+								occupant.MoveInDate <= today)))
+					.ToListAsync(cancellationToken);
+
+				foreach (RentalContract contract in contracts)
+				{
+					if (contract.Room.Status == RoomStatus.Reserved)
+					{
+						contract.Room.Status = RoomStatus.Occupied;
+						contract.Room.UpdatedAt = now;
+					}
+
+					foreach (ContractOccupant occupant in contract.Occupants.Where((ContractOccupant x) =>
+						x.Status == ContractOccupantStatus.PendingMoveIn &&
+						x.MoveInDate <= today))
+					{
+						occupant.Status = ContractOccupantStatus.Active;
+						occupant.UpdatedAt = now;
+					}
+
+					contract.UpdatedAt = now;
+				}
+
+				await context.SaveChangesAsync(cancellationToken);
+				await transaction.CommitAsync(cancellationToken);
+				count = contracts.Count;
+			}
+			catch
+			{
+				await transaction.RollbackAsync(cancellationToken);
+				throw;
+			}
+		}
+
 		return count;
 	}
 
@@ -688,6 +862,75 @@ public class RentalContractService : IRentalContractService
 		return null;
 	}
 
+	private async Task<bool> IsAwaitingFinalInvoiceAsync(
+		RentalContract contract,
+		CancellationToken cancellationToken)
+	{
+		if (!TryResolveRequiredFinalInvoicePeriod(contract, out DateOnly periodStart, out DateOnly periodEnd))
+		{
+			return false;
+		}
+
+		return !await context.Invoices.AsNoTracking().AnyAsync(
+			x => x.ContractId == contract.Id &&
+				x.BillingPeriodStart == periodStart &&
+				x.BillingPeriodEnd == periodEnd &&
+				x.Status != InvoiceStatus.Cancelled,
+			cancellationToken);
+	}
+
+	private async Task<HashSet<Guid>> GetAwaitingFinalInvoiceContractIdsAsync(
+		IReadOnlyCollection<RentalContract> contracts,
+		CancellationToken cancellationToken)
+	{
+		var candidates = contracts
+			.Select(contract => TryResolveRequiredFinalInvoicePeriod(contract, out DateOnly start, out DateOnly end)
+				? new { contract.Id, Start = start, End = end }
+				: null)
+			.Where(x => x is not null)
+			.ToList();
+
+		if (candidates.Count == 0)
+		{
+			return [];
+		}
+
+		Guid[] contractIds = candidates.Select(x => x!.Id).ToArray();
+		var invoices = await context.Invoices.AsNoTracking()
+			.Where(x => contractIds.Contains(x.ContractId) && x.Status != InvoiceStatus.Cancelled)
+			.Select(x => new { x.ContractId, x.BillingPeriodStart, x.BillingPeriodEnd })
+			.ToListAsync(cancellationToken);
+
+		return candidates
+			.Where(candidate => !invoices.Any(invoice =>
+				invoice.ContractId == candidate!.Id &&
+				invoice.BillingPeriodStart == candidate.Start &&
+				invoice.BillingPeriodEnd == candidate.End))
+			.Select(candidate => candidate!.Id)
+			.ToHashSet();
+	}
+
+	private static bool TryResolveRequiredFinalInvoicePeriod(
+		RentalContract contract,
+		out DateOnly periodStart,
+		out DateOnly periodEnd)
+	{
+		periodStart = default;
+		periodEnd = default;
+		if (contract.Status != RentalContractStatus.Cancelled ||
+			contract.TerminationType != ContractTerminationType.TenantUnilateral ||
+			!contract.TerminationDate.HasValue ||
+			contract.TerminationDate.Value < contract.StartDate)
+		{
+			return false;
+		}
+
+		periodEnd = contract.TerminationDate.Value;
+		DateOnly monthStart = new(periodEnd.Year, periodEnd.Month, 1);
+		periodStart = contract.StartDate > monthStart ? contract.StartDate : monthStart;
+		return true;
+	}
+
 	private static ContractSignature CreateSignature(Guid contractId, Guid signerUserId, ContractSignerRole signerRole, SignContractRequest request, string? ipAddress, string? userAgent, DateTimeOffset now)
 	{
 		return new ContractSignature
@@ -728,6 +971,8 @@ public class RentalContractService : IRentalContractService
 		contractDetailResponse.RoomSnapshot = contract.RoomSnapshot;
 		contractDetailResponse.SignatureDeadlineAt = contract.SignatureDeadlineAt;
 		contractDetailResponse.ActivatedAt = contract.ActivatedAt;
+		contractDetailResponse.TerminationDate = contract.TerminationDate;
+		contractDetailResponse.TerminationType = contract.TerminationType?.ToString();
 		contractDetailResponse.StatusReason = contract.StatusReason;
 		contractDetailResponse.Occupants = contract.Occupants.OrderBy((ContractOccupant x) => x.CreatedAt).Select(MapOccupantToResponse).ToList();
 		contractDetailResponse.Signatures = contract.Signatures.OrderBy((ContractSignature x) => x.SignedAt).Select(MapSignatureToResponse).ToList();
@@ -777,6 +1022,8 @@ public class RentalContractService : IRentalContractService
 		contractHistoryItemResponse.StatusReason = contract.StatusReason;
 		contractHistoryItemResponse.SignatureDeadlineAt = contract.SignatureDeadlineAt;
 		contractHistoryItemResponse.ActivatedAt = contract.ActivatedAt;
+		contractHistoryItemResponse.TerminationDate = contract.TerminationDate;
+		contractHistoryItemResponse.TerminationType = contract.TerminationType?.ToString();
 		contractHistoryItemResponse.IsMainTenant = flag2;
 		contractHistoryItemResponse.WasMainTenant = flag3;
 		contractHistoryItemResponse.IsFormerMainTenant = isFormerMainTenant;
@@ -804,6 +1051,41 @@ public class RentalContractService : IRentalContractService
 	private static void ResolveCurrentContractTerms(RentalContract contract)
 	{
 		ResolveContractTerms(contract, null);
+	}
+
+	private static (DateOnly StartDate, DateOnly EndDate) ResolveCurrentContractTermValues(RentalContract contract)
+	{
+		var startDate = contract.StartDate;
+		var endDate = contract.EndDate;
+		foreach (ContractAppendix appendix in GetActiveAppendicesInOrder(contract))
+		{
+			foreach (ContractAppendixChange change in appendix.Changes.OrderBy((ContractAppendixChange x) => x.SortOrder))
+			{
+				if (change.TargetType != ContractAppendixTargetType.Contract ||
+					change.ChangeType != ContractAppendixChangeType.Update ||
+					string.IsNullOrWhiteSpace(change.NewValue))
+				{
+					continue;
+				}
+				switch (NormalizeFieldName(change.FieldName))
+				{
+				case "startdate":
+					if (DateOnly.TryParse(change.NewValue, out var parsedStartDate))
+					{
+						startDate = parsedStartDate;
+					}
+					break;
+				case "enddate":
+					if (DateOnly.TryParse(change.NewValue, out var parsedEndDate))
+					{
+						endDate = parsedEndDate;
+					}
+					break;
+				}
+			}
+		}
+
+		return (startDate, endDate);
 	}
 
 	private static void ResolveContractTerms(RentalContract contract, ContractAppendix? boundaryAppendix)
@@ -1303,6 +1585,38 @@ public class RentalContractService : IRentalContractService
 		return reason.Trim();
 	}
 
+	private static void EnsureContractStartDateAllowsLandlordSignature(DateOnly startDate, DateTimeOffset now)
+	{
+		var today = DateOnly.FromDateTime(now.UtcDateTime);
+		var minimumStartDate = today.AddDays(LandlordSignatureMinimumStartOffsetDays);
+		if (startDate < minimumStartDate)
+		{
+			throw new BadRequestException(
+				"VALIDATION_ERROR",
+				"Ngày bắt đầu hợp đồng phải còn cách hôm nay ít nhất 2 ngày để người thuê có thời gian ký hợp đồng.");
+		}
+	}
+
+	private static void EnsureTenantCanSignBeforeStartDate(DateOnly startDate, DateOnly today)
+	{
+		if (today > startDate)
+		{
+			throw new BadRequestException(
+				"VALIDATION_ERROR",
+				"Hợp đồng đã quá ngày bắt đầu thuê nên không thể ký.");
+		}
+	}
+
+	private static void EnsureTenantSignatureDeadlineNotExpired(RentalContract contract, DateTimeOffset now)
+	{
+		if (contract.SignatureDeadlineAt.HasValue && contract.SignatureDeadlineAt.Value <= now)
+		{
+			throw new BadRequestException(
+				"VALIDATION_ERROR",
+				"Hợp đồng đã quá hạn ký. Vui lòng liên hệ chủ trọ để xử lý.");
+		}
+	}
+
 	private static string? MaskDocumentNumber(string? documentNumber)
 	{
 		if (string.IsNullOrWhiteSpace(documentNumber))
@@ -1320,6 +1634,11 @@ public class RentalContractService : IRentalContractService
 	private static string? NormalizeOptionalText(string? value)
 	{
 		return string.IsNullOrWhiteSpace(value) ? null : value.Trim();
+	}
+
+	private static ContractOccupantStatus ResolveMoveInStatus(DateOnly moveInDate, DateOnly today)
+	{
+		return moveInDate <= today ? ContractOccupantStatus.Active : ContractOccupantStatus.PendingMoveIn;
 	}
 
 	private static Guid GetCurrentMainTenantUserId(RentalContract contract)
@@ -1370,8 +1689,8 @@ public class RentalContractService : IRentalContractService
 	private static IEnumerable<ContractAppendix> GetActiveAppendicesInOrder(RentalContract contract)
 	{
 		return from x in contract.Appendices
-			where x.Status == ContractAppendixStatus.Active
-			orderby x.ActivatedAt ?? x.UpdatedAt, x.CreatedAt
+			where x.AppliedAt.HasValue && (x.Status == ContractAppendixStatus.Active || x.Status == ContractAppendixStatus.Cancelled)
+			orderby x.AppliedAt ?? x.ActivatedAt ?? x.UpdatedAt, x.CreatedAt
 			select x;
 	}
 

@@ -106,25 +106,7 @@ export function LandlordRentalRequestsPage() {
 
   if (loading) {
     return (
-      <div className="landlord-dashboard">
-        <aside className="dashboard-sidebar">
-          <h1>Chủ trọ</h1>
-          <button className="sidebar-item" onClick={() => navigate(ROUTE_PATHS.LANDLORD.DASHBOARD)}>
-            Quản lý khu trọ
-          </button>
-          <button className="sidebar-item active">
-            Yêu cầu thuê
-          </button>
-          <button className="sidebar-item" onClick={() => navigate(ROUTE_PATHS.LANDLORD.VIEWING_APPOINTMENTS)}>
-            Lịch hẹn xem phòng
-          </button>
-          <button className="sidebar-item" disabled style={{ opacity: 0.6, cursor: 'not-allowed' }}>
-            Quản lý doanh thu (sau này)
-          </button>
-          <button className="sidebar-item sidebar-back-btn" onClick={() => navigate(ROUTE_PATHS.ME.ROOT)}>
-            Quay lại trang chủ
-          </button>
-        </aside>
+      <div className="landlord-dashboard-page" style={{ display: 'contents' }}>
         <main className="dashboard-main">
           <div className="empty-panel">Đang tải yêu cầu thuê...</div>
         </main>
@@ -133,26 +115,7 @@ export function LandlordRentalRequestsPage() {
   }
 
   return (
-    <div className="landlord-dashboard landlord-dashboard-page">
-      <aside className="dashboard-sidebar">
-        <h1>Chủ trọ</h1>
-        <button className="sidebar-item" onClick={() => navigate(ROUTE_PATHS.LANDLORD.DASHBOARD)}>
-          Quản lý khu trọ
-        </button>
-        <button className="sidebar-item active">
-          Yêu cầu thuê
-        </button>
-        <button className="sidebar-item" onClick={() => navigate(ROUTE_PATHS.LANDLORD.VIEWING_APPOINTMENTS)}>
-          Lịch hẹn xem phòng
-        </button>
-        <button className="sidebar-item" disabled style={{ opacity: 0.6, cursor: 'not-allowed' }}>
-          Quản lý doanh thu (sau này)
-        </button>
-        <button className="sidebar-item sidebar-back-btn" onClick={() => navigate(ROUTE_PATHS.ME.ROOT)}>
-          Quay lại trang chủ
-        </button>
-      </aside>
-
+    <div className="landlord-dashboard-page" style={{ display: 'contents' }}>
       <main className="dashboard-main">
         <section className="overview-band">
           <div className="overview-left">

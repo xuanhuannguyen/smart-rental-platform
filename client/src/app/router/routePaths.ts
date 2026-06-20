@@ -22,6 +22,8 @@ export const ROUTE_PATHS = {
         RENTAL_REQUEST_DETAIL: (id: string) => `/account/rental-requests/${id}`,
         RENTAL_HISTORY: '/account/rental-history',
         RENTAL_HISTORY_DETAIL: (id: string) => `/account/rental-history/${id}`,
+        INVOICES: '/account/invoices',
+        INVOICE_DETAIL: (id: string) => `/account/invoices/${id}`,
         CONTRACT_SETUP: (id: string) => `/account/contracts/${id}/setup`
     },
     LANDLORD: {
@@ -33,7 +35,12 @@ export const ROUTE_PATHS = {
         ROOM_CREATE: (houseId: string) => `/landlord/rooming-houses/${houseId}/rooms/create`,
         VIEWING_APPOINTMENTS: '/landlord/viewing-appointments',
         RENTAL_REQUESTS: '/landlord/rental-requests',
-        RENTAL_REQUEST_DETAIL: (id: string) => `/landlord/rental-requests/${id}`
+        RENTAL_REQUEST_DETAIL: (id: string) => `/landlord/rental-requests/${id}`,
+        SERVICE_PRICES: (houseId: string) => `/landlord/rooming-houses/${houseId}/service-prices`,
+        INVOICES: '/landlord/invoices',
+        INVOICE_DETAIL: (id: string) => `/landlord/invoices/${id}`,
+        CONTRACTS: '/landlord/contracts',
+        CONTRACT_DETAIL: (id: string) => `/landlord/contracts/${id}`
     },
     TEST: {
         RENTAL_FLOW: '/test/rental-flow'

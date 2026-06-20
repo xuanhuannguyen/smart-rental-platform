@@ -402,8 +402,8 @@ public class ContractFileService : IContractFileService
         var currentMainTenantUserId = contract.MainTenantUserId;
 
         foreach (var appendix in contract.Appendices
-            .Where(x => x.Status == ContractAppendixStatus.Active)
-            .OrderBy(x => x.ActivatedAt ?? x.UpdatedAt)
+            .Where(x => x.Status == ContractAppendixStatus.Active && x.AppliedAt.HasValue)
+            .OrderBy(x => x.AppliedAt ?? x.ActivatedAt ?? x.UpdatedAt)
             .ThenBy(x => x.CreatedAt))
         {
             foreach (var change in appendix.Changes.OrderBy(x => x.SortOrder))
@@ -429,8 +429,8 @@ public class ContractFileService : IContractFileService
         var userIds = new HashSet<Guid> { contract.MainTenantUserId };
 
         foreach (var appendix in contract.Appendices
-            .Where(x => x.Status == ContractAppendixStatus.Active)
-            .OrderBy(x => x.ActivatedAt ?? x.UpdatedAt)
+            .Where(x => x.Status == ContractAppendixStatus.Active && x.AppliedAt.HasValue)
+            .OrderBy(x => x.AppliedAt ?? x.ActivatedAt ?? x.UpdatedAt)
             .ThenBy(x => x.CreatedAt))
         {
             foreach (var change in appendix.Changes.OrderBy(x => x.SortOrder))
@@ -470,8 +470,8 @@ public class ContractFileService : IContractFileService
         ContractAppendix targetAppendix)
     {
         return contract.Appendices
-            .Where(x => x.Status == ContractAppendixStatus.Active)
-            .OrderBy(x => x.ActivatedAt ?? x.UpdatedAt)
+            .Where(x => x.Status == ContractAppendixStatus.Active && x.AppliedAt.HasValue)
+            .OrderBy(x => x.AppliedAt ?? x.ActivatedAt ?? x.UpdatedAt)
             .ThenBy(x => x.CreatedAt)
             .Where(x => x.Id != targetAppendix.Id && x.CreatedAt <= targetAppendix.CreatedAt);
     }

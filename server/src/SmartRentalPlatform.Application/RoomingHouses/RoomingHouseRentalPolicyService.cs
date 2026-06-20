@@ -46,7 +46,7 @@ public class RoomingHouseRentalPolicyService : IRoomingHouseRentalPolicyService
         {
             throw new NotFoundException(
                 ErrorCodes.HouseNotFound,
-                "Khong tim thay khu tro.",
+                "Không tìm thấy khu trọ.",
                 new { roomingHouseId });
         }
 
@@ -54,7 +54,7 @@ public class RoomingHouseRentalPolicyService : IRoomingHouseRentalPolicyService
         {
             throw new ConflictException(
                 ErrorCodes.HouseNotApproved,
-                "Chi khu tro da duoc duyet moi co the cau hinh chinh sach thue.",
+                "Chỉ khu trọ đã được duyệt mới có thể cấu hình chính sách thuê.",
                 new { currentStatus = roomingHouse.ApprovalStatus.ToString() });
         }
 
@@ -97,7 +97,7 @@ public class RoomingHouseRentalPolicyService : IRoomingHouseRentalPolicyService
         {
             throw new BadRequestException(
                 ErrorCodes.RentalPolicyInvalid,
-                "So thang thue toi thieu phai lon hon 0.",
+                "Số tháng thuê tối thiểu phải lớn hơn 0.",
                 new { field = nameof(request.MinRentalMonths) });
         }
 
@@ -105,7 +105,7 @@ public class RoomingHouseRentalPolicyService : IRoomingHouseRentalPolicyService
         {
             throw new BadRequestException(
                 ErrorCodes.RentalPolicyInvalid,
-                "So thang thue toi da phai lon hon hoac bang so thang thue toi thieu.",
+                "Số tháng thuê tối đa phải lớn hơn hoặc bằng số tháng thuê tối thiểu.",
                 new { field = nameof(request.MaxRentalMonths) });
         }
 
@@ -113,7 +113,7 @@ public class RoomingHouseRentalPolicyService : IRoomingHouseRentalPolicyService
         {
             throw new BadRequestException(
                 ErrorCodes.RentalPolicyInvalid,
-                "So ngay bao truoc khi gia han phai lon hon hoac bang 0.",
+                "Số ngày báo trước khi gia hạn phải lớn hơn hoặc bằng 0.",
                 new { field = nameof(request.RenewalNoticeDays) });
         }
 
@@ -121,7 +121,7 @@ public class RoomingHouseRentalPolicyService : IRoomingHouseRentalPolicyService
         {
             throw new BadRequestException(
                 ErrorCodes.RentalPolicyInvalid,
-                "So thang tien thue dung de tinh tien coc phai lon hon hoac bang 0.",
+                "Số tháng tiền thuê dùng để tính tiền cọc phải lớn hơn hoặc bằng 0.",
                 new { field = nameof(request.DepositMonths) });
         }
 
@@ -129,7 +129,7 @@ public class RoomingHouseRentalPolicyService : IRoomingHouseRentalPolicyService
         {
             throw new BadRequestException(
                 ErrorCodes.RentalPolicyInvalid,
-                "Ngay thanh toan mac dinh phai nam trong khoang tu 1 den 28.",
+                "Ngày thanh toán mặc định phải nằm trong khoảng từ 1 đến 28.",
                 new { field = nameof(request.DefaultPaymentDay) });
         }
     }

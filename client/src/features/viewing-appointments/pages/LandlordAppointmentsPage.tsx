@@ -29,13 +29,13 @@ export default function LandlordAppointmentsPage() {
   const [landlordNote, setLandlordNote] = useState('');
   const [confirmDespiteConflict, setConfirmDespiteConflict] = useState(false);
   const [modalConflictLoading, setModalConflictLoading] = useState(false);
-  
+
   const [rejectingId, setRejectingId] = useState<string | null>(null);
   const [rejectReason, setRejectReason] = useState('');
-  
+
   const [cancellingId, setCancellingId] = useState<string | null>(null);
   const [cancelReason, setCancelReason] = useState('');
-  
+
   const [completingId, setCompletingId] = useState<string | null>(null);
 
   const [actionLoading, setActionLoading] = useState(false);
@@ -231,26 +231,7 @@ export default function LandlordAppointmentsPage() {
   };
 
   return (
-    <div className="landlord-dashboard landlord-dashboard-page landlord-appointments-page">
-      <aside className="dashboard-sidebar">
-        <h1>Chủ trọ</h1>
-        <button className="sidebar-item" onClick={() => navigate('/landlord/dashboard')}>
-          Quản lý khu trọ
-        </button>
-        <button className="sidebar-item" onClick={() => navigate('/landlord/rental-requests')}>
-          Yêu cầu thuê
-        </button>
-        <button className="sidebar-item active" onClick={() => navigate('/landlord/viewing-appointments')}>
-          Lịch hẹn xem phòng
-        </button>
-        <button className="sidebar-item" disabled style={{ opacity: 0.6, cursor: 'not-allowed' }}>
-          Quản lý doanh thu (sau này)
-        </button>
-        <button className="sidebar-item sidebar-back-btn" onClick={() => navigate('/home')}>
-          Quay lại trang chủ
-        </button>
-      </aside>
-
+    <div className="landlord-dashboard-page landlord-appointments-page" style={{ display: 'contents' }}>
       <main className="dashboard-main">
         <section className="overview-band">
           <div className="overview-left">
@@ -310,7 +291,7 @@ export default function LandlordAppointmentsPage() {
                     {item.tenantNote && <p className="note-text"><strong>Lời nhắn khách thuê:</strong> "{item.tenantNote}"</p>}
                     {item.landlordNote && <p className="note-text"><strong>Ghi chú phản hồi:</strong> "{item.landlordNote}"</p>}
                     {item.cancelReason && <p className="cancel-reason"><strong>Lý do hủy/từ chối:</strong> "{item.cancelReason}"</p>}
-                    
+
                     {/* Visual overlap check warning for Pending state */}
                     {item.status === 'Pending' && conflict?.hasConflict && (
                       <div className="conflict-warning-card">

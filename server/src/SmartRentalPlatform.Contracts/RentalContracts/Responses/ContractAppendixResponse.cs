@@ -16,6 +16,8 @@ public class ContractAppendixResponse
 
     public DateTimeOffset? ActivatedAt { get; set; }
 
+    public DateTimeOffset? AppliedAt { get; set; }
+
     public string? StatusReason { get; set; }
 
     public List<ContractAppendixChangeResponse> Changes { get; set; } = [];

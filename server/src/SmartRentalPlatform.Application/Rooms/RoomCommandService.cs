@@ -91,6 +91,7 @@ public class RoomCommandService : IRoomCommandService
         }
 
         roomAccessService.EnsureRoomingHouseApproved(room.RoomingHouse);
+        EnsureRoomCanEditBasicInfo(room);
         RoomValidationRules.ValidateRoomFields(
             request.RoomNumber,
             request.Floor,
@@ -134,5 +135,16 @@ public class RoomCommandService : IRoomCommandService
         await context.SaveChangesAsync(cancellationToken);
 
         return await roomQueryService.GetByIdAsync(landlordUserId, roomId, cancellationToken);
+    }
+
+    private static void EnsureRoomCanEditBasicInfo(Room room)
+    {
+        if (room.Status is RoomStatus.Reserved or RoomStatus.Occupied)
+        {
+            throw new ConflictException(
+                ErrorCodes.RoomInvalidStatus,
+                "Không thể chỉnh sửa thông tin phòng khi phòng đang được giữ chỗ hoặc đang có hợp đồng active.",
+                new { currentStatus = room.Status.ToString() });
+        }
     }
 }

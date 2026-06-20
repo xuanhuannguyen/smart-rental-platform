@@ -41,7 +41,7 @@ export function HomeHeader({ centerContent }: HomeHeaderProps) {
       const onboarding = await getMyRoomingHouseOnboarding();
 
       if (onboarding.canEnterLandlordDashboard) {
-        navigate(ROUTE_PATHS.LANDLORD.DASHBOARD);
+        navigate(ROUTE_PATHS.LANDLORD.ROOMING_HOUSES);
         return;
       }
 
@@ -87,7 +87,7 @@ export function HomeHeader({ centerContent }: HomeHeaderProps) {
                 Duyệt hồ sơ
               </Button>
             ) : isLandlord ? (
-              <Button type="button" variant="secondary" onClick={() => navigate(ROUTE_PATHS.LANDLORD.DASHBOARD)}>
+              <Button type="button" variant="secondary" onClick={() => navigate(ROUTE_PATHS.LANDLORD.ROOMING_HOUSES)}>
                 Kênh chủ trọ
               </Button>
             ) : (
@@ -132,6 +132,9 @@ export function HomeHeader({ centerContent }: HomeHeaderProps) {
                 </button>
                 <button className="dropdown-item" onClick={() => { setShowDropdown(false); navigate(ROUTE_PATHS.ACCOUNT.RENTAL_HISTORY); }}>
                   Lịch sử thuê phòng
+                </button>
+                <button className="dropdown-item" onClick={() => { setShowDropdown(false); navigate(ROUTE_PATHS.ACCOUNT.INVOICES); }}>
+                  Hóa đơn của tôi
                 </button>
                 {isAdmin && (
                   <button className="dropdown-item" onClick={() => { setShowDropdown(false); navigate(ROUTE_PATHS.ADMIN.APPROVALS); }}>

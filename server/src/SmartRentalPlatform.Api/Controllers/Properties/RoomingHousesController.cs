@@ -187,6 +187,23 @@ public class RoomingHousesController : ControllerBase
     }
 
     [Authorize]
+    [HttpPut("{id:guid}/visibility")]
+    public async Task<ActionResult<ApiResponse<RoomingHouseDetailResponse>>> UpdateVisibility(
+        Guid id,
+        UpdateRoomingHouseVisibilityRequest request,
+        CancellationToken cancellationToken)
+    {
+        var ownership = await EnsureOwnerAsync(id, cancellationToken);
+        if (ownership is not null)
+        {
+            return ownership;
+        }
+
+        var result = await roomingHouseDraftService.UpdateVisibilityAsync(id, request, cancellationToken);
+        return RoomingHouseDetailResult(result, "Cập nhật trạng thái hiển thị khu trọ thành công.");
+    }
+
+    [Authorize]
     [HttpPost("{id:guid}/submit")]
     public async Task<ActionResult<ApiResponse<RoomingHouseDetailResponse>>> Submit(
         Guid id,

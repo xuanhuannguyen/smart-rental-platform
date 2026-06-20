@@ -47,16 +47,20 @@ export const ENDPOINTS = {
     SUBMIT: (id: string) => `/api/rooming-houses/${id}/submit`
   },
   BILLING: {
+    SERVICE_TYPES: '/api/billing/service-types',
     SERVICE_PRICES: (roomingHouseId: string) => `/api/landlord/rooming-houses/${roomingHouseId}/service-prices`,
     ROOM_BILLING_CONTEXT: (roomId: string) => `/api/landlord/rooms/${roomId}/billing-context`,
-    METER_READINGS: '/api/landlord/meter-readings',
+    ROOM_INVOICE_PREVIEW: (roomId: string) => `/api/landlord/rooms/${roomId}/invoice-preview`,
+    TERMINATION_INVOICE_PREVIEW: (contractId: string) => `/api/landlord/contracts/${contractId}/termination-invoice-preview`,
+    CREATE_TERMINATION_INVOICE: (contractId: string) => `/api/landlord/contracts/${contractId}/termination-invoices`,
     LANDLORD_INVOICES: '/api/landlord/invoices',
-    GENERATE_DRAFT: '/api/landlord/invoices/generate-draft',
+    GENERATE_WITH_READINGS: '/api/landlord/invoices/generate-with-readings',
     LANDLORD_INVOICE: (id: string) => `/api/landlord/invoices/${id}`,
     ISSUE_INVOICE: (id: string) => `/api/landlord/invoices/${id}/issue`,
     CANCEL_INVOICE: (id: string) => `/api/landlord/invoices/${id}/cancel`,
     MY_INVOICES: '/api/me/invoices',
     MY_INVOICE: (id: string) => `/api/me/invoices/${id}`,
+    MY_CONTRACT_INVOICES: (contractId: string) => `/api/me/contracts/${contractId}/invoices`,
     PAY_INVOICE: (id: string) => `/api/me/invoices/${id}/pay`
   },
   PUBLIC: {
@@ -78,6 +82,7 @@ export const ENDPOINTS = {
   },
   CONTRACTS: {
     MY_HISTORY: '/api/contracts/my-history',
+    LANDLORD: '/api/contracts/landlord',
     BY_ID: (id: string) => `/api/contracts/${id}`,
     PREVIEW: (id: string) => `/api/contracts/${id}/preview`,
     PREVIEW_PDF: (id: string) => `/api/contracts/${id}/preview/pdf`,

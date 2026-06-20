@@ -1,6 +1,10 @@
+import type { MeterReadingInput } from '../billing/types';
+
 export interface ContractBriefResponse {
   id: string;
   status: string;
+  startDate: string;
+  endDate: string;
   signatureDeadlineAt?: string | null;
   activatedAt?: string | null;
   statusReason?: string | null;
@@ -73,7 +77,13 @@ export interface TerminateContractRequest {
   terminationDate?: string | null;
   damageFee: number;
   reason: string;
+  createFinalInvoice?: boolean;
+  finalInvoiceDiscountAmount?: number;
+  finalInvoiceNote?: string | null;
+  finalInvoiceMeterReadings?: MeterReadingInput[];
 }
+
+export type ContractTerminationType = 'NormalExpiration' | 'MutualAgreement' | 'TenantUnilateral' | 'LandlordUnilateral';
 
 export interface ContractOccupantDocumentResponse {
   id: string;
@@ -129,6 +139,9 @@ export interface ContractDetailResponse {
   roomSnapshot?: string | null;
   signatureDeadlineAt?: string | null;
   activatedAt?: string | null;
+  terminationDate?: string | null;
+  terminationType?: ContractTerminationType | null;
+  isAwaitingFinalInvoice: boolean;
   statusReason?: string | null;
   occupants: ContractOccupantResponse[];
   signatures: ContractSignatureResponse[];
@@ -156,6 +169,9 @@ export interface ContractHistoryItemResponse {
   statusReason?: string | null;
   signatureDeadlineAt?: string | null;
   activatedAt?: string | null;
+  terminationDate?: string | null;
+  terminationType?: ContractTerminationType | null;
+  isAwaitingFinalInvoice: boolean;
   isMainTenant: boolean;
   wasMainTenant: boolean;
   isFormerMainTenant: boolean;
@@ -219,6 +235,7 @@ export interface ContractAppendixResponse {
   status: string;
   createdByUserId: string;
   activatedAt?: string | null;
+  appliedAt?: string | null;
   statusReason?: string | null;
   changes: ContractAppendixChangeResponse[];
   signatures: ContractSignatureResponse[];

@@ -6,23 +6,30 @@ using SmartRentalPlatform.Contracts.RentalContracts.Responses;
 using SmartRentalPlatform.Contracts.RentalRequests.Requests;
 using SmartRentalPlatform.Contracts.RentalRequests.Responses;
 using SmartRentalPlatform.Domain.Entities.Rental;
+using SmartRentalPlatform.Domain.Enums.Billing;
 using SmartRentalPlatform.Domain.Enums.Properties;
 using SmartRentalPlatform.Domain.Enums.Rental;
+using SmartRentalPlatform.Domain.Enums.RentalContracts;
+using System.Text.Json;
 
 namespace SmartRentalPlatform.Application.RentalRequests;
 
 public class RentalRequestService : IRentalRequestService
 {
-    private static readonly RentalRequestStatus[] DuplicateBlockingStatuses =
-    [
-        RentalRequestStatus.Pending,
-        RentalRequestStatus.Accepted
-    ];
+    private const int TenantRequestMinimumStartOffsetDays = 3;
+    private const int LandlordApprovalMinimumStartOffsetDays = 2;
 
     private static readonly RoomDepositStatus[] ActiveDepositStatuses =
     [
         RoomDepositStatus.PendingPayment,
         RoomDepositStatus.Paid
+    ];
+
+    private static readonly RentalContractStatus[] TerminalContractStatuses =
+    [
+        RentalContractStatus.Cancelled,
+        RentalContractStatus.Expired,
+        RentalContractStatus.Rejected
     ];
 
     private readonly IAppDbContext context;
@@ -39,6 +46,7 @@ public class RentalRequestService : IRentalRequestService
         CancellationToken cancellationToken = default)
     {
         ValidateCreateRequest(request);
+        await EnsureTenantBillingEligibilityAsync(tenantUserId, cancellationToken);
 
         var room = await context.Rooms
             .Include(x => x.RoomingHouse)
@@ -61,7 +69,10 @@ public class RentalRequestService : IRentalRequestService
         var duplicateExists = await context.RentalRequests.AnyAsync(
             x => x.RoomId == roomId &&
                  x.TenantUserId == tenantUserId &&
-                 DuplicateBlockingStatuses.Contains(x.Status),
+                 (x.Status == RentalRequestStatus.Pending ||
+                  (x.Status == RentalRequestStatus.Accepted &&
+                   (x.RentalContract == null ||
+                    !TerminalContractStatuses.Contains(x.RentalContract.Status)))),
             cancellationToken);
 
         if (duplicateExists)
@@ -185,6 +196,7 @@ public class RentalRequestService : IRentalRequestService
 
             EnsureLandlordOwnsRequest(landlordUserId, rentalRequest);
             EnsureStatus(rentalRequest, RentalRequestStatus.Pending);
+            EnsureDesiredStartDateCanBeApproved(rentalRequest.DesiredStartDate);
 
             var room = await context.Rooms
                 .FromSqlInterpolated($"""
@@ -371,6 +383,8 @@ public class RentalRequestService : IRentalRequestService
         {
             Id = contract.Id,
             Status = contract.Status.ToString(),
+            StartDate = contract.StartDate,
+            EndDate = contract.EndDate,
             SignatureDeadlineAt = contract.SignatureDeadlineAt,
             ActivatedAt = contract.ActivatedAt,
             StatusReason = contract.StatusReason
@@ -411,11 +425,12 @@ public class RentalRequestService : IRentalRequestService
         }
 
         var today = DateOnly.FromDateTime(DateTime.UtcNow);
-        if (request.DesiredStartDate < today)
+        var minimumStartDate = today.AddDays(TenantRequestMinimumStartOffsetDays);
+        if (request.DesiredStartDate < minimumStartDate)
         {
             throw new BadRequestException(
                 ErrorCodes.RentalRequestInvalidDuration,
-                "Ngày bắt đầu thuê không được nằm trong quá khứ.");
+                "Ngày bắt đầu thuê phải cách hôm nay ít nhất 3 ngày để hai bên có thời gian hoàn tất hợp đồng.");
         }
 
         if (request.ExpectedEndDate <= request.DesiredStartDate)
@@ -447,6 +462,179 @@ public class RentalRequestService : IRentalRequestService
                     minRentalMonths,
                     maxRentalMonths
                 });
+        }
+    }
+
+    private async Task EnsureTenantBillingEligibilityAsync(
+        Guid tenantUserId,
+        CancellationToken cancellationToken)
+    {
+        bool hasOutstandingInvoice = await context.Invoices.AsNoTracking().AnyAsync(
+            x => x.TenantUserId == tenantUserId &&
+                 (x.Status == InvoiceStatus.Issued || x.Status == InvoiceStatus.Overdue),
+            cancellationToken);
+        if (hasOutstandingInvoice)
+        {
+            throw new ConflictException(
+                ErrorCodes.TenantOutstandingInvoice,
+                "Bạn cần thanh toán tất cả hóa đơn đã phát hành hoặc quá hạn trước khi gửi yêu cầu thuê mới.");
+        }
+
+        var pendingFinalInvoiceContracts = await context.RentalContracts.AsNoTracking()
+            .Where(contract =>
+                contract.Status == RentalContractStatus.Cancelled &&
+                contract.TerminationType == ContractTerminationType.TenantUnilateral &&
+                contract.TerminationDate.HasValue &&
+                contract.TerminationDate.Value >= contract.StartDate &&
+                !context.Invoices.Any(invoice =>
+                    invoice.ContractId == contract.Id &&
+                    invoice.BillingPeriodEnd == contract.TerminationDate.Value &&
+                    invoice.Status != InvoiceStatus.Cancelled))
+            .Select(contract => new
+            {
+                contract.Id,
+                contract.MainTenantUserId,
+                TerminationDate = contract.TerminationDate!.Value
+            })
+            .ToListAsync(cancellationToken);
+
+        var hasPendingFinalInvoice = false;
+        foreach (var contract in pendingFinalInvoiceContracts)
+        {
+            var effectiveMainTenantUserId = await ResolveEffectiveMainTenantUserIdAsync(
+                contract.Id,
+                contract.MainTenantUserId,
+                contract.TerminationDate,
+                cancellationToken);
+
+            if (effectiveMainTenantUserId == tenantUserId)
+            {
+                hasPendingFinalInvoice = true;
+                break;
+            }
+        }
+
+        if (hasPendingFinalInvoice)
+        {
+            throw new ConflictException(
+                ErrorCodes.TenantFinalInvoicePending,
+                "Hợp đồng vừa chấm dứt vẫn đang chờ chủ trọ tạo hóa đơn kỳ cuối.");
+        }
+    }
+
+    private async Task<Guid> ResolveEffectiveMainTenantUserIdAsync(
+        Guid contractId,
+        Guid currentContractTenantUserId,
+        DateOnly effectiveOn,
+        CancellationToken cancellationToken)
+    {
+        var tenantChanges = await context.ContractAppendixChanges
+            .AsNoTracking()
+            .Where(x => x.RentalContractAppendix.RentalContractId == contractId &&
+                        x.RentalContractAppendix.AppliedAt != null &&
+                        x.TargetType == ContractAppendixTargetType.Contract &&
+                        x.ChangeType == ContractAppendixChangeType.Update &&
+                        x.FieldName != null)
+            .Select(x => new
+            {
+                x.RentalContractAppendix.EffectiveDate,
+                x.SortOrder,
+                x.OldValue,
+                x.NewValue,
+                x.FieldName
+            })
+            .ToListAsync(cancellationToken);
+
+        var mainTenantChanges = tenantChanges
+            .Where(x => NormalizeAppendixFieldName(x.FieldName) == "maintenantuserid")
+            .OrderBy(x => x.EffectiveDate)
+            .ThenBy(x => x.SortOrder)
+            .ToList();
+
+        var effectiveTenantUserId = currentContractTenantUserId;
+        var latestAppliedChange = mainTenantChanges
+            .Where(x => x.EffectiveDate <= effectiveOn)
+            .OrderByDescending(x => x.EffectiveDate)
+            .ThenByDescending(x => x.SortOrder)
+            .FirstOrDefault();
+
+        if (latestAppliedChange is not null &&
+            TryExtractGuid(latestAppliedChange.NewValue, out var appliedTenantUserId))
+        {
+            effectiveTenantUserId = appliedTenantUserId;
+        }
+        else if (mainTenantChanges.Count > 0 &&
+                 effectiveOn < mainTenantChanges[0].EffectiveDate &&
+                 TryExtractGuid(mainTenantChanges[0].OldValue, out var oldTenantUserId))
+        {
+            effectiveTenantUserId = oldTenantUserId;
+        }
+
+        return effectiveTenantUserId;
+    }
+
+    private static string NormalizeAppendixFieldName(string? value)
+    {
+        return string.IsNullOrWhiteSpace(value)
+            ? string.Empty
+            : value.Trim().Replace("_", string.Empty).Replace("-", string.Empty).ToLowerInvariant();
+    }
+
+    private static bool TryExtractGuid(string? value, out Guid result)
+    {
+        result = Guid.Empty;
+        if (string.IsNullOrWhiteSpace(value))
+        {
+            return false;
+        }
+
+        var trimmed = value.Trim().Trim('"');
+        if (Guid.TryParse(trimmed, out result))
+        {
+            return true;
+        }
+
+        try
+        {
+            using var document = JsonDocument.Parse(value);
+            var root = document.RootElement;
+            if (root.ValueKind == JsonValueKind.String)
+            {
+                return Guid.TryParse(root.GetString(), out result);
+            }
+
+            if (root.ValueKind != JsonValueKind.Object)
+            {
+                return false;
+            }
+
+            foreach (var propertyName in new[] { "id", "userId", "tenantUserId", "mainTenantUserId", "value" })
+            {
+                if (root.TryGetProperty(propertyName, out var property) &&
+                    property.ValueKind == JsonValueKind.String &&
+                    Guid.TryParse(property.GetString(), out result))
+                {
+                    return true;
+                }
+            }
+        }
+        catch (JsonException)
+        {
+            return false;
+        }
+
+        return false;
+    }
+
+    private static void EnsureDesiredStartDateCanBeApproved(DateOnly desiredStartDate)
+    {
+        var today = DateOnly.FromDateTime(DateTime.UtcNow);
+        var minimumStartDate = today.AddDays(LandlordApprovalMinimumStartOffsetDays);
+        if (desiredStartDate < minimumStartDate)
+        {
+            throw new BadRequestException(
+                ErrorCodes.RentalRequestInvalidDuration,
+                "Ngày bắt đầu thuê phải còn cách hôm nay ít nhất 2 ngày để hai bên có thời gian hoàn tất hợp đồng.");
         }
     }
 

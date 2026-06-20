@@ -70,4 +70,6 @@ public interface IContractAppendixService
         Guid contractId,
         Guid appendixId,
         CancellationToken cancellationToken = default);
+
+    Task<int> ApplyDueAppendicesAsync(CancellationToken cancellationToken = default);
 }

@@ -2,28 +2,45 @@ import { apiClient } from '../../shared/api/apiClient';
 import type { ApiResponse } from '../../shared/api/apiResponse.types';
 import { ENDPOINTS } from '../../shared/api/endpoints';
 import type {
-  CreateMeterReadingRequest,
+  BillingServiceType,
+  CreateTerminationInvoiceRequest,
   CreateServicePriceRequest,
-  GenerateInvoiceDraftRequest,
+  GenerateInvoiceWithReadingsRequest,
   Invoice,
-  MeterReading,
   RoomBillingContext,
+  RoomInvoicePreview,
   ServicePrice
 } from './types';
 
 export const billingApi = {
-  getServicePrices(roomingHouseId: string) {
-    return apiClient<ApiResponse<ServicePrice[]>>(ENDPOINTS.BILLING.SERVICE_PRICES(roomingHouseId), {
+  getServiceTypes() {
+    return apiClient<ApiResponse<BillingServiceType[]>>(ENDPOINTS.BILLING.SERVICE_TYPES, {
       auth: true
     });
   },
 
-  createServicePrice(roomingHouseId: string, payload: CreateServicePriceRequest) {
-    return apiClient<ApiResponse<ServicePrice>>(ENDPOINTS.BILLING.SERVICE_PRICES(roomingHouseId), {
+  async getServicePrices(roomingHouseId: string) {
+    const response = await apiClient<ApiResponse<ServicePrice[]>>(ENDPOINTS.BILLING.SERVICE_PRICES(roomingHouseId), {
+      auth: true
+    });
+    response.data = response.data.map(normalizeServicePrice);
+    return response;
+  },
+
+  async createServicePrice(roomingHouseId: string, payload: CreateServicePriceRequest) {
+    const response = await apiClient<ApiResponse<ServicePrice>>(ENDPOINTS.BILLING.SERVICE_PRICES(roomingHouseId), {
       method: 'POST',
       auth: true,
-      body: payload
+      body: {
+        serviceTypeId: payload.serviceTypeId ?? payload.serviceCode,
+        pricingUnit: payload.pricingUnit ?? payload.billingMethod,
+        unitPrice: payload.unitPrice,
+        effectiveFrom: payload.effectiveFrom,
+        note: payload.note ?? null
+      }
     });
+    response.data = normalizeServicePrice(response.data);
+    return response;
   },
 
   getRoomBillingContext(roomId: string) {
@@ -32,29 +49,50 @@ export const billingApi = {
     });
   },
 
-  createMeterReading(payload: CreateMeterReadingRequest) {
-    return apiClient<ApiResponse<MeterReading>>(ENDPOINTS.BILLING.METER_READINGS, {
+  getRoomInvoicePreview(roomId: string, params: { billingPeriodStart: string; billingPeriodEnd?: string | null }) {
+    const query = new URLSearchParams();
+    query.set('billingPeriodStart', params.billingPeriodStart);
+    if (params.billingPeriodEnd) {
+      query.set('billingPeriodEnd', params.billingPeriodEnd);
+    }
+
+    return apiClient<ApiResponse<RoomInvoicePreview>>(`${ENDPOINTS.BILLING.ROOM_INVOICE_PREVIEW(roomId)}?${query.toString()}`, {
+      auth: true
+    });
+  },
+
+  getTerminationInvoicePreview(contractId: string) {
+    return apiClient<ApiResponse<RoomInvoicePreview>>(ENDPOINTS.BILLING.TERMINATION_INVOICE_PREVIEW(contractId), {
+      auth: true
+    });
+  },
+
+  createTerminationInvoice(contractId: string, payload: CreateTerminationInvoiceRequest) {
+    return apiClient<ApiResponse<Invoice>>(ENDPOINTS.BILLING.CREATE_TERMINATION_INVOICE(contractId), {
       method: 'POST',
       auth: true,
       body: payload
     });
   },
 
-  generateDraft(payload: GenerateInvoiceDraftRequest) {
-    return apiClient<ApiResponse<Invoice>>(ENDPOINTS.BILLING.GENERATE_DRAFT, {
+  generateWithReadings(payload: GenerateInvoiceWithReadingsRequest) {
+    return apiClient<ApiResponse<Invoice>>(ENDPOINTS.BILLING.GENERATE_WITH_READINGS, {
       method: 'POST',
       auth: true,
       body: payload
     });
   },
 
-  getLandlordInvoices(filters?: { status?: string; search?: string }) {
+  getLandlordInvoices(filters?: { status?: string; search?: string; contractId?: string }) {
     const params = new URLSearchParams();
     if (filters?.status) {
       params.set('status', filters.status);
     }
     if (filters?.search) {
       params.set('search', filters.search);
+    }
+    if (filters?.contractId) {
+      params.set('contractId', filters.contractId);
     }
 
     const query = params.toString();
@@ -96,6 +134,18 @@ export const billingApi = {
     });
   },
 
+  getMyContractInvoices(contractId: string, filters?: { status?: string }) {
+    const params = new URLSearchParams();
+    if (filters?.status) {
+      params.set('status', filters.status);
+    }
+
+    const query = params.toString();
+    return apiClient<ApiResponse<Invoice[]>>(`${ENDPOINTS.BILLING.MY_CONTRACT_INVOICES(contractId)}${query ? `?${query}` : ''}`, {
+      auth: true
+    });
+  },
+
   payInvoice(invoiceId: string) {
     return apiClient<ApiResponse<Invoice>>(ENDPOINTS.BILLING.PAY_INVOICE(invoiceId), {
       method: 'POST',
@@ -103,3 +153,12 @@ export const billingApi = {
     });
   }
 };
+
+function normalizeServicePrice(price: ServicePrice): ServicePrice {
+  return {
+    ...price,
+    serviceCode: price.serviceCode ?? price.serviceTypeId,
+    billingMethod: price.billingMethod ?? price.pricingUnit,
+    unitName: price.unitName ?? price.displayUnitName
+  };
+}

@@ -2,13 +2,13 @@ using Microsoft.EntityFrameworkCore;
 using SmartRentalPlatform.Application.Common.Interfaces;
 using SmartRentalPlatform.Domain.Entities.AdminApproval;
 using SmartRentalPlatform.Domain.Entities.Administrative;
-using SmartRentalPlatform.Domain.Entities.AdminApproval;
+
 using SmartRentalPlatform.Domain.Entities.Billing;
 using SmartRentalPlatform.Domain.Entities.RentalContracts;
 using SmartRentalPlatform.Domain.Entities.Properties;
 using SmartRentalPlatform.Domain.Entities.Rental;
 using SmartRentalPlatform.Domain.Entities.Users;
-using SmartRentalPlatform.Domain.Entities.Wallets;
+
 
 
 namespace SmartRentalPlatform.Infrastructure.Persistence;

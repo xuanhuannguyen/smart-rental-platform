@@ -15,14 +15,19 @@ import LandlordDashboardPage from '../../features/landlord/pages/LandlordDashboa
 import { LandlordRentalRequestsPage } from '../../features/landlord/pages/LandlordRentalRequestsPage';
 import RoomingHouseDetailPage from '../../features/landlord/pages/RoomingHouseDetailPage';
 import RoomDetailPage from '../../features/landlord/pages/RoomDetailPage';
+import LandlordBillingPage from '../../features/billing/pages/LandlordBillingPage';
+import { AccountTenantInvoicesPage } from '../../features/billing/pages/TenantInvoicesPage';
 import TenantAppointmentsPage from '../../features/viewing-appointments/pages/TenantAppointmentsPage';
 import LandlordAppointmentsPage from '../../features/viewing-appointments/pages/LandlordAppointmentsPage';
+import LandlordContractsPage from '../../features/contracts/pages/LandlordContractsPage';
+import LandlordContractDetailPage from '../../features/contracts/pages/LandlordContractDetailPage';
 import { AdminHomePage } from '../../features/admin/pages/AdminHomePage';
 import { OnboardingGuard } from './OnboardingGuard';
 import { ProtectedRoute } from './ProtectedRoute';
 import { RoleGuard } from './RoleGuard';
 import { ROUTE_PATHS } from './routePaths';
 import { AccountLayout } from '../../shared/components/layout/AccountLayout';
+import { LandlordLayout } from '../../shared/components/layout/LandlordLayout';
 import { ProfileInfoPage } from '../../features/profile/pages/ProfileInfoPage';
 import { SecurityPage } from '../../features/profile/pages/SecurityPage';
 import { TenantRentalRequestsPage } from '../../features/rental-requests/pages/TenantRentalRequestsPage';
@@ -115,6 +120,14 @@ export const router = createBrowserRouter([
                                 element: <TenantRentalHistoryDetailPage />
                             },
                             {
+                                path: ROUTE_PATHS.ACCOUNT.INVOICES,
+                                element: <AccountTenantInvoicesPage />
+                            },
+                            {
+                                path: '/account/invoices/:invoiceId',
+                                element: <AccountTenantInvoicesPage />
+                            },
+                            {
                                 path: ROUTE_PATHS.ACCOUNT.VIEWING_APPOINTMENTS,
                                 element: <TenantAppointmentsPage />
                             },
@@ -138,32 +151,62 @@ export const router = createBrowserRouter([
                         element: <CreateRoomingHousePage />
                     },
                     {
-                        path: ROUTE_PATHS.LANDLORD.DASHBOARD,
-                        element: <LandlordDashboardPage />
-                    },
-                    {
-                        path: ROUTE_PATHS.LANDLORD.ROOMING_HOUSES,
-                        element: <Navigate to={ROUTE_PATHS.LANDLORD.DASHBOARD} replace />
-                    },
-                    {
-                        path: '/landlord/rooming-houses/:id',
-                        element: <RoomingHouseDetailPage />
-                    },
-                    {
-                        path: '/landlord/rooming-houses/:id/rooms/:roomId',
-                        element: <RoomDetailPage />
-                    },
-                    {
-                        path: ROUTE_PATHS.LANDLORD.VIEWING_APPOINTMENTS,
-                        element: <LandlordAppointmentsPage />
-                    },
-                    {
-                        path: ROUTE_PATHS.LANDLORD.RENTAL_REQUESTS,
-                        element: <LandlordRentalRequestsPage />
-                    },
-                    {
-                        path: '/landlord/rental-requests/:id',
-                        element: <LandlordRentalRequestDetailPage />
+                        element: <LandlordLayout />,
+                        children: [
+                            {
+                                path: ROUTE_PATHS.LANDLORD.DASHBOARD,
+                                element: (
+                                    <div className="landlord-dashboard-page" style={{ display: 'contents' }}>
+                                        <main className="dashboard-main">
+                                            <div className="empty-panel">
+                                                <h2>Thống kê</h2>
+                                                <p>Tính năng thống kê đang được phát triển...</p>
+                                            </div>
+                                        </main>
+                                    </div>
+                                )
+                            },
+                            {
+                                path: ROUTE_PATHS.LANDLORD.ROOMING_HOUSES,
+                                element: <LandlordDashboardPage />
+                            },
+                            {
+                                path: '/landlord/rooming-houses/:id',
+                                element: <RoomingHouseDetailPage />
+                            },
+                            {
+                                path: '/landlord/rooming-houses/:id/rooms/:roomId',
+                                element: <RoomDetailPage />
+                            },
+                            {
+                                path: ROUTE_PATHS.LANDLORD.VIEWING_APPOINTMENTS,
+                                element: <LandlordAppointmentsPage />
+                            },
+                            {
+                                path: ROUTE_PATHS.LANDLORD.RENTAL_REQUESTS,
+                                element: <LandlordRentalRequestsPage />
+                            },
+                            {
+                                path: '/landlord/rental-requests/:id',
+                                element: <LandlordRentalRequestDetailPage />
+                            },
+                            {
+                                path: ROUTE_PATHS.LANDLORD.INVOICES,
+                                element: <LandlordBillingPage />
+                            },
+                            {
+                                path: '/landlord/invoices/:invoiceId',
+                                element: <LandlordBillingPage />
+                            },
+                            {
+                                path: ROUTE_PATHS.LANDLORD.CONTRACTS,
+                                element: <LandlordContractsPage />
+                            },
+                            {
+                                path: '/landlord/contracts/:id',
+                                element: <LandlordContractDetailPage />
+                            }
+                        ]
                     },
 
 

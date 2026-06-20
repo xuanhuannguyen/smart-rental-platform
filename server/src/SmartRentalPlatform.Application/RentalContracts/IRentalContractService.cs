@@ -9,6 +9,10 @@ public interface IRentalContractService
         Guid tenantUserId,
         CancellationToken cancellationToken = default);
 
+    Task<IReadOnlyCollection<ContractHistoryItemResponse>> GetLandlordContractsAsync(
+        Guid landlordUserId,
+        CancellationToken cancellationToken = default);
+
     Task<ContractDetailResponse?> GetByIdAsync(
         Guid userId,
         Guid contractId,
@@ -76,4 +80,6 @@ public interface IRentalContractService
         CancellationToken cancellationToken = default);
 
     Task<int> ExpireOverdueTenantSignaturesAsync(CancellationToken cancellationToken = default);
+
+    Task<int> ActivatePendingMoveInsAsync(CancellationToken cancellationToken = default);
 }

@@ -145,6 +145,17 @@ export async function updateRoomingHouseLegalDocument(
   return data.data;
 }
 
+export async function updateRoomingHouseVisibility(
+  id: string,
+  visibilityStatus: 'Visible' | 'Hidden'
+): Promise<RoomingHouseDetail> {
+  const data = await apiClient<ApiResponse<RoomingHouseDetail>>(
+    `/api/rooming-houses/${id}/visibility`,
+    { method: 'PUT', auth: true, body: { visibilityStatus } }
+  );
+  return data.data;
+}
+
 export async function getRoomingHouseRentalPolicy(id: string): Promise<RentalPolicy | null> {
   const data = await apiClient<ApiResponse<RentalPolicy | null>>(
     `/api/rooming-houses/${id}/rental-policy`,

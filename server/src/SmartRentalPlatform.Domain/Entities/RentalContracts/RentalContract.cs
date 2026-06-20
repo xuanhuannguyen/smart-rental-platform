@@ -37,6 +37,10 @@ namespace SmartRentalPlatform.Domain.Entities.RentalContracts
 
         public DateTimeOffset? ActivatedAt { get; set; }
 
+        public DateOnly? TerminationDate { get; set; }
+
+        public ContractTerminationType? TerminationType { get; set; }
+
         public string? StatusReason { get; set; }
 
         public DateTimeOffset CreatedAt { get; set; }

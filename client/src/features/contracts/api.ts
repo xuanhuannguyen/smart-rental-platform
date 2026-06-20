@@ -27,6 +27,12 @@ export const contractApi = {
       auth: true
     }),
 
+  getLandlordContracts: () =>
+    apiClient<ApiResponse<ContractHistoryItemResponse[]>>(ENDPOINTS.CONTRACTS.LANDLORD, {
+      method: 'GET',
+      auth: true
+    }),
+
   getContract: (id: string) =>
     apiClient<ApiResponse<ContractDetailResponse>>(ENDPOINTS.CONTRACTS.BY_ID(id), {
       method: 'GET',

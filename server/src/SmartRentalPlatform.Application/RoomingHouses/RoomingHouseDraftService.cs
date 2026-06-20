@@ -90,13 +90,6 @@ public class RoomingHouseDraftService : IRoomingHouseDraftService
         UpdateRoomingHouseRequest request,
         CancellationToken cancellationToken = default)
     {
-        ValidateRoomingHouseFields(request);
-        var addressDisplay = await BuildAddressDisplayAsync(
-            request.AddressLine,
-            request.ProvinceCode,
-            request.WardCode,
-            cancellationToken);
-
         var roomingHouse = await context.RoomingHouses
             .FirstOrDefaultAsync(x => x.Id == roomingHouseId && x.DeletedAt == null, cancellationToken);
 
@@ -106,16 +99,66 @@ public class RoomingHouseDraftService : IRoomingHouseDraftService
         }
 
         EnsureEditable(roomingHouse);
+        ValidateRoomingHouseFields(request);
+        EnsureAddressEditable(roomingHouse, request);
+
+        var addressDisplay = roomingHouse.ApprovalStatus == RoomingHouseApprovalStatus.Approved
+            ? roomingHouse.AddressDisplay
+            : await BuildAddressDisplayAsync(
+                request.AddressLine,
+                request.ProvinceCode,
+                request.WardCode,
+                cancellationToken);
 
         roomingHouse.Name = request.Name.Trim();
         roomingHouse.Description = request.Description;
-        roomingHouse.AddressLine = request.AddressLine.Trim();
-        roomingHouse.ProvinceCode = request.ProvinceCode.Trim();
-        roomingHouse.WardCode = request.WardCode.Trim();
+        if (roomingHouse.ApprovalStatus != RoomingHouseApprovalStatus.Approved)
+        {
+            roomingHouse.AddressLine = request.AddressLine.Trim();
+            roomingHouse.ProvinceCode = request.ProvinceCode.Trim();
+            roomingHouse.WardCode = request.WardCode.Trim();
+        }
         roomingHouse.AddressDisplay = addressDisplay;
         roomingHouse.Latitude = request.Latitude;
         roomingHouse.Longitude = request.Longitude;
         roomingHouse.GoogleMapUrl = NormalizeOptionalUrl(request.GoogleMapUrl);
+        roomingHouse.UpdatedAt = DateTimeOffset.UtcNow;
+
+        await context.SaveChangesAsync(cancellationToken);
+
+        return await queryService.GetByIdAsync(roomingHouseId, cancellationToken);
+    }
+
+    public async Task<RoomingHouseDetailResponse?> UpdateVisibilityAsync(
+        Guid roomingHouseId,
+        UpdateRoomingHouseVisibilityRequest request,
+        CancellationToken cancellationToken = default)
+    {
+        var roomingHouse = await context.RoomingHouses
+            .FirstOrDefaultAsync(x => x.Id == roomingHouseId && x.DeletedAt == null, cancellationToken);
+
+        if (roomingHouse is null)
+        {
+            return null;
+        }
+
+        if (roomingHouse.ApprovalStatus != RoomingHouseApprovalStatus.Approved)
+        {
+            throw new ConflictException(
+                ErrorCodes.HouseInvalidStatus,
+                "Chỉ khu trọ đã được duyệt mới có thể bật/tắt hiển thị.",
+                new { currentStatus = roomingHouse.ApprovalStatus.ToString() });
+        }
+
+        if (!Enum.TryParse<RoomingHouseVisibilityStatus>(request.VisibilityStatus, ignoreCase: true, out var visibilityStatus))
+        {
+            throw new BadRequestException(
+                ErrorCodes.ValidationError,
+                "Trạng thái hiển thị khu trọ không hợp lệ.",
+                new { field = nameof(request.VisibilityStatus) });
+        }
+
+        roomingHouse.VisibilityStatus = visibilityStatus;
         roomingHouse.UpdatedAt = DateTimeOffset.UtcNow;
 
         await context.SaveChangesAsync(cancellationToken);
@@ -203,6 +246,32 @@ public class RoomingHouseDraftService : IRoomingHouseDraftService
     private static string? NormalizeOptionalUrl(string? value)
     {
         return string.IsNullOrWhiteSpace(value) ? null : value.Trim();
+    }
+
+    private static void EnsureAddressEditable(RoomingHouse roomingHouse, RoomingHouseBasicInfoRequest request)
+    {
+        if (roomingHouse.ApprovalStatus != RoomingHouseApprovalStatus.Approved)
+        {
+            return;
+        }
+
+        var addressChanged =
+            !string.Equals(roomingHouse.AddressLine.Trim(), request.AddressLine.Trim(), StringComparison.Ordinal) ||
+            !string.Equals(roomingHouse.ProvinceCode.Trim(), request.ProvinceCode.Trim(), StringComparison.Ordinal) ||
+            !string.Equals(roomingHouse.WardCode.Trim(), request.WardCode.Trim(), StringComparison.Ordinal);
+
+        if (!addressChanged)
+        {
+            return;
+        }
+
+        throw new ConflictException(
+            ErrorCodes.HouseInvalidStatus,
+            "Không thể chỉnh sửa địa chỉ hành chính của khu trọ đã được duyệt.",
+            new
+            {
+                fields = new[] { nameof(request.AddressLine), nameof(request.ProvinceCode), nameof(request.WardCode) }
+            });
     }
 
     private static void EnsureEditable(RoomingHouse roomingHouse)

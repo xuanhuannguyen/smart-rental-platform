@@ -23,9 +23,10 @@ public class InvoicePaymentConfiguration : IEntityTypeConfiguration<InvoicePayme
         builder.Property(x => x.PaidAt).HasColumnName("paid_at").IsRequired();
         builder.Property(x => x.CreatedAt).HasColumnName("created_at").IsRequired();
 
+        builder.HasIndex(x => x.InvoiceId).IsUnique();
         builder.HasIndex(x => x.WalletTransferGroupId).IsUnique();
 
-        builder.HasOne(x => x.Invoice).WithMany(x => x.Payments).HasForeignKey(x => x.InvoiceId).OnDelete(DeleteBehavior.Restrict);
+        builder.HasOne(x => x.Invoice).WithOne(x => x.Payment).HasForeignKey<InvoicePayment>(x => x.InvoiceId).OnDelete(DeleteBehavior.Restrict);
         builder.HasOne(x => x.Tenant).WithMany().HasForeignKey(x => x.TenantUserId).OnDelete(DeleteBehavior.Restrict);
         builder.HasOne(x => x.Landlord).WithMany().HasForeignKey(x => x.LandlordUserId).OnDelete(DeleteBehavior.Restrict);
     }

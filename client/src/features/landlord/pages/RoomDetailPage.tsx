@@ -1,4 +1,4 @@
-import { useState, useEffect, type FormEvent } from 'react';
+import { useState, useEffect, useMemo, type FormEvent } from 'react';
 import { useParams, useNavigate, useLocation } from 'react-router-dom';
 import { useAuth } from '../../../app/providers/AuthProvider';
 import { ROUTE_PATHS } from '../../../app/router/routePaths';
@@ -17,6 +17,7 @@ import {
   updateRoomPriceTiers,
   getActiveContractByRoomId,
   getActiveTenantsByRoomId,
+  updateRoomStatus,
 } from '../../rooms/api';
 import type { RoomingHouseDetail } from '../../rooming-houses/types';
 import type { Room, CreateRoomRequest, RoomPriceTierRequest } from '../../rooms/types';
@@ -34,7 +35,20 @@ import { cleanImages, toImageRequests } from '../../rooming-houses/utils/imageRe
 import { formatDateVi, formatMoneyString, parseMoneyString } from '../../../shared/utils/format';
 import { TerminateContractModal } from '../../rental-history/pages/TerminateContractModal';
 import { AppendixPreviewModal } from '../../rental-history/components/AppendixPreviewModal';
+import { billingApi } from '../../billing/api';
+import type {
+  FixedServicePreview,
+  Invoice,
+  MeteredServicePreview,
+  MeterReadingInput,
+  PricingUnit,
+  RoomBillingContext,
+  RoomInvoicePreview,
+  ServicePrice
+} from '../../billing/types';
 import '../../rental-history/pages/TenantRentalHistoryDetailPage.css';
+import '../../billing/pages/BillingPages.css';
+import './RoomingHouseDetailPage.css';
 
 type RoomTab = 'basic' | 'images' | 'amenities' | 'price';
 type RoomMainTab = 'room-info' | 'tenants' | 'contracts' | 'invoices';
@@ -86,6 +100,9 @@ export default function RoomDetailPage() {
   const [isAppendixModalOpen, setIsAppendixModalOpen] = useState(false);
   const [editingAppendix, setEditingAppendix] = useState<ContractAppendixResponse | null>(null);
   const [signingAppendixId, setSigningAppendixId] = useState<string | null>(null);
+  const [contractInvoices, setContractInvoices] = useState<Invoice[]>([]);
+  const [invoiceTabLoading, setInvoiceTabLoading] = useState(false);
+  const [isCreateInvoiceModalOpen, setIsCreateInvoiceModalOpen] = useState(false);
 
   useEffect(() => {
     if (!id) return;
@@ -95,12 +112,13 @@ export default function RoomDetailPage() {
   useEffect(() => {
     if (!roomId || !selectedRoom) return;
 
-    if (mainTab !== 'tenants' && mainTab !== 'contracts') return;
+    if (mainTab !== 'tenants' && mainTab !== 'contracts' && mainTab !== 'invoices') return;
 
     if (selectedRoom.status !== 'Occupied') {
       setActiveContract(null);
       setActiveTenants([]);
       setAppendices(null);
+      setContractInvoices([]);
       return;
     }
 
@@ -127,11 +145,20 @@ export default function RoomDetailPage() {
 
         if (isCancelled) return;
         setActiveContract(contract);
+        if (mainTab === 'invoices') {
+          await Promise.all([
+            loadContractInvoices(contract.id),
+            refreshAppendices(contract.id),
+          ]);
+          return;
+        }
+
         await refreshAppendices(contract.id);
       } catch (err) {
         if (isCancelled) return;
         setActiveContract(null);
         setActiveTenants([]);
+        setContractInvoices([]);
         setAppendices([]);
         setAppendicesError(getApiErrorMessage(err, 'Không thể tải danh sách phụ lục.'));
         setMessage(getApiErrorMessage(err, 'Không thể tải dữ liệu hợp đồng đang active của phòng.'));
@@ -154,7 +181,7 @@ export default function RoomDetailPage() {
     setMessage('');
     try {
       const houseData = await getRoomingHouseDetail(id!);
-      
+
       if (houseData.approvalStatus !== 'Approved') {
         setMessage('Khu trọ này chưa được quản trị viên phê duyệt. Không thể truy cập quản lý phòng.');
         setHouse(null);
@@ -176,7 +203,7 @@ export default function RoomDetailPage() {
       if (roomId) {
         const roomDetail = await getRoomDetail(roomId);
         setSelectedRoom(roomDetail);
-        
+
         setRoomForm({
           roomNumber: roomDetail.roomNumber,
           floor: roomDetail.floor,
@@ -202,8 +229,25 @@ export default function RoomDetailPage() {
     }
   }
 
+  async function loadContractInvoices(contractId: string) {
+    setInvoiceTabLoading(true);
+    try {
+      const response = await billingApi.getLandlordInvoices({ contractId });
+      setContractInvoices(response.data);
+    } catch (err) {
+      setContractInvoices([]);
+      setMessage(getApiErrorMessage(err, 'Không thể tải danh sách hóa đơn của hợp đồng.'));
+    } finally {
+      setInvoiceTabLoading(false);
+    }
+  }
+
   async function handleSaveRoomBasic() {
     if (!house) return;
+    if (isRoomEditLocked(selectedRoom)) {
+      setMessage('Không thể chỉnh sửa thông tin phòng khi phòng đang được giữ chỗ hoặc đang được thuê.');
+      return;
+    }
     setActionLoading(true);
     setMessage('');
     try {
@@ -253,6 +297,10 @@ export default function RoomDetailPage() {
 
   async function handleSaveRoomPrice() {
     if (!selectedRoom) return;
+    if (isRoomEditLocked(selectedRoom)) {
+      setMessage('Không thể chỉnh sửa bảng giá phòng khi phòng đang được giữ chỗ hoặc đang được thuê.');
+      return;
+    }
     setActionLoading(true);
     setMessage('');
     try {
@@ -277,6 +325,25 @@ export default function RoomDetailPage() {
       setMessage('Phòng đã được hiển thị hoạt động và sẵn sàng cho thuê.');
     } catch (err) {
       setMessage(getApiErrorMessage(err, 'Không thể hiển thị hoạt động phòng.'));
+    } finally {
+      setActionLoading(false);
+    }
+  }
+
+  async function handleToggleRoomMaintenance() {
+    if (!selectedRoom) return;
+
+    const nextStatus = selectedRoom.status === 'Available' ? 'Maintenance' : 'Available';
+    setActionLoading(true);
+    setMessage('');
+    try {
+      const updated = await updateRoomStatus(selectedRoom.id, nextStatus);
+      setSelectedRoom(updated);
+      setMessage(nextStatus === 'Maintenance'
+        ? 'Phòng đã được tạm ngưng hiển thị.'
+        : 'Phòng đã được mở lại và có thể nhận thuê.');
+    } catch (err) {
+      setMessage(getApiErrorMessage(err, 'Không thể cập nhật trạng thái phòng.'));
     } finally {
       setActionLoading(false);
     }
@@ -338,13 +405,12 @@ export default function RoomDetailPage() {
   }) ?? null;
 
   const hasBlockingAppendix = appendices?.some(isBlockingAppendix) ?? false;
+  const roomEditLocked = isRoomEditLocked(selectedRoom);
+  const canToggleRoomMaintenance = selectedRoom?.status === 'Available' || selectedRoom?.status === 'Maintenance';
 
   if (loading) {
     return (
-      <div className="landlord-dashboard">
-        <aside className="dashboard-sidebar">
-          <h1>Chủ trọ</h1>
-        </aside>
+      <div className="rooming-house-detail-page" style={{ display: 'contents' }}>
         <main className="dashboard-main">
           <div className="empty-panel">Đang tải thông tin phòng...</div>
         </main>
@@ -354,10 +420,7 @@ export default function RoomDetailPage() {
 
   if (!house || !selectedRoom) {
     return (
-      <div className="landlord-dashboard">
-        <aside className="dashboard-sidebar">
-          <h1>Chủ trọ</h1>
-        </aside>
+      <div className="rooming-house-detail-page" style={{ display: 'contents' }}>
         <main className="dashboard-main">
           <div className="empty-panel">
             <h2>Lỗi truy cập</h2>
@@ -372,35 +435,7 @@ export default function RoomDetailPage() {
   }
 
   return (
-    <div className="landlord-dashboard rooming-house-detail-page">
-      <aside className="dashboard-sidebar">
-        <h1>Chủ trọ</h1>
-        <button
-          className="sidebar-item active"
-          onClick={() => navigate(ROUTE_PATHS.LANDLORD.DASHBOARD)}
-        >
-          Quản lý khu trọ
-        </button>
-        <button
-          className="sidebar-item"
-          onClick={() => navigate(ROUTE_PATHS.LANDLORD.RENTAL_REQUESTS)}
-        >
-          Yêu cầu thuê
-        </button>
-        <button
-          className="sidebar-item"
-          onClick={() => navigate(ROUTE_PATHS.LANDLORD.VIEWING_APPOINTMENTS)}
-        >
-          Lịch hẹn xem phòng
-        </button>
-        <button className="sidebar-item" disabled style={{ opacity: 0.6, cursor: 'not-allowed' }}>
-          Quản lý doanh thu (Sau này)
-        </button>
-        <button className="sidebar-item sidebar-back-btn" onClick={() => navigate(ROUTE_PATHS.ME.ROOT)}>
-          ← Quay lại trang chủ
-        </button>
-      </aside>
-
+    <div className="rooming-house-detail-page" style={{ display: 'contents' }}>
       <main className="dashboard-main">
         <section className="overview-band">
           <div className="overview-header-title-area">
@@ -425,46 +460,56 @@ export default function RoomDetailPage() {
               </p>
             </div>
           </div>
-          
+
           <div className="overview-right">
-            <div className="overview-stats" style={{ display: 'flex', justifyContent: 'flex-end', marginBottom: '12px' }}>
+            <div className="overview-stats" style={{ display: 'flex', justifyContent: 'flex-end', alignItems: 'center', gap: '8px', marginBottom: '12px' }}>
               <span className={`status-pill ${getStatusToneClass(selectedRoom.status)}`} style={{ padding: '8px 16px', fontSize: '15px', fontWeight: 'bold', border: '1px solid currentColor' }}>
                 {formatStatus(selectedRoom.status)}
               </span>
-          </div>
+              {canToggleRoomMaintenance && (
+                <Button
+                  type="button"
+                  variant="outline"
+                  onClick={handleToggleRoomMaintenance}
+                  disabled={actionLoading}
+                >
+                  {selectedRoom.status === 'Available' ? 'Tạm ngưng' : 'Mở lại phòng'}
+                </Button>
+              )}
+            </div>
 
-          <div className="main-tabs" style={{ marginTop: '20px' }}>
-            <button
-              className={`tab-btn ${mainTab === 'room-info' ? 'active' : ''}`}
-              onClick={() => setMainTab('room-info')}
-            >
-              Thông tin phòng
-            </button>
-            <button
-              className={`tab-btn ${mainTab === 'tenants' ? 'active' : ''}`}
-              onClick={() => setMainTab('tenants')}
-              disabled={selectedRoom.status !== 'Occupied'}
-              title={selectedRoom.status !== 'Occupied' ? 'Phòng phải ở trạng thái Đang cho thuê mới có thể quản lý người ở' : ''}
-            >
-              Người ở
-            </button>
-            <button
-              className={`tab-btn ${mainTab === 'contracts' ? 'active' : ''}`}
-              onClick={() => setMainTab('contracts')}
-              disabled={selectedRoom.status !== 'Occupied'}
-              title={selectedRoom.status !== 'Occupied' ? 'Phòng phải ở trạng thái Đang cho thuê mới có hợp đồng active' : ''}
-            >
-              Hợp đồng
-            </button>
-            <button
-              className={`tab-btn ${mainTab === 'invoices' ? 'active' : ''}`}
-              onClick={() => setMainTab('invoices')}
-              disabled={selectedRoom.status !== 'Occupied'}
-              title={selectedRoom.status !== 'Occupied' ? 'Phòng phải ở trạng thái Đang cho thuê mới có thể quản lý hóa đơn' : ''}
-            >
-              Hóa đơn
-            </button>
-          </div>
+            <div className="tabs" style={{ display: 'flex', alignItems: 'center', marginTop: '20px', marginBottom: 0 }}>
+              <button
+                className={mainTab === 'room-info' ? 'active' : ''}
+                onClick={() => setMainTab('room-info')}
+              >
+                Thông tin phòng
+              </button>
+              <button
+                className={mainTab === 'tenants' ? 'active' : ''}
+                onClick={() => setMainTab('tenants')}
+                disabled={selectedRoom.status !== 'Occupied'}
+                title={selectedRoom.status !== 'Occupied' ? 'Phòng phải ở trạng thái Đang cho thuê mới có thể quản lý người ở' : ''}
+              >
+                Người ở
+              </button>
+              <button
+                className={mainTab === 'contracts' ? 'active' : ''}
+                onClick={() => setMainTab('contracts')}
+                disabled={selectedRoom.status !== 'Occupied'}
+                title={selectedRoom.status !== 'Occupied' ? 'Phòng phải ở trạng thái Đang cho thuê mới có hợp đồng active' : ''}
+              >
+                Hợp đồng
+              </button>
+              <button
+                className={mainTab === 'invoices' ? 'active' : ''}
+                onClick={() => setMainTab('invoices')}
+                disabled={selectedRoom.status !== 'Occupied'}
+                title={selectedRoom.status !== 'Occupied' ? 'Phòng phải ở trạng thái Đang cho thuê mới có thể quản lý hóa đơn' : ''}
+              >
+                Hóa đơn
+              </button>
+            </div>
           </div>
         </section>
 
@@ -505,98 +550,116 @@ export default function RoomDetailPage() {
               )}
             </div>
 
-          {/* ROOM TAB 1: THÔNG TIN CƠ BẢN PHÒNG */}
-          {roomActiveTab === 'basic' && (
-            <div className="form-grid">
-              <label className="field">
-                <span>Số phòng / Tên phòng</span>
-                <input value={roomForm.roomNumber} onChange={e => setRoomForm({ ...roomForm, roomNumber: e.target.value })} />
-              </label>
+            {/* ROOM TAB 1: THÔNG TIN CƠ BẢN PHÒNG */}
+            {roomActiveTab === 'basic' && (
+              <div className="form-grid">
+                {roomEditLocked && (
+                  <div className="empty-panel compact" style={{ gridColumn: '1 / -1' }}>
+                    Không thể chỉnh sửa thông tin cơ bản khi phòng đang được giữ chỗ hoặc đang được thuê.
+                  </div>
+                )}
+                <label className="field">
+                  <span>Số phòng / Tên phòng</span>
+                  <input disabled={roomEditLocked} value={roomForm.roomNumber} onChange={e => setRoomForm({ ...roomForm, roomNumber: e.target.value })} />
+                </label>
 
-              <label className="field">
-                <span>Tầng</span>
-                <input
-                  type="number"
-                  value={roomForm.floor}
-                  onChange={e => setRoomForm({ ...roomForm, floor: Number(e.target.value) || 1 })}
-                />
-              </label>
+                <label className="field">
+                  <span>Tầng</span>
+                  <input
+                    type="number"
+                    disabled={roomEditLocked}
+                    value={roomForm.floor}
+                    onChange={e => setRoomForm({ ...roomForm, floor: Number(e.target.value) || 1 })}
+                  />
+                </label>
 
-              <label className="field">
-                <span>Diện tích (m²)</span>
-                <input
-                  type="number"
-                  value={roomForm.areaM2 ?? ''}
-                  onChange={e => setRoomForm({ ...roomForm, areaM2: e.target.value === '' ? null : Number(e.target.value) })}
-                />
-              </label>
+                <label className="field">
+                  <span>Diện tích (m²)</span>
+                  <input
+                    type="number"
+                    disabled={roomEditLocked}
+                    value={roomForm.areaM2 ?? ''}
+                    onChange={e => setRoomForm({ ...roomForm, areaM2: e.target.value === '' ? null : Number(e.target.value) })}
+                  />
+                </label>
 
-              <label className="field">
-                <span>Số khách tối đa</span>
-                <input
-                  type="number"
-                  value={roomForm.maxOccupants}
-                  onChange={e => setRoomForm({ ...roomForm, maxOccupants: Number(e.target.value) || 1 })}
-                />
-              </label>
+                <label className="field">
+                  <span>Số khách tối đa</span>
+                  <input
+                    type="number"
+                    disabled={roomEditLocked}
+                    value={roomForm.maxOccupants}
+                    onChange={e => setRoomForm({ ...roomForm, maxOccupants: Number(e.target.value) || 1 })}
+                  />
+                </label>
 
-              <label className="field checkbox-field" style={{ gridColumn: '1 / -1', display: 'flex', alignItems: 'center', gap: '8px', marginTop: '8px' }}>
-                <input
-                  type="checkbox"
-                  checked={roomForm.isTieredPricing}
-                  onChange={e => setRoomForm({ ...roomForm, isTieredPricing: e.target.checked })}
-                  style={{ width: '18px', height: '18px', margin: 0, cursor: 'pointer' }}
-                />
-                <span style={{ fontSize: '14px', fontWeight: 600, color: '#475569' }}>
-                  Áp dụng giá thuê theo số lượng người ở (bảng giá thay đổi)
-                </span>
-              </label>
+                <label className="field checkbox-field" style={{ gridColumn: '1 / -1', display: 'flex', alignItems: 'center', gap: '8px', marginTop: '8px' }}>
+                  <input
+                    type="checkbox"
+                    disabled={roomEditLocked}
+                    checked={roomForm.isTieredPricing}
+                    onChange={e => setRoomForm({ ...roomForm, isTieredPricing: e.target.checked })}
+                    style={{ width: '18px', height: '18px', margin: 0, cursor: 'pointer' }}
+                  />
+                  <span style={{ fontSize: '14px', fontWeight: 600, color: '#475569' }}>
+                    Áp dụng giá thuê theo số lượng người ở (bảng giá thay đổi)
+                  </span>
+                </label>
 
-              <label className="field" style={{ gridColumn: '1 / -1' }}>
-                <span>Mô tả phòng</span>
-                <textarea
-                  style={{ width: '100%', minHeight: '80px', padding: '10px', border: '1px solid #cbd5e1', borderRadius: '6px', font: 'inherit' }}
-                  value={roomForm.description ?? ''}
-                  onChange={e => setRoomForm({ ...roomForm, description: e.target.value })}
-                />
-              </label>
+                <label className="field" style={{ gridColumn: '1 / -1' }}>
+                  <span>Mô tả phòng</span>
+                  <textarea
+                    style={{ width: '100%', minHeight: '80px', padding: '10px', border: '1px solid #cbd5e1', borderRadius: '6px', font: 'inherit' }}
+                    disabled={roomEditLocked}
+                    value={roomForm.description ?? ''}
+                    onChange={e => setRoomForm({ ...roomForm, description: e.target.value })}
+                  />
+                </label>
 
-              <div className="save-row">
-                <button className="primary-action" onClick={handleSaveRoomBasic}>Lưu thông tin</button>
+                <div className="save-row">
+                  <button className="primary-action" onClick={handleSaveRoomBasic} disabled={roomEditLocked || actionLoading}>Lưu thông tin</button>
+                </div>
               </div>
-            </div>
-          )}
+            )}
 
-          {/* ROOM TAB 2: ẢNH PHÒNG */}
-          {roomActiveTab === 'images' && selectedRoom && (
-            <PropertyImageEditor
-              images={roomImages}
-              scope="Room"
-              onChange={setRoomImages}
-              onSave={handleSaveRoomImages}
-            />
-          )}
+            {/* ROOM TAB 2: ẢNH PHÒNG */}
+            {roomActiveTab === 'images' && selectedRoom && (
+              <PropertyImageEditor
+                images={roomImages}
+                scope="Room"
+                onChange={setRoomImages}
+                onSave={handleSaveRoomImages}
+              />
+            )}
 
-          {/* ROOM TAB 3: TIỆN NGHI PHÒNG */}
-          {roomActiveTab === 'amenities' && selectedRoom && (
-            <AmenityEditor
-              amenities={roomAmenities}
-              selectedIds={roomAmenityIds}
-              onChange={setRoomAmenityIds}
-              onSave={handleSaveRoomAmenities}
-            />
-          )}
+            {/* ROOM TAB 3: TIỆN NGHI PHÒNG */}
+            {roomActiveTab === 'amenities' && selectedRoom && (
+              <AmenityEditor
+                amenities={roomAmenities}
+                selectedIds={roomAmenityIds}
+                onChange={setRoomAmenityIds}
+                onSave={handleSaveRoomAmenities}
+              />
+            )}
 
             {/* ROOM TAB 4: BẢNG GIÁ PHÒNG */}
             {roomActiveTab === 'price' && selectedRoom && (
-              <PriceTierEditor
-                priceTiers={priceTiers}
-                isTieredPricing={selectedRoom.isTieredPricing}
-                maxOccupants={selectedRoom.maxOccupants}
-                onChange={setPriceTiers}
-                onSave={handleSaveRoomPrice}
-                depositMonths={house?.rentalPolicy?.depositMonths}
-              />
+              <>
+                {roomEditLocked && (
+                  <div className="empty-panel compact" style={{ marginBottom: '16px' }}>
+                    Không thể chỉnh sửa bảng giá phòng khi phòng đang được giữ chỗ hoặc đang được thuê.
+                  </div>
+                )}
+                <PriceTierEditor
+                  priceTiers={priceTiers}
+                  isTieredPricing={selectedRoom.isTieredPricing}
+                  maxOccupants={selectedRoom.maxOccupants}
+                  onChange={setPriceTiers}
+                  onSave={handleSaveRoomPrice}
+                  depositMonths={house?.rentalPolicy?.depositMonths}
+                  disabled={roomEditLocked}
+                />
+              </>
             )}
           </div>
         )}
@@ -792,6 +855,71 @@ export default function RoomDetailPage() {
 
         {/* TAB 4: HÓA ĐƠN */}
         {mainTab === 'invoices' && (
+          <div className="empty-panel" style={{ marginTop: '20px', textAlign: 'left' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', gap: '16px', alignItems: 'center', marginBottom: '16px' }}>
+              <div>
+                <h2>Hóa đơn của hợp đồng hiện tại</h2>
+                <p>Danh sách hóa đơn hằng tháng thuộc hợp đồng active của phòng này.</p>
+              </div>
+              <Button
+                type="button"
+                onClick={() => setIsCreateInvoiceModalOpen(true)}
+                disabled={!activeContract || invoiceTabLoading}
+              >
+                Tạo hóa đơn
+              </Button>
+            </div>
+
+            {tabLoading || invoiceTabLoading ? (
+              <p>Đang tải hóa đơn...</p>
+            ) : !activeContract ? (
+              <p>Không tìm thấy hợp đồng active cho phòng này.</p>
+            ) : contractInvoices.length === 0 ? (
+              <p>Chưa có hóa đơn nào cho hợp đồng {activeContract.contractNumber}.</p>
+            ) : (
+              <div className="table-wrapper">
+                <table className="rooms-table">
+                  <thead>
+                    <tr>
+                      <th>Mã hóa đơn</th>
+                      <th>Kỳ hóa đơn</th>
+                      <th>Tổng tiền</th>
+                      <th>Hạn thanh toán</th>
+                      <th>Trạng thái</th>
+                      <th></th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {contractInvoices.map((invoice) => (
+                      <tr key={invoice.id}>
+                        <td>{invoice.invoiceNo}</td>
+                        <td>{formatDateVi(invoice.billingPeriodStart)} - {formatDateVi(invoice.billingPeriodEnd)}</td>
+                        <td>{formatMoneyString(invoice.totalAmount)} đ</td>
+                        <td>{formatDateVi(invoice.dueDate)}</td>
+                        <td>
+                          <span className={`status-badge ${getInvoiceStatusClass(invoice.status)}`}>
+                            {formatInvoiceStatus(invoice.status)}
+                          </span>
+                        </td>
+                        <td>
+                          <Button
+                            type="button"
+                            variant="outline"
+                            onClick={() => navigate(ROUTE_PATHS.LANDLORD.INVOICE_DETAIL(invoice.id))}
+                          >
+                            Chi tiết
+                          </Button>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            )}
+          </div>
+        )}
+
+        {false && mainTab === 'invoices' && (
           <div className="empty-panel" style={{ marginTop: '20px' }}>
             <h2>Hóa đơn của hợp đồng hiện tại</h2>
             <p>Tính năng hiển thị danh sách hóa đơn hàng tháng thuộc về hợp đồng đang active đang được phát triển.</p>
@@ -811,6 +939,20 @@ export default function RoomDetailPage() {
             setMainTab('room-info');
             setIsTerminateModalOpen(false);
             setMessage('Đã chấm dứt hợp đồng.');
+          }}
+        />
+      )}
+
+      {isCreateInvoiceModalOpen && activeContract && (
+        <CreateInvoiceWithReadingsModal
+          contract={activeContract}
+          appendices={appendices ?? []}
+          existingInvoices={contractInvoices}
+          onClose={() => setIsCreateInvoiceModalOpen(false)}
+          onCreated={(invoice) => {
+            setIsCreateInvoiceModalOpen(false);
+            setMessage(`Đã tạo hóa đơn nháp ${invoice.invoiceNo}.`);
+            void loadContractInvoices(activeContract.id);
           }}
         />
       )}
@@ -857,6 +999,374 @@ export default function RoomDetailPage() {
 
 // ─── Subcomponents ──────────────────────────────────────────────────────────
 
+type ReadingDraft = {
+  previousReading: number;
+  currentReading: number;
+  proofImageObjectKey: string;
+};
+
+function CreateInvoiceWithReadingsModal({
+  contract,
+  appendices,
+  existingInvoices,
+  onClose,
+  onCreated,
+}: {
+  contract: ContractDetailResponse;
+  appendices: ContractAppendixResponse[];
+  existingInvoices: Invoice[];
+  onClose: () => void;
+  onCreated: (invoice: Invoice) => void;
+}) {
+  const defaultMonth = getDefaultInvoiceMonth(contract);
+  const [billingMonth, setBillingMonth] = useState(defaultMonth);
+  const [preview, setPreview] = useState<RoomInvoicePreview | null>(null);
+  const [prices, setPrices] = useState<ServicePrice[]>([]);
+  const [billingContext, setBillingContext] = useState<RoomBillingContext | null>(null);
+  const [readings, setReadings] = useState<Record<string, ReadingDraft>>({});
+  const [discountAmount, setDiscountAmount] = useState(0);
+  const [note, setNote] = useState('');
+  const [loading, setLoading] = useState(true);
+  const [submitting, setSubmitting] = useState(false);
+  const [error, setError] = useState('');
+  const latestReadingByServiceType = Object.fromEntries(
+    (preview?.meteredServices ?? []).map((service) => [service.serviceTypeId, service.latestReading ?? null])
+  );
+
+  useEffect(() => {
+    let cancelled = false;
+
+    async function loadPrices() {
+      setLoading(true);
+      setError('');
+      try {
+        const [priceResponse, contextResponse] = await Promise.all([
+          billingApi.getServicePrices(contract.roomingHouseId),
+          billingApi.getRoomBillingContext(contract.roomId),
+        ]);
+        if (cancelled) return;
+
+        setPrices(priceResponse.data);
+        setBillingContext(contextResponse.data);
+        const nextReadings: Record<string, ReadingDraft> = {};
+        priceResponse.data
+          .filter((price) => price.isActive && isMeteredServicePrice(price))
+          .forEach((price) => {
+            const latestReading = contextResponse.data.latestReadingByServiceType?.[price.serviceTypeId];
+            nextReadings[price.serviceTypeId] = {
+              previousReading: latestReading?.currentReading ?? 0,
+              currentReading: latestReading?.currentReading ?? 0,
+              proofImageObjectKey: '',
+            };
+          });
+        setReadings(nextReadings);
+      } catch (err) {
+        if (!cancelled) {
+          setError(getApiErrorMessage(err, 'Không thể tải bảng giá dịch vụ.'));
+        }
+      } finally {
+        if (!cancelled) {
+          setLoading(false);
+        }
+      }
+    }
+
+    void loadPrices();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [contract.roomId, contract.roomingHouseId]);
+
+  const period = useMemo(
+    () => resolveInvoicePeriodForContract(billingMonth, contract),
+    [billingMonth, contract]
+  );
+  const effectivePrices = useMemo(
+    () => period ? getEffectiveServicePricesForInvoice(prices, period.start) : [],
+    [prices, period]
+  );
+  const fixedPrices = preview?.fixedServices ?? [];
+  const meteredPrices = preview?.meteredServices ?? [];
+  const todayDateString = toDateOnlyString(getTodayDateOnly());
+  const periodIsFuture = period ? compareDateOnly(period.end, todayDateString) > 0 : false;
+  const periodValidationMessage = !period
+    ? 'Tháng hóa đơn không nằm trong thời hạn hợp đồng.'
+    : '';
+  const previewBlockReason = preview && !preview.canGenerate
+    ? preview.blockReason || 'Chưa thể tạo hóa đơn cho kỳ này.'
+    : '';
+  useEffect(() => {
+    if (!period) {
+      setPreview(null);
+      return;
+    }
+
+    let cancelled = false;
+
+    async function loadPreview() {
+      setLoading(true);
+      setError('');
+      try {
+        const response = await billingApi.getRoomInvoicePreview(contract.roomId, {
+          billingPeriodStart: period!.start,
+          billingPeriodEnd: period!.end,
+        });
+        if (cancelled) return;
+
+        setPreview(response.data);
+        const nextReadings: Record<string, ReadingDraft> = {};
+        response.data.meteredServices.forEach((service) => {
+          const latestReading = service.latestReading;
+          nextReadings[service.serviceTypeId] = {
+            previousReading: latestReading?.currentReading ?? 0,
+            currentReading: latestReading?.currentReading ?? 0,
+            proofImageObjectKey: '',
+          };
+        });
+        setReadings(nextReadings);
+      } catch (err) {
+        if (!cancelled) {
+          setPreview(null);
+          setError(getApiErrorMessage(err, 'Không thể tải thông tin xem trước hóa đơn.'));
+        }
+      } finally {
+        if (!cancelled) {
+          setLoading(false);
+        }
+      }
+    }
+
+    void loadPreview();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [contract.roomId, period?.start, period?.end]);
+
+  const resolvedMonthlyRent = preview?.monthlyRent ?? (period
+    ? resolveMonthlyRentFromAppendices(contract.monthlyRent, appendices, period.start)
+    : contract.monthlyRent);
+  const occupantCount = fixedPrices[0]?.occupantCount ?? (period ? getActiveInvoiceOccupantCount(contract, period) : 1);
+  const rentPreview = preview?.rentAmount ?? (period ? calculatePeriodAmount(resolvedMonthlyRent, period) : 0);
+  const fixedTotal = preview?.fixedServiceAmount ?? 0;
+  const utilityPreview = meteredPrices.reduce((sum, price) => {
+    const draft = readings[price.serviceTypeId];
+    if (!draft) return sum;
+    const latestReading = price.latestReading;
+    const previousReading = latestReading?.currentReading ?? Number(draft.previousReading);
+    const consumption = Math.max(0, Number(draft.currentReading) - previousReading);
+    return sum + consumption * price.unitPrice;
+  }, 0);
+  const previewTotal = Math.max(0, rentPreview + fixedTotal + utilityPreview - discountAmount);
+
+  function updateReading(serviceTypeId: string, patch: Partial<ReadingDraft>) {
+    setReadings((current) => ({
+      ...current,
+      [serviceTypeId]: {
+        ...(current[serviceTypeId] ?? { previousReading: 0, currentReading: 0, proofImageObjectKey: '' }),
+        ...patch,
+      },
+    }));
+  }
+
+  async function handleSubmit(event: FormEvent) {
+    event.preventDefault();
+    setError('');
+
+    if (!period) {
+      setError(periodValidationMessage || 'Kỳ hóa đơn không hợp lệ.');
+      return;
+    }
+
+    if (previewBlockReason) {
+      setError(previewBlockReason);
+      return;
+    }
+
+    const meterReadings: MeterReadingInput[] = meteredPrices.map((price) => {
+      const draft = readings[price.serviceTypeId] ?? { previousReading: 0, currentReading: 0, proofImageObjectKey: '' };
+      const latestReading = latestReadingByServiceType[price.serviceTypeId];
+      return {
+        serviceTypeId: price.serviceTypeId,
+        previousReading: latestReading ? null : Number(draft.previousReading),
+        currentReading: Number(draft.currentReading),
+        proofImageObjectKey: draft.proofImageObjectKey.trim() || null,
+      };
+    });
+
+    for (const reading of meterReadings) {
+      const latestReading = latestReadingByServiceType[reading.serviceTypeId];
+      const previousReading = latestReading?.currentReading ?? reading.previousReading;
+      if (previousReading !== null && previousReading !== undefined && reading.currentReading < previousReading) {
+        setError('Chỉ số mới không được nhỏ hơn chỉ số cũ.');
+        return;
+      }
+    }
+
+    setSubmitting(true);
+    try {
+      const response = await billingApi.generateWithReadings({
+        contractId: contract.id,
+        billingPeriodStart: period.start,
+        billingPeriodEnd: period.end,
+        discountAmount: Number(discountAmount) || 0,
+        note: note.trim() || null,
+        meterReadings,
+      });
+      onCreated(response.data);
+    } catch (err) {
+      setError(getApiErrorMessage(err, 'Không thể tạo hóa đơn.'));
+    } finally {
+      setSubmitting(false);
+    }
+  }
+
+  return (
+    <div className="history-modal-overlay">
+      <div className="history-modal-content invoice-create-modal">
+        <div className="history-modal-header">
+          <h2>Tạo hóa đơn</h2>
+          <button className="history-modal-close" onClick={onClose} type="button">&times;</button>
+        </div>
+
+        <form onSubmit={handleSubmit}>
+          <div className="history-modal-body">
+            {error && <div className="billing-alert error" style={{ marginBottom: '12px' }}>{error}</div>}
+            {loading ? (
+              <p>Đang tải dữ liệu...</p>
+            ) : (
+              <div className="invoice-create-stack">
+                {periodValidationMessage && (
+                  <div className="billing-alert error" style={{ marginTop: '16px', marginBottom: '-4px' }}>{periodValidationMessage}</div>
+                )}
+                {previewBlockReason && (
+                  <div className="billing-alert error" style={{ marginTop: '16px', marginBottom: '-4px' }}>{previewBlockReason}</div>
+                )}
+                <div className="invoice-create-grid">
+                  <div className="invoice-create-field">
+                    <span className="label">Phòng</span>
+                    <span className="value">{contract.roomNumber}</span>
+                  </div>
+                  <div className="invoice-create-field">
+                    <span className="label">Người thuê</span>
+                    <span className="value">{contract.mainTenantName}</span>
+                  </div>
+                  <div className="invoice-create-field">
+                    <span className="label">Tiền phòng</span>
+                    <span className="value">{formatMoneyString(resolvedMonthlyRent)} đ</span>
+                  </div>
+                  <div className="invoice-create-field">
+                    <span className="label">Kỳ hóa đơn</span>
+                    <input type="month" value={billingMonth} onChange={(event) => setBillingMonth(event.target.value)} />
+                  </div>
+                  <div className="invoice-create-field">
+                    <span className="label">Kỳ thực tế</span>
+                    <span className="value">{period ? `${formatDateVi(period.start)} - ${formatDateVi(period.end)}` : '--'}</span>
+                  </div>
+                  <div className="invoice-create-field">
+                    <span className="label">Tiền phòng kỳ này</span>
+                    <span className="value">{formatMoneyString(rentPreview)} đ</span>
+                  </div>
+                </div>
+
+                <section className="invoice-create-section">
+                  <h3>Dịch vụ cố định</h3>
+                  {fixedPrices.length === 0 ? (
+                    <p className="invoice-create-empty">Chưa có dịch vụ cố định được cấu hình.</p>
+                  ) : (
+                    <div className="invoice-create-stack">
+                      {fixedPrices.map((price) => (
+                        <div key={price.serviceTypeId} className="invoice-create-line">
+                          <span>{price.serviceName} / {price.displayUnitName}</span>
+                          <strong>{formatFixedPreviewLine(price)}</strong>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </section>
+
+                <section className="invoice-create-section">
+                  <h3>Chỉ số điện nước</h3>
+                  {meteredPrices.length === 0 ? (
+                    <p className="invoice-create-empty">Không có dịch vụ điện/nước nào đang cấu hình theo chỉ số.</p>
+                  ) : (
+                    <div className="invoice-create-meter-list">
+                      {meteredPrices.map((price) => {
+                        const draft = readings[price.serviceTypeId] ?? { previousReading: 0, currentReading: 0, proofImageObjectKey: '' };
+                        const latestReading = latestReadingByServiceType[price.serviceTypeId];
+                        const previousReading = latestReading?.currentReading ?? Number(draft.previousReading);
+                        const consumption = Math.max(0, Number(draft.currentReading) - previousReading);
+                        const amount = Math.round(consumption * price.unitPrice);
+                        return (
+                          <div key={price.serviceTypeId} className="invoice-create-meter-card">
+                            <strong>{price.serviceName} ({formatMoneyString(price.unitPrice)} đ / {price.meterUnitName})</strong>
+                            <div className="invoice-create-grid">
+                              {latestReading ? (
+                                <div className="invoice-create-field">
+                                  <span className="label">Chỉ số cũ</span>
+                                  <strong>{latestReading.currentReading}</strong>
+                                </div>
+                              ) : (
+                                <label className="invoice-create-field">
+                                  <span className="label">Chỉ số cũ</span>
+                                  <input
+                                    type="number"
+                                    min="0"
+                                    value={draft.previousReading}
+                                    onChange={(event) => updateReading(price.serviceTypeId, { previousReading: Number(event.target.value) })}
+                                  />
+                                </label>
+                              )}
+                              <label className="invoice-create-field">
+                                <span className="label">Chỉ số mới</span>
+                                <input
+                                  type="number"
+                                  min="0"
+                                  value={draft.currentReading}
+                                  onChange={(event) => updateReading(price.serviceTypeId, { currentReading: Number(event.target.value) })}
+                                />
+                              </label>
+                              <div className="invoice-create-field invoice-create-total">
+                                <span className="label">Tạm tính</span>
+                                <strong>{formatMoneyString(consumption)} x {formatMoneyString(price.unitPrice)} = {formatMoneyString(amount)} đ</strong>
+                              </div>
+                            </div>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  )}
+                </section>
+
+                <div className="invoice-create-summary">
+                  <label className="invoice-create-field">
+                    <span className="label">Giảm trừ</span>
+                    <input type="number" min="0" value={discountAmount} onChange={(event) => setDiscountAmount(Number(event.target.value))} />
+                  </label>
+                  <label className="invoice-create-field">
+                    <span className="label">Ghi chú</span>
+                    <input value={note} onChange={(event) => setNote(event.target.value)} />
+                  </label>
+                  <div className="invoice-create-field invoice-create-total">
+                    <span className="label">Tạm tính</span>
+                    <span className="value">{formatMoneyString(previewTotal)} đ</span>
+                  </div>
+                </div>
+              </div>
+            )}
+          </div>
+
+          <div className="history-modal-footer">
+            <Button variant="outline" type="button" onClick={onClose} disabled={submitting}>Đóng</Button>
+            <Button type="submit" disabled={loading || submitting || !period || !preview || Boolean(previewBlockReason)}>{submitting ? 'Đang tạo...' : 'Tạo hóa đơn nháp'}</Button>
+          </div>
+        </form>
+      </div>
+    </div>
+  );
+}
+
 async function resolveRawContractFile(contractId: string): Promise<ContractFileResponse> {
   const response = await contractApi.getContractFiles(contractId);
   let file = findContractFile(response.data ?? [], 'Raw');
@@ -878,6 +1388,280 @@ function findContractFile(files: ContractFileResponse[], fileVariant: string) {
   return files
     .filter((file) => !file.rentalContractAppendixId && file.fileVariant === fileVariant)
     .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime())[0];
+}
+
+function normalizePricingUnit(unit: PricingUnit | string) {
+  if (unit === 'Metered' || unit === 'MeterBased') {
+    return 'MeterReading';
+  }
+
+  if (unit === 'Fixed' || unit === 'PerMonth') {
+    return 'PerMonth';
+  }
+
+  if (unit === 'PerPerson' || unit === 'PerPersonPerMonth') {
+    return 'PerPersonPerMonth';
+  }
+
+  return unit;
+}
+
+function isMeteredServicePrice(price: ServicePrice) {
+  return normalizePricingUnit(price.pricingUnit) === 'MeterReading';
+}
+
+function calculateFixedServiceAmount(
+  price: ServicePrice,
+  period: ResolvedInvoicePeriod,
+  occupantCount: number
+) {
+  const unitCount = normalizePricingUnit(price.pricingUnit) === 'PerPersonPerMonth'
+    ? occupantCount
+    : 1;
+
+  return Math.round(price.unitPrice * unitCount * getInvoicePeriodQuantity(period));
+}
+
+function formatFixedServicePreview(
+  price: ServicePrice,
+  period: ResolvedInvoicePeriod | null,
+  occupantCount: number
+) {
+  if (!period) {
+    return '0 đ';
+  }
+
+  const amount = calculateFixedServiceAmount(price, period, occupantCount);
+
+  if (normalizePricingUnit(price.pricingUnit) !== 'PerPersonPerMonth') {
+    return `${formatMoneyString(amount)} đ`;
+  }
+
+  const unitAmount = Math.round(price.unitPrice * getInvoicePeriodQuantity(period));
+  return `${formatMoneyString(unitAmount)} x ${occupantCount} = ${formatMoneyString(amount)} đ`;
+}
+
+function formatFixedPreviewLine(price: FixedServicePreview) {
+  if (normalizePricingUnit(price.pricingUnit) !== 'PerPersonPerMonth') {
+    return `${formatMoneyString(price.amount)} đ`;
+  }
+
+  const unitAmount = price.occupantCount > 0
+    ? Math.round(price.amount / price.occupantCount)
+    : price.unitPrice;
+
+  return `${formatMoneyString(unitAmount)} x ${price.occupantCount} = ${formatMoneyString(price.amount)} đ`;
+}
+
+function getInvoicePeriodQuantity(period: ResolvedInvoicePeriod) {
+  return period.isFullMonth ? 1 : period.billableDays / period.daysInMonth;
+}
+
+function getActiveInvoiceOccupantCount(contract: ContractDetailResponse, period: ResolvedInvoicePeriod) {
+  const count = contract.occupants.filter((occupant) =>
+    occupant.status === 'Active' &&
+    occupant.moveInDate <= period.end &&
+    (!occupant.moveOutDate || occupant.moveOutDate >= period.start)
+  ).length;
+
+  return Math.max(count, 1);
+}
+
+function getEffectiveServicePricesForInvoice(prices: ServicePrice[], effectiveOn: string) {
+  const latestByServiceType = new Map<string, ServicePrice>();
+
+  prices
+    .filter((price) => price.effectiveFrom <= effectiveOn && (!price.effectiveTo || price.effectiveTo >= effectiveOn))
+    .sort((left, right) => right.effectiveFrom.localeCompare(left.effectiveFrom))
+    .forEach((price) => {
+      if (!latestByServiceType.has(price.serviceTypeId)) {
+        latestByServiceType.set(price.serviceTypeId, price);
+      }
+    });
+
+  return Array.from(latestByServiceType.values());
+}
+
+function resolveMonthlyRentFromAppendices(
+  baseMonthlyRent: number,
+  appendices: ContractAppendixResponse[],
+  effectiveOn: string
+) {
+  const rentChanges = appendices
+    .filter((appendix) => appendix.status === 'Active')
+    .flatMap((appendix) =>
+      appendix.changes
+        .filter((change) =>
+          change.changeType === 'Update' &&
+          change.targetType === 'Contract' &&
+          change.fieldName?.toLowerCase() === 'monthlyrent'
+        )
+        .map((change) => ({
+          effectiveDate: appendix.effectiveDate,
+          oldValue: change.oldValue,
+          newValue: change.newValue
+        }))
+    )
+    .sort((left, right) => left.effectiveDate.localeCompare(right.effectiveDate));
+
+  if (rentChanges.length === 0) {
+    return baseMonthlyRent;
+  }
+
+  const latestAppliedChange = [...rentChanges]
+    .filter((change) => change.effectiveDate <= effectiveOn)
+    .sort((left, right) => right.effectiveDate.localeCompare(left.effectiveDate))[0];
+  const appliedRent = parseInvoiceAppendixMoney(latestAppliedChange?.newValue);
+  if (appliedRent !== null) {
+    return appliedRent;
+  }
+
+  const firstChange = rentChanges[0];
+  const oldRent = effectiveOn < firstChange.effectiveDate
+    ? parseInvoiceAppendixMoney(firstChange.oldValue)
+    : null;
+
+  return oldRent ?? baseMonthlyRent;
+}
+
+function parseInvoiceAppendixMoney(value?: string | null) {
+  if (!value?.trim()) {
+    return null;
+  }
+
+  const parsed = Number.parseFloat(value.trim().replace(/^"|"$/g, '').replace(/,/g, ''));
+  return Number.isFinite(parsed) ? parsed : null;
+}
+
+function getBillingServiceLabel(code: string) {
+  const labels: Record<string, string> = {
+    Electric: 'Điện',
+    Water: 'Nước',
+    Wifi: 'Wifi',
+    Trash: 'Rác',
+  };
+
+  return labels[code] ?? code;
+}
+
+type ResolvedInvoicePeriod = {
+  start: string;
+  end: string;
+  billableDays: number;
+  daysInMonth: number;
+  isFullMonth: boolean;
+};
+
+function getDefaultInvoiceMonth(contract: ContractDetailResponse) {
+  const today = getTodayDateOnly();
+  const contractStart = parseDateOnly(contract.startDate);
+  let cursor = new Date(today.getFullYear(), today.getMonth(), 1);
+
+  for (let index = 0; index < 240; index += 1) {
+    const monthValue = toMonthValue(cursor);
+    const period = resolveInvoicePeriodForContract(monthValue, contract);
+    if (period && compareDateOnly(period.end, toDateOnlyString(today)) <= 0) {
+      return monthValue;
+    }
+
+    cursor = new Date(cursor.getFullYear(), cursor.getMonth() - 1, 1);
+  }
+
+  return toMonthValue(contractStart);
+}
+
+function resolveInvoicePeriodForContract(monthValue: string, contract: ContractDetailResponse): ResolvedInvoicePeriod | null {
+  const [year, month] = monthValue.split('-').map(Number);
+  if (!year || !month) {
+    return null;
+  }
+
+  const monthStart = new Date(year, month - 1, 1);
+  const monthEnd = new Date(year, month, 0);
+  const contractStart = parseDateOnly(contract.startDate);
+  const contractEnd = parseDateOnly(contract.endDate);
+  const startDate = compareDates(contractStart, monthStart) > 0 ? contractStart : monthStart;
+  const endDate = compareDates(contractEnd, monthEnd) < 0 ? contractEnd : monthEnd;
+
+  if (compareDates(startDate, endDate) > 0) {
+    return null;
+  }
+
+  const billableDays = countInclusiveDays(startDate, endDate);
+  const daysInMonth = countInclusiveDays(monthStart, monthEnd);
+
+  return {
+    start: toDateOnlyString(startDate),
+    end: toDateOnlyString(endDate),
+    billableDays,
+    daysInMonth,
+    isFullMonth: compareDates(startDate, monthStart) === 0 && compareDates(endDate, monthEnd) === 0,
+  };
+}
+
+function calculatePeriodAmount(monthlyAmount: number, period: ResolvedInvoicePeriod) {
+  if (period.isFullMonth) {
+    return monthlyAmount;
+  }
+
+  return Math.round(monthlyAmount * period.billableDays / period.daysInMonth);
+}
+
+function getTodayDateOnly() {
+  const today = new Date();
+  return new Date(today.getFullYear(), today.getMonth(), today.getDate());
+}
+
+function parseDateOnly(value: string) {
+  const [year, month, day] = value.split('-').map(Number);
+  return new Date(year, month - 1, day);
+}
+
+function toDateOnlyString(date: Date) {
+  return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`;
+}
+
+function toMonthValue(date: Date) {
+  return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}`;
+}
+
+function compareDateOnly(left: string, right: string) {
+  return compareDates(parseDateOnly(left), parseDateOnly(right));
+}
+
+function compareDates(left: Date, right: Date) {
+  return getDayNumber(left) - getDayNumber(right);
+}
+
+function countInclusiveDays(start: Date, end: Date) {
+  return getDayNumber(end) - getDayNumber(start) + 1;
+}
+
+function getDayNumber(date: Date) {
+  return Math.floor(Date.UTC(date.getFullYear(), date.getMonth(), date.getDate()) / 86400000);
+}
+
+function formatInvoiceStatus(status: string) {
+  const labels: Record<string, string> = {
+    Draft: 'Nháp',
+    Issued: 'Đã phát hành',
+    Paid: 'Đã thanh toán',
+    Overdue: 'Quá hạn',
+    Cancelled: 'Đã hủy',
+  };
+
+  return labels[status] ?? status;
+}
+
+function getInvoiceStatusClass(status: string) {
+  if (status === 'Paid') return 'success';
+  if (status === 'Cancelled' || status === 'Overdue') return 'danger';
+  if (status === 'Issued') return 'warning';
+  return 'info';
+}
+
+function isRoomEditLocked(room: Room | null) {
+  return room?.status === 'Reserved' || room?.status === 'Occupied';
 }
 
 type LandlordAppendixChangeMode = 'monthlyRent' | 'paymentDay';
@@ -1429,6 +2213,7 @@ function PriceTierEditor({
   onChange,
   onSave,
   depositMonths = 0,
+  disabled = false,
 }: {
   priceTiers: RoomPriceTierRequest[];
   isTieredPricing: boolean;
@@ -1436,6 +2221,7 @@ function PriceTierEditor({
   onChange: (tiers: RoomPriceTierRequest[]) => void;
   onSave: () => void;
   depositMonths?: number;
+  disabled?: boolean;
 }) {
   const structureKey = priceTiers.map(t => t.occupantCount).join(',');
 
@@ -1476,6 +2262,7 @@ function PriceTierEditor({
             </span>
             <input
               type="text"
+              disabled={disabled}
               value={formatMoneyString(tier.monthlyRent)}
               onChange={(e) =>
                 updateTier(index, { ...tier, monthlyRent: parseMoneyString(e.target.value) })
@@ -1496,7 +2283,7 @@ function PriceTierEditor({
         </div>
       ))}
       <div className="save-row" style={{ marginTop: '8px' }}>
-        <button className="primary-action" onClick={onSave}>
+        <button className="primary-action" onClick={onSave} disabled={disabled}>
           Lưu bảng giá
         </button>
       </div>

@@ -54,6 +54,8 @@ public static class DependencyInjection
         services.AddScoped<ISensitiveDataProtector, DataProtectionSensitiveDataProtector>();
         services.AddHostedService<RoomDepositExpirationWorker>();
         services.AddHostedService<RentalContractExpirationWorker>();
+        services.AddHostedService<RentalContractMoveInActivationWorker>();
+        services.AddHostedService<ContractAppendixApplicationWorker>();
         services.AddHttpClient(RealVnptEkycClient.HttpClientName, (provider, client) =>
         {
             var options = provider.GetRequiredService<IOptions<VnptEkycOptions>>().Value;

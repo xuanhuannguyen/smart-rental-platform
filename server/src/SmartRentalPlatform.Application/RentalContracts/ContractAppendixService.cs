@@ -210,6 +210,8 @@ public class ContractAppendixService : IContractAppendixService
 
             appendix.EffectiveDate = request.EffectiveDate;
             appendix.Status = ContractAppendixStatus.PendingSignature;
+            appendix.ActivatedAt = null;
+            appendix.AppliedAt = null;
             appendix.StatusReason = null;
             appendix.UpdatedAt = now;
 
@@ -285,6 +287,9 @@ public class ContractAppendixService : IContractAppendixService
             return null;
         }
 
+        EnsureContractActive(appendix.RentalContract);
+        EnsureAppendixPendingSignature(appendix);
+        EnsureAppendixEffectiveDateStillSignable(appendix, DateOnly.FromDateTime(DateTime.UtcNow));
         var signerRole = GetSignerRole(userId, appendix.RentalContract);
         return await contractSignatureOtpService.RequestAppendixOtpAsync(
             userId,
@@ -317,6 +322,8 @@ public class ContractAppendixService : IContractAppendixService
         EnsureAppendixNotSigned(appendix, signerRole);
 
         var now = DateTimeOffset.UtcNow;
+        var today = DateOnly.FromDateTime(now.UtcDateTime);
+        EnsureAppendixEffectiveDateStillSignable(appendix, today);
 
         await using var transaction = await context.BeginTransactionAsync(cancellationToken);
         try
@@ -351,7 +358,7 @@ public class ContractAppendixService : IContractAppendixService
                 appendix.Status = ContractAppendixStatus.Active;
                 appendix.ActivatedAt = now;
                 appendix.StatusReason = null;
-                await ApplyAppendixChangesAsync(appendix, now, cancellationToken);
+                await ApplyAppendixIfDueAsync(appendix, now, today, cancellationToken);
                 await GenerateAppendixFileAsync(appendix, now, cancellationToken);
             }
 
@@ -541,7 +548,10 @@ public class ContractAppendixService : IContractAppendixService
     {
         await context.ContractAppendices
             .Include(x => x.Changes)
-            .Where(x => x.RentalContractId == contractId && x.Status == ContractAppendixStatus.Active)
+            .Where(x =>
+                x.RentalContractId == contractId &&
+                x.Status == ContractAppendixStatus.Active &&
+                x.AppliedAt.HasValue)
             .LoadAsync(cancellationToken);
 
         var appendix = await BaseAppendixQuery()
@@ -585,6 +595,70 @@ public class ContractAppendixService : IContractAppendixService
         return true;
     }
 
+    public async Task<int> ApplyDueAppendicesAsync(CancellationToken cancellationToken = default)
+    {
+        var now = DateTimeOffset.UtcNow;
+        var today = DateOnly.FromDateTime(now.UtcDateTime);
+
+        var appendices = await BaseAppendixQuery()
+            .Where(x =>
+                x.Status == ContractAppendixStatus.Active &&
+                x.AppliedAt == null &&
+                x.EffectiveDate <= today &&
+                x.RentalContract.DeletedAt == null &&
+                x.RentalContract.Status == RentalContractStatus.Active)
+            .OrderBy(x => x.EffectiveDate)
+            .ThenBy(x => x.ActivatedAt ?? x.UpdatedAt)
+            .ThenBy(x => x.CreatedAt)
+            .ToListAsync(cancellationToken);
+
+        if (appendices.Count == 0)
+        {
+            return 0;
+        }
+
+        await using var transaction = await context.BeginTransactionAsync(cancellationToken);
+        try
+        {
+            var appliedCount = 0;
+            foreach (var appendix in appendices)
+            {
+                if (await ApplyAppendixIfDueAsync(appendix, now, today, cancellationToken))
+                {
+                    appliedCount++;
+                }
+            }
+
+            await context.SaveChangesAsync(cancellationToken);
+            await transaction.CommitAsync(cancellationToken);
+            return appliedCount;
+        }
+        catch
+        {
+            await transaction.RollbackAsync(cancellationToken);
+            throw;
+        }
+    }
+
+    private async Task<bool> ApplyAppendixIfDueAsync(
+        ContractAppendix appendix,
+        DateTimeOffset now,
+        DateOnly today,
+        CancellationToken cancellationToken)
+    {
+        if (appendix.Status != ContractAppendixStatus.Active ||
+            appendix.AppliedAt.HasValue ||
+            appendix.EffectiveDate > today)
+        {
+            return false;
+        }
+
+        await ApplyAppendixChangesAsync(appendix, now, cancellationToken);
+        appendix.AppliedAt = now;
+        appendix.UpdatedAt = now;
+        return true;
+    }
+
     private async Task ApplyAppendixChangesAsync(
         ContractAppendix appendix,
         DateTimeOffset now,
@@ -621,7 +695,8 @@ public class ContractAppendixService : IContractAppendixService
             if (change.ChangeType == ContractAppendixChangeType.Remove)
             {
                 var occupant = appendix.RentalContract.Occupants.FirstOrDefault(x => x.Id == change.TargetId);
-                if (occupant is null || occupant.Status != ContractOccupantStatus.Active)
+                if (occupant is null ||
+                    occupant.Status is ContractOccupantStatus.MoveOut or ContractOccupantStatus.Voided)
                 {
                     throw new ConflictException(
                         ErrorCodes.RentalContractInvalidOccupant,
@@ -629,10 +704,19 @@ public class ContractAppendixService : IContractAppendixService
                         new { change.TargetId });
                 }
 
-                occupant.Status = ContractOccupantStatus.MoveOut;
-                occupant.MoveOutDate ??= TryParseDateOnly(change.NewValue, out var moveOutDate)
-                    ? moveOutDate
-                    : appendix.EffectiveDate;
+                if (occupant.Status == ContractOccupantStatus.PendingMoveIn)
+                {
+                    occupant.Status = ContractOccupantStatus.Voided;
+                    occupant.MoveOutDate = null;
+                }
+                else
+                {
+                    occupant.Status = ContractOccupantStatus.MoveOut;
+                    occupant.MoveOutDate ??= TryParseDateOnly(change.NewValue, out var moveOutDate)
+                        ? moveOutDate
+                        : appendix.EffectiveDate;
+                }
+
                 occupant.UpdatedAt = now;
             }
         }
@@ -725,6 +809,7 @@ public class ContractAppendixService : IContractAppendixService
         var verifiedAccount = !string.IsNullOrEmpty(emailKey)
             ? await GetVerifiedOccupantAccountByEmailAsync(emailKey, cancellationToken)
             : null;
+        var today = DateOnly.FromDateTime(now.UtcDateTime);
 
         var occupant = new ContractOccupant
         {
@@ -737,7 +822,9 @@ public class ContractAppendixService : IContractAppendixService
             RelationshipToMainTenant = NormalizeOptionalText(occupantRequest.RelationshipToMainTenant),
             MoveInDate = occupantRequest.MoveInDate,
             MoveOutDate = occupantRequest.MoveOutDate,
-            Status = ContractOccupantStatus.Active,
+            Status = occupantRequest.MoveInDate <= today
+                ? ContractOccupantStatus.Active
+                : ContractOccupantStatus.PendingMoveIn,
             CreatedAt = now,
             UpdatedAt = now
         };
@@ -915,6 +1002,19 @@ public class ContractAppendixService : IContractAppendixService
             ErrorCodes.ContractAppendixInvalidStatus,
             "Trạng thái phụ lục không cho phép thao tác này.",
             new { appendix.Id, currentStatus = appendix.Status.ToString() });
+    }
+
+    private static void EnsureAppendixEffectiveDateStillSignable(ContractAppendix appendix, DateOnly today)
+    {
+        if (today <= appendix.EffectiveDate)
+        {
+            return;
+        }
+
+        throw new ConflictException(
+            ErrorCodes.ContractAppendixInvalidStatus,
+            "Phụ lục đã quá ngày áp dụng, vui lòng hủy và tạo phụ lục mới.",
+            new { appendix.Id, appendix.EffectiveDate });
     }
 
     private static void EnsureAppendixCanPreview(ContractAppendix appendix)
@@ -1143,8 +1243,8 @@ public class ContractAppendixService : IContractAppendixService
     private static IEnumerable<ContractAppendix> GetActiveAppendicesInOrder(RentalContract contract)
     {
         return contract.Appendices
-            .Where(x => x.Status == ContractAppendixStatus.Active)
-            .OrderBy(x => x.ActivatedAt ?? x.UpdatedAt)
+            .Where(x => x.Status == ContractAppendixStatus.Active && x.AppliedAt.HasValue)
+            .OrderBy(x => x.AppliedAt ?? x.ActivatedAt ?? x.UpdatedAt)
             .ThenBy(x => x.CreatedAt);
     }
 
@@ -2153,6 +2253,7 @@ public class ContractAppendixService : IContractAppendixService
             Status = appendix.Status.ToString(),
             CreatedByUserId = appendix.CreatedByUserId,
             ActivatedAt = appendix.ActivatedAt,
+            AppliedAt = appendix.AppliedAt,
             StatusReason = appendix.StatusReason,
             Changes = appendix.Changes
                 .OrderBy(x => x.SortOrder)

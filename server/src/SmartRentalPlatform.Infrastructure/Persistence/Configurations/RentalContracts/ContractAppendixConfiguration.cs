@@ -19,6 +19,7 @@ public class ContractAppendixConfiguration : IEntityTypeConfiguration<ContractAp
         builder.Property(x => x.Status).HasColumnName("status").HasConversion<string>().HasMaxLength(40).IsRequired();
         builder.Property(x => x.CreatedByUserId).HasColumnName("created_by_user_id").IsRequired();
         builder.Property(x => x.ActivatedAt).HasColumnName("activated_at");
+        builder.Property(x => x.AppliedAt).HasColumnName("applied_at");
         builder.Property(x => x.StatusReason).HasColumnName("status_reason").HasColumnType("text");
         builder.Property(x => x.CreatedAt).HasColumnName("created_at").IsRequired();
         builder.Property(x => x.UpdatedAt).HasColumnName("updated_at").IsRequired();

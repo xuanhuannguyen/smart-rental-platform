@@ -14,14 +14,13 @@ public class RoomingHouseServicePriceConfiguration : IEntityTypeConfiguration<Ro
         builder.Property(x => x.Id).HasColumnName("id");
         builder.Property(x => x.RoomingHouseId).HasColumnName("rooming_house_id").IsRequired();
         builder.Property(x => x.ServiceTypeId).HasColumnName("service_type_id").IsRequired();
-        builder.Property(x => x.BillingMethod)
-            .HasColumnName("billing_method")
+        builder.Property(x => x.PricingUnit)
+            .HasColumnName("pricing_unit")
             .HasConversion(
                 value => value.ToString(),
-                value => ParseBillingMethod(value))
+                value => ParsePricingUnit(value))
             .HasMaxLength(30)
             .IsRequired();
-        builder.Property(x => x.UnitName).HasColumnName("unit_name").HasMaxLength(50).IsRequired();
         builder.Property(x => x.UnitPrice).HasColumnName("unit_price").HasPrecision(12, 2).IsRequired();
         builder.Property(x => x.EffectiveFrom).HasColumnName("effective_from").IsRequired();
         builder.Property(x => x.EffectiveTo).HasColumnName("effective_to");
@@ -44,12 +43,14 @@ public class RoomingHouseServicePriceConfiguration : IEntityTypeConfiguration<Ro
             .OnDelete(DeleteBehavior.Restrict);
     }
 
-    private static BillingMethod ParseBillingMethod(string value)
+    private static PricingUnit ParsePricingUnit(string value)
     {
         return value switch
         {
-            "PerMonth" or "PerPerson" => BillingMethod.Fixed,
-            _ => Enum.Parse<BillingMethod>(value, ignoreCase: true)
+            "Metered" or "MeterBased" or "MeterReading" => PricingUnit.MeterReading,
+            "Fixed" or "PerMonth" => PricingUnit.PerMonth,
+            "PerPerson" or "PerPersonPerMonth" => PricingUnit.PerPersonPerMonth,
+            _ => Enum.Parse<PricingUnit>(value, ignoreCase: true)
         };
     }
 }

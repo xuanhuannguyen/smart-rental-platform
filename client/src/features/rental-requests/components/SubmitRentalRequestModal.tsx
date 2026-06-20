@@ -22,6 +22,8 @@ function addDays(days: number) {
   return toDateInput(date);
 }
 
+const minimumStartDate = addDays(3);
+
 export default function SubmitRentalRequestModal({
   roomId,
   roomNumber,
@@ -42,6 +44,11 @@ export default function SubmitRentalRequestModal({
     e.preventDefault();
     if (!desiredStartDate || !expectedEndDate) {
       setError('Vui lòng chọn ngày dự kiến bắt đầu và kết thúc.');
+      return;
+    }
+
+    if (desiredStartDate < minimumStartDate) {
+      setError('Ngày bắt đầu thuê phải cách hôm nay ít nhất 3 ngày để hai bên có thời gian hoàn tất hợp đồng.');
       return;
     }
 
@@ -93,6 +100,7 @@ export default function SubmitRentalRequestModal({
               <input
                 id="desiredStartDate"
                 type="date"
+                min={minimumStartDate}
                 value={desiredStartDate}
                 onChange={(e) => setDesiredStartDate(e.target.value)}
                 disabled={loading}

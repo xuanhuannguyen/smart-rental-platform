@@ -6,6 +6,10 @@ public class ContractBriefResponse
 
     public string Status { get; set; } = string.Empty;
 
+    public DateOnly StartDate { get; set; }
+
+    public DateOnly EndDate { get; set; }
+
     public DateTimeOffset? SignatureDeadlineAt { get; set; }
 
     public DateTimeOffset? ActivatedAt { get; set; }

@@ -13,12 +13,21 @@ import {
   updateRoomingHouseBasicInfo,
   updateRoomingHouseImages,
   updateRoomingHouseRentalPolicy,
+  updateRoomingHouseVisibility,
 } from '../../rooming-houses/api';
 import {
   getRoomsByRoomingHouse,
   createRoom,
 } from '../../rooms/api';
 import { billingApi } from '../../billing/api';
+import type {
+  BillingServiceType,
+  ServicePrice,
+  CreateServicePriceRequest,
+  BillingServiceCode,
+  BillingMethod,
+  PricingUnit,
+} from '../../billing/types';
 import type {
   RoomingHouseDetail,
   Amenity,
@@ -35,7 +44,18 @@ import RoomingHouseRuleEditor from '../../rooming-houses/components/RoomingHouse
 import { cleanImages, toImageRequests } from '../../rooming-houses/utils/imageRequests';
 import './RoomingHouseDetailPage.css';
 
-type MainTab = 'basic' | 'images' | 'amenities' | 'legal' | 'house-rule' | 'rental-policy' | 'rooms' | 'create-room';
+type MainTab = 'basic' | 'images' | 'amenities' | 'legal' | 'house-rule' | 'rental-policy' | 'service-prices' | 'rooms' | 'create-room';
+
+const serviceOptions: { code: BillingServiceCode; label: string; method: BillingMethod; unit: string; defaultPrice: number }[] = [
+  { code: 'Electric', label: 'Điện', method: 'Metered', unit: 'kWh', defaultPrice: 3500 },
+  { code: 'Water', label: 'Nước', method: 'PerPerson', unit: 'người/tháng', defaultPrice: 100000 },
+  { code: 'Wifi', label: 'Internet', method: 'PerMonth', unit: 'tháng', defaultPrice: 100000 },
+  { code: 'Trash', label: 'Rác', method: 'PerPerson', unit: 'người/tháng', defaultPrice: 50000 },
+];
+
+const nextPeriodStart = new Date(new Date().getFullYear(), new Date().getMonth() + 1, 1).toISOString().split('T')[0];
+
+const defaultServicePriceDrafts: CreateServicePriceRequest[] = [];
 
 const emptyRoomForm: CreateRoomRequest = {
   roomNumber: '',
@@ -95,6 +115,102 @@ export default function RoomingHouseDetailPage() {
 
   // States của Quản lý Phòng (Tab 5)
   const [rooms, setRooms] = useState<Room[]>([]);
+
+  // States của Bảng giá dịch vụ (Tab Service Prices)
+  const [billingServiceTypes, setBillingServiceTypes] = useState<BillingServiceType[]>([]);
+  const [servicePrices, setServicePrices] = useState<ServicePrice[]>([]);
+  const [servicePricesLoading, setServicePricesLoading] = useState(false);
+  const [servicePriceDrafts, setServicePriceDrafts] = useState<CreateServicePriceRequest[]>(defaultServicePriceDrafts);
+  const [servicePriceNote, setServicePriceNote] = useState('');
+
+  const activeServicePrices = useMemo(() => servicePrices.filter(p => p.isActive), [servicePrices]);
+  const servicePriceHistory = useMemo(() => servicePrices, [servicePrices]);
+
+  async function loadServicePrices() {
+    if (!id) return;
+    setServicePricesLoading(true);
+    try {
+      const [pricesResponse, serviceTypesResponse] = await Promise.all([
+        billingApi.getServicePrices(id),
+        billingApi.getServiceTypes(),
+      ]);
+      const activeServiceTypes = serviceTypesResponse.data
+        .filter((serviceType) => serviceType.isActive)
+        .sort((a, b) => a.name.localeCompare(b.name, 'vi'));
+      const activePriceByServiceTypeId = new Map(
+        pricesResponse.data
+          .filter((price: ServicePrice) => price.isActive)
+          .map((price: ServicePrice) => [price.serviceTypeId, price])
+      );
+
+      setBillingServiceTypes(activeServiceTypes);
+      setServicePrices(pricesResponse.data);
+      setServicePriceDrafts(activeServiceTypes.map((serviceType) => {
+        const activePrice = activePriceByServiceTypeId.get(serviceType.id);
+        const pricingUnit = normalizePricingUnit(activePrice?.pricingUnit ?? getDefaultServicePricingUnit(serviceType));
+
+        return {
+          serviceTypeId: serviceType.id,
+          serviceCode: serviceType.id,
+          pricingUnit,
+          billingMethod: pricingUnit,
+          unitName: getServicePricingUnitDisplayUnit(pricingUnit, serviceType),
+          unitPrice: activePrice?.unitPrice ?? 0,
+          effectiveFrom: nextPeriodStart,
+        };
+      }));
+    } catch (err) {
+      console.warn('Cannot load service prices:', err);
+    } finally {
+      setServicePricesLoading(false);
+    }
+  }
+
+  function handleChangeServicePriceDraft(serviceTypeId: string, patch: Partial<CreateServicePriceRequest>) {
+    setServicePriceDrafts((drafts) =>
+      drafts.map((draft) => {
+        if (draft.serviceTypeId !== serviceTypeId) {
+          return draft;
+        }
+
+        const pricingUnit = normalizePricingUnit(patch.pricingUnit ?? patch.billingMethod ?? draft.pricingUnit ?? draft.billingMethod ?? 'PerMonth');
+
+        return {
+          ...draft,
+          ...patch,
+          pricingUnit,
+          billingMethod: pricingUnit,
+          effectiveFrom: nextPeriodStart,
+        };
+      })
+    );
+  }
+
+  async function handleSaveServicePrices(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    if (!house) return;
+
+    setActionLoading(true);
+    setMessage('');
+    try {
+      for (const draft of servicePriceDrafts) {
+        await billingApi.createServicePrice(house.id, {
+          ...draft,
+          unitPrice: Number(draft.unitPrice) || 0,
+          effectiveFrom: nextPeriodStart,
+          note: servicePriceNote.trim() || null,
+        });
+      }
+
+      await loadServicePrices();
+      setMessage('Đã lưu tất cả giá dịch vụ thành công.');
+    } catch (err) {
+      setMessage(getApiErrorMessage(err, 'Không thể lưu giá dịch vụ.'));
+    } finally {
+      setActionLoading(false);
+    }
+  }
+
   // Tải thông tin khu trọ
   useEffect(() => {
     if (!id) return;
@@ -193,12 +309,13 @@ export default function RoomingHouseDetailPage() {
     total: rooms.length,
     available: rooms.filter((r) => r.status === 'Available').length,
     occupied: rooms.filter((r) => r.status === 'Occupied').length,
-    hidden: rooms.filter((r) => r.status === 'Hidden').length,
+    hidden: rooms.filter((r) => r.status === 'Hidden' || r.status === 'Maintenance').length,
   }), [rooms]);
   const selectedProvinceName =
     provinces.find((province) => province.code === basicForm.provinceCode)?.name ?? '';
   const selectedWardName = wards.find((ward) => ward.code === basicForm.wardCode)?.name ?? '';
   const canCreateRoom = Boolean(house?.rentalPolicy && house?.houseRule);
+  const addressLocked = house?.approvalStatus === 'Approved';
 
   // ─── Tab 1: Lưu thông tin cơ bản khu trọ ──────────────────────────────────
   async function handleSaveBasicInfo() {
@@ -217,6 +334,25 @@ export default function RoomingHouseDetailPage() {
   }
 
   // ─── Tab 2: Lưu ảnh khu trọ ──────────────────────────────────────────────
+  async function handleToggleVisibility() {
+    if (!house) return;
+
+    const nextVisibility = house.visibilityStatus === 'Visible' ? 'Hidden' : 'Visible';
+    setActionLoading(true);
+    setMessage('');
+    try {
+      const updated = await updateRoomingHouseVisibility(house.id, nextVisibility);
+      setHouse(updated);
+      setMessage(nextVisibility === 'Hidden'
+        ? 'Khu trọ đã được ẩn khỏi trang công khai.'
+        : 'Khu trọ đã được hiển thị công khai.');
+    } catch (err) {
+      setMessage(getApiErrorMessage(err, 'Không thể cập nhật trạng thái hiển thị khu trọ.'));
+    } finally {
+      setActionLoading(false);
+    }
+  }
+
   async function handleSaveImages() {
     if (!house) return;
     setActionLoading(true);
@@ -323,11 +459,7 @@ export default function RoomingHouseDetailPage() {
 
   if (loading) {
     return (
-      <div className="landlord-dashboard">
-        <aside className="dashboard-sidebar">
-          <h1>Chủ trọ</h1>
-          <button className="sidebar-item active">Quản lý khu trọ</button>
-        </aside>
+      <div className="rooming-house-detail-page" style={{ display: 'contents' }}>
         <main className="dashboard-main">
           <div className="empty-panel">Đang tải thông tin khu trọ...</div>
         </main>
@@ -337,13 +469,7 @@ export default function RoomingHouseDetailPage() {
 
   if (!house) {
     return (
-      <div className="landlord-dashboard">
-        <aside className="dashboard-sidebar">
-          <h1>Chủ trọ</h1>
-          <button className="sidebar-item" onClick={() => navigate(ROUTE_PATHS.LANDLORD.DASHBOARD)}>
-            Quay lại Dashboard
-          </button>
-        </aside>
+      <div className="rooming-house-detail-page" style={{ display: 'contents' }}>
         <main className="dashboard-main">
           <div className="empty-panel">
             <h2>Lỗi truy cập</h2>
@@ -355,35 +481,7 @@ export default function RoomingHouseDetailPage() {
   }
 
   return (
-    <div className="landlord-dashboard rooming-house-detail-page">
-      <aside className="dashboard-sidebar">
-        <h1>Chủ trọ</h1>
-        <button
-          className="sidebar-item active"
-          onClick={() => navigate(ROUTE_PATHS.LANDLORD.DASHBOARD)}
-        >
-          Quản lý khu trọ
-        </button>
-        <button
-          className="sidebar-item"
-          onClick={() => navigate(ROUTE_PATHS.LANDLORD.RENTAL_REQUESTS)}
-        >
-          Yêu cầu thuê
-        </button>
-        <button
-          className="sidebar-item"
-          onClick={() => navigate(ROUTE_PATHS.LANDLORD.VIEWING_APPOINTMENTS)}
-        >
-          Lịch hẹn xem phòng
-        </button>
-        <button className="sidebar-item" disabled style={{ opacity: 0.6, cursor: 'not-allowed' }}>
-          Quản lý doanh thu (Sau này)
-        </button>
-        <button className="sidebar-item sidebar-back-btn" onClick={() => navigate(ROUTE_PATHS.ME.ROOT)}>
-          ← Quay lại trang chủ
-        </button>
-      </aside>
-
+    <div className="rooming-house-detail-page" style={{ display: 'contents' }}>
       <main className="dashboard-main">
         {/* Banner Tổng quan */}
         {/* Banner Tổng quan */}
@@ -392,7 +490,7 @@ export default function RoomingHouseDetailPage() {
             <button
               type="button"
               className="back-icon-btn"
-              onClick={() => navigate(ROUTE_PATHS.LANDLORD.DASHBOARD)}
+              onClick={() => navigate(ROUTE_PATHS.LANDLORD.ROOMING_HOUSES)}
               title="Quay về quản lý khu trọ"
             >
               <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
@@ -460,6 +558,15 @@ export default function RoomingHouseDetailPage() {
               >
                 Thông tin khu trọ
               </button>
+              {house.approvalStatus === 'Approved' && (
+                <button
+                  className="secondary-action"
+                  onClick={handleToggleVisibility}
+                  disabled={actionLoading}
+                >
+                  {house.visibilityStatus === 'Visible' ? 'Ẩn khu trọ' : 'Hiển thị khu trọ'}
+                </button>
+              )}
               <button
                 className="primary-action"
                 onClick={handleCreateRoomClick}
@@ -497,6 +604,9 @@ export default function RoomingHouseDetailPage() {
             <button className={activeTab === 'rental-policy' ? 'active' : ''} onClick={() => setActiveTab('rental-policy')}>
               Chính sách thuê
             </button>
+            <button className={activeTab === 'service-prices' ? 'active' : ''} onClick={() => setActiveTab('service-prices')}>
+              Bảng giá dịch vụ
+            </button>
           </div>
         )}
 
@@ -505,6 +615,11 @@ export default function RoomingHouseDetailPage() {
           {/* TAB 1: THÔNG TIN CƠ BẢN */}
           {activeTab === 'basic' && (
             <div className="editor-panel form-grid">
+              {addressLocked && (
+                <div className="empty-panel compact" style={{ gridColumn: '1 / -1' }}>
+                  Địa chỉ hành chính của khu trọ đã được duyệt nên không thể chỉnh sửa. Bạn vẫn có thể cập nhật tọa độ và link Google Maps.
+                </div>
+              )}
               <label className="field">
                 <span>Tên khu trọ</span>
                 <input value={basicForm.name} onChange={e => setBasicForm({ ...basicForm, name: e.target.value })} />
@@ -512,12 +627,13 @@ export default function RoomingHouseDetailPage() {
 
               <label className="field">
                 <span>Địa chỉ chi tiết</span>
-                <input value={basicForm.addressLine} onChange={e => setBasicForm({ ...basicForm, addressLine: e.target.value })} />
+                <input disabled={addressLocked} value={basicForm.addressLine} onChange={e => setBasicForm({ ...basicForm, addressLine: e.target.value })} />
               </label>
 
               <label className="field">
                 <span>Tỉnh / Thành phố</span>
                 <select
+                  disabled={addressLocked}
                   value={basicForm.provinceCode}
                   onChange={e => setBasicForm({ ...basicForm, provinceCode: e.target.value, wardCode: '' })}
                 >
@@ -533,7 +649,7 @@ export default function RoomingHouseDetailPage() {
                 <select
                   value={basicForm.wardCode}
                   onChange={e => setBasicForm({ ...basicForm, wardCode: e.target.value })}
-                  disabled={!basicForm.provinceCode}
+                  disabled={addressLocked || !basicForm.provinceCode}
                 >
                   <option value="">-- Chọn Phường/Xã --</option>
                   {wards.map(w => (
@@ -550,7 +666,7 @@ export default function RoomingHouseDetailPage() {
                 longitude={basicForm.longitude}
                 googleMapUrl={basicForm.googleMapUrl}
                 onAddressChange={(addressLine) =>
-                  setBasicForm((current) => ({ ...current, addressLine }))
+                  setBasicForm((current) => addressLocked ? current : { ...current, addressLine })
                 }
                 onLocationChange={(latitude, longitude) =>
                   setBasicForm((current) => ({ ...current, latitude, longitude }))
@@ -823,6 +939,7 @@ export default function RoomingHouseDetailPage() {
           {/* TAB 5: QUẢN LÝ PHÒNG */}
           {activeTab === 'service-prices' && (
             <ServicePriceEditorBatch
+              serviceTypes={billingServiceTypes}
               prices={servicePrices}
               activePrices={activeServicePrices}
               priceHistory={servicePriceHistory}
@@ -892,6 +1009,7 @@ export default function RoomingHouseDetailPage() {
 // ─── Subcomponents ──────────────────────────────────────────────────────────
 
 function ServicePriceEditorBatch({
+  serviceTypes,
   activePrices,
   priceHistory,
   loading,
@@ -903,6 +1021,7 @@ function ServicePriceEditorBatch({
   onSubmit,
   onReload,
 }: {
+  serviceTypes: BillingServiceType[];
   prices: ServicePrice[];
   activePrices: ServicePrice[];
   priceHistory: ServicePrice[];
@@ -910,13 +1029,13 @@ function ServicePriceEditorBatch({
   drafts: CreateServicePriceRequest[];
   note: string;
   actionLoading: boolean;
-  onChangeDraft: (serviceCode: BillingServiceCode, patch: Partial<CreateServicePriceRequest>) => void;
+  onChangeDraft: (serviceTypeId: string, patch: Partial<CreateServicePriceRequest>) => void;
   onChangeNote: (note: string) => void;
   onSubmit: (event: FormEvent<HTMLFormElement>) => void;
   onReload: () => void;
 }) {
-  const activeByCode = new Map(activePrices.map((price) => [price.serviceCode, price]));
-  const historyGroups = buildServicePriceHistoryGroups(priceHistory);
+  const activeByServiceTypeId = new Map(activePrices.map((price) => [price.serviceTypeId, price]));
+  const historyGroups = buildServicePriceHistoryGroups(priceHistory, serviceTypes);
 
   return (
     <div className="editor-panel service-price-editor">
@@ -939,16 +1058,25 @@ function ServicePriceEditorBatch({
             <span>Giá mới</span>
             <span>Từ ngày</span>
           </div>
-          {serviceOptions.map((service) => {
-            const currentPrice = activeByCode.get(service.code);
-            const draft = drafts.find((item) => item.serviceCode === service.code) ?? defaultServicePriceDrafts.find((item) => item.serviceCode === service.code)!;
-            const methods = getServiceBillingMethods(service.code);
+          {serviceTypes.map((serviceType) => {
+            const currentPrice = activeByServiceTypeId.get(serviceType.id);
+            const defaultPricingUnit = getDefaultServicePricingUnit(serviceType);
+            const draft = drafts.find((item) => item.serviceTypeId === serviceType.id) ?? {
+              serviceTypeId: serviceType.id,
+              serviceCode: serviceType.id,
+              pricingUnit: defaultPricingUnit,
+              billingMethod: defaultPricingUnit,
+              unitName: getServicePricingUnitDisplayUnit(defaultPricingUnit, serviceType),
+              unitPrice: 0,
+              effectiveFrom: nextPeriodStart,
+            };
+            const methods = getServicePricingUnitOptions(serviceType);
 
             return (
-              <div className="service-price-batch-row" key={service.code}>
+              <div className="service-price-batch-row" key={serviceType.id}>
                 <div className="service-price-service">
-                  <span className={`service-price-icon service-price-icon--${service.code.toLowerCase()}`}>{getServiceIcon(service.code)}</span>
-                  <strong>{service.label}</strong>
+                  <span className={`service-price-icon service-price-icon--${getServiceTypeSlug(serviceType)}`}>{getServiceTypeIcon(serviceType)}</span>
+                  <strong>{serviceType.name}</strong>
                 </div>
                 <div className="service-price-current">
                   <strong>{currentPrice ? `${formatMoneyString(currentPrice.unitPrice)} VND / ${currentPrice.unitName}` : 'Chưa có giá'}</strong>
@@ -963,10 +1091,11 @@ function ServicePriceEditorBatch({
                         <button
                           type="button"
                           key={method}
-                          className={normalizeBillingMethod(draft.billingMethod) === method ? 'active' : ''}
-                          onClick={() => onChangeDraft(service.code, {
+                          className={normalizeBillingMethod(draft.billingMethod ?? 'PerMonth') === method ? 'active' : ''}
+                          onClick={() => onChangeDraft(serviceType.id, {
+                            pricingUnit: method,
                             billingMethod: method,
-                            unitName: method === 'PerPerson' ? 'person' : method === 'PerMonth' ? 'month' : service.unit,
+                            unitName: getServicePricingUnitDisplayUnit(method, serviceType),
                           })}
                         >
                           {getBillingMethodShortLabel(method)}
@@ -974,13 +1103,13 @@ function ServicePriceEditorBatch({
                       ))}
                     </div>
                   )}
-                  <small>{getUnitHint(draft.billingMethod)}</small>
+                  <small>{getServicePricingUnitHint(draft.billingMethod ?? 'PerMonth', serviceType)}</small>
                 </div>
                 <label className="service-price-inline-field">
                   <input
                     type="text"
                     value={formatMoneyString(draft.unitPrice)}
-                    onChange={(event) => onChangeDraft(service.code, { unitPrice: parseMoneyString(event.target.value) })}
+                    onChange={(event) => onChangeDraft(serviceType.id, { unitPrice: parseMoneyString(event.target.value) })}
                   />
                 </label>
                 <label className="service-price-inline-field">
@@ -997,7 +1126,7 @@ function ServicePriceEditorBatch({
             onChange={(event) => onChangeNote(event.target.value)}
             placeholder="Ghi chú chung (ví dụ: điều chỉnh theo biểu giá tháng tới)"
           />
-          <button type="submit" className="primary-action" disabled={actionLoading || drafts.some((draft) => Number(draft.unitPrice) <= 0)}>
+          <button type="submit" className="primary-action" disabled={actionLoading || serviceTypes.length === 0 || drafts.some((draft) => Number(draft.unitPrice) < 0)}>
             {actionLoading ? 'Đang lưu...' : 'Lưu tất cả'}
           </button>
         </div>
@@ -1016,8 +1145,8 @@ function ServicePriceEditorBatch({
               <details className="service-price-history-group" key={group.key} open={index === 0}>
                 <summary>
                   <span className="history-dot-row">
-                    {group.serviceCodes.map((code) => (
-                      <i key={code} className={`history-dot history-dot--${code.toLowerCase()}`} />
+                    {group.serviceTypeIds.map((serviceTypeId) => (
+                      <i key={serviceTypeId} className={`history-dot history-dot--${getHistoryServiceTypeSlug(serviceTypeId, serviceTypes)}`} />
                     ))}
                   </span>
                   <strong>{group.label}</strong>
@@ -1034,7 +1163,7 @@ function ServicePriceEditorBatch({
                   </div>
                   {group.items.map((price) => (
                     <div className="service-price-row" key={price.id}>
-                      <span>{serviceOptions.find((service) => service.code === price.serviceCode)?.label ?? price.serviceName}</span>
+                      <span>{serviceTypes.find((serviceType) => serviceType.id === price.serviceTypeId)?.name ?? price.serviceName}</span>
                       <span>{formatMoneyString(price.unitPrice)} VND</span>
                       <span>{price.unitName}</span>
                       <span>{getBillingMethodLabel(price.billingMethod)}</span>
@@ -1107,7 +1236,7 @@ function ServicePriceEditor({
                       <strong>{service.label}</strong>
                       <span>{price ? `${formatMoneyString(price.unitPrice)} VND / ${price.unitName}` : 'Chưa cấu hình'}</span>
                     </div>
-                    <small>{price ? `Từ ${price.effectiveFrom}` : service.method === 'Metered' ? 'Theo chỉ số' : 'Cố định'}</small>
+                    <small>{price ? `Từ ${price.effectiveFrom}` : getBillingMethodLabel(service.method)}</small>
                   </div>
                 );
               })}
@@ -1133,7 +1262,7 @@ function ServicePriceEditor({
             <div className="form-grid">
               <label className="field">
                 <span>Cách tính</span>
-                <input value={form.billingMethod === 'Metered' ? 'Theo chỉ số' : 'Cố định'} readOnly />
+                <input value={getBillingMethodLabel(form.billingMethod ?? 'PerMonth')} readOnly />
               </label>
               <label className="field">
                 <span>Đơn vị</span>
@@ -1203,9 +1332,10 @@ function ServicePriceEditor({
   );
 }
 
-function buildServicePriceHistoryGroups(prices: ServicePrice[]) {
+function buildServicePriceHistoryGroups(prices: ServicePrice[], serviceTypes: BillingServiceType[] = []) {
   const formatter = new Intl.DateTimeFormat('vi-VN', { month: 'long', year: 'numeric' });
   const groups = new Map<string, ServicePrice[]>();
+  const serviceTypeOrder = new Map(serviceTypes.map((serviceType, index) => [serviceType.id, index]));
 
   for (const price of prices) {
     const key = price.effectiveFrom.slice(0, 7);
@@ -1216,26 +1346,29 @@ function buildServicePriceHistoryGroups(prices: ServicePrice[]) {
   return Array.from(groups.entries())
     .sort(([a], [b]) => b.localeCompare(a))
     .map(([key, items]) => {
-      const latestByService = new Map<BillingServiceCode, ServicePrice>();
+      const latestByService = new Map<string, ServicePrice>();
       for (const item of [...items].sort((a, b) =>
         b.effectiveFrom.localeCompare(a.effectiveFrom) ||
         b.updatedAt.localeCompare(a.updatedAt)
       )) {
-        if (!latestByService.has(item.serviceCode)) {
-          latestByService.set(item.serviceCode, item);
+        if (!latestByService.has(item.serviceTypeId)) {
+          latestByService.set(item.serviceTypeId, item);
         }
       }
 
-      const sortedItems = serviceOptions
-        .map((service) => latestByService.get(service.code))
-        .filter((item): item is ServicePrice => Boolean(item));
+      const sortedItems = Array.from(latestByService.values())
+        .sort((a, b) =>
+          (serviceTypeOrder.get(a.serviceTypeId) ?? Number.MAX_SAFE_INTEGER) -
+          (serviceTypeOrder.get(b.serviceTypeId) ?? Number.MAX_SAFE_INTEGER) ||
+          a.serviceName.localeCompare(b.serviceName, 'vi')
+        );
       const date = new Date(`${key}-01T00:00:00`);
 
       return {
         key,
         label: formatter.format(date),
         items: sortedItems,
-        serviceCodes: sortedItems.map((item) => item.serviceCode),
+        serviceTypeIds: sortedItems.map((item) => item.serviceTypeId),
       };
     });
 }
@@ -1249,7 +1382,7 @@ function getNextPeriodStart() {
 }
 
 function normalizeBillingMethod(method: BillingMethod): BillingMethod {
-  if (method === 'Metered') {
+  if (method === 'Metered' || method === 'MeterReading') {
     return 'MeterBased';
   }
 
@@ -1257,19 +1390,83 @@ function normalizeBillingMethod(method: BillingMethod): BillingMethod {
     return 'PerMonth';
   }
 
+  if (method === 'PerPersonPerMonth') {
+    return 'PerPerson';
+  }
+
   return method;
+}
+
+function normalizePricingUnit(unit: PricingUnit | BillingMethod): PricingUnit {
+  const normalized = normalizeBillingMethod(unit);
+
+  if (normalized === 'MeterBased') {
+    return 'MeterReading';
+  }
+
+  if (normalized === 'PerPerson') {
+    return 'PerPersonPerMonth';
+  }
+
+  if (normalized === 'PerMonth') {
+    return 'PerMonth';
+  }
+
+  return normalized;
 }
 
 function toApiBillingMethod(method: BillingMethod): BillingMethod {
   if (method === 'MeterBased') {
-    return 'Metered';
+    return 'MeterReading';
   }
 
-  if (method === 'PerMonth' || method === 'PerPerson') {
-    return 'Fixed';
+  if (method === 'Fixed' || method === 'PerMonth') {
+    return 'PerMonth';
+  }
+
+  if (method === 'PerPerson' || method === 'PerPersonPerMonth') {
+    return 'PerPersonPerMonth';
   }
 
   return method;
+}
+
+function getDefaultServicePricingUnit(serviceType: BillingServiceType): PricingUnit {
+  return serviceType.supportsMeterReading ? 'MeterReading' : 'PerMonth';
+}
+
+function getServicePricingUnitOptions(serviceType: BillingServiceType): BillingMethod[] {
+  return serviceType.supportsMeterReading
+    ? ['MeterBased', 'PerMonth', 'PerPerson']
+    : ['PerMonth', 'PerPerson'];
+}
+
+function getServicePricingUnitDisplayUnit(unit: PricingUnit | BillingMethod | string, serviceType: BillingServiceType) {
+  const normalized = normalizeBillingMethod(unit as BillingMethod);
+
+  if (normalized === 'PerPerson') {
+    return 'người/tháng';
+  }
+
+  if (normalized === 'PerMonth') {
+    return 'tháng';
+  }
+
+  return serviceType.meterUnitName ?? '';
+}
+
+function getServicePricingUnitHint(unit: PricingUnit | BillingMethod | string, serviceType: BillingServiceType) {
+  const normalized = normalizeBillingMethod(unit as BillingMethod);
+
+  if (normalized === 'PerPerson') {
+    return 'VND / người / tháng';
+  }
+
+  if (normalized === 'PerMonth') {
+    return 'VND / phòng / tháng';
+  }
+
+  return serviceType.meterUnitName ? `VND / ${serviceType.meterUnitName}` : 'VND / chỉ số';
 }
 
 function getServiceBillingMethods(serviceCode: BillingServiceCode): BillingMethod[] {
@@ -1284,29 +1481,55 @@ function getServiceBillingMethods(serviceCode: BillingServiceCode): BillingMetho
   return ['PerMonth', 'PerPerson'];
 }
 
+function getServiceTypeSlug(serviceType: BillingServiceType) {
+  return serviceType.name
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .replace(/đ/g, 'd')
+    .replace(/Đ/g, 'D')
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, '-')
+    .replace(/^-|-$/g, '') || 'service';
+}
+
+function getHistoryServiceTypeSlug(serviceTypeId: string, serviceTypes: BillingServiceType[]) {
+  const serviceType = serviceTypes.find((item) => item.id === serviceTypeId);
+  return serviceType ? getServiceTypeSlug(serviceType) : 'service';
+}
+
+function getServiceTypeIcon(serviceType: BillingServiceType) {
+  const name = serviceType.name.trim();
+  return name ? name.slice(0, 2).toUpperCase() : 'DV';
+}
+
 function getBillingMethodLabel(method: BillingMethod) {
   const normalized = normalizeBillingMethod(method);
   const labels: Record<BillingMethod, string> = {
     Metered: 'MeterBased',
     MeterBased: 'MeterBased',
+    MeterReading: 'MeterBased',
     Fixed: 'Theo tháng',
     PerMonth: 'Theo tháng',
-    PerPerson: 'Theo người',
+    PerPerson: 'Theo người/tháng',
+    PerPersonPerMonth: 'Theo người/tháng',
   };
 
   return labels[normalized];
 }
 
 function getBillingMethodShortLabel(method: BillingMethod) {
+  const normalized = normalizeBillingMethod(method);
   const labels: Record<BillingMethod, string> = {
     Metered: 'Chỉ số',
     MeterBased: 'Chỉ số',
+    MeterReading: 'Chỉ số',
     Fixed: 'Tháng',
     PerMonth: 'Tháng',
-    PerPerson: 'Người',
+    PerPerson: 'Người/tháng',
+    PerPersonPerMonth: 'Người/tháng',
   };
 
-  return labels[method];
+  return labels[normalized];
 }
 
 function getUnitHint(method: BillingMethod) {

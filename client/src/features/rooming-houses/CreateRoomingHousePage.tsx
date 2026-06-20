@@ -33,7 +33,7 @@ export default function CreateRoomingHousePage() {
         setEligibility(eligibilityData);
 
         if (!mode && !queryId && data.canEnterLandlordDashboard) {
-          navigate(ROUTE_PATHS.LANDLORD.DASHBOARD);
+          navigate(ROUTE_PATHS.LANDLORD.ROOMING_HOUSES);
           return;
         }
 
@@ -161,7 +161,7 @@ export default function CreateRoomingHousePage() {
             {onboarding.canEnterLandlordDashboard && (
               <Link
                 className="create-rooming-house-page__primary"
-                to="/landlord/dashboard"
+                to="/landlord/rooming-houses"
               >
                 Vào kênh chủ trọ
               </Link>
@@ -197,12 +197,12 @@ export default function CreateRoomingHousePage() {
             setEligibility(eligibilityData);
 
             if (data.canEnterLandlordDashboard) {
-              navigate(ROUTE_PATHS.LANDLORD.DASHBOARD);
+              navigate(ROUTE_PATHS.LANDLORD.ROOMING_HOUSES);
             } else {
               setRoomingHouse(data.roomingHouse ?? null);
             }
           } catch (err) {
-            navigate(ROUTE_PATHS.LANDLORD.DASHBOARD);
+            navigate(ROUTE_PATHS.LANDLORD.ROOMING_HOUSES);
           } finally {
             setLoading(false);
           }
