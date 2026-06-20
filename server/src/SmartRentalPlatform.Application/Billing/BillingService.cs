@@ -170,21 +170,23 @@ public class BillingService : IBillingService
             contract.EndDate,
             termsEffectiveOn,
             cancellationToken);
-        var billingPeriod = ResolveBillingPeriodWithinContract(
+        var periodContext = await ResolveInvoicePeriodContextAsync(
+            contract.Id,
             effectiveTerms.StartDate,
             effectiveTerms.EndDate,
             billingPeriodStart,
-            billingPeriodEnd);
-        var monthlyRent = await ResolveEffectiveMonthlyRentAsync(
-            contract.Id,
-            contract.MonthlyRent,
-            billingPeriod.Start,
+            billingPeriodEnd,
             cancellationToken);
-        var effectiveTenant = await ResolveEffectiveInvoiceTenantAsync(
+        var billingPeriod = periodContext.BillingPeriod;
+        var contractContext = await ResolveInvoiceContractContextAsync(
             contract.Id,
             contract.MainTenantUserId,
+            contract.MonthlyRent,
+            billingPeriod,
             billingPeriod.Start,
             cancellationToken);
+        var monthlyRent = contractContext.MonthlyRent;
+        var effectiveTenant = contractContext.EffectiveTenant;
         var rentAmount = CalculatePeriodAmount(monthlyRent, billingPeriod);
         var serviceTypes = await context.BillingServiceTypes
             .AsNoTracking()
@@ -196,66 +198,27 @@ public class BillingService : IBillingService
             serviceTypes.Select(x => x.Id).ToList(),
             billingPeriod.Start,
             cancellationToken);
-        var occupantCount = await GetActiveOccupantCountAsync(contract.Id, billingPeriod, cancellationToken);
+        var occupantCount = contractContext.OccupantCount;
         var latestReadingByServiceType = await GetLatestReadingByServiceTypeAsync(
             contract.Id,
             billingPeriod.Start,
             cancellationToken);
-        var generationBlockReason = await GetInvoiceGenerationBlockReasonAsync(
-            contract.Id,
-            effectiveTerms.StartDate,
-            effectiveTerms.EndDate,
-            billingPeriod,
-            billingPeriodEnd,
-            cancellationToken);
-        var today = DateOnly.FromDateTime(DateTime.UtcNow);
-        if (billingPeriod.Start > today || billingPeriod.End > today)
+        var generationBlockReason = periodContext.BlockReason;
+        if (IsFutureBillingPeriod(billingPeriod))
         {
             generationBlockReason = "Kỳ hóa đơn chưa kết thúc nên chưa thể tạo hóa đơn.";
         }
 
-        var fixedServices = prices
-            .Where(x => x.PricingUnit is PricingUnit.PerMonth or PricingUnit.PerPersonPerMonth)
-            .GroupBy(x => x.ServiceTypeId)
-            .Select(x => x.OrderByDescending(price => price.EffectiveFrom).First())
-            .Where(x => serviceTypeById.ContainsKey(x.ServiceTypeId))
-            .OrderBy(x => serviceTypeById[x.ServiceTypeId].Name)
-            .Select(price =>
-            {
-                var serviceType = serviceTypeById[price.ServiceTypeId];
-                var quantity = GetFixedServiceQuantity(price.PricingUnit, billingPeriod, occupantCount);
-                var amount = RoundMoney(price.UnitPrice * quantity);
-                return new FixedServicePreviewResponse(
-                    serviceType.Id,
-                    serviceType.Name,
-                    price.PricingUnit.ToString(),
-                    GetDisplayUnitName(price, serviceType),
-                    price.UnitPrice,
-                    quantity,
-                    occupantCount,
-                    amount);
-            })
-            .ToList();
+        var fixedServices = BuildFixedServicePreviews(
+            prices,
+            serviceTypeById,
+            billingPeriod,
+            occupantCount);
 
-        var meteredServices = prices
-            .Where(x => x.PricingUnit == PricingUnit.MeterReading)
-            .GroupBy(x => x.ServiceTypeId)
-            .Select(x => x.OrderByDescending(price => price.EffectiveFrom).First())
-            .Where(x => serviceTypeById.ContainsKey(x.ServiceTypeId))
-            .OrderBy(x => serviceTypeById[x.ServiceTypeId].Name)
-            .Select(price =>
-            {
-                var serviceType = serviceTypeById[price.ServiceTypeId];
-                latestReadingByServiceType.TryGetValue(serviceType.Id, out var latestReading);
-                return new MeteredServicePreviewResponse(
-                    serviceType.Id,
-                    serviceType.Name,
-                    serviceType.MeterUnitName ?? string.Empty,
-                    price.UnitPrice,
-                    latestReading,
-                    latestReading is null);
-            })
-            .ToList();
+        var meteredServices = BuildMeteredServicePreviews(
+            prices,
+            serviceTypeById,
+            latestReadingByServiceType);
 
         var fixedServiceAmount = fixedServices.Sum(x => x.Amount);
 
@@ -339,24 +302,26 @@ public class BillingService : IBillingService
                 "Hợp đồng đã được tạo đủ hóa đơn đến ngày chấm dứt.");
         }
 
-        var billingPeriod = ResolveBillingPeriodWithinContract(
+        var periodContext = await ResolveInvoicePeriodContextAsync(
+            contract.Id,
             effectiveTerms.StartDate,
             effectiveTerms.EndDate,
             nextPeriodStart,
-            terminationDate);
-        var monthlyRent = await ResolveEffectiveMonthlyRentAsync(
-            contract.Id,
-            contract.MonthlyRent,
-            billingPeriod.Start,
+            terminationDate,
             cancellationToken);
+        var billingPeriod = periodContext.BillingPeriod;
         DateOnly tenantEffectiveOn = billingPeriod.End == terminationDate
             ? terminationDate
             : billingPeriod.Start;
-        var effectiveTenant = await ResolveEffectiveInvoiceTenantAsync(
+        var contractContext = await ResolveInvoiceContractContextAsync(
             contract.Id,
             contract.MainTenantUserId,
+            contract.MonthlyRent,
+            billingPeriod,
             tenantEffectiveOn,
             cancellationToken);
+        var monthlyRent = contractContext.MonthlyRent;
+        var effectiveTenant = contractContext.EffectiveTenant;
         var rentAmount = CalculatePeriodAmount(monthlyRent, billingPeriod);
         var serviceTypes = await context.BillingServiceTypes
             .AsNoTracking()
@@ -368,66 +333,27 @@ public class BillingService : IBillingService
             serviceTypes.Select(x => x.Id).ToList(),
             billingPeriod.Start,
             cancellationToken);
-        var occupantCount = await GetActiveOccupantCountAsync(contract.Id, billingPeriod, cancellationToken);
+        var occupantCount = contractContext.OccupantCount;
         var latestReadingByServiceType = await GetLatestReadingByServiceTypeAsync(
             contract.Id,
             billingPeriod.Start,
             cancellationToken);
-        var generationBlockReason = await GetInvoiceGenerationBlockReasonAsync(
-            contract.Id,
-            effectiveTerms.StartDate,
-            effectiveTerms.EndDate,
-            billingPeriod,
-            terminationDate,
-            cancellationToken);
-        var today = DateOnly.FromDateTime(DateTime.UtcNow);
-        if (billingPeriod.Start > today || billingPeriod.End > today)
+        var generationBlockReason = periodContext.BlockReason;
+        if (IsFutureBillingPeriod(billingPeriod))
         {
             generationBlockReason = "Kỳ hóa đơn chưa kết thúc nên chưa thể tạo hóa đơn.";
         }
 
-        var fixedServices = prices
-            .Where(x => x.PricingUnit is PricingUnit.PerMonth or PricingUnit.PerPersonPerMonth)
-            .GroupBy(x => x.ServiceTypeId)
-            .Select(x => x.OrderByDescending(price => price.EffectiveFrom).First())
-            .Where(x => serviceTypeById.ContainsKey(x.ServiceTypeId))
-            .OrderBy(x => serviceTypeById[x.ServiceTypeId].Name)
-            .Select(price =>
-            {
-                var serviceType = serviceTypeById[price.ServiceTypeId];
-                var quantity = GetFixedServiceQuantity(price.PricingUnit, billingPeriod, occupantCount);
-                var amount = RoundMoney(price.UnitPrice * quantity);
-                return new FixedServicePreviewResponse(
-                    serviceType.Id,
-                    serviceType.Name,
-                    price.PricingUnit.ToString(),
-                    GetDisplayUnitName(price, serviceType),
-                    price.UnitPrice,
-                    quantity,
-                    occupantCount,
-                    amount);
-            })
-            .ToList();
+        var fixedServices = BuildFixedServicePreviews(
+            prices,
+            serviceTypeById,
+            billingPeriod,
+            occupantCount);
 
-        var meteredServices = prices
-            .Where(x => x.PricingUnit == PricingUnit.MeterReading)
-            .GroupBy(x => x.ServiceTypeId)
-            .Select(x => x.OrderByDescending(price => price.EffectiveFrom).First())
-            .Where(x => serviceTypeById.ContainsKey(x.ServiceTypeId))
-            .OrderBy(x => serviceTypeById[x.ServiceTypeId].Name)
-            .Select(price =>
-            {
-                var serviceType = serviceTypeById[price.ServiceTypeId];
-                latestReadingByServiceType.TryGetValue(serviceType.Id, out var latestReading);
-                return new MeteredServicePreviewResponse(
-                    serviceType.Id,
-                    serviceType.Name,
-                    serviceType.MeterUnitName ?? string.Empty,
-                    price.UnitPrice,
-                    latestReading,
-                    latestReading is null);
-            })
-            .ToList();
+        var meteredServices = BuildMeteredServicePreviews(
+            prices,
+            serviceTypeById,
+            latestReadingByServiceType);
         var fixedServiceAmount = fixedServices.Sum(x => x.Amount);
 
         return new RoomInvoicePreviewResponse(
@@ -569,270 +495,6 @@ public class BillingService : IBillingService
         price.ServiceType = serviceType;
         return ToServicePriceResponse(price);
     }
-
-#if false
-    public async Task<MeterReadingResponse> CreateMeterReadingAsync(
-        Guid landlordUserId,
-        CreateMeterReadingRequest request,
-        CancellationToken cancellationToken = default)
-    {
-        var serviceCode = ParseServiceCode(request.ServiceCode);
-        if (!MeteredServices.Contains(serviceCode))
-        {
-            throw new BadRequestException(
-                ErrorCodes.MeterReadingInvalid,
-                "Chỉ được nhập chỉ số cho dịch vụ Điện và Nước.");
-        }
-
-        if (request.BillingPeriodEnd < request.BillingPeriodStart)
-        {
-            throw new BadRequestException(ErrorCodes.MeterReadingInvalid, "Kỳ hóa đơn không hợp lệ.");
-        }
-
-        if (request.CurrentReading < request.PreviousReading)
-        {
-            throw new BadRequestException(
-                ErrorCodes.MeterReadingInvalid,
-                "Chỉ số cuối kỳ phải lớn hơn hoặc bằng chỉ số đầu kỳ.");
-        }
-
-        var contract = await GetOwnedActiveContractAsync(landlordUserId, request.ContractId, cancellationToken);
-        if (contract.RoomId != request.RoomId)
-        {
-            throw new BadRequestException(ErrorCodes.MeterReadingInvalid, "Phòng không khớp với hợp đồng đang active.");
-        }
-
-        var today = DateOnly.FromDateTime(DateTime.Now);
-        if (request.BillingPeriodStart > today || request.BillingPeriodEnd > today)
-        {
-            throw new BadRequestException(
-                ErrorCodes.MeterReadingInvalid,
-                "Kỳ ghi chỉ số không được nằm trong tương lai.");
-        }
-
-        if (request.BillingPeriodStart < contract.StartDate || request.BillingPeriodEnd > contract.EndDate)
-        {
-            throw new BadRequestException(
-                ErrorCodes.MeterReadingInvalid,
-                "Kỳ ghi chỉ số phải nằm trong thời hạn hợp đồng.");
-        }
-
-        var serviceType = await GetServiceTypeAsync(serviceCode, cancellationToken);
-        var duplicate = await context.MeterReadings.AnyAsync(
-            x => x.ContractId == request.ContractId &&
-                 x.ServiceTypeId == serviceType.Id &&
-                 x.BillingPeriodStart == request.BillingPeriodStart &&
-                 x.BillingPeriodEnd == request.BillingPeriodEnd,
-            cancellationToken);
-
-        if (duplicate)
-        {
-            throw new ConflictException(
-                ErrorCodes.MeterReadingInvalid,
-                "Chỉ số của dịch vụ trong kỳ này đã tồn tại.");
-        }
-
-        var overlapping = await context.MeterReadings.AnyAsync(
-            x => x.ContractId == request.ContractId &&
-                 x.ServiceTypeId == serviceType.Id &&
-                 x.BillingPeriodStart <= request.BillingPeriodEnd &&
-                 x.BillingPeriodEnd >= request.BillingPeriodStart,
-            cancellationToken);
-
-        if (overlapping)
-        {
-            throw new ConflictException(
-                ErrorCodes.MeterReadingInvalid,
-                "Kỳ ghi chỉ số bị trùng hoặc chồng lấn với bản ghi đã có.");
-        }
-
-        var now = DateTimeOffset.UtcNow;
-        var reading = new MeterReading
-        {
-            Id = Guid.NewGuid(),
-            RoomId = request.RoomId,
-            ContractId = request.ContractId,
-            ServiceTypeId = serviceType.Id,
-            BillingPeriodStart = request.BillingPeriodStart,
-            BillingPeriodEnd = request.BillingPeriodEnd,
-            PreviousReading = request.PreviousReading,
-            CurrentReading = request.CurrentReading,
-            Consumption = request.CurrentReading - request.PreviousReading,
-            ProofImageObjectKey = request.ProofImageObjectKey,
-            Status = MeterReadingStatus.Draft,
-            RecordedByLandlordUserId = landlordUserId,
-            ReadingAt = now,
-            CreatedAt = now,
-            UpdatedAt = now
-        };
-
-        context.MeterReadings.Add(reading);
-        await context.SaveChangesAsync(cancellationToken);
-
-        reading.ServiceType = serviceType;
-        return ToMeterReadingResponse(reading);
-    }
-
-    public async Task<InvoiceResponse> GenerateDraftInvoiceAsync(
-        Guid landlordUserId,
-        GenerateInvoiceDraftRequest request,
-        CancellationToken cancellationToken = default)
-    {
-        if (request.BillingPeriodEnd < request.BillingPeriodStart)
-        {
-            throw new BadRequestException(ErrorCodes.InvoiceInvalidStatus, "Kỳ hóa đơn không hợp lệ.");
-        }
-
-        if (!IsFullCalendarMonth(request.BillingPeriodStart, request.BillingPeriodEnd))
-        {
-            throw new BadRequestException(
-                ErrorCodes.InvoiceInvalidStatus,
-                "Hóa đơn tháng phải bắt đầu ngày 01 và kết thúc vào ngày cuối cùng của cùng tháng.");
-        }
-
-        if (request.DiscountAmount < 0)
-        {
-            throw new BadRequestException(ErrorCodes.InvoiceInvalidStatus, "Số tiền giảm trừ không được âm.");
-        }
-
-        var contract = await GetOwnedActiveContractAsync(landlordUserId, request.ContractId, cancellationToken);
-        var duplicate = await context.Invoices.AnyAsync(
-            x => x.ContractId == request.ContractId &&
-                 x.BillingPeriodStart == request.BillingPeriodStart &&
-                 x.BillingPeriodEnd == request.BillingPeriodEnd,
-            cancellationToken);
-
-        if (duplicate)
-        {
-            throw new ConflictException(
-                ErrorCodes.InvoiceDuplicatePeriod,
-                "Hợp đồng đã có hóa đơn trong kỳ này.");
-        }
-
-        var serviceTypes = await context.BillingServiceTypes
-            .AsNoTracking()
-            .Where(x => x.IsActive)
-            .ToListAsync(cancellationToken);
-
-        var serviceTypeByCode = serviceTypes.ToDictionary(x => x.Code);
-        var prices = await GetEffectivePricesAsync(
-            contract.RoomingHouseId,
-            serviceTypes.Select(x => x.Id).ToList(),
-            request.BillingPeriodEnd,
-            cancellationToken);
-
-        var now = DateTimeOffset.UtcNow;
-        var dueDate = BuildDueDate(request.BillingPeriodEnd, contract.PaymentDay);
-        var invoice = new Invoice
-        {
-            Id = Guid.NewGuid(),
-            ContractId = contract.Id,
-            RoomId = contract.RoomId,
-            TenantUserId = contract.TenantUserId,
-            LandlordUserId = contract.LandlordUserId,
-            InvoiceNo = GenerateInvoiceNo(),
-            BillingPeriodStart = request.BillingPeriodStart,
-            BillingPeriodEnd = request.BillingPeriodEnd,
-            DueDate = dueDate,
-            RentAmount = contract.MonthlyRent,
-            DiscountAmount = request.DiscountAmount,
-            Status = InvoiceStatus.Draft,
-            Note = request.Note,
-            CreatedAt = now,
-            UpdatedAt = now
-        };
-
-        invoice.Items.Add(new InvoiceItem
-        {
-            Id = Guid.NewGuid(),
-            ItemType = InvoiceItemType.Rent,
-            Description = "Tiền thuê phòng",
-            Quantity = 1,
-            UnitPrice = contract.MonthlyRent,
-            Amount = contract.MonthlyRent,
-            CreatedAt = now
-        });
-
-        var meterReadings = await context.MeterReadings
-            .Include(x => x.ServiceType)
-            .Where(x => x.ContractId == contract.Id &&
-                        x.BillingPeriodStart == request.BillingPeriodStart &&
-                        x.BillingPeriodEnd == request.BillingPeriodEnd &&
-                        x.Status == MeterReadingStatus.Draft)
-            .ToListAsync(cancellationToken);
-
-        foreach (var code in MeteredServices)
-        {
-            if (!serviceTypeByCode.TryGetValue(code, out var serviceType))
-            {
-                continue;
-            }
-
-            var reading = meterReadings.FirstOrDefault(x => x.ServiceTypeId == serviceType.Id);
-            if (reading is null)
-            {
-                continue;
-            }
-
-            var price = GetEffectivePriceOrThrow(prices, serviceType.Id, code);
-            var itemType = code == BillingServiceCode.Electric ? InvoiceItemType.Electricity : InvoiceItemType.Water;
-            var amount = reading.Consumption * price.UnitPrice;
-
-            invoice.UtilityAmount += amount;
-            invoice.Items.Add(new InvoiceItem
-            {
-                Id = Guid.NewGuid(),
-                ServiceTypeId = serviceType.Id,
-                MeterReadingId = reading.Id,
-                ItemType = itemType,
-                Description = $"{serviceType.Name} ({reading.Consumption} {price.UnitName})",
-                Quantity = reading.Consumption,
-                UnitPrice = price.UnitPrice,
-                Amount = amount,
-                CreatedAt = now
-            });
-
-            reading.Status = MeterReadingStatus.UsedInInvoice;
-            reading.UpdatedAt = now;
-        }
-
-        foreach (var code in FixedServices)
-        {
-            if (!serviceTypeByCode.TryGetValue(code, out var serviceType))
-            {
-                continue;
-            }
-
-            var price = GetEffectivePriceOrThrow(prices, serviceType.Id, code);
-            var itemType = code == BillingServiceCode.Wifi ? InvoiceItemType.Wifi : InvoiceItemType.Garbage;
-
-            invoice.ServiceAmount += price.UnitPrice;
-            invoice.Items.Add(new InvoiceItem
-            {
-                Id = Guid.NewGuid(),
-                ServiceTypeId = serviceType.Id,
-                ItemType = itemType,
-                Description = serviceType.Name,
-                Quantity = 1,
-                UnitPrice = price.UnitPrice,
-                Amount = price.UnitPrice,
-                CreatedAt = now
-            });
-        }
-
-        invoice.TotalAmount = invoice.RentAmount + invoice.UtilityAmount + invoice.ServiceAmount - invoice.DiscountAmount;
-        if (invoice.TotalAmount < 0)
-        {
-            throw new BadRequestException(ErrorCodes.InvoiceInvalidStatus, "Tổng tiền hóa đơn không được âm.");
-        }
-
-        context.Invoices.Add(invoice);
-        await context.SaveChangesAsync(cancellationToken);
-
-        return await GetInvoiceResponseAsync(invoice.Id, cancellationToken);
-    }
-
-#endif
 
     public async Task<List<InvoiceResponse>> GetLandlordInvoicesAsync(
         Guid landlordUserId,
@@ -1141,19 +803,16 @@ public class BillingService : IBillingService
             effectiveTerms.EndDate,
             request.BillingPeriodStart);
 
-        var today = DateOnly.FromDateTime(DateTime.UtcNow);
-        if (billingPeriod.Start > today || billingPeriod.End > today)
+        if (IsFutureBillingPeriod(billingPeriod))
         {
             throw new BadRequestException(
                 ErrorCodes.MeterReadingInvalid,
                 "Kỳ ghi chỉ số không được nằm trong tương lai.");
         }
 
-        var duplicate = await context.Invoices.AnyAsync(
-            x => x.ContractId == request.ContractId &&
-                 x.BillingPeriodStart == billingPeriod.Start &&
-                 x.BillingPeriodEnd == billingPeriod.End &&
-                 x.Status != InvoiceStatus.Cancelled,
+        var duplicate = await InvoicePeriodExistsAsync(
+            request.ContractId,
+            billingPeriod,
             cancellationToken);
 
         if (duplicate)
@@ -1187,144 +846,27 @@ public class BillingService : IBillingService
             throw new BadRequestException(ErrorCodes.InvoiceInvalidStatus, sequenceBlockReason);
         }
 
-        var duplicatedInputService = request.MeterReadings
-            .Select(x => x.ServiceTypeId)
-            .GroupBy(x => x)
-            .FirstOrDefault(x => x.Count() > 1);
-        if (duplicatedInputService is not null)
-        {
-            throw new BadRequestException(
-                ErrorCodes.MeterReadingInvalid,
-                "Một dịch vụ chỉ số bị nhập trùng trong cùng hóa đơn.");
-        }
-
-        var meterReadingByServiceType = request.MeterReadings.ToDictionary(x => x.ServiceTypeId);
-        var requiredMeteredPrices = prices
-            .Where(x => x.PricingUnit == PricingUnit.MeterReading)
-            .GroupBy(x => x.ServiceTypeId)
-            .Select(x => x.OrderByDescending(price => price.EffectiveFrom).First())
-            .ToList();
-
-        foreach (var price in requiredMeteredPrices)
-        {
-            if (!meterReadingByServiceType.ContainsKey(price.ServiceTypeId) &&
-                serviceTypeById.TryGetValue(price.ServiceTypeId, out var missingServiceType))
-            {
-                throw new BadRequestException(
-                    ErrorCodes.MeterReadingInvalid,
-                    $"Vui lòng nhập chỉ số cho dịch vụ {missingServiceType.Name} trước khi tạo hóa đơn.");
-            }
-        }
-
-        var meteredInputs = new List<ResolvedMeterReadingInput>();
-        foreach (var input in request.MeterReadings)
-        {
-            if (!serviceTypeById.TryGetValue(input.ServiceTypeId, out var serviceType))
-            {
-                throw new NotFoundException(
-                    ErrorCodes.BillingServiceInvalid,
-                    "Không tìm thấy loại dịch vụ đang hoạt động.");
-            }
-
-            var price = GetEffectivePriceOrThrow(prices, serviceType.Id, serviceType.Name);
-            if (price.PricingUnit != PricingUnit.MeterReading)
-            {
-                throw new BadRequestException(
-                    ErrorCodes.MeterReadingInvalid,
-                    $"Dịch vụ {serviceType.Name} không được cấu hình tính tiền theo chỉ số trong kỳ này.");
-            }
-
-            if (!serviceType.SupportsMeterReading || string.IsNullOrWhiteSpace(serviceType.MeterUnitName))
-            {
-                throw new BadRequestException(
-                    ErrorCodes.MeterReadingInvalid,
-                    $"Dịch vụ {serviceType.Name} không hỗ trợ nhập chỉ số.");
-            }
-
-            if (input.PreviousReading.HasValue && input.PreviousReading.Value < 0)
-            {
-                throw new BadRequestException(
-                    ErrorCodes.MeterReadingInvalid,
-                    $"Chỉ số đầu kỳ không được âm cho dịch vụ {serviceType.Name}.");
-            }
-
-            if (input.CurrentReading < 0)
-            {
-                throw new BadRequestException(
-                    ErrorCodes.MeterReadingInvalid,
-                    $"Chỉ số cuối kỳ không được âm cho dịch vụ {serviceType.Name}.");
-            }
-
-            var overlapping = await context.MeterReadings.AnyAsync(
-                x => x.ContractId == contract.Id &&
-                     x.ServiceTypeId == serviceType.Id &&
-                     x.BillingPeriodStart <= billingPeriod.End &&
-                     x.BillingPeriodEnd >= billingPeriod.Start &&
-                     x.InvoiceItems.Any(item => item.Invoice.Status != InvoiceStatus.Cancelled),
-                cancellationToken);
-
-            if (overlapping)
-            {
-                throw new ConflictException(
-                    ErrorCodes.MeterReadingInvalid,
-                    $"Kỳ ghi chỉ số của dịch vụ {serviceType.Name} bị trùng hoặc chồng lấn với bản ghi đã có.");
-            }
-
-            var latestReading = await context.MeterReadings
-                .AsNoTracking()
-                .Where(x => x.ContractId == contract.Id &&
-                            x.ServiceTypeId == serviceType.Id &&
-                            x.BillingPeriodEnd < billingPeriod.Start &&
-                            x.InvoiceItems.Any(item => item.Invoice.Status != InvoiceStatus.Cancelled))
-                .OrderByDescending(x => x.BillingPeriodEnd)
-                .ThenByDescending(x => x.CreatedAt)
-                .FirstOrDefaultAsync(cancellationToken);
-
-            var previousReading = latestReading?.CurrentReading ?? input.PreviousReading;
-            if (!previousReading.HasValue)
-            {
-                throw new BadRequestException(
-                    ErrorCodes.MeterReadingInvalid,
-                    $"Lần tạo hóa đơn đầu tiên của dịch vụ {serviceType.Name} phải nhập chỉ số đầu kỳ.");
-            }
-
-            if (latestReading is not null &&
-                input.PreviousReading.HasValue &&
-                input.PreviousReading.Value != latestReading.CurrentReading)
-            {
-                throw new BadRequestException(
-                    ErrorCodes.MeterReadingInvalid,
-                    $"Chỉ số đầu kỳ của {serviceType.Name} phải bằng chỉ số cuối kỳ gần nhất ({latestReading.CurrentReading}).");
-            }
-
-            if (input.CurrentReading < previousReading.Value)
-            {
-                throw new BadRequestException(
-                    ErrorCodes.MeterReadingInvalid,
-                    $"Chỉ số cuối kỳ phải lớn hơn hoặc bằng chỉ số đầu kỳ cho dịch vụ {serviceType.Name}.");
-            }
-
-            meteredInputs.Add(new ResolvedMeterReadingInput(
-                serviceType,
-                price,
-                previousReading.Value,
-                input.CurrentReading,
-                input.ProofImageObjectKey));
-        }
+        var meteredInputs = await ResolveMeterReadingInputsAsync(
+            contract.Id,
+            billingPeriod,
+            request.MeterReadings,
+            serviceTypeById,
+            prices,
+            isFinalInvoice: false,
+            cancellationToken);
 
         await using var transaction = await context.BeginTransactionAsync(cancellationToken);
         var now = DateTimeOffset.UtcNow;
         var dueDate = BuildDueDate(billingPeriod.End, contract.PaymentDay);
-        var monthlyRent = await ResolveEffectiveMonthlyRentAsync(
-            contract.Id,
-            contract.MonthlyRent,
-            billingPeriod.Start,
-            cancellationToken);
-        var effectiveTenant = await ResolveEffectiveInvoiceTenantAsync(
+        var contractContext = await ResolveInvoiceContractContextAsync(
             contract.Id,
             contract.TenantUserId,
+            contract.MonthlyRent,
+            billingPeriod,
             billingPeriod.Start,
             cancellationToken);
+        var monthlyRent = contractContext.MonthlyRent;
+        var effectiveTenant = contractContext.EffectiveTenant;
         var rentAmount = CalculatePeriodAmount(monthlyRent, billingPeriod);
 
         var invoice = new Invoice
@@ -1346,90 +888,23 @@ public class BillingService : IBillingService
             UpdatedAt = now
         };
 
-        invoice.Items.Add(new InvoiceItem
-        {
-            Id = Guid.NewGuid(),
-            ItemType = InvoiceItemType.Rent,
-            Description = BuildPeriodDescription("Tiền thuê phòng", billingPeriod),
-            Quantity = GetPeriodQuantity(billingPeriod),
-            UnitPrice = monthlyRent,
-            Amount = rentAmount,
-            CreatedAt = now
-        });
-
-        foreach (var input in meteredInputs)
-        {
-            var consumption = input.CurrentReading - input.PreviousReading;
-            var amount = RoundMoney(consumption * input.Price.UnitPrice);
-            var reading = new MeterReading
-            {
-                Id = Guid.NewGuid(),
-                RoomId = contract.RoomId,
-                ContractId = contract.Id,
-                ServiceTypeId = input.ServiceType.Id,
-                BillingPeriodStart = billingPeriod.Start,
-                BillingPeriodEnd = billingPeriod.End,
-                PreviousReading = input.PreviousReading,
-                CurrentReading = input.CurrentReading,
-                Consumption = consumption,
-                ProofImageObjectKey = input.ProofImageObjectKey,
-                RecordedByLandlordUserId = landlordUserId,
-                ReadingAt = now,
-                CreatedAt = now,
-                UpdatedAt = now
-            };
-
-            context.MeterReadings.Add(reading);
-            invoice.UtilityAmount += amount;
-            invoice.Items.Add(new InvoiceItem
-            {
-                Id = Guid.NewGuid(),
-                ServiceTypeId = input.ServiceType.Id,
-                MeterReadingId = reading.Id,
-                ItemType = InvoiceItemType.Service,
-                Description = $"{input.ServiceType.Name} ({consumption} {GetDisplayUnitName(input.Price, input.ServiceType)})",
-                Quantity = consumption,
-                UnitPrice = input.Price.UnitPrice,
-                Amount = amount,
-                CreatedAt = now
-            });
-        }
-
-        var occupantCount = await GetActiveOccupantCountAsync(contract.Id, billingPeriod, cancellationToken);
-        var fixedPrices = prices
-            .Where(x => x.PricingUnit is PricingUnit.PerMonth or PricingUnit.PerPersonPerMonth)
-            .GroupBy(x => x.ServiceTypeId)
-            .Select(x => x.OrderByDescending(price => price.EffectiveFrom).First())
-            .OrderBy(x => serviceTypeById.TryGetValue(x.ServiceTypeId, out var serviceType) ? serviceType.Name : string.Empty);
-
-        foreach (var price in fixedPrices)
-        {
-            if (!serviceTypeById.TryGetValue(price.ServiceTypeId, out var serviceType))
-            {
-                continue;
-            }
-
-            var quantity = GetFixedServiceQuantity(price.PricingUnit, billingPeriod, occupantCount);
-            var serviceAmount = RoundMoney(price.UnitPrice * quantity);
-            invoice.ServiceAmount += serviceAmount;
-            invoice.Items.Add(new InvoiceItem
-            {
-                Id = Guid.NewGuid(),
-                ServiceTypeId = serviceType.Id,
-                ItemType = InvoiceItemType.Service,
-                Description = BuildFixedServiceDescription(serviceType.Name, price.PricingUnit, billingPeriod, occupantCount),
-                Quantity = quantity,
-                UnitPrice = price.UnitPrice,
-                Amount = serviceAmount,
-                CreatedAt = now
-            });
-        }
-
-        invoice.TotalAmount = RoundMoney(invoice.RentAmount + invoice.UtilityAmount + invoice.ServiceAmount - invoice.DiscountAmount);
-        if (invoice.TotalAmount < 0)
-        {
-            throw new BadRequestException(ErrorCodes.InvoiceInvalidStatus, "Tổng tiền hóa đơn không được âm.");
-        }
+        AddRentInvoiceItem(invoice, monthlyRent, rentAmount, billingPeriod, now);
+        AddMeteredServiceInvoiceItems(
+            invoice,
+            contract.RoomId,
+            contract.Id,
+            landlordUserId,
+            billingPeriod,
+            meteredInputs,
+            now);
+        AddFixedServiceInvoiceItems(
+            invoice,
+            prices,
+            serviceTypeById,
+            billingPeriod,
+            contractContext.OccupantCount,
+            now);
+        CalculateAndValidateInvoiceTotal(invoice);
 
         context.Invoices.Add(invoice);
         try
@@ -1534,19 +1009,16 @@ public class BillingService : IBillingService
             billingPeriodReferenceDate,
             terminationDate);
 
-        var today = DateOnly.FromDateTime(DateTime.UtcNow);
-        if (billingPeriod.Start > today || billingPeriod.End > today)
+        if (IsFutureBillingPeriod(billingPeriod))
         {
             throw new BadRequestException(
                 ErrorCodes.MeterReadingInvalid,
                 "Kỳ ghi chỉ số không được nằm trong tương lai.");
         }
 
-        var duplicate = await context.Invoices.AnyAsync(
-            x => x.ContractId == contractId &&
-                 x.BillingPeriodStart == billingPeriod.Start &&
-                 x.BillingPeriodEnd == billingPeriod.End &&
-                 x.Status != InvoiceStatus.Cancelled,
+        var duplicate = await InvoicePeriodExistsAsync(
+            contractId,
+            billingPeriod,
             cancellationToken);
 
         if (duplicate)
@@ -1580,146 +1052,28 @@ public class BillingService : IBillingService
             billingPeriod.Start,
             cancellationToken);
 
-        var duplicatedInputService = meterReadings
-            .Select(x => x.ServiceTypeId)
-            .GroupBy(x => x)
-            .FirstOrDefault(x => x.Count() > 1);
-        if (duplicatedInputService is not null)
-        {
-            throw new BadRequestException(
-                ErrorCodes.MeterReadingInvalid,
-                "Một dịch vụ chỉ số bị nhập trùng trong cùng hóa đơn.");
-        }
-
-        var meterReadingByServiceType = meterReadings.ToDictionary(x => x.ServiceTypeId);
-        var requiredMeteredPrices = prices
-            .Where(x => x.PricingUnit == PricingUnit.MeterReading)
-            .GroupBy(x => x.ServiceTypeId)
-            .Select(x => x.OrderByDescending(price => price.EffectiveFrom).First())
-            .ToList();
-
-        foreach (var price in requiredMeteredPrices)
-        {
-            if (!meterReadingByServiceType.ContainsKey(price.ServiceTypeId) &&
-                serviceTypeById.TryGetValue(price.ServiceTypeId, out var missingServiceType))
-            {
-                throw new BadRequestException(
-                    ErrorCodes.MeterReadingInvalid,
-                    $"Vui lòng nhập chỉ số cho dịch vụ {missingServiceType.Name} trước khi tạo hóa đơn kỳ cuối.");
-            }
-        }
-
-        var meteredInputs = new List<ResolvedMeterReadingInput>();
-        foreach (var input in meterReadings)
-        {
-            if (!serviceTypeById.TryGetValue(input.ServiceTypeId, out var serviceType))
-            {
-                throw new NotFoundException(
-                    ErrorCodes.BillingServiceInvalid,
-                    "Không tìm thấy loại dịch vụ đang hoạt động.");
-            }
-
-            var price = GetEffectivePriceOrThrow(prices, serviceType.Id, serviceType.Name);
-            if (price.PricingUnit != PricingUnit.MeterReading)
-            {
-                throw new BadRequestException(
-                    ErrorCodes.MeterReadingInvalid,
-                    $"Dịch vụ {serviceType.Name} không được cấu hình tính tiền theo chỉ số trong kỳ này.");
-            }
-
-            if (!serviceType.SupportsMeterReading || string.IsNullOrWhiteSpace(serviceType.MeterUnitName))
-            {
-                throw new BadRequestException(
-                    ErrorCodes.MeterReadingInvalid,
-                    $"Dịch vụ {serviceType.Name} không hỗ trợ nhập chỉ số.");
-            }
-
-            if (input.PreviousReading.HasValue && input.PreviousReading.Value < 0)
-            {
-                throw new BadRequestException(
-                    ErrorCodes.MeterReadingInvalid,
-                    $"Chỉ số đầu kỳ không được âm cho dịch vụ {serviceType.Name}.");
-            }
-
-            if (input.CurrentReading < 0)
-            {
-                throw new BadRequestException(
-                    ErrorCodes.MeterReadingInvalid,
-                    $"Chỉ số cuối kỳ không được âm cho dịch vụ {serviceType.Name}.");
-            }
-
-            var overlapping = await context.MeterReadings.AnyAsync(
-                x => x.ContractId == contract.Id &&
-                     x.ServiceTypeId == serviceType.Id &&
-                     x.BillingPeriodStart <= billingPeriod.End &&
-                     x.BillingPeriodEnd >= billingPeriod.Start &&
-                     x.InvoiceItems.Any(item => item.Invoice.Status != InvoiceStatus.Cancelled),
-                cancellationToken);
-
-            if (overlapping)
-            {
-                throw new ConflictException(
-                    ErrorCodes.MeterReadingInvalid,
-                    $"Kỳ ghi chỉ số của dịch vụ {serviceType.Name} bị trùng hoặc chồng lên với bản ghi đã có.");
-            }
-
-            var latestReading = await context.MeterReadings
-                .AsNoTracking()
-                .Where(x => x.ContractId == contract.Id &&
-                            x.ServiceTypeId == serviceType.Id &&
-                            x.BillingPeriodEnd < billingPeriod.Start &&
-                            x.InvoiceItems.Any(item => item.Invoice.Status != InvoiceStatus.Cancelled))
-                .OrderByDescending(x => x.BillingPeriodEnd)
-                .ThenByDescending(x => x.CreatedAt)
-                .FirstOrDefaultAsync(cancellationToken);
-
-            var previousReading = latestReading?.CurrentReading ?? input.PreviousReading;
-            if (!previousReading.HasValue)
-            {
-                throw new BadRequestException(
-                    ErrorCodes.MeterReadingInvalid,
-                    $"Lần tạo hóa đơn đầu tiên của dịch vụ {serviceType.Name} phải nhập chỉ số đầu kỳ.");
-            }
-
-            if (latestReading is not null &&
-                input.PreviousReading.HasValue &&
-                input.PreviousReading.Value != latestReading.CurrentReading)
-            {
-                throw new BadRequestException(
-                    ErrorCodes.MeterReadingInvalid,
-                    $"Chỉ số đầu kỳ của {serviceType.Name} phải bằng chỉ số cuối kỳ gần nhất ({latestReading.CurrentReading}).");
-            }
-
-            if (input.CurrentReading < previousReading.Value)
-            {
-                throw new BadRequestException(
-                    ErrorCodes.MeterReadingInvalid,
-                    $"Chỉ số cuối kỳ phải lớn hơn hoặc bằng chỉ số đầu kỳ cho dịch vụ {serviceType.Name}.");
-            }
-
-            meteredInputs.Add(new ResolvedMeterReadingInput(
-                serviceType,
-                price,
-                previousReading.Value,
-                input.CurrentReading,
-                input.ProofImageObjectKey));
-        }
-
+        var meteredInputs = await ResolveMeterReadingInputsAsync(
+            contract.Id,
+            billingPeriod,
+            meterReadings,
+            serviceTypeById,
+            prices,
+            isFinalInvoice: true,
+            cancellationToken);
         var now = DateTimeOffset.UtcNow;
         var dueDate = BuildDueDate(billingPeriod.End, contract.PaymentDay);
-        var monthlyRent = await ResolveEffectiveMonthlyRentAsync(
-            contract.Id,
-            contract.MonthlyRent,
-            billingPeriod.Start,
-            cancellationToken);
         DateOnly tenantEffectiveOn = billingPeriod.End == terminationDate
             ? terminationDate
             : billingPeriod.Start;
-        var effectiveTenant = await ResolveEffectiveInvoiceTenantAsync(
+        var contractContext = await ResolveInvoiceContractContextAsync(
             contract.Id,
             contract.TenantUserId,
+            contract.MonthlyRent,
+            billingPeriod,
             tenantEffectiveOn,
             cancellationToken);
+        var monthlyRent = contractContext.MonthlyRent;
+        var effectiveTenant = contractContext.EffectiveTenant;
         var rentAmount = CalculatePeriodAmount(monthlyRent, billingPeriod);
 
         var invoice = new Invoice
@@ -1742,90 +1096,23 @@ public class BillingService : IBillingService
             UpdatedAt = now
         };
 
-        invoice.Items.Add(new InvoiceItem
-        {
-            Id = Guid.NewGuid(),
-            ItemType = InvoiceItemType.Rent,
-            Description = BuildPeriodDescription("Tiền thuê phòng", billingPeriod),
-            Quantity = GetPeriodQuantity(billingPeriod),
-            UnitPrice = monthlyRent,
-            Amount = rentAmount,
-            CreatedAt = now
-        });
-
-        foreach (var input in meteredInputs)
-        {
-            var consumption = input.CurrentReading - input.PreviousReading;
-            var amount = RoundMoney(consumption * input.Price.UnitPrice);
-            var reading = new MeterReading
-            {
-                Id = Guid.NewGuid(),
-                RoomId = contract.RoomId,
-                ContractId = contract.Id,
-                ServiceTypeId = input.ServiceType.Id,
-                BillingPeriodStart = billingPeriod.Start,
-                BillingPeriodEnd = billingPeriod.End,
-                PreviousReading = input.PreviousReading,
-                CurrentReading = input.CurrentReading,
-                Consumption = consumption,
-                ProofImageObjectKey = input.ProofImageObjectKey,
-                RecordedByLandlordUserId = landlordUserId,
-                ReadingAt = now,
-                CreatedAt = now,
-                UpdatedAt = now
-            };
-
-            context.MeterReadings.Add(reading);
-            invoice.UtilityAmount += amount;
-            invoice.Items.Add(new InvoiceItem
-            {
-                Id = Guid.NewGuid(),
-                ServiceTypeId = input.ServiceType.Id,
-                MeterReadingId = reading.Id,
-                ItemType = InvoiceItemType.Service,
-                Description = $"{input.ServiceType.Name} ({consumption} {GetDisplayUnitName(input.Price, input.ServiceType)})",
-                Quantity = consumption,
-                UnitPrice = input.Price.UnitPrice,
-                Amount = amount,
-                CreatedAt = now
-            });
-        }
-
-        var occupantCount = await GetActiveOccupantCountAsync(contract.Id, billingPeriod, cancellationToken);
-        var fixedPrices = prices
-            .Where(x => x.PricingUnit is PricingUnit.PerMonth or PricingUnit.PerPersonPerMonth)
-            .GroupBy(x => x.ServiceTypeId)
-            .Select(x => x.OrderByDescending(price => price.EffectiveFrom).First())
-            .OrderBy(x => serviceTypeById.TryGetValue(x.ServiceTypeId, out var serviceType) ? serviceType.Name : string.Empty);
-
-        foreach (var price in fixedPrices)
-        {
-            if (!serviceTypeById.TryGetValue(price.ServiceTypeId, out var serviceType))
-            {
-                continue;
-            }
-
-            var quantity = GetFixedServiceQuantity(price.PricingUnit, billingPeriod, occupantCount);
-            var serviceAmount = RoundMoney(price.UnitPrice * quantity);
-            invoice.ServiceAmount += serviceAmount;
-            invoice.Items.Add(new InvoiceItem
-            {
-                Id = Guid.NewGuid(),
-                ServiceTypeId = serviceType.Id,
-                ItemType = InvoiceItemType.Service,
-                Description = BuildFixedServiceDescription(serviceType.Name, price.PricingUnit, billingPeriod, occupantCount),
-                Quantity = quantity,
-                UnitPrice = price.UnitPrice,
-                Amount = serviceAmount,
-                CreatedAt = now
-            });
-        }
-
-        invoice.TotalAmount = RoundMoney(invoice.RentAmount + invoice.UtilityAmount + invoice.ServiceAmount - invoice.DiscountAmount);
-        if (invoice.TotalAmount < 0)
-        {
-            throw new BadRequestException(ErrorCodes.InvoiceInvalidStatus, "Tổng tiền hóa đơn không được âm.");
-        }
+        AddRentInvoiceItem(invoice, monthlyRent, rentAmount, billingPeriod, now);
+        AddMeteredServiceInvoiceItems(
+            invoice,
+            contract.RoomId,
+            contract.Id,
+            landlordUserId,
+            billingPeriod,
+            meteredInputs,
+            now);
+        AddFixedServiceInvoiceItems(
+            invoice,
+            prices,
+            serviceTypeById,
+            billingPeriod,
+            contractContext.OccupantCount,
+            now);
+        CalculateAndValidateInvoiceTotal(invoice);
 
         context.Invoices.Add(invoice);
         try
@@ -1841,269 +1128,6 @@ public class BillingService : IBillingService
 
         return await GetInvoiceResponseAsync(invoice.Id, cancellationToken);
     }
-
-#if false
-    private async Task<InvoiceResponse> GenerateInvoiceWithReadingsLegacyAsync(
-        Guid landlordUserId,
-        GenerateInvoiceWithReadingsRequest request,
-        CancellationToken cancellationToken = default)
-    {
-        // ── 1. Validate input cơ bản ──────────────────────────────────────────
-        if (request.BillingPeriodEnd < request.BillingPeriodStart)
-        {
-            throw new BadRequestException(ErrorCodes.InvoiceInvalidStatus, "Kỳ hóa đơn không hợp lệ.");
-        }
-
-        if (!IsFullCalendarMonth(request.BillingPeriodStart, request.BillingPeriodEnd))
-        {
-            throw new BadRequestException(
-                ErrorCodes.InvoiceInvalidStatus,
-                "Hóa đơn tháng phải bắt đầu ngày 01 và kết thúc vào ngày cuối cùng của cùng tháng.");
-        }
-
-        if (request.DiscountAmount < 0)
-        {
-            throw new BadRequestException(ErrorCodes.InvoiceInvalidStatus, "Số tiền giảm trừ không được âm.");
-        }
-
-        // ── 2. Kiểm tra contract + quyền sở hữu ──────────────────────────────
-        var contract = await GetOwnedActiveContractAsync(landlordUserId, request.ContractId, cancellationToken);
-
-        // ── 3. Kiểm tra duplicate invoice (loại trừ Cancelled) ────────────────
-        var duplicate = await context.Invoices.AnyAsync(
-            x => x.ContractId == request.ContractId &&
-                 x.BillingPeriodStart == request.BillingPeriodStart &&
-                 x.BillingPeriodEnd == request.BillingPeriodEnd &&
-                 x.Status != InvoiceStatus.Cancelled,
-            cancellationToken);
-
-        if (duplicate)
-        {
-            throw new ConflictException(
-                ErrorCodes.InvoiceDuplicatePeriod,
-                "Hợp đồng đã có hóa đơn trong kỳ này.");
-        }
-
-        // ── 4. Lấy danh sách service types và bảng giá hiệu lực ──────────────
-        var serviceTypes = await context.BillingServiceTypes
-            .AsNoTracking()
-            .Where(x => x.IsActive)
-            .ToListAsync(cancellationToken);
-
-        var serviceTypeByCode = serviceTypes.ToDictionary(x => x.Code);
-
-        var prices = await GetEffectivePricesAsync(
-            contract.RoomingHouseId,
-            serviceTypes.Select(x => x.Id).ToList(),
-            request.BillingPeriodEnd,
-            cancellationToken);
-
-        // ── 5. Validate từng meter reading đầu vào ────────────────────────────
-        var today = DateOnly.FromDateTime(DateTime.UtcNow);
-
-        foreach (var input in request.MeterReadings)
-        {
-            var code = ParseServiceCode(input.ServiceCode);
-
-            if (!MeteredServices.Contains(code))
-            {
-                throw new BadRequestException(
-                    ErrorCodes.MeterReadingInvalid,
-                    $"Dịch vụ '{input.ServiceCode}' không phải dịch vụ đo chỉ số.");
-            }
-
-            if (input.PreviousReading < 0)
-            {
-                throw new BadRequestException(
-                    ErrorCodes.MeterReadingInvalid,
-                    $"Chỉ số không được âm cho dịch vụ {input.ServiceCode}.");
-            }
-
-            if (input.CurrentReading < input.PreviousReading)
-            {
-                throw new BadRequestException(
-                    ErrorCodes.MeterReadingInvalid,
-                    $"Chỉ số cuối kỳ phải lớn hơn hoặc bằng chỉ số đầu kỳ cho dịch vụ {input.ServiceCode}.");
-            }
-
-            if (request.BillingPeriodStart > today || request.BillingPeriodEnd > today)
-            {
-                throw new BadRequestException(
-                    ErrorCodes.MeterReadingInvalid,
-                    "Kỳ ghi chỉ số không được nằm trong tương lai.");
-            }
-
-            if (request.BillingPeriodStart < contract.StartDate ||
-                request.BillingPeriodEnd > contract.EndDate)
-            {
-                throw new BadRequestException(
-                    ErrorCodes.MeterReadingInvalid,
-                    "Kỳ ghi chỉ số phải nằm trong thời hạn hợp đồng.");
-            }
-        }
-
-        // ── 6. Kiểm tra duplicate meter reading trong DB ──────────────────────
-        foreach (var input in request.MeterReadings)
-        {
-            var code = ParseServiceCode(input.ServiceCode);
-            if (!serviceTypeByCode.TryGetValue(code, out var st)) continue;
-
-            var alreadyExists = await context.MeterReadings.AnyAsync(
-                x => x.ContractId == contract.Id &&
-                     x.ServiceTypeId == st.Id &&
-                     x.BillingPeriodStart == request.BillingPeriodStart &&
-                     x.BillingPeriodEnd == request.BillingPeriodEnd,
-                cancellationToken);
-
-            if (alreadyExists)
-            {
-                throw new ConflictException(
-                    ErrorCodes.MeterReadingInvalid,
-                    $"Chỉ số dịch vụ '{input.ServiceCode}' trong kỳ này đã tồn tại. Vui lòng kiểm tra lại.");
-            }
-        }
-
-        // ── 7. Bắt đầu transaction ────────────────────────────────────────────
-        await using var transaction = await context.BeginTransactionAsync(cancellationToken);
-        var now = DateTimeOffset.UtcNow;
-        var dueDate = BuildDueDate(request.BillingPeriodEnd, contract.PaymentDay);
-
-        // ── 8. Tạo Invoice entity ─────────────────────────────────────────────
-        var invoice = new Invoice
-        {
-            Id = Guid.NewGuid(),
-            ContractId = contract.Id,
-            RoomId = contract.RoomId,
-            TenantUserId = contract.TenantUserId,
-            LandlordUserId = contract.LandlordUserId,
-            InvoiceNo = GenerateInvoiceNo(),
-            BillingPeriodStart = request.BillingPeriodStart,
-            BillingPeriodEnd = request.BillingPeriodEnd,
-            DueDate = dueDate,
-            RentAmount = contract.MonthlyRent,
-            DiscountAmount = request.DiscountAmount,
-            Status = InvoiceStatus.Draft,
-            Note = request.Note,
-            CreatedAt = now,
-            UpdatedAt = now
-        };
-
-        // Item: tiền thuê phòng
-        invoice.Items.Add(new InvoiceItem
-        {
-            Id = Guid.NewGuid(),
-            ItemType = InvoiceItemType.Rent,
-            Description = "Tiền thuê phòng",
-            Quantity = 1,
-            UnitPrice = contract.MonthlyRent,
-            Amount = contract.MonthlyRent,
-            CreatedAt = now
-        });
-
-        // ── 9. Tạo MeterReading + thêm item cho dịch vụ Metered ──────────────
-        foreach (var input in request.MeterReadings)
-        {
-            var code = ParseServiceCode(input.ServiceCode);
-            if (!serviceTypeByCode.TryGetValue(code, out var serviceType)) continue;
-
-            // Bỏ qua nếu không có bảng giá (không lỗi)
-            var price = prices
-                .OrderByDescending(x => x.EffectiveFrom)
-                .FirstOrDefault(x => x.ServiceTypeId == serviceType.Id);
-            if (price is null) continue;
-
-            var consumption = input.CurrentReading - input.PreviousReading;
-            var amount = consumption * price.UnitPrice;
-            var itemType = code == BillingServiceCode.Electric
-                ? InvoiceItemType.Electricity
-                : InvoiceItemType.Water;
-
-            // Tạo MeterReading với trạng thái UsedInInvoice ngay (atomic trong transaction)
-            var reading = new MeterReading
-            {
-                Id = Guid.NewGuid(),
-                RoomId = contract.RoomId,
-                ContractId = contract.Id,
-                ServiceTypeId = serviceType.Id,
-                BillingPeriodStart = request.BillingPeriodStart,
-                BillingPeriodEnd = request.BillingPeriodEnd,
-                PreviousReading = input.PreviousReading,
-                CurrentReading = input.CurrentReading,
-                Consumption = consumption,
-                ProofImageObjectKey = input.ProofImageObjectKey,
-                RecordedByLandlordUserId = landlordUserId,
-                ReadingAt = now,
-                CreatedAt = now,
-                UpdatedAt = now
-            };
-
-            context.MeterReadings.Add(reading);
-
-            invoice.UtilityAmount += amount;
-            invoice.Items.Add(new InvoiceItem
-            {
-                Id = Guid.NewGuid(),
-                ServiceTypeId = serviceType.Id,
-                MeterReadingId = reading.Id,
-                ItemType = itemType,
-                Description = $"{serviceType.Name} ({consumption} {price.UnitName})",
-                Quantity = consumption,
-                UnitPrice = price.UnitPrice,
-                Amount = amount,
-                CreatedAt = now
-            });
-        }
-
-        // ── 10. Thêm item cho dịch vụ Fixed (bỏ qua nếu chưa có giá) ─────────
-        foreach (var code in FixedServices)
-        {
-            if (!serviceTypeByCode.TryGetValue(code, out var serviceType)) continue;
-
-            var price = prices
-                .OrderByDescending(x => x.EffectiveFrom)
-                .FirstOrDefault(x => x.ServiceTypeId == serviceType.Id);
-            if (price is null) continue;
-
-            var itemType = code == BillingServiceCode.Wifi
-                ? InvoiceItemType.Wifi
-                : InvoiceItemType.Garbage;
-
-            invoice.ServiceAmount += price.UnitPrice;
-            invoice.Items.Add(new InvoiceItem
-            {
-                Id = Guid.NewGuid(),
-                ServiceTypeId = serviceType.Id,
-                ItemType = itemType,
-                Description = serviceType.Name,
-                Quantity = 1,
-                UnitPrice = price.UnitPrice,
-                Amount = price.UnitPrice,
-                CreatedAt = now
-            });
-        }
-
-        // ── 11. Tính tổng và kiểm tra âm ─────────────────────────────────────
-        invoice.TotalAmount = invoice.RentAmount
-                            + invoice.UtilityAmount
-                            + invoice.ServiceAmount
-                            - invoice.DiscountAmount;
-
-        if (invoice.TotalAmount < 0)
-        {
-            throw new BadRequestException(
-                ErrorCodes.InvoiceInvalidStatus,
-                "Tổng tiền hóa đơn không được âm.");
-        }
-
-        // ── 12. Lưu và commit ─────────────────────────────────────────────────
-        context.Invoices.Add(invoice);
-        await context.SaveChangesAsync(cancellationToken);
-        await transaction.CommitAsync(cancellationToken);
-
-        return await GetInvoiceResponseAsync(invoice.Id, cancellationToken);
-    }
-
-#endif
 
     private sealed record ResolvedMeterReadingInput(
         BillingServiceType ServiceType,
@@ -2121,10 +1145,19 @@ public class BillingService : IBillingService
         int DaysInMonth,
         bool IsFullMonth);
 
+    private sealed record ResolvedInvoicePeriodContext(
+        ResolvedBillingPeriod BillingPeriod,
+        string? BlockReason);
+
     private sealed record ResolvedInvoiceTenant(
         Guid UserId,
         string DisplayName,
         string Email);
+
+    private sealed record ResolvedInvoiceContractContext(
+        ResolvedInvoiceTenant EffectiveTenant,
+        decimal MonthlyRent,
+        int OccupantCount);
 
     private sealed record ResolvedContractTerms(
         DateOnly StartDate,
@@ -2188,6 +1221,37 @@ public class BillingService : IBillingService
                 "Không tìm thấy người thuê chính hiện tại của hợp đồng.");
 
         return tenant;
+    }
+
+    private async Task<ResolvedInvoiceContractContext> ResolveInvoiceContractContextAsync(
+        Guid contractId,
+        Guid currentContractTenantUserId,
+        decimal currentMonthlyRent,
+        ResolvedBillingPeriod billingPeriod,
+        DateOnly tenantEffectiveOn,
+        CancellationToken cancellationToken)
+    {
+        var monthlyRent = await ResolveEffectiveMonthlyRentAsync(
+            contractId,
+            currentMonthlyRent,
+            billingPeriod.Start,
+            cancellationToken);
+
+        var effectiveTenant = await ResolveEffectiveInvoiceTenantAsync(
+            contractId,
+            currentContractTenantUserId,
+            tenantEffectiveOn,
+            cancellationToken);
+
+        var occupantCount = await GetActiveOccupantCountAsync(
+            contractId,
+            billingPeriod,
+            cancellationToken);
+
+        return new ResolvedInvoiceContractContext(
+            effectiveTenant,
+            monthlyRent,
+            occupantCount);
     }
 
     private async Task<IReadOnlyDictionary<Guid, LatestMeterReadingResponse>> GetLatestReadingByServiceTypeAsync(
@@ -2278,6 +1342,49 @@ public class BillingService : IBillingService
             isFullMonth);
     }
 
+    private async Task<ResolvedInvoicePeriodContext> ResolveInvoicePeriodContextAsync(
+        Guid contractId,
+        DateOnly contractStart,
+        DateOnly contractEnd,
+        DateOnly requestedMonth,
+        DateOnly? billingPeriodEndOverride,
+        CancellationToken cancellationToken)
+    {
+        var billingPeriod = ResolveBillingPeriodWithinContract(
+            contractStart,
+            contractEnd,
+            requestedMonth,
+            billingPeriodEndOverride);
+
+        var blockReason = await GetInvoiceGenerationBlockReasonAsync(
+            contractId,
+            contractStart,
+            contractEnd,
+            billingPeriod,
+            billingPeriodEndOverride,
+            cancellationToken);
+
+        if (IsFutureBillingPeriod(billingPeriod))
+        {
+            blockReason = "Kỳ hóa đơn chưa kết thúc nên chưa thể tạo hóa đơn.";
+        }
+
+        return new ResolvedInvoicePeriodContext(billingPeriod, blockReason);
+    }
+
+    private async Task<bool> InvoicePeriodExistsAsync(
+        Guid contractId,
+        ResolvedBillingPeriod billingPeriod,
+        CancellationToken cancellationToken)
+    {
+        return await context.Invoices.AnyAsync(
+            x => x.ContractId == contractId &&
+                 x.BillingPeriodStart == billingPeriod.Start &&
+                 x.BillingPeriodEnd == billingPeriod.End &&
+                 x.Status != InvoiceStatus.Cancelled,
+            cancellationToken);
+    }
+
     private async Task<string?> GetInvoiceGenerationBlockReasonAsync(
         Guid contractId,
         DateOnly contractStart,
@@ -2338,6 +1445,12 @@ public class BillingService : IBillingService
         return left.Start == right.Start && left.End == right.End;
     }
 
+    private static bool IsFutureBillingPeriod(ResolvedBillingPeriod period)
+    {
+        var today = DateOnly.FromDateTime(DateTime.UtcNow);
+        return period.Start > today || period.End > today;
+    }
+
     private static string BuildExpectedInvoicePeriodMessage(
         ResolvedBillingPeriod expectedPeriod,
         ResolvedBillingPeriod requestedPeriod)
@@ -2358,6 +1471,314 @@ public class BillingService : IBillingService
         }
 
         return RoundMoney(monthlyAmount * period.BillableDays / period.DaysInMonth);
+    }
+
+    private static List<FixedServicePreviewResponse> BuildFixedServicePreviews(
+        List<RoomingHouseServicePrice> prices,
+        IReadOnlyDictionary<Guid, BillingServiceType> serviceTypeById,
+        ResolvedBillingPeriod billingPeriod,
+        int occupantCount)
+    {
+        return prices
+            .Where(x => x.PricingUnit is PricingUnit.PerMonth or PricingUnit.PerPersonPerMonth)
+            .GroupBy(x => x.ServiceTypeId)
+            .Select(x => x.OrderByDescending(price => price.EffectiveFrom).First())
+            .Where(x => serviceTypeById.ContainsKey(x.ServiceTypeId))
+            .OrderBy(x => serviceTypeById[x.ServiceTypeId].Name)
+            .Select(price =>
+            {
+                var serviceType = serviceTypeById[price.ServiceTypeId];
+                var quantity = GetFixedServiceQuantity(price.PricingUnit, billingPeriod, occupantCount);
+                var amount = RoundMoney(price.UnitPrice * quantity);
+                return new FixedServicePreviewResponse(
+                    serviceType.Id,
+                    serviceType.Name,
+                    price.PricingUnit.ToString(),
+                    GetDisplayUnitName(price, serviceType),
+                    price.UnitPrice,
+                    quantity,
+                    occupantCount,
+                    amount);
+            })
+            .ToList();
+    }
+
+    private static List<MeteredServicePreviewResponse> BuildMeteredServicePreviews(
+        List<RoomingHouseServicePrice> prices,
+        IReadOnlyDictionary<Guid, BillingServiceType> serviceTypeById,
+        IReadOnlyDictionary<Guid, LatestMeterReadingResponse> latestReadingByServiceType)
+    {
+        return prices
+            .Where(x => x.PricingUnit == PricingUnit.MeterReading)
+            .GroupBy(x => x.ServiceTypeId)
+            .Select(x => x.OrderByDescending(price => price.EffectiveFrom).First())
+            .Where(x => serviceTypeById.ContainsKey(x.ServiceTypeId))
+            .OrderBy(x => serviceTypeById[x.ServiceTypeId].Name)
+            .Select(price =>
+            {
+                var serviceType = serviceTypeById[price.ServiceTypeId];
+                latestReadingByServiceType.TryGetValue(serviceType.Id, out var latestReading);
+                return new MeteredServicePreviewResponse(
+                    serviceType.Id,
+                    serviceType.Name,
+                    serviceType.MeterUnitName ?? string.Empty,
+                    price.UnitPrice,
+                    latestReading,
+                    latestReading is null);
+            })
+            .ToList();
+    }
+
+    private static void AddRentInvoiceItem(
+        Invoice invoice,
+        decimal monthlyRent,
+        decimal rentAmount,
+        ResolvedBillingPeriod billingPeriod,
+        DateTimeOffset now)
+    {
+        invoice.Items.Add(new InvoiceItem
+        {
+            Id = Guid.NewGuid(),
+            ItemType = InvoiceItemType.Rent,
+            Description = BuildPeriodDescription("Tiền thuê phòng", billingPeriod),
+            Quantity = GetPeriodQuantity(billingPeriod),
+            UnitPrice = monthlyRent,
+            Amount = rentAmount,
+            CreatedAt = now
+        });
+    }
+
+    private void AddMeteredServiceInvoiceItems(
+        Invoice invoice,
+        Guid roomId,
+        Guid contractId,
+        Guid landlordUserId,
+        ResolvedBillingPeriod billingPeriod,
+        IReadOnlyCollection<ResolvedMeterReadingInput> meteredInputs,
+        DateTimeOffset now)
+    {
+        foreach (var input in meteredInputs)
+        {
+            var consumption = input.CurrentReading - input.PreviousReading;
+            var amount = RoundMoney(consumption * input.Price.UnitPrice);
+            var reading = new MeterReading
+            {
+                Id = Guid.NewGuid(),
+                RoomId = roomId,
+                ContractId = contractId,
+                ServiceTypeId = input.ServiceType.Id,
+                BillingPeriodStart = billingPeriod.Start,
+                BillingPeriodEnd = billingPeriod.End,
+                PreviousReading = input.PreviousReading,
+                CurrentReading = input.CurrentReading,
+                Consumption = consumption,
+                ProofImageObjectKey = input.ProofImageObjectKey,
+                RecordedByLandlordUserId = landlordUserId,
+                ReadingAt = now,
+                CreatedAt = now,
+                UpdatedAt = now
+            };
+
+            context.MeterReadings.Add(reading);
+            invoice.UtilityAmount += amount;
+            invoice.Items.Add(new InvoiceItem
+            {
+                Id = Guid.NewGuid(),
+                ServiceTypeId = input.ServiceType.Id,
+                MeterReadingId = reading.Id,
+                ItemType = InvoiceItemType.Service,
+                Description = $"{input.ServiceType.Name} ({consumption} {GetDisplayUnitName(input.Price, input.ServiceType)})",
+                Quantity = consumption,
+                UnitPrice = input.Price.UnitPrice,
+                Amount = amount,
+                CreatedAt = now
+            });
+        }
+    }
+
+    private static void AddFixedServiceInvoiceItems(
+        Invoice invoice,
+        List<RoomingHouseServicePrice> prices,
+        IReadOnlyDictionary<Guid, BillingServiceType> serviceTypeById,
+        ResolvedBillingPeriod billingPeriod,
+        int occupantCount,
+        DateTimeOffset now)
+    {
+        var fixedPrices = prices
+            .Where(x => x.PricingUnit is PricingUnit.PerMonth or PricingUnit.PerPersonPerMonth)
+            .GroupBy(x => x.ServiceTypeId)
+            .Select(x => x.OrderByDescending(price => price.EffectiveFrom).First())
+            .OrderBy(x => serviceTypeById.TryGetValue(x.ServiceTypeId, out var serviceType) ? serviceType.Name : string.Empty);
+
+        foreach (var price in fixedPrices)
+        {
+            if (!serviceTypeById.TryGetValue(price.ServiceTypeId, out var serviceType))
+            {
+                continue;
+            }
+
+            var quantity = GetFixedServiceQuantity(price.PricingUnit, billingPeriod, occupantCount);
+            var serviceAmount = RoundMoney(price.UnitPrice * quantity);
+            invoice.ServiceAmount += serviceAmount;
+            invoice.Items.Add(new InvoiceItem
+            {
+                Id = Guid.NewGuid(),
+                ServiceTypeId = serviceType.Id,
+                ItemType = InvoiceItemType.Service,
+                Description = BuildFixedServiceDescription(serviceType.Name, price.PricingUnit, billingPeriod, occupantCount),
+                Quantity = quantity,
+                UnitPrice = price.UnitPrice,
+                Amount = serviceAmount,
+                CreatedAt = now
+            });
+        }
+    }
+
+    private static void CalculateAndValidateInvoiceTotal(Invoice invoice)
+    {
+        invoice.TotalAmount = RoundMoney(invoice.RentAmount + invoice.UtilityAmount + invoice.ServiceAmount - invoice.DiscountAmount);
+        if (invoice.TotalAmount < 0)
+        {
+            throw new BadRequestException(ErrorCodes.InvoiceInvalidStatus, "Tổng tiền hóa đơn không được âm.");
+        }
+    }
+
+    private async Task<List<ResolvedMeterReadingInput>> ResolveMeterReadingInputsAsync(
+        Guid contractId,
+        ResolvedBillingPeriod billingPeriod,
+        IReadOnlyCollection<MeterReadingInput> meterReadings,
+        IReadOnlyDictionary<Guid, BillingServiceType> serviceTypeById,
+        List<RoomingHouseServicePrice> prices,
+        bool isFinalInvoice,
+        CancellationToken cancellationToken)
+    {
+        var duplicatedInputService = meterReadings
+            .Select(x => x.ServiceTypeId)
+            .GroupBy(x => x)
+            .FirstOrDefault(x => x.Count() > 1);
+        if (duplicatedInputService is not null)
+        {
+            throw new BadRequestException(
+                ErrorCodes.MeterReadingInvalid,
+                "Mỗi dịch vụ chỉ số chỉ được nhập một lần trong cùng hóa đơn.");
+        }
+
+        var meterReadingByServiceType = meterReadings.ToDictionary(x => x.ServiceTypeId);
+        var requiredMeteredPrices = prices
+            .Where(x => x.PricingUnit == PricingUnit.MeterReading)
+            .GroupBy(x => x.ServiceTypeId)
+            .Select(x => x.OrderByDescending(price => price.EffectiveFrom).First())
+            .ToList();
+
+        foreach (var price in requiredMeteredPrices)
+        {
+            if (!meterReadingByServiceType.ContainsKey(price.ServiceTypeId) &&
+                serviceTypeById.TryGetValue(price.ServiceTypeId, out var missingServiceType))
+            {
+                var suffix = isFinalInvoice ? " kỳ cuối" : string.Empty;
+                throw new BadRequestException(
+                    ErrorCodes.MeterReadingInvalid,
+                    $"Vui lòng nhập chỉ số cho dịch vụ {missingServiceType.Name} trước khi tạo hóa đơn{suffix}.");
+            }
+        }
+
+        var meteredInputs = new List<ResolvedMeterReadingInput>();
+        foreach (var input in meterReadings)
+        {
+            if (!serviceTypeById.TryGetValue(input.ServiceTypeId, out var serviceType))
+            {
+                throw new NotFoundException(
+                    ErrorCodes.BillingServiceInvalid,
+                    "Không tìm thấy loại dịch vụ đang hoạt động.");
+            }
+
+            var price = GetEffectivePriceOrThrow(prices, serviceType.Id, serviceType.Name);
+            if (price.PricingUnit != PricingUnit.MeterReading)
+            {
+                throw new BadRequestException(
+                    ErrorCodes.MeterReadingInvalid,
+                    $"Dịch vụ {serviceType.Name} không được cấu hình tính tiền theo chỉ số trong kỳ này.");
+            }
+
+            if (!serviceType.SupportsMeterReading || string.IsNullOrWhiteSpace(serviceType.MeterUnitName))
+            {
+                throw new BadRequestException(
+                    ErrorCodes.MeterReadingInvalid,
+                    $"Dịch vụ {serviceType.Name} không hỗ trợ nhập chỉ số.");
+            }
+
+            if (input.PreviousReading.HasValue && input.PreviousReading.Value < 0)
+            {
+                throw new BadRequestException(
+                    ErrorCodes.MeterReadingInvalid,
+                    $"Chỉ số đầu kỳ không được âm cho dịch vụ {serviceType.Name}.");
+            }
+
+            if (input.CurrentReading < 0)
+            {
+                throw new BadRequestException(
+                    ErrorCodes.MeterReadingInvalid,
+                    $"Chỉ số cuối kỳ không được âm cho dịch vụ {serviceType.Name}.");
+            }
+
+            var overlapping = await context.MeterReadings.AnyAsync(
+                x => x.ContractId == contractId &&
+                     x.ServiceTypeId == serviceType.Id &&
+                     x.BillingPeriodStart <= billingPeriod.End &&
+                     x.BillingPeriodEnd >= billingPeriod.Start &&
+                     x.InvoiceItems.Any(item => item.Invoice.Status != InvoiceStatus.Cancelled),
+                cancellationToken);
+
+            if (overlapping)
+            {
+                throw new ConflictException(
+                    ErrorCodes.MeterReadingInvalid,
+                    $"Kỳ ghi chỉ số của dịch vụ {serviceType.Name} bị trùng hoặc chồng lên với bản ghi đã có.");
+            }
+
+            var latestReading = await context.MeterReadings
+                .AsNoTracking()
+                .Where(x => x.ContractId == contractId &&
+                            x.ServiceTypeId == serviceType.Id &&
+                            x.BillingPeriodEnd < billingPeriod.Start &&
+                            x.InvoiceItems.Any(item => item.Invoice.Status != InvoiceStatus.Cancelled))
+                .OrderByDescending(x => x.BillingPeriodEnd)
+                .ThenByDescending(x => x.CreatedAt)
+                .FirstOrDefaultAsync(cancellationToken);
+
+            var previousReading = latestReading?.CurrentReading ?? input.PreviousReading;
+            if (!previousReading.HasValue)
+            {
+                throw new BadRequestException(
+                    ErrorCodes.MeterReadingInvalid,
+                    $"Lần tạo hóa đơn đầu tiên của dịch vụ {serviceType.Name} phải nhập chỉ số đầu kỳ.");
+            }
+
+            if (latestReading is not null &&
+                input.PreviousReading.HasValue &&
+                input.PreviousReading.Value != latestReading.CurrentReading)
+            {
+                throw new BadRequestException(
+                    ErrorCodes.MeterReadingInvalid,
+                    $"Chỉ số đầu kỳ của {serviceType.Name} phải bằng chỉ số cuối kỳ gần nhất ({latestReading.CurrentReading}).");
+            }
+
+            if (input.CurrentReading < previousReading.Value)
+            {
+                throw new BadRequestException(
+                    ErrorCodes.MeterReadingInvalid,
+                    $"Chỉ số cuối kỳ phải lớn hơn hoặc bằng chỉ số đầu kỳ cho dịch vụ {serviceType.Name}.");
+            }
+
+            meteredInputs.Add(new ResolvedMeterReadingInput(
+                serviceType,
+                price,
+                previousReading.Value,
+                input.CurrentReading,
+                input.ProofImageObjectKey));
+        }
+
+        return meteredInputs;
     }
 
     private static decimal GetPeriodQuantity(ResolvedBillingPeriod period)

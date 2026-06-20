@@ -129,41 +129,6 @@ public class BillingController : ControllerBase
         });
     }
 
-#if false
-    [Authorize]
-    [HttpPost("landlord/meter-readings")]
-    public async Task<ActionResult<ApiResponse<MeterReadingResponse>>> CreateMeterReading(
-        CreateMeterReadingRequest request,
-        CancellationToken cancellationToken)
-    {
-        var result = await billingService.CreateMeterReadingAsync(GetCurrentUserId(), request, cancellationToken);
-
-        return Ok(new ApiResponse<MeterReadingResponse>
-        {
-            Success = true,
-            Message = "Ghi chi so dich vu thanh cong.",
-            Data = result
-        });
-    }
-
-    [Authorize]
-    [HttpPost("landlord/invoices/generate-draft")]
-    public async Task<ActionResult<ApiResponse<InvoiceResponse>>> GenerateDraftInvoice(
-        GenerateInvoiceDraftRequest request,
-        CancellationToken cancellationToken)
-    {
-        var result = await billingService.GenerateDraftInvoiceAsync(GetCurrentUserId(), request, cancellationToken);
-
-        return Ok(new ApiResponse<InvoiceResponse>
-        {
-            Success = true,
-            Message = "Tạo hóa đơn nháp thành công.",
-            Data = result
-        });
-    }
-
-#endif
-
     /// <summary>
     /// Tạo hóa đơn kết hợp nhập chỉ số điện/nước trong một bước.
     /// Các dịch vụ MeterReading có giá hiệu lực trong kỳ bắt buộc phải có chỉ số.
