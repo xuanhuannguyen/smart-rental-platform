@@ -204,7 +204,12 @@ public class BillingService : IBillingService
             billingPeriod.Start,
             cancellationToken);
         var generationBlockReason = periodContext.BlockReason;
-        if (IsFutureBillingPeriod(billingPeriod))
+        var missingPricesReason = GetMissingServicePricesBlockReason(prices, serviceTypes);
+        if (missingPricesReason is not null)
+        {
+            generationBlockReason = missingPricesReason;
+        }
+        else if (IsFutureBillingPeriod(billingPeriod))
         {
             generationBlockReason = "Kỳ hóa đơn chưa kết thúc nên chưa thể tạo hóa đơn.";
         }
@@ -339,7 +344,12 @@ public class BillingService : IBillingService
             billingPeriod.Start,
             cancellationToken);
         var generationBlockReason = periodContext.BlockReason;
-        if (IsFutureBillingPeriod(billingPeriod))
+        var missingPricesReason = GetMissingServicePricesBlockReason(prices, serviceTypes);
+        if (missingPricesReason is not null)
+        {
+            generationBlockReason = missingPricesReason;
+        }
+        else if (IsFutureBillingPeriod(billingPeriod))
         {
             generationBlockReason = "Kỳ hóa đơn chưa kết thúc nên chưa thể tạo hóa đơn.";
         }
@@ -408,7 +418,20 @@ public class BillingService : IBillingService
         }
 
         var now = DateTimeOffset.UtcNow;
-        var effectiveFrom = GetNextBillingPeriodStart(DateOnly.FromDateTime(now.UtcDateTime));
+        var nowUtc = now.UtcDateTime;
+
+        var activePrice = await context.RoomingHouseServicePrices
+            .Where(x => x.RoomingHouseId == roomingHouseId &&
+                        x.ServiceTypeId == serviceType.Id &&
+                        x.IsActive)
+            .OrderByDescending(x => x.EffectiveFrom)
+            .FirstOrDefaultAsync(cancellationToken);
+
+        var effectiveFrom = activePrice is null
+            ? new DateOnly(nowUtc.Year, nowUtc.Month, 1)
+            : (nowUtc.Day == 1
+                ? new DateOnly(nowUtc.Year, nowUtc.Month, 1)
+                : GetNextBillingPeriodStart(DateOnly.FromDateTime(nowUtc)));
 
         var scheduledPrice = await context.RoomingHouseServicePrices
             .Where(x => x.RoomingHouseId == roomingHouseId &&
@@ -444,13 +467,6 @@ public class BillingService : IBillingService
             scheduledPrice.ServiceType = serviceType;
             return ToServicePriceResponse(scheduledPrice);
         }
-
-        var activePrice = await context.RoomingHouseServicePrices
-            .Where(x => x.RoomingHouseId == roomingHouseId &&
-                        x.ServiceTypeId == serviceType.Id &&
-                        x.IsActive)
-            .OrderByDescending(x => x.EffectiveFrom)
-            .FirstOrDefaultAsync(cancellationToken);
 
         if (activePrice is not null)
         {
@@ -834,6 +850,12 @@ public class BillingService : IBillingService
             billingPeriod.Start,
             cancellationToken);
 
+        var missingPricesReason = GetMissingServicePricesBlockReason(prices, serviceTypes);
+        if (missingPricesReason is not null)
+        {
+            throw new BadRequestException(ErrorCodes.BillingPriceNotFound, missingPricesReason);
+        }
+
         var sequenceBlockReason = await GetInvoiceGenerationBlockReasonAsync(
             contract.Id,
             effectiveTerms.StartDate,
@@ -1051,6 +1073,12 @@ public class BillingService : IBillingService
             serviceTypes.Select(x => x.Id).ToList(),
             billingPeriod.Start,
             cancellationToken);
+
+        var missingPricesReason = GetMissingServicePricesBlockReason(prices, serviceTypes);
+        if (missingPricesReason is not null)
+        {
+            throw new BadRequestException(ErrorCodes.BillingPriceNotFound, missingPricesReason);
+        }
 
         var meteredInputs = await ResolveMeterReadingInputsAsync(
             contract.Id,
@@ -1411,7 +1439,8 @@ public class BillingService : IBillingService
             var expectedFirstPeriod = ResolveBillingPeriodWithinContract(
                 contractStart,
                 contractEnd,
-                contractStart);
+                contractStart,
+                billingPeriodEndOverride);
 
             return IsSameBillingPeriod(expectedFirstPeriod, billingPeriod)
                 ? null
@@ -2140,6 +2169,23 @@ public class BillingService : IBillingService
                         x.EffectiveFrom <= effectiveOn &&
                         (x.EffectiveTo == null || x.EffectiveTo >= effectiveOn))
             .ToListAsync(cancellationToken);
+    }
+
+    private static string? GetMissingServicePricesBlockReason(
+        List<RoomingHouseServicePrice> prices,
+        List<BillingServiceType> serviceTypes)
+    {
+        var configuredServiceIds = prices.Select(x => x.ServiceTypeId).Distinct().ToList();
+        if (configuredServiceIds.Count < serviceTypes.Count)
+        {
+            var missingServiceNames = serviceTypes
+                .Where(x => !configuredServiceIds.Contains(x.Id))
+                .Select(x => x.Name);
+
+            return $"Vui lòng cấu hình bảng giá cho các dịch vụ còn thiếu trước khi tạo hóa đơn: {string.Join(", ", missingServiceNames)}.";
+        }
+
+        return null;
     }
 
     private static RoomingHouseServicePrice GetEffectivePriceOrThrow(
