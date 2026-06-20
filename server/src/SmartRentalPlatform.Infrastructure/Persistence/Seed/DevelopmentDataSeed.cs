@@ -2,11 +2,13 @@ using Microsoft.EntityFrameworkCore;
 using SmartRentalPlatform.Application.Common.Interfaces;
 using SmartRentalPlatform.Domain.Entities.Billing;
 using SmartRentalPlatform.Domain.Entities.Leasing;
+using SmartRentalPlatform.Domain.Entities.Payments;
 using SmartRentalPlatform.Domain.Entities.Properties;
 using SmartRentalPlatform.Domain.Entities.Users;
-using SmartRentalPlatform.Domain.Entities.Wallets;
 using SmartRentalPlatform.Domain.Enums;
 using SmartRentalPlatform.Domain.Enums.Billing;
+using SmartRentalPlatform.Domain.Enums.Payments;
+using WalletAccountStatus = SmartRentalPlatform.Domain.Enums.Payments.WalletAccountStatus;
 
 namespace SmartRentalPlatform.Infrastructure.Persistence.Seed;
 
@@ -20,6 +22,7 @@ public static class DevelopmentDataSeed
     private static readonly Guid AdminUserId = Guid.Parse("10000000-0000-0000-0000-000000000099");
     private static readonly Guid TenantUserId = Guid.Parse("10000000-0000-0000-0000-000000000001");
     private static readonly Guid LandlordUserId = Guid.Parse("10000000-0000-0000-0000-000000000002");
+    private static readonly Guid TenantApprovedKycId = Guid.Parse("50000000-0000-0000-0000-000000000001");
     private static readonly Guid TenantLinhUserId = Guid.Parse("10000000-0000-0000-0000-000000000003");
     private static readonly Guid TenantMinhUserId = Guid.Parse("10000000-0000-0000-0000-000000000004");
     private static readonly Guid LandlordMaiUserId = Guid.Parse("10000000-0000-0000-0000-000000000005");
@@ -107,7 +110,95 @@ public static class DevelopmentDataSeed
             admin.UpdatedAt = DateTimeOffset.UtcNow;
         }
 
+        await SeedApprovedTenantAsync(context, passwordService, admin.Id, cancellationToken);
+
         await context.SaveChangesAsync(cancellationToken);
+    }
+
+    private static async Task SeedApprovedTenantAsync(
+        AppDbContext context,
+        IPasswordService passwordService,
+        Guid reviewedByAdminId,
+        CancellationToken cancellationToken)
+    {
+        var normalizedEmail = TenantEmail.ToUpperInvariant();
+        var tenant = await context.Users
+            .Include(x => x.UserRoles)
+            .FirstOrDefaultAsync(x => x.NormalizedEmail == normalizedEmail, cancellationToken);
+
+        if (tenant is null)
+        {
+            tenant = CreateUser(TenantUserId, TenantEmail, "Nguyen Tenant Demo", passwordService);
+            context.Users.Add(tenant);
+        }
+
+        tenant.Status = UserStatus.Active;
+        tenant.OnboardingStatus = OnboardingStatus.Completed;
+        tenant.EmailConfirmed = true;
+        tenant.UpdatedAt = DateTimeOffset.UtcNow;
+
+        var profile = await context.UserProfiles
+            .FirstOrDefaultAsync(x => x.UserId == tenant.Id, cancellationToken);
+
+        if (profile is null)
+        {
+            profile = CreateProfile(tenant.Id, "Nguyen Tenant Demo");
+            context.UserProfiles.Add(profile);
+        }
+
+        profile.FullName = "Nguyen Tenant Demo";
+        profile.DateOfBirth = new DateOnly(1998, 1, 1);
+        profile.Gender = "Male";
+        profile.AddressLine = "123 Test Street, Ho Chi Minh City";
+        profile.VerifiedCitizenIdMasked = "079********001";
+        profile.UpdatedAt = DateTimeOffset.UtcNow;
+
+        if (tenant.UserRoles.All(x => x.RoleId != RoleSeed.TenantRoleId))
+        {
+            context.UserRoles.Add(new UserRole
+            {
+                UserId = tenant.Id,
+                RoleId = RoleSeed.TenantRoleId,
+                CreatedAt = SeededAt
+            });
+        }
+
+        if (!await context.KycVerifications.AnyAsync(
+            x => x.UserId == tenant.Id && x.Status == KycVerificationStatus.Approved,
+            cancellationToken))
+        {
+            context.KycVerifications.Add(new KycVerification
+            {
+                Id = TenantApprovedKycId,
+                UserId = tenant.Id,
+                DocumentType = KycDocumentType.CCCD,
+                EkycProvider = EkycProvider.VNPT,
+                EkycSessionId = "dev-approved-tenant-session",
+                FrontImageObjectKey = "demo/kyc/tenant/front.jpg",
+                BackImageObjectKey = "demo/kyc/tenant/back.jpg",
+                SelfieImageObjectKey = "demo/kyc/tenant/selfie.jpg",
+                SelfieCaptureMethod = SelfieCaptureMethod.Upload,
+                OcrFullName = "Nguyen Tenant Demo",
+                OcrCitizenIdMasked = "079********001",
+                CitizenIdHash = "dev-approved-tenant-citizen-id-hash",
+                OcrDateOfBirth = new DateOnly(1998, 1, 1),
+                OcrGender = "Male",
+                OcrAddress = "123 Test Street, Ho Chi Minh City",
+                OcrConfidence = 0.9900m,
+                DocumentCheckResult = DocumentCheckResult.Valid,
+                FaceMatchScore = 0.9900m,
+                FaceMatchResult = FaceMatchResult.Matched,
+                LivenessResult = LivenessResult.Passed,
+                EkycResult = EkycResult.Passed,
+                RiskLevel = KycRiskLevel.Low,
+                Status = KycVerificationStatus.Approved,
+                ReviewedByAdminId = reviewedByAdminId,
+                SubmittedAt = SeededAt,
+                ReviewedAt = SeededAt,
+                CreatedAt = SeededAt,
+                UpdatedAt = SeededAt
+            });
+        }
     }
 
     private static async Task SeedUsersAsync(

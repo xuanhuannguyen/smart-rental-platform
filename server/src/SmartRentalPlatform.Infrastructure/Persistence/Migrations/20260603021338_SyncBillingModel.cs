@@ -67,28 +67,6 @@ namespace SmartRentalPlatform.Infrastructure.Persistence.Migrations
                 });
 
             migrationBuilder.CreateTable(
-                name: "wallet_accounts",
-                columns: table => new
-                {
-                    id = table.Column<Guid>(type: "uuid", nullable: false),
-                    user_id = table.Column<Guid>(type: "uuid", nullable: false),
-                    balance = table.Column<decimal>(type: "numeric(12,2)", precision: 12, scale: 2, nullable: false),
-                    reserved_balance = table.Column<decimal>(type: "numeric(12,2)", precision: 12, scale: 2, nullable: false),
-                    currency = table.Column<string>(type: "character varying(10)", maxLength: 10, nullable: false, defaultValue: "VND"),
-                    status = table.Column<string>(type: "character varying(30)", maxLength: 30, nullable: false, defaultValue: "Active")
-                },
-                constraints: table =>
-                {
-                    table.PrimaryKey("PK_wallet_accounts", x => x.id);
-                    table.ForeignKey(
-                        name: "FK_wallet_accounts_users_user_id",
-                        column: x => x.user_id,
-                        principalTable: "users",
-                        principalColumn: "id",
-                        onDelete: ReferentialAction.Restrict);
-                });
-
-            migrationBuilder.CreateTable(
                 name: "rooming_house_service_prices",
                 columns: table => new
                 {
@@ -226,32 +204,6 @@ namespace SmartRentalPlatform.Infrastructure.Persistence.Migrations
                         name: "FK_meter_readings_users_recorded_by_landlord_user_id",
                         column: x => x.recorded_by_landlord_user_id,
                         principalTable: "users",
-                        principalColumn: "id",
-                        onDelete: ReferentialAction.Restrict);
-                });
-
-            migrationBuilder.CreateTable(
-                name: "wallet_transactions",
-                columns: table => new
-                {
-                    id = table.Column<Guid>(type: "uuid", nullable: false),
-                    wallet_account_id = table.Column<Guid>(type: "uuid", nullable: false),
-                    user_id = table.Column<Guid>(type: "uuid", nullable: false),
-                    transfer_group_id = table.Column<Guid>(type: "uuid", nullable: false),
-                    transaction_type = table.Column<string>(type: "character varying(50)", maxLength: 50, nullable: false),
-                    direction = table.Column<string>(type: "character varying(20)", maxLength: 20, nullable: false),
-                    amount = table.Column<decimal>(type: "numeric(12,2)", precision: 12, scale: 2, nullable: false),
-                    balance_before = table.Column<decimal>(type: "numeric(12,2)", precision: 12, scale: 2, nullable: false),
-                    balance_after = table.Column<decimal>(type: "numeric(12,2)", precision: 12, scale: 2, nullable: false),
-                    status = table.Column<string>(type: "character varying(30)", maxLength: 30, nullable: false, defaultValue: "Pending")
-                },
-                constraints: table =>
-                {
-                    table.PrimaryKey("PK_wallet_transactions", x => x.id);
-                    table.ForeignKey(
-                        name: "FK_wallet_transactions_wallet_accounts_wallet_account_id",
-                        column: x => x.wallet_account_id,
-                        principalTable: "wallet_accounts",
                         principalColumn: "id",
                         onDelete: ReferentialAction.Restrict);
                 });
@@ -464,21 +416,6 @@ namespace SmartRentalPlatform.Infrastructure.Persistence.Migrations
                 table: "rooming_house_service_prices",
                 column: "service_type_id");
 
-            migrationBuilder.CreateIndex(
-                name: "IX_wallet_accounts_user_id",
-                table: "wallet_accounts",
-                column: "user_id",
-                unique: true);
-
-            migrationBuilder.CreateIndex(
-                name: "IX_wallet_transactions_transfer_group_id",
-                table: "wallet_transactions",
-                column: "transfer_group_id");
-
-            migrationBuilder.CreateIndex(
-                name: "IX_wallet_transactions_wallet_account_id",
-                table: "wallet_transactions",
-                column: "wallet_account_id");
         }
 
         /// <inheritdoc />
@@ -494,16 +431,10 @@ namespace SmartRentalPlatform.Infrastructure.Persistence.Migrations
                 name: "rooming_house_service_prices");
 
             migrationBuilder.DropTable(
-                name: "wallet_transactions");
-
-            migrationBuilder.DropTable(
                 name: "meter_readings");
 
             migrationBuilder.DropTable(
                 name: "invoices");
-
-            migrationBuilder.DropTable(
-                name: "wallet_accounts");
 
             migrationBuilder.DropTable(
                 name: "billing_service_types");
