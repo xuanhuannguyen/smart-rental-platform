@@ -24,41 +24,9 @@ import '../../landlord/pages/LandlordDashboardPage.css';
 import '../../rental-history/pages/HistoryModals.css';
 
 const invoiceStatuses = ['Draft', 'Issued', 'Paid', 'Overdue', 'Cancelled'];
-const today = formatDateInput(new Date());
-const defaultBillingMonth = getDefaultBillingMonth(new Date());
-const monthStart = getMonthStart(defaultBillingMonth);
-const monthEnd = getMonthEnd(defaultBillingMonth);
+const today = centralToDateOnlyString(getCentralTodayDateOnly());
 
 type LandlordTab = 'prices' | 'readings' | 'invoices' | 'create' | 'detail';
-
-type CreateMeterReadingRequest = {
-  roomId: string;
-  contractId: string;
-  serviceTypeId: string;
-  billingPeriodStart: string;
-  billingPeriodEnd: string;
-  previousReading: number;
-  currentReading: number;
-  proofImageObjectKey?: string | null;
-};
-
-type MeterReading = {
-  serviceTypeId: string;
-  serviceName: string;
-  billingPeriodStart: string;
-  billingPeriodEnd: string;
-  previousReading: number;
-  currentReading: number;
-  consumption: number;
-};
-
-type GenerateInvoiceDraftRequest = {
-  contractId: string;
-  billingPeriodStart: string;
-  billingPeriodEnd: string;
-  discountAmount: number;
-  note?: string | null;
-};
 
 export default function LandlordBillingPage() {
   const { id, invoiceId } = useParams();
@@ -435,7 +403,7 @@ function ServicePricesSection({
           {loading ? (
             <LoadingBlock text="Đang tải bảng giá..." />
           ) : activePrices.length === 0 ? (
-            <EmptyBlock title="Chưa có giá đang áp dụng" text="Hãy tạo giá cho Điện, Nước, Wifi và Rác." />
+            <EmptyBlock title="Chưa có giá đang áp dụng" text="Hãy tạo giá cho các dịch vụ của khu trọ." />
           ) : (
             activePrices.map((price) => <PriceRow key={price.id} price={price} />)
           )}
@@ -516,117 +484,6 @@ function ServicePricesSection({
               </div>
             ))}
           </div>
-        )}
-      </section>
-    </section>
-  );
-}
-
-function MeterReadingsSection({
-  roomContext,
-  form,
-  busy,
-  consumption,
-  invalid,
-  dateError,
-  createdReading,
-  onChangeForm,
-  onSubmit
-}: {
-  roomContext: RoomBillingContext | null;
-  form: CreateMeterReadingRequest;
-  busy: string;
-  consumption: number;
-  invalid: boolean;
-  dateError: string;
-  createdReading: MeterReading | null;
-  onChangeForm: Dispatch<SetStateAction<CreateMeterReadingRequest>>;
-  onSubmit: (event: FormEvent) => void;
-}) {
-  const maxBillingDate = roomContext?.contractEndDate && roomContext.contractEndDate < today
-    ? roomContext.contractEndDate
-    : today;
-
-  return (
-    <section className="billing-grid">
-      <section className="billing-panel">
-        <div className="panel-heading">
-          <div>
-            <span className="billing-kicker">Dịch vụ theo chỉ số</span>
-            <h3>Nhập chỉ số điện nước</h3>
-          </div>
-        </div>
-        <form className="billing-form" onSubmit={onSubmit}>
-          {roomContext && <RoomContextCard context={roomContext} showContract={false} />}
-          <div className="form-row">
-            <label>
-              Dịch vụ
-              <input value={form.serviceTypeId} onChange={(event) => onChangeForm((prev) => ({ ...prev, serviceTypeId: event.target.value }))} />
-            </label>
-            <label>
-              Ảnh minh chứng
-              <input value={form.proofImageObjectKey ?? ''} onChange={(event) => onChangeForm((prev) => ({ ...prev, proofImageObjectKey: event.target.value }))} placeholder="Không bắt buộc" />
-            </label>
-          </div>
-          <div className="form-row">
-            <label>
-              Từ ngày
-              <input
-                type="date"
-                min={roomContext?.contractStartDate}
-                max={maxBillingDate}
-                value={form.billingPeriodStart}
-                onChange={(event) => onChangeForm((prev) => ({ ...prev, billingPeriodStart: event.target.value }))}
-              />
-            </label>
-            <label>
-              Đến ngày
-              <input
-                type="date"
-                min={roomContext?.contractStartDate}
-                max={maxBillingDate}
-                value={form.billingPeriodEnd}
-                onChange={(event) => onChangeForm((prev) => ({ ...prev, billingPeriodEnd: event.target.value }))}
-              />
-            </label>
-          </div>
-          <div className="form-row">
-            <label>
-              Chỉ số đầu
-              <input type="number" min="0" value={form.previousReading} onChange={(event) => onChangeForm((prev) => ({ ...prev, previousReading: Number(event.target.value) }))} />
-            </label>
-            <label>
-              Chỉ số cuối
-              <input type="number" min="0" value={form.currentReading} onChange={(event) => onChangeForm((prev) => ({ ...prev, currentReading: Number(event.target.value) }))} />
-            </label>
-          </div>
-          <div className={`computed-strip ${invalid || dateError ? 'invalid' : ''}`}>
-            Tiêu thụ: <strong>{invalid ? 0 : consumption}</strong>
-            {invalid && <span>Chỉ số cuối không được nhỏ hơn chỉ số đầu.</span>}
-            {dateError && <span>{dateError}</span>}
-          </div>
-          <button type="submit" className="billing-button" disabled={busy === 'reading' || invalid || Boolean(dateError)}>
-            {busy === 'reading' ? 'Đang ghi...' : 'Ghi chỉ số'}
-          </button>
-        </form>
-      </section>
-
-      <section className="billing-panel">
-        <div className="panel-heading">
-          <div>
-            <span className="billing-kicker">Kết quả</span>
-            <h3>Bản ghi mới nhất</h3>
-          </div>
-        </div>
-        {createdReading ? (
-          <div className="result-box">
-            <strong>{createdReading.serviceName}</strong>
-            <span>{createdReading.billingPeriodStart} - {createdReading.billingPeriodEnd}</span>
-            <span>{createdReading.previousReading} - {createdReading.currentReading}</span>
-            <span>Tiêu thụ: {createdReading.consumption}</span>
-          </div>
-        ) : (
-          <EmptyBlock title="Chưa ghi chỉ số" text="Sau khi lưu thành công, bản ghi mới sẽ hiển thị tại đây." />
         )}
       </section>
     </section>
@@ -799,9 +656,7 @@ function CentralCreateInvoiceModal({
   const [billingMonth, setBillingMonth] = useState('');
   const [prices, setPrices] = useState<ServicePrice[]>([]);
   const [preview, setPreview] = useState<RoomInvoicePreview | null>(null);
-  const [serviceTypes, setServiceTypes] = useState<BillingServiceType[]>([]);
   const [appendices, setAppendices] = useState<ContractAppendixResponse[]>([]);
-  const [existingInvoices, setExistingInvoices] = useState<Invoice[]>([]);
   const [latestReadingByServiceType, setLatestReadingByServiceType] = useState<Record<string, LatestMeterReading>>({});
   const [readings, setReadings] = useState<Record<string, ReadingDraft>>({});
   const [discountAmount, setDiscountAmount] = useState(0);
@@ -865,7 +720,6 @@ function CentralCreateInvoiceModal({
       setPrices([]);
       setPreview(null);
       setAppendices([]);
-      setExistingInvoices([]);
       setLatestReadingByServiceType({});
       setReadings({});
       return;
@@ -883,16 +737,14 @@ function CentralCreateInvoiceModal({
       setLoadingDetails(true);
       setError('');
       try {
-        const [priceResponse, invoiceResponse, appendixResponse, contextResponse] = await Promise.all([
+        const [priceResponse, appendixResponse, contextResponse] = await Promise.all([
           billingApi.getServicePrices(contract.roomingHouseId),
-          billingApi.getLandlordInvoices({ contractId: contract.id }),
           contractApi.getAppendices(contract.id),
           billingApi.getRoomBillingContext(contract.roomId)
         ]);
         if (cancelled) return;
 
         setPrices(priceResponse.data);
-        setExistingInvoices(invoiceResponse.data);
         setAppendices(appendixResponse.data ?? []);
         const latestReadings = contextResponse.data.latestReadingByServiceType ?? {};
         setLatestReadingByServiceType(latestReadings);
@@ -931,10 +783,6 @@ function CentralCreateInvoiceModal({
     () => selectedContract && billingMonth ? resolveCentralInvoicePeriodForContract(billingMonth, selectedContract) : null,
     [billingMonth, selectedContract]
   );
-  const effectivePrices = useMemo(
-    () => period ? getCentralEffectiveServicePrices(prices, period.start) : [],
-    [prices, period]
-  );
   const fixedPrices = useMemo(
     () => preview?.fixedServices ?? [],
     [preview]
@@ -943,8 +791,6 @@ function CentralCreateInvoiceModal({
     () => preview?.meteredServices ?? [],
     [preview]
   );
-  const todayDateString = centralToDateOnlyString(getCentralTodayDateOnly());
-  const periodIsFuture = period ? compareCentralDateOnly(period.end, todayDateString) > 0 : false;
   const periodValidationMessage = !selectedContract
     ? ''
     : !period
@@ -1360,89 +1206,6 @@ function LegacyInvoiceListSection({
   );
 }
 
-function InvoiceCreateSection({
-  roomContext,
-  form,
-  busy,
-  previewTotals,
-  onChangeForm,
-  onSubmit
-}: {
-  roomContext: RoomBillingContext | null;
-  form: GenerateInvoiceDraftRequest;
-  busy: string;
-  previewTotals: { fixedServices: number; discount: number; estimatedTotal: number };
-  onChangeForm: Dispatch<SetStateAction<GenerateInvoiceDraftRequest>>;
-  onSubmit: (event: FormEvent) => void;
-}) {
-  return (
-    <section className="billing-grid">
-      <section className="billing-panel">
-        <div className="panel-heading">
-          <div>
-            <span className="billing-kicker">Hóa đơn nháp</span>
-            <h3>Tạo hóa đơn nháp</h3>
-          </div>
-        </div>
-        <form className="billing-form" onSubmit={onSubmit}>
-          {roomContext && <RoomContextCard context={roomContext} showContract={false} />}
-          <div className="form-row">
-            <label>
-              Từ ngày
-              <input
-                type="month"
-                value={toMonthValue(form.billingPeriodStart)}
-                onChange={(event) => {
-                  const range = getMonthRange(event.target.value);
-                  onChangeForm((prev) => ({
-                    ...prev,
-                    billingPeriodStart: range.start,
-                    billingPeriodEnd: range.end
-                  }));
-                }}
-              />
-            </label>
-            <label>
-              Đến ngày
-              <input type="date" value={form.billingPeriodEnd} readOnly />
-            </label>
-          </div>
-          <label>
-            Giảm trừ
-            <input type="number" min="0" value={form.discountAmount} onChange={(event) => onChangeForm((prev) => ({ ...prev, discountAmount: Number(event.target.value) }))} />
-          </label>
-          <label>
-            Ghi chú
-            <input value={form.note ?? ''} onChange={(event) => onChangeForm((prev) => ({ ...prev, note: event.target.value }))} placeholder="Hóa đơn tháng này" />
-          </label>
-          <button type="submit" className="billing-button" disabled={busy === 'invoice'}>
-            {busy === 'invoice' ? 'Đang tạo...' : 'Tạo hóa đơn nháp'}
-          </button>
-        </form>
-      </section>
-      <section className="billing-panel">
-        <div className="panel-heading">
-          <div>
-            <span className="billing-kicker">Xem trước</span>
-            <h3>Kiểm tra trước khi tạo</h3>
-          </div>
-        </div>
-        <div className="check-list">
-          <span>Phòng phải đang có người thuê.</span>
-          <span>Dịch vụ điện và nước cần có bản ghi chỉ số cùng kỳ.</span>
-          <span>Giá dịch vụ sẽ được chốt vào từng hạng mục hóa đơn.</span>
-          <span>Hệ thống không cho tạo trùng hóa đơn cùng hợp đồng và cùng kỳ.</span>
-        </div>
-        <div className="invoice-summary single">
-          <span>Dịch vụ cố định <strong>{formatMoney(previewTotals.fixedServices)}</strong></span>
-          <span>Giảm trừ <strong>{formatMoney(previewTotals.discount)}</strong></span>
-          <span>Tạm tính dịch vụ cố định <strong>{formatMoney(previewTotals.estimatedTotal)}</strong></span>
-        </div>
-      </section>
-    </section>
-  );
-}
-
 function InvoiceDetailSection({
   invoice,
   loading,
@@ -1677,21 +1440,6 @@ function getCentralActiveOccupantCount(contract: ActiveInvoiceContract, period: 
   return Math.max(count, 1);
 }
 
-function getCentralEffectiveServicePrices(prices: ServicePrice[], effectiveOn: string) {
-  const latestByServiceType = new Map<string, ServicePrice>();
-
-  prices
-    .filter((price) => price.effectiveFrom <= effectiveOn && (!price.effectiveTo || price.effectiveTo >= effectiveOn))
-    .sort((left, right) => right.effectiveFrom.localeCompare(left.effectiveFrom))
-    .forEach((price) => {
-      if (!latestByServiceType.has(price.serviceTypeId)) {
-        latestByServiceType.set(price.serviceTypeId, price);
-      }
-    });
-
-  return Array.from(latestByServiceType.values());
-}
-
 function resolveCentralMonthlyRentFromAppendices(
   baseMonthlyRent: number,
   appendices: ContractAppendixResponse[],
@@ -1832,80 +1580,6 @@ function getCentralDayNumber(date: Date) {
   return Math.floor(Date.UTC(date.getFullYear(), date.getMonth(), date.getDate()) / 86400000);
 }
 
-function buildDraftPreview(prices: ServicePrice[], discount: number) {
-  const fixedServices = prices
-    .filter((price) => normalizeCentralPricingUnit(price.pricingUnit) !== 'MeterReading')
-    .reduce((sum, price) => sum + price.unitPrice, 0);
-
-  return {
-    fixedServices,
-    discount: Number(discount) || 0,
-    estimatedTotal: Math.max(0, fixedServices - (Number(discount) || 0))
-  };
-}
-
-function getMeterReadingDateError(form: CreateMeterReadingRequest, roomContext: RoomBillingContext | null) {
-  if (!roomContext) {
-    return 'Vui lòng chọn phòng có hợp đồng đang hiệu lực trước khi ghi chỉ số.';
-  }
-
-  if (!form.billingPeriodStart || !form.billingPeriodEnd) {
-    return 'Vui lòng nhập đầy đủ từ ngày và đến ngày.';
-  }
-
-  if (form.billingPeriodEnd < form.billingPeriodStart) {
-    return 'Đến ngày phải lớn hơn hoặc bằng từ ngày.';
-  }
-
-  if (form.billingPeriodStart > today || form.billingPeriodEnd > today) {
-    return 'Kỳ ghi chỉ số không được nằm trong tương lai.';
-  }
-
-  if (form.billingPeriodStart < roomContext.contractStartDate || form.billingPeriodEnd > roomContext.contractEndDate) {
-    return `Kỳ ghi chỉ số phải nằm trong thời hạn hợp đồng (${roomContext.contractStartDate} - ${roomContext.contractEndDate}).`;
-  }
-
-  return '';
-}
-
-function formatDateInput(date: Date) {
-  const year = date.getFullYear();
-  const month = String(date.getMonth() + 1).padStart(2, '0');
-  const day = String(date.getDate()).padStart(2, '0');
-  return `${year}-${month}-${day}`;
-}
-
-function getDefaultBillingMonth(date: Date) {
-  const lastDayOfCurrentMonth = new Date(date.getFullYear(), date.getMonth() + 1, 0).getDate();
-  const billingDate = date.getDate() === lastDayOfCurrentMonth
-    ? date
-    : new Date(date.getFullYear(), date.getMonth() - 1, 1);
-
-  return `${billingDate.getFullYear()}-${String(billingDate.getMonth() + 1).padStart(2, '0')}`;
-}
-
-function getMonthRange(monthValue: string) {
-  const [year, month] = monthValue.split('-').map(Number);
-  const paddedMonth = String(month).padStart(2, '0');
-  const start = `${year}-${paddedMonth}-01`;
-  const endDay = new Date(year, month, 0).getDate();
-  const end = `${year}-${paddedMonth}-${String(endDay).padStart(2, '0')}`;
-
-  return { start, end };
-}
-
-function getMonthStart(monthValue: string) {
-  return getMonthRange(monthValue).start;
-}
-
-function getMonthEnd(monthValue: string) {
-  return getMonthRange(monthValue).end;
-}
-
-function toMonthValue(dateValue: string) {
-  return dateValue.slice(0, 7) || defaultBillingMonth;
-}
-
 function getTab(pathname: string, invoiceId?: string): LandlordTab {
   if (invoiceId) {
     return 'detail';
@@ -2011,10 +1685,6 @@ function getInvoiceStatusLabel(status: string) {
 function getInvoiceItemTypeLabel(itemType: string) {
   const labels: Record<string, string> = {
     Rent: 'Tiền phòng',
-    Electricity: 'Tiền điện',
-    Water: 'Tiền nước',
-    Wifi: 'Wifi',
-    Garbage: 'Rác',
     Service: 'Dịch vụ',
     Discount: 'Giảm trừ',
     Other: 'Khác'

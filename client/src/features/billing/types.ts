@@ -2,12 +2,10 @@ export interface ServicePrice {
   id: string;
   roomingHouseId: string;
   serviceTypeId: string;
-  serviceCode: string;
   serviceName: string;
   supportsMeterReading: boolean;
   meterUnitName?: string | null;
   pricingUnit: PricingUnit;
-  billingMethod: PricingUnit;
   displayUnitName: string;
   unitName: string;
   unitPrice: number;
@@ -28,8 +26,6 @@ export interface BillingServiceType {
 }
 
 export type PricingUnit = 'MeterReading' | 'Metered' | 'MeterBased' | 'PerMonth' | 'Fixed' | 'PerPerson' | 'PerPersonPerMonth';
-export type BillingServiceCode = string;
-export type BillingMethod = PricingUnit;
 
 export interface LatestMeterReading {
   serviceTypeId: string;
@@ -116,9 +112,7 @@ export interface RoomInvoicePreview {
 
 export interface CreateServicePriceRequest {
   serviceTypeId?: string;
-  serviceCode?: string;
   pricingUnit?: PricingUnit;
-  billingMethod?: PricingUnit;
   unitName?: string;
   unitPrice: number;
   effectiveFrom: string;

@@ -32,8 +32,8 @@ export const billingApi = {
       method: 'POST',
       auth: true,
       body: {
-        serviceTypeId: payload.serviceTypeId ?? payload.serviceCode,
-        pricingUnit: payload.pricingUnit ?? payload.billingMethod,
+        serviceTypeId: payload.serviceTypeId,
+        pricingUnit: payload.pricingUnit,
         unitPrice: payload.unitPrice,
         effectiveFrom: payload.effectiveFrom,
         note: payload.note ?? null
@@ -157,8 +157,6 @@ export const billingApi = {
 function normalizeServicePrice(price: ServicePrice): ServicePrice {
   return {
     ...price,
-    serviceCode: price.serviceCode ?? price.serviceTypeId,
-    billingMethod: price.billingMethod ?? price.pricingUnit,
     unitName: price.unitName ?? price.displayUnitName
   };
 }

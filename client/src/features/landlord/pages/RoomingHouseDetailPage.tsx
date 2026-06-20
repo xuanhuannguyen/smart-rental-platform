@@ -24,8 +24,6 @@ import type {
   BillingServiceType,
   ServicePrice,
   CreateServicePriceRequest,
-  BillingServiceCode,
-  BillingMethod,
   PricingUnit,
 } from '../../billing/types';
 import type {
@@ -45,13 +43,6 @@ import { cleanImages, toImageRequests } from '../../rooming-houses/utils/imageRe
 import './RoomingHouseDetailPage.css';
 
 type MainTab = 'basic' | 'images' | 'amenities' | 'legal' | 'house-rule' | 'rental-policy' | 'service-prices' | 'rooms' | 'create-room';
-
-const serviceOptions: { code: BillingServiceCode; label: string; method: BillingMethod; unit: string; defaultPrice: number }[] = [
-  { code: 'Electric', label: 'Điện', method: 'Metered', unit: 'kWh', defaultPrice: 3500 },
-  { code: 'Water', label: 'Nước', method: 'PerPerson', unit: 'người/tháng', defaultPrice: 100000 },
-  { code: 'Wifi', label: 'Internet', method: 'PerMonth', unit: 'tháng', defaultPrice: 100000 },
-  { code: 'Trash', label: 'Rác', method: 'PerPerson', unit: 'người/tháng', defaultPrice: 50000 },
-];
 
 const nextPeriodStart = new Date(new Date().getFullYear(), new Date().getMonth() + 1, 1).toISOString().split('T')[0];
 
@@ -151,9 +142,7 @@ export default function RoomingHouseDetailPage() {
 
         return {
           serviceTypeId: serviceType.id,
-          serviceCode: serviceType.id,
           pricingUnit,
-          billingMethod: pricingUnit,
           unitName: getServicePricingUnitDisplayUnit(pricingUnit, serviceType),
           unitPrice: activePrice?.unitPrice ?? 0,
           effectiveFrom: nextPeriodStart,
@@ -173,13 +162,12 @@ export default function RoomingHouseDetailPage() {
           return draft;
         }
 
-        const pricingUnit = normalizePricingUnit(patch.pricingUnit ?? patch.billingMethod ?? draft.pricingUnit ?? draft.billingMethod ?? 'PerMonth');
+        const pricingUnit = normalizePricingUnit(patch.pricingUnit ?? draft.pricingUnit ?? 'PerMonth');
 
         return {
           ...draft,
           ...patch,
           pricingUnit,
-          billingMethod: pricingUnit,
           effectiveFrom: nextPeriodStart,
         };
       })
@@ -1063,9 +1051,7 @@ function ServicePriceEditorBatch({
             const defaultPricingUnit = getDefaultServicePricingUnit(serviceType);
             const draft = drafts.find((item) => item.serviceTypeId === serviceType.id) ?? {
               serviceTypeId: serviceType.id,
-              serviceCode: serviceType.id,
               pricingUnit: defaultPricingUnit,
-              billingMethod: defaultPricingUnit,
               unitName: getServicePricingUnitDisplayUnit(defaultPricingUnit, serviceType),
               unitPrice: 0,
               effectiveFrom: nextPeriodStart,
@@ -1080,30 +1066,29 @@ function ServicePriceEditorBatch({
                 </div>
                 <div className="service-price-current">
                   <strong>{currentPrice ? `${formatMoneyString(currentPrice.unitPrice)} VND / ${currentPrice.unitName}` : 'Chưa có giá'}</strong>
-                  <span>{currentPrice ? getBillingMethodLabel(currentPrice.billingMethod) : 'Chưa cấu hình'}</span>
+                  <span>{currentPrice ? getPricingUnitLabel(currentPrice.pricingUnit) : 'Chưa cấu hình'}</span>
                 </div>
                 <div className="service-price-methods">
                   {methods.length === 1 ? (
-                    <span className="service-price-method-static">{getBillingMethodLabel(methods[0])}</span>
+                    <span className="service-price-method-static">{getPricingUnitLabel(methods[0])}</span>
                   ) : (
                     <div className="service-price-segmented">
                       {methods.map((method) => (
                         <button
                           type="button"
                           key={method}
-                          className={normalizeBillingMethod(draft.billingMethod ?? 'PerMonth') === method ? 'active' : ''}
+                          className={normalizePricingUnitForDisplay(draft.pricingUnit ?? 'PerMonth') === method ? 'active' : ''}
                           onClick={() => onChangeDraft(serviceType.id, {
                             pricingUnit: method,
-                            billingMethod: method,
                             unitName: getServicePricingUnitDisplayUnit(method, serviceType),
                           })}
                         >
-                          {getBillingMethodShortLabel(method)}
+                          {getPricingUnitShortLabel(method)}
                         </button>
                       ))}
                     </div>
                   )}
-                  <small>{getServicePricingUnitHint(draft.billingMethod ?? 'PerMonth', serviceType)}</small>
+                  <small>{getServicePricingUnitHint(draft.pricingUnit ?? 'PerMonth', serviceType)}</small>
                 </div>
                 <label className="service-price-inline-field">
                   <input
@@ -1166,164 +1151,13 @@ function ServicePriceEditorBatch({
                       <span>{serviceTypes.find((serviceType) => serviceType.id === price.serviceTypeId)?.name ?? price.serviceName}</span>
                       <span>{formatMoneyString(price.unitPrice)} VND</span>
                       <span>{price.unitName}</span>
-                      <span>{getBillingMethodLabel(price.billingMethod)}</span>
+                      <span>{getPricingUnitLabel(price.pricingUnit)}</span>
                       <span>{price.effectiveFrom}</span>
                       <span>{price.effectiveTo ?? 'Đang thay thế'}</span>
                     </div>
                   ))}
                 </div>
               </details>
-            ))}
-          </div>
-        )}
-      </section>
-    </div>
-  );
-}
-
-function ServicePriceEditor({
-  activePrices,
-  priceHistory,
-  loading,
-  form,
-  actionLoading,
-  onSelectService,
-  onChangeForm,
-  onSubmit,
-  onReload,
-}: {
-  prices: ServicePrice[];
-  activePrices: ServicePrice[];
-  priceHistory: ServicePrice[];
-  loading: boolean;
-  form: CreateServicePriceRequest;
-  actionLoading: boolean;
-  onSelectService: (code: BillingServiceCode) => void;
-  onChangeForm: (form: CreateServicePriceRequest) => void;
-  onSubmit: (event: FormEvent<HTMLFormElement>) => void;
-  onReload: () => void;
-}) {
-  const activeByCode = new Map(activePrices.map((price) => [price.serviceCode, price]));
-
-  return (
-    <div className="editor-panel service-price-editor">
-      <div className="service-price-header">
-        <div>
-          <h3>Giá dịch vụ của khu trọ</h3>
-          <p>Mỗi khu trọ có thể cấu hình giá điện, nước và các khoản cố định riêng.</p>
-        </div>
-        <button type="button" className="secondary-action" onClick={onReload} disabled={loading}>
-          Làm mới
-        </button>
-      </div>
-
-      <div className="service-price-grid">
-        <section className="service-price-panel">
-          <div className="section-heading">
-            <h4>Giá đang áp dụng</h4>
-            <span>{activePrices.length}/4 dịch vụ</span>
-          </div>
-
-          {loading ? (
-            <div className="empty-panel compact">Đang tải bảng giá dịch vụ...</div>
-          ) : (
-            <div className="service-price-cards">
-              {serviceOptions.map((service) => {
-                const price = activeByCode.get(service.code);
-                return (
-                  <div className="service-price-card" key={service.code}>
-                    <div>
-                      <strong>{service.label}</strong>
-                      <span>{price ? `${formatMoneyString(price.unitPrice)} VND / ${price.unitName}` : 'Chưa cấu hình'}</span>
-                    </div>
-                    <small>{price ? `Từ ${price.effectiveFrom}` : getBillingMethodLabel(service.method)}</small>
-                  </div>
-                );
-              })}
-            </div>
-          )}
-        </section>
-
-        <section className="service-price-panel">
-          <div className="section-heading">
-            <h4>Cập nhật giá mới</h4>
-          </div>
-
-          <form className="service-price-form" onSubmit={onSubmit}>
-            <label className="field">
-              <span>Dịch vụ</span>
-              <select value={form.serviceCode} onChange={(event) => onSelectService(event.target.value as BillingServiceCode)}>
-                {serviceOptions.map((service) => (
-                  <option key={service.code} value={service.code}>{service.label}</option>
-                ))}
-              </select>
-            </label>
-
-            <div className="form-grid">
-              <label className="field">
-                <span>Cách tính</span>
-                <input value={getBillingMethodLabel(form.billingMethod ?? 'PerMonth')} readOnly />
-              </label>
-              <label className="field">
-                <span>Đơn vị</span>
-                <input value={form.unitName} onChange={(event) => onChangeForm({ ...form, unitName: event.target.value })} />
-              </label>
-            </div>
-
-            <div className="form-grid">
-              <label className="field">
-                <span>Đơn giá (VND)</span>
-                <input
-                  type="text"
-                  value={formatMoneyString(form.unitPrice)}
-                  onChange={(event) => onChangeForm({ ...form, unitPrice: parseMoneyString(event.target.value) })}
-                  placeholder="0"
-                />
-              </label>
-              <label className="field">
-                <span>Hiệu lực từ</span>
-                <input type="date" value={form.effectiveFrom} onChange={(event) => onChangeForm({ ...form, effectiveFrom: event.target.value })} />
-              </label>
-            </div>
-
-            <label className="field">
-              <span>Ghi chú</span>
-              <input value={form.note ?? ''} onChange={(event) => onChangeForm({ ...form, note: event.target.value })} placeholder="Ví dụ: điều chỉnh theo biểu giá tháng này" />
-            </label>
-
-            <div className="save-row">
-              <button type="submit" className="primary-action" disabled={actionLoading || form.unitPrice <= 0}>
-                {actionLoading ? 'Đang lưu...' : 'Lưu giá dịch vụ'}
-              </button>
-            </div>
-          </form>
-        </section>
-      </div>
-
-      <section className="service-price-panel service-price-history">
-        <div className="section-heading">
-          <h4>Lịch sử thay đổi giá</h4>
-          <span>{priceHistory.length} bản ghi</span>
-        </div>
-        {priceHistory.length === 0 ? (
-          <div className="empty-panel compact">Chưa có lịch sử thay đổi giá.</div>
-        ) : (
-          <div className="service-price-table">
-            <div className="service-price-row service-price-row--head">
-              <span>Dịch vụ</span>
-              <span>Đơn giá</span>
-              <span>Đơn vị</span>
-              <span>Từ ngày</span>
-              <span>Đến ngày</span>
-            </div>
-            {priceHistory.map((price) => (
-              <div className="service-price-row" key={price.id}>
-                <span>{serviceOptions.find((service) => service.code === price.serviceCode)?.label ?? price.serviceName}</span>
-                <span>{formatMoneyString(price.unitPrice)} VND</span>
-                <span>{price.unitName}</span>
-                <span>{price.effectiveFrom}</span>
-                <span>{price.effectiveTo ?? 'Đang thay thế'}</span>
-              </div>
             ))}
           </div>
         )}
@@ -1381,7 +1215,7 @@ function getNextPeriodStart() {
   return `${year}-${month}-01`;
 }
 
-function normalizeBillingMethod(method: BillingMethod): BillingMethod {
+function normalizePricingUnitForDisplay(method: PricingUnit | string): PricingUnit {
   if (method === 'Metered' || method === 'MeterReading') {
     return 'MeterBased';
   }
@@ -1394,11 +1228,11 @@ function normalizeBillingMethod(method: BillingMethod): BillingMethod {
     return 'PerPerson';
   }
 
-  return method;
+  return method as PricingUnit;
 }
 
-function normalizePricingUnit(unit: PricingUnit | BillingMethod): PricingUnit {
-  const normalized = normalizeBillingMethod(unit);
+function normalizePricingUnit(unit: PricingUnit | string): PricingUnit {
+  const normalized = normalizePricingUnitForDisplay(unit);
 
   if (normalized === 'MeterBased') {
     return 'MeterReading';
@@ -1415,34 +1249,18 @@ function normalizePricingUnit(unit: PricingUnit | BillingMethod): PricingUnit {
   return normalized;
 }
 
-function toApiBillingMethod(method: BillingMethod): BillingMethod {
-  if (method === 'MeterBased') {
-    return 'MeterReading';
-  }
-
-  if (method === 'Fixed' || method === 'PerMonth') {
-    return 'PerMonth';
-  }
-
-  if (method === 'PerPerson' || method === 'PerPersonPerMonth') {
-    return 'PerPersonPerMonth';
-  }
-
-  return method;
-}
-
 function getDefaultServicePricingUnit(serviceType: BillingServiceType): PricingUnit {
   return serviceType.supportsMeterReading ? 'MeterReading' : 'PerMonth';
 }
 
-function getServicePricingUnitOptions(serviceType: BillingServiceType): BillingMethod[] {
+function getServicePricingUnitOptions(serviceType: BillingServiceType): PricingUnit[] {
   return serviceType.supportsMeterReading
     ? ['MeterBased', 'PerMonth', 'PerPerson']
     : ['PerMonth', 'PerPerson'];
 }
 
-function getServicePricingUnitDisplayUnit(unit: PricingUnit | BillingMethod | string, serviceType: BillingServiceType) {
-  const normalized = normalizeBillingMethod(unit as BillingMethod);
+function getServicePricingUnitDisplayUnit(unit: PricingUnit | string, serviceType: BillingServiceType) {
+  const normalized = normalizePricingUnitForDisplay(unit);
 
   if (normalized === 'PerPerson') {
     return 'người/tháng';
@@ -1455,8 +1273,8 @@ function getServicePricingUnitDisplayUnit(unit: PricingUnit | BillingMethod | st
   return serviceType.meterUnitName ?? '';
 }
 
-function getServicePricingUnitHint(unit: PricingUnit | BillingMethod | string, serviceType: BillingServiceType) {
-  const normalized = normalizeBillingMethod(unit as BillingMethod);
+function getServicePricingUnitHint(unit: PricingUnit | string, serviceType: BillingServiceType) {
+  const normalized = normalizePricingUnitForDisplay(unit);
 
   if (normalized === 'PerPerson') {
     return 'VND / người / tháng';
@@ -1467,18 +1285,6 @@ function getServicePricingUnitHint(unit: PricingUnit | BillingMethod | string, s
   }
 
   return serviceType.meterUnitName ? `VND / ${serviceType.meterUnitName}` : 'VND / chỉ số';
-}
-
-function getServiceBillingMethods(serviceCode: BillingServiceCode): BillingMethod[] {
-  if (serviceCode === 'Electric') {
-    return ['MeterBased'];
-  }
-
-  if (serviceCode === 'Water') {
-    return ['MeterBased', 'PerPerson', 'PerMonth'];
-  }
-
-  return ['PerMonth', 'PerPerson'];
 }
 
 function getServiceTypeSlug(serviceType: BillingServiceType) {
@@ -1502,9 +1308,9 @@ function getServiceTypeIcon(serviceType: BillingServiceType) {
   return name ? name.slice(0, 2).toUpperCase() : 'DV';
 }
 
-function getBillingMethodLabel(method: BillingMethod) {
-  const normalized = normalizeBillingMethod(method);
-  const labels: Record<BillingMethod, string> = {
+function getPricingUnitLabel(method: PricingUnit | string) {
+  const normalized = normalizePricingUnitForDisplay(method);
+  const labels: Record<PricingUnit, string> = {
     Metered: 'MeterBased',
     MeterBased: 'MeterBased',
     MeterReading: 'MeterBased',
@@ -1517,9 +1323,9 @@ function getBillingMethodLabel(method: BillingMethod) {
   return labels[normalized];
 }
 
-function getBillingMethodShortLabel(method: BillingMethod) {
-  const normalized = normalizeBillingMethod(method);
-  const labels: Record<BillingMethod, string> = {
+function getPricingUnitShortLabel(method: PricingUnit | string) {
+  const normalized = normalizePricingUnitForDisplay(method);
+  const labels: Record<PricingUnit, string> = {
     Metered: 'Chỉ số',
     MeterBased: 'Chỉ số',
     MeterReading: 'Chỉ số',
@@ -1530,30 +1336,6 @@ function getBillingMethodShortLabel(method: BillingMethod) {
   };
 
   return labels[normalized];
-}
-
-function getUnitHint(method: BillingMethod) {
-  const normalized = normalizeBillingMethod(method);
-  if (normalized === 'PerPerson') {
-    return 'VND / người / tháng';
-  }
-
-  if (normalized === 'PerMonth') {
-    return 'VND / phòng / tháng';
-  }
-
-  return 'Theo số kWh/m3 tiêu thụ';
-}
-
-function getServiceIcon(serviceCode: BillingServiceCode) {
-  const icons: Record<BillingServiceCode, string> = {
-    Electric: 'E',
-    Water: 'W',
-    Wifi: 'Wi',
-    Trash: 'R',
-  };
-
-  return icons[serviceCode];
 }
 
 function AmenityEditor({

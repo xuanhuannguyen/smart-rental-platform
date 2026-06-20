@@ -371,8 +371,6 @@ function getInvoiceStatusLabel(status: string) {
 function getInvoiceItemTypeLabel(itemType: string) {
   const labels: Record<string, string> = {
     Rent: 'Tiền phòng',
-    Electricity: 'Tiền điện',
-    Water: 'Tiền nước',
     Service: 'Dịch vụ',
     Discount: 'Giảm trừ',
     Other: 'Khác'

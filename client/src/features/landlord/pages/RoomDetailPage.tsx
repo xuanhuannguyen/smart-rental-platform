@@ -42,7 +42,6 @@ import type {
   MeteredServicePreview,
   MeterReadingInput,
   PricingUnit,
-  RoomBillingContext,
   RoomInvoicePreview,
   ServicePrice
 } from '../../billing/types';
@@ -947,7 +946,6 @@ export default function RoomDetailPage() {
         <CreateInvoiceWithReadingsModal
           contract={activeContract}
           appendices={appendices ?? []}
-          existingInvoices={contractInvoices}
           onClose={() => setIsCreateInvoiceModalOpen(false)}
           onCreated={(invoice) => {
             setIsCreateInvoiceModalOpen(false);
@@ -1008,13 +1006,11 @@ type ReadingDraft = {
 function CreateInvoiceWithReadingsModal({
   contract,
   appendices,
-  existingInvoices,
   onClose,
   onCreated,
 }: {
   contract: ContractDetailResponse;
   appendices: ContractAppendixResponse[];
-  existingInvoices: Invoice[];
   onClose: () => void;
   onCreated: (invoice: Invoice) => void;
 }) {
@@ -1022,7 +1018,6 @@ function CreateInvoiceWithReadingsModal({
   const [billingMonth, setBillingMonth] = useState(defaultMonth);
   const [preview, setPreview] = useState<RoomInvoicePreview | null>(null);
   const [prices, setPrices] = useState<ServicePrice[]>([]);
-  const [billingContext, setBillingContext] = useState<RoomBillingContext | null>(null);
   const [readings, setReadings] = useState<Record<string, ReadingDraft>>({});
   const [discountAmount, setDiscountAmount] = useState(0);
   const [note, setNote] = useState('');
@@ -1040,26 +1035,10 @@ function CreateInvoiceWithReadingsModal({
       setLoading(true);
       setError('');
       try {
-        const [priceResponse, contextResponse] = await Promise.all([
-          billingApi.getServicePrices(contract.roomingHouseId),
-          billingApi.getRoomBillingContext(contract.roomId),
-        ]);
+        const priceResponse = await billingApi.getServicePrices(contract.roomingHouseId);
         if (cancelled) return;
 
         setPrices(priceResponse.data);
-        setBillingContext(contextResponse.data);
-        const nextReadings: Record<string, ReadingDraft> = {};
-        priceResponse.data
-          .filter((price) => price.isActive && isMeteredServicePrice(price))
-          .forEach((price) => {
-            const latestReading = contextResponse.data.latestReadingByServiceType?.[price.serviceTypeId];
-            nextReadings[price.serviceTypeId] = {
-              previousReading: latestReading?.currentReading ?? 0,
-              currentReading: latestReading?.currentReading ?? 0,
-              proofImageObjectKey: '',
-            };
-          });
-        setReadings(nextReadings);
       } catch (err) {
         if (!cancelled) {
           setError(getApiErrorMessage(err, 'Không thể tải bảng giá dịch vụ.'));
@@ -1082,14 +1061,8 @@ function CreateInvoiceWithReadingsModal({
     () => resolveInvoicePeriodForContract(billingMonth, contract),
     [billingMonth, contract]
   );
-  const effectivePrices = useMemo(
-    () => period ? getEffectiveServicePricesForInvoice(prices, period.start) : [],
-    [prices, period]
-  );
   const fixedPrices = preview?.fixedServices ?? [];
   const meteredPrices = preview?.meteredServices ?? [];
-  const todayDateString = toDateOnlyString(getTodayDateOnly());
-  const periodIsFuture = period ? compareDateOnly(period.end, todayDateString) > 0 : false;
   const periodValidationMessage = !period
     ? 'Tháng hóa đơn không nằm trong thời hạn hợp đồng.'
     : '';
@@ -1467,21 +1440,6 @@ function getActiveInvoiceOccupantCount(contract: ContractDetailResponse, period:
   return Math.max(count, 1);
 }
 
-function getEffectiveServicePricesForInvoice(prices: ServicePrice[], effectiveOn: string) {
-  const latestByServiceType = new Map<string, ServicePrice>();
-
-  prices
-    .filter((price) => price.effectiveFrom <= effectiveOn && (!price.effectiveTo || price.effectiveTo >= effectiveOn))
-    .sort((left, right) => right.effectiveFrom.localeCompare(left.effectiveFrom))
-    .forEach((price) => {
-      if (!latestByServiceType.has(price.serviceTypeId)) {
-        latestByServiceType.set(price.serviceTypeId, price);
-      }
-    });
-
-  return Array.from(latestByServiceType.values());
-}
-
 function resolveMonthlyRentFromAppendices(
   baseMonthlyRent: number,
   appendices: ContractAppendixResponse[],
@@ -1531,17 +1489,6 @@ function parseInvoiceAppendixMoney(value?: string | null) {
 
   const parsed = Number.parseFloat(value.trim().replace(/^"|"$/g, '').replace(/,/g, ''));
   return Number.isFinite(parsed) ? parsed : null;
-}
-
-function getBillingServiceLabel(code: string) {
-  const labels: Record<string, string> = {
-    Electric: 'Điện',
-    Water: 'Nước',
-    Wifi: 'Wifi',
-    Trash: 'Rác',
-  };
-
-  return labels[code] ?? code;
 }
 
 type ResolvedInvoicePeriod = {
