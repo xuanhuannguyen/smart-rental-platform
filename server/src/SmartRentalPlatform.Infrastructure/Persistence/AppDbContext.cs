@@ -3,6 +3,7 @@ using SmartRentalPlatform.Application.Common.Interfaces;
 using SmartRentalPlatform.Domain.Entities.AdminApproval;
 using SmartRentalPlatform.Domain.Entities.Administrative;
 
+using SmartRentalPlatform.Domain.Entities.Payments;
 using SmartRentalPlatform.Domain.Entities.Billing;
 using SmartRentalPlatform.Domain.Entities.RentalContracts;
 using SmartRentalPlatform.Domain.Entities.Properties;
@@ -43,6 +44,11 @@ public class AppDbContext : DbContext, IAppDbContext
     public DbSet<RoomingHouseRule> RoomingHouseRules => Set<RoomingHouseRule>();
     public DbSet<RentalPolicy> RentalPolicies => Set<RentalPolicy>();
     public DbSet<ApprovalAuditLog> ApprovalAuditLogs => Set<ApprovalAuditLog>();
+    // Payments
+    public DbSet<WalletAccount> WalletAccounts => Set<WalletAccount>();
+    public DbSet<WalletTransaction> WalletTransactions => Set<WalletTransaction>();
+    public DbSet<PaymentTransaction> PaymentTransactions => Set<PaymentTransaction>();
+    public DbSet<PaymentWebhookLog> PaymentWebhookLogs => Set<PaymentWebhookLog>();
     // Billing
     public DbSet<BillingServiceType> BillingServiceTypes => Set<BillingServiceType>();
     public DbSet<RoomingHouseServicePrice> RoomingHouseServicePrices => Set<RoomingHouseServicePrice>();
@@ -50,7 +56,9 @@ public class AppDbContext : DbContext, IAppDbContext
     public DbSet<Invoice> Invoices => Set<Invoice>();
     public DbSet<InvoiceItem> InvoiceItems => Set<InvoiceItem>();
     public DbSet<InvoicePayment> InvoicePayments => Set<InvoicePayment>();
-    // VeiwingAppointment
+    // Leasing
+    public DbSet<Contract> Contracts => Set<Contract>();
+    // Viewing appointments
     public DbSet<ViewingAppointment> ViewingAppointments => Set<ViewingAppointment>();
     // Rental
     public DbSet<RentalRequest> RentalRequests => Set<RentalRequest>();

@@ -8,6 +8,7 @@ using SmartRentalPlatform.Infrastructure.BackgroundServices;
 using SmartRentalPlatform.Infrastructure.ExternalServices.Ekyc;
 using SmartRentalPlatform.Infrastructure.ExternalServices.Email;
 using SmartRentalPlatform.Infrastructure.ExternalServices.Google;
+using SmartRentalPlatform.Infrastructure.ExternalServices.PayOS;
 using SmartRentalPlatform.Infrastructure.ExternalServices.VietMap;
 using SmartRentalPlatform.Infrastructure.Identity;
 using SmartRentalPlatform.Infrastructure.Options;
@@ -56,6 +57,16 @@ public static class DependencyInjection
         services.AddHostedService<RentalContractExpirationWorker>();
         services.AddHostedService<RentalContractMoveInActivationWorker>();
         services.AddHostedService<ContractAppendixApplicationWorker>();
+        services.Configure<PayOSOptions>(configuration.GetSection(PayOSOptions.SectionName));
+        services.AddHttpClient(PayOSClient.HttpClientName, (provider, client) =>
+        {
+            var options = provider.GetRequiredService<IOptions<PayOSOptions>>().Value;
+            client.BaseAddress = new Uri(options.BaseUrl.TrimEnd('/') + "/");
+            client.Timeout = TimeSpan.FromSeconds(options.TimeoutSeconds);
+        });
+        services.AddScoped<IPayOSClient, PayOSClient>();
+        services.AddScoped<IPayOSWebhookSignatureVerifier, PayOSWebhookSignatureVerifier>();
+        services.AddScoped<IPaymentRowLockService, PaymentRowLockService>();
         services.AddHttpClient(RealVnptEkycClient.HttpClientName, (provider, client) =>
         {
             var options = provider.GetRequiredService<IOptions<VnptEkycOptions>>().Value;

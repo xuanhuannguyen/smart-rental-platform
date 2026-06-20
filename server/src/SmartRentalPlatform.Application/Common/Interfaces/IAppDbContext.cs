@@ -5,8 +5,10 @@ using SmartRentalPlatform.Domain.Entities.RentalContracts;
 using SmartRentalPlatform.Domain.Entities.Properties;
 using SmartRentalPlatform.Domain.Entities.Rental;
 using SmartRentalPlatform.Domain.Entities.Users;
+using SmartRentalPlatform.Domain.Entities.Payments;
 using SmartRentalPlatform.Domain.Entities.Billing;
 
+using SmartRentalPlatform.Domain.Entities.Leasing;
 
 namespace SmartRentalPlatform.Application.Common.Interfaces;
 
@@ -71,6 +73,14 @@ public interface IAppDbContext {
 
     DbSet<ContractSignature> ContractSignatures { get; }
 
+    DbSet<WalletAccount> WalletAccounts { get; }
+
+    DbSet<WalletTransaction> WalletTransactions { get; }
+
+    DbSet<PaymentTransaction> PaymentTransactions { get; }
+
+    DbSet<PaymentWebhookLog> PaymentWebhookLogs { get; }
+
     DbSet<BillingServiceType> BillingServiceTypes { get; }
 
     DbSet<RoomingHouseServicePrice> RoomingHouseServicePrices { get; }
@@ -82,6 +92,8 @@ public interface IAppDbContext {
     DbSet<InvoiceItem> InvoiceItems { get; }
 
     DbSet<InvoicePayment> InvoicePayments { get; }
+
+    DbSet<Contract> Contracts { get; }
 
     DbSet<ViewingAppointment> ViewingAppointments { get; }
 
