@@ -7,6 +7,7 @@ import { toAssetUrl } from '../../../shared/api/assets';
 import { Button } from '../../../shared/components/ui/Button';
 import { billingApi } from '../api';
 import type { Invoice } from '../types';
+import { WalletPaymentConfirmModal } from '../../wallet/components/WalletPaymentConfirmModal';
 import '../../home/pages/MePage.css';
 import './BillingPages.css';
 
@@ -200,18 +201,20 @@ export function TenantInvoicesPanel({ invoiceId: controlledInvoiceId, onOpenInvo
         </section>
       )}
 
-      {confirmPay && (
-        <div className="modal-backdrop">
-          <div className="confirm-dialog">
-            <h3>Xác nhận thanh toán</h3>
-            <p>Thanh toán {formatMoney(getPayableAmount(confirmPay))} từ ví nội bộ?</p>
-            <div className="action-row">
-              <button type="button" className="billing-button secondary" onClick={() => setConfirmPay(null)} disabled={Boolean(busy)}>Đóng</button>
-              <button type="button" className="billing-button" onClick={() => void handlePay(confirmPay)} disabled={Boolean(busy)}>Thanh toán</button>
-            </div>
-          </div>
-        </div>
-      )}
+      <WalletPaymentConfirmModal
+        isOpen={Boolean(confirmPay)}
+        title="Xác nhận thanh toán"
+        description={confirmPay ? `Thanh toán ${formatMoney(getPayableAmount(confirmPay))} từ ví nội bộ?` : undefined}
+        amount={confirmPay ? getPayableAmount(confirmPay) : 0}
+        confirmLabel="Thanh toán"
+        isSubmitting={Boolean(busy)}
+        onConfirm={() => {
+          if (confirmPay) {
+            void handlePay(confirmPay);
+          }
+        }}
+        onClose={() => setConfirmPay(null)}
+      />
     </>
   );
 }

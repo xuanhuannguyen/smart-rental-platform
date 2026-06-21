@@ -77,6 +77,8 @@ public class ContractFileService : IContractFileService
             .Include(x => x.Occupants)
             .Include(x => x.Appendices)
                 .ThenInclude(x => x.Changes)
+            .Include(x => x.Appendices)
+                .ThenInclude(x => x.Signatures)
             .Include(x => x.Files)
             .FirstOrDefaultAsync(x => x.Id == contractId && x.DeletedAt == null, cancellationToken);
 
@@ -107,6 +109,8 @@ public class ContractFileService : IContractFileService
             .Include(x => x.Occupants)
             .Include(x => x.Appendices)
                 .ThenInclude(x => x.Changes)
+            .Include(x => x.Appendices)
+                .ThenInclude(x => x.Signatures)
             .Include(x => x.Files)
             .FirstOrDefaultAsync(x => x.Id == contractId && x.DeletedAt == null, cancellationToken);
 
@@ -375,9 +379,28 @@ public class ContractFileService : IContractFileService
         RentalContract contract,
         ContractAppendix targetAppendix)
     {
+        var targetMainTenantChange = targetAppendix.Changes
+            .OrderBy(x => x.SortOrder)
+            .FirstOrDefault(IsMainTenantUserIdChange);
+        var oldMainTenantUserId = ExtractUserId(targetMainTenantChange?.OldValue);
+        if (oldMainTenantUserId.HasValue)
+        {
+            return oldMainTenantUserId.Value;
+        }
+
+        var tenantSignerUserId = targetAppendix.Signatures
+            .Where(x => x.SignerRole == ContractSignerRole.Tenant)
+            .OrderBy(x => x.SignedAt)
+            .Select(x => (Guid?)x.SignerUserId)
+            .FirstOrDefault();
+        if (tenantSignerUserId.HasValue)
+        {
+            return tenantSignerUserId.Value;
+        }
+
         var currentMainTenantUserId = contract.MainTenantUserId;
 
-        foreach (var appendix in GetActiveAppendicesBefore(contract, targetAppendix))
+        foreach (var appendix in GetAppliedAppendicesBefore(contract, targetAppendix))
         {
             foreach (var change in appendix.Changes.OrderBy(x => x.SortOrder))
             {
@@ -401,10 +424,7 @@ public class ContractFileService : IContractFileService
     {
         var currentMainTenantUserId = contract.MainTenantUserId;
 
-        foreach (var appendix in contract.Appendices
-            .Where(x => x.Status == ContractAppendixStatus.Active && x.AppliedAt.HasValue)
-            .OrderBy(x => x.AppliedAt ?? x.ActivatedAt ?? x.UpdatedAt)
-            .ThenBy(x => x.CreatedAt))
+        foreach (var appendix in GetAppliedAppendicesInOrder(contract))
         {
             foreach (var change in appendix.Changes.OrderBy(x => x.SortOrder))
             {
@@ -428,16 +448,25 @@ public class ContractFileService : IContractFileService
     {
         var userIds = new HashSet<Guid> { contract.MainTenantUserId };
 
-        foreach (var appendix in contract.Appendices
-            .Where(x => x.Status == ContractAppendixStatus.Active && x.AppliedAt.HasValue)
-            .OrderBy(x => x.AppliedAt ?? x.ActivatedAt ?? x.UpdatedAt)
-            .ThenBy(x => x.CreatedAt))
+        foreach (var appendix in GetAppliedAppendicesInOrder(contract))
         {
+            foreach (var tenantSignature in appendix.Signatures
+                .Where(x => x.SignerRole == ContractSignerRole.Tenant))
+            {
+                userIds.Add(tenantSignature.SignerUserId);
+            }
+
             foreach (var change in appendix.Changes.OrderBy(x => x.SortOrder))
             {
                 if (!IsMainTenantUserIdChange(change))
                 {
                     continue;
+                }
+
+                var oldMainTenantUserId = ExtractUserId(change.OldValue);
+                if (oldMainTenantUserId.HasValue)
+                {
+                    userIds.Add(oldMainTenantUserId.Value);
                 }
 
                 var newMainTenantUserId = ExtractUserId(change.NewValue);
@@ -465,15 +494,22 @@ public class ContractFileService : IContractFileService
                NormalizeFieldName(change.FieldName) == "maintenantuserid";
     }
 
-    private static IEnumerable<ContractAppendix> GetActiveAppendicesBefore(
+    private static IEnumerable<ContractAppendix> GetAppliedAppendicesBefore(
         RentalContract contract,
         ContractAppendix targetAppendix)
     {
-        return contract.Appendices
-            .Where(x => x.Status == ContractAppendixStatus.Active && x.AppliedAt.HasValue)
-            .OrderBy(x => x.AppliedAt ?? x.ActivatedAt ?? x.UpdatedAt)
-            .ThenBy(x => x.CreatedAt)
+        return GetAppliedAppendicesInOrder(contract)
             .Where(x => x.Id != targetAppendix.Id && x.CreatedAt <= targetAppendix.CreatedAt);
+    }
+
+    private static IEnumerable<ContractAppendix> GetAppliedAppendicesInOrder(RentalContract contract)
+    {
+        return contract.Appendices
+            .Where(x =>
+                x.AppliedAt.HasValue &&
+                x.Status is ContractAppendixStatus.Active or ContractAppendixStatus.Cancelled)
+            .OrderBy(x => x.AppliedAt ?? x.ActivatedAt ?? x.UpdatedAt)
+            .ThenBy(x => x.CreatedAt);
     }
 
     private static Guid? ExtractUserId(string? value)

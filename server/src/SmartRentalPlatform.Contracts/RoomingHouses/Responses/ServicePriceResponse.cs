@@ -1,4 +1,4 @@
-namespace SmartRentalPlatform.Contracts.Billing.Responses;
+namespace SmartRentalPlatform.Contracts.RoomingHouses.Responses;
 
 public sealed record ServicePriceResponse(
     Guid Id,

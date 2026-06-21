@@ -278,7 +278,6 @@ public class RealVnptEkycClient : IVnptEkycClient
         using var request = await CreateJsonRequestAsync(httpClient, HttpMethod.Post, "ai/v1/ocr/id", payload, cancellationToken);
         using var response = await httpClient.SendAsync(request, cancellationToken);
         var body = await response.Content.ReadAsStringAsync(cancellationToken);
-        _logger.LogInformation("VNPT OCR response body: {Body}", body);
 
         if (!response.IsSuccessStatusCode)
         {
@@ -313,8 +312,6 @@ public class RealVnptEkycClient : IVnptEkycClient
         }
 
         var result = MapOcrResult(clientSession, obj, documentCheck);
-        _logger.LogInformation("OCR mapped result. BirthDay extracted: {BirthDay}, parsed as: {ParsedDob}",
-            obj.BirthDay ?? obj.BirthdayAlternative ?? obj.Dob, result.OcrDateOfBirth);
         if (string.IsNullOrWhiteSpace(result.OcrAddress))
         {
             _logger.LogInformation(
@@ -349,13 +346,12 @@ public class RealVnptEkycClient : IVnptEkycClient
         using var request = await CreateJsonRequestAsync(httpClient, HttpMethod.Post, "ai/v1/ocr/id/front", payload, cancellationToken);
         using var response = await httpClient.SendAsync(request, cancellationToken);
         var body = await response.Content.ReadAsStringAsync(cancellationToken);
-        _logger.LogInformation("VNPT front OCR response body: {Body}", body);
 
         if (!response.IsSuccessStatusCode)
         {
-            _logger.LogWarning("VNPT front OCR HTTP {StatusCode}. SessionId={SessionId}, ElapsedMs={ElapsedMs}, Body={Body}",
-                (int)response.StatusCode, clientSession, sw.ElapsedMilliseconds, TruncateForLog(body, 500));
-            return (true, ProviderHttpFailure("VNPT_FRONT_OCR_HTTP", response, body));
+            _logger.LogWarning("VNPT front OCR HTTP {StatusCode}. SessionId={SessionId}, ElapsedMs={ElapsedMs}",
+                (int)response.StatusCode, clientSession, sw.ElapsedMilliseconds);
+            return (true, ProviderHttpFailure("VNPT_FRONT_OCR_HTTP", response));
         }
 
         var parsed = JsonSerializer.Deserialize<VnptGenericResponse>(body, JsonOptions);
@@ -377,14 +373,11 @@ public class RealVnptEkycClient : IVnptEkycClient
 
         var documentCheck = ResolveDocumentCheck(obj);
         var result = MapOcrResult(clientSession, obj, documentCheck);
-        _logger.LogInformation("Front OCR mapped result. BirthDay extracted: {BirthDay}, parsed as: {ParsedDob}",
-            obj.BirthDay ?? obj.BirthdayAlternative ?? obj.Dob, result.OcrDateOfBirth);
 
         _logger.LogInformation(
-            "VNPT front OCR completed. SessionId={SessionId}, HasAddress={HasAddress}, AddressPreview={AddressPreview}, DocumentCheckResult={DocumentCheckResult}, ElapsedMs={ElapsedMs}",
+            "VNPT front OCR completed. SessionId={SessionId}, HasAddress={HasAddress}, DocumentCheckResult={DocumentCheckResult}, ElapsedMs={ElapsedMs}",
             clientSession,
             !string.IsNullOrWhiteSpace(result.OcrAddress),
-            TruncateForLog(result.OcrAddress, 80),
             documentCheck,
             sw.ElapsedMilliseconds);
 
@@ -700,7 +693,7 @@ public class RealVnptEkycClient : IVnptEkycClient
         {
             _logger.LogWarning("VNPT face compare HTTP {StatusCode}. SessionId={SessionId}, ElapsedMs={ElapsedMs}",
                 (int)response.StatusCode, clientSession, sw.ElapsedMilliseconds);
-            return (true, ProviderHttpFailure("VNPT_FACE_COMPARE_HTTP", response, body));
+            return (true, ProviderHttpFailure("VNPT_FACE_COMPARE_HTTP", response));
         }
 
         var parsed = JsonSerializer.Deserialize<VnptGenericResponse>(body, JsonOptions);
@@ -770,7 +763,7 @@ public class RealVnptEkycClient : IVnptEkycClient
         {
             _logger.LogWarning("VNPT face liveness HTTP {StatusCode}. SessionId={SessionId}, ElapsedMs={ElapsedMs}",
                 (int)response.StatusCode, clientSession, sw.ElapsedMilliseconds);
-            return (true, ProviderHttpFailure("VNPT_LIVENESS_HTTP", response, body));
+            return (true, ProviderHttpFailure("VNPT_LIVENESS_HTTP", response));
         }
 
         var parsed = JsonSerializer.Deserialize<VnptGenericResponse>(body, JsonOptions);
@@ -972,20 +965,6 @@ public class RealVnptEkycClient : IVnptEkycClient
             ? (decimal)_options.FaceMatchThreshold / 100m
             : (decimal)_options.FaceMatchThreshold;
 
-    private static string TruncateForLog(string? value, int maxLength)
-    {
-        if (string.IsNullOrWhiteSpace(value))
-            return string.Empty;
-
-        var compact = value.Replace("\r", " ", StringComparison.Ordinal)
-            .Replace("\n", " ", StringComparison.Ordinal)
-            .Trim();
-
-        return compact.Length <= maxLength
-            ? compact
-            : compact[..maxLength] + "...";
-    }
-
     private static VnptEkycClientResult ProviderFailure(string errorCode, string message) =>
         new()
         {
@@ -997,17 +976,13 @@ public class RealVnptEkycClient : IVnptEkycClient
 
     private static VnptEkycClientResult ProviderHttpFailure(
         string errorCode,
-        HttpResponseMessage response,
-        string body)
+        HttpResponseMessage response)
     {
         var statusCode = (int)response.StatusCode;
-        var detail = string.IsNullOrWhiteSpace(body)
-            ? "<empty body>"
-            : body.Length > 1000 ? body[..1000] : body;
 
         return ProviderFailure(
             errorCode,
-            $"VNPT HTTP {statusCode} {response.ReasonPhrase}. Body: {detail}");
+            $"VNPT HTTP {statusCode} {response.ReasonPhrase}.");
     }
 
     private static VnptEkycClientResult BuildOcrHttpFailure(
@@ -1030,7 +1005,7 @@ public class RealVnptEkycClient : IVnptEkycClient
             };
         }
 
-        return ProviderHttpFailure("VNPT_OCR_HTTP", response, body);
+        return ProviderHttpFailure("VNPT_OCR_HTTP", response);
     }
 
     private static bool IsDocumentInputError(string body) =>

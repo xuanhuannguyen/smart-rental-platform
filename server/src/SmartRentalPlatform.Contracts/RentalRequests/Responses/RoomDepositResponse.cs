@@ -32,6 +32,10 @@ public class RoomDepositResponse
 
     public string? Note { get; set; }
 
+    public Guid? PaymentTransferGroupId { get; set; }
+
+    public Guid? RefundTransferGroupId { get; set; }
+
     public DateTimeOffset CreatedAt { get; set; }
 
     public DateTimeOffset UpdatedAt { get; set; }

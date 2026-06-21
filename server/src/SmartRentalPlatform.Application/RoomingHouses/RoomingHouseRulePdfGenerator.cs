@@ -34,7 +34,7 @@ internal static class RoomingHouseRulePdfGenerator
                     AddSection(column, "Ve sinh", request.CleaningPolicy);
                     AddSection(column, "Khach ra vao", request.GuestPolicy);
                     AddSection(column, "Gui xe", request.ParkingPolicy);
-                    AddSection(column, "Dien, nuoc va tien ich", request.UtilityPolicy);
+                    AddSection(column, "Điện, nước và tiện ích", request.UtilityPolicy);
                     AddSection(column, "Boi thuong hu hong", request.DamageCompensationPolicy);
                     AddSection(column, "Ghi chu bo sung", request.AdditionalNotes);
                 });

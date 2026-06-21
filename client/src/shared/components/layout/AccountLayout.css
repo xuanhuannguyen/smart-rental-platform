@@ -152,7 +152,8 @@
   color: #0f172a;
   letter-spacing: -0.02em;
 }
-.overview-left .overview-description {
+.overview-left .overview-description,
+.overview-left .text-secondary {
   margin: 4px 0 0;
   font-size: 15px;
   color: #475569;

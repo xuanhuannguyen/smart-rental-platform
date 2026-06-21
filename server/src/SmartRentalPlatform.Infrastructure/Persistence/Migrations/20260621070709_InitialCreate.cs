@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using Microsoft.EntityFrameworkCore.Migrations;
 using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
 
@@ -70,9 +70,9 @@ namespace SmartRentalPlatform.Infrastructure.Persistence.Migrations
                 columns: table => new
                 {
                     id = table.Column<Guid>(type: "uuid", nullable: false),
-                    code = table.Column<string>(type: "character varying(30)", maxLength: 30, nullable: false),
                     name = table.Column<string>(type: "character varying(100)", maxLength: 100, nullable: false),
-                    is_metered = table.Column<bool>(type: "boolean", nullable: false),
+                    supports_meter_reading = table.Column<bool>(type: "boolean", nullable: false),
+                    meter_unit_name = table.Column<string>(type: "character varying(30)", maxLength: 30, nullable: true),
                     is_active = table.Column<bool>(type: "boolean", nullable: false, defaultValue: true),
                     created_at = table.Column<DateTimeOffset>(type: "timestamp with time zone", nullable: false)
                 },
@@ -337,6 +337,33 @@ namespace SmartRentalPlatform.Infrastructure.Persistence.Migrations
                 });
 
             migrationBuilder.CreateTable(
+                name: "wallet_accounts",
+                columns: table => new
+                {
+                    id = table.Column<Guid>(type: "uuid", nullable: false),
+                    user_id = table.Column<Guid>(type: "uuid", nullable: false),
+                    balance = table.Column<decimal>(type: "numeric(18,2)", precision: 18, scale: 2, nullable: false),
+                    reserved_balance = table.Column<decimal>(type: "numeric(18,2)", precision: 18, scale: 2, nullable: false),
+                    currency = table.Column<string>(type: "character varying(3)", maxLength: 3, nullable: false, defaultValue: "VND"),
+                    status = table.Column<string>(type: "character varying(30)", maxLength: 30, nullable: false, defaultValue: "Active"),
+                    created_at = table.Column<DateTimeOffset>(type: "timestamp with time zone", nullable: false),
+                    updated_at = table.Column<DateTimeOffset>(type: "timestamp with time zone", nullable: false)
+                },
+                constraints: table =>
+                {
+                    table.PrimaryKey("PK_wallet_accounts", x => x.id);
+                    table.CheckConstraint("ck_wallet_accounts_balance_non_negative", "balance >= 0");
+                    table.CheckConstraint("ck_wallet_accounts_reserved_balance_lte_balance", "reserved_balance <= balance");
+                    table.CheckConstraint("ck_wallet_accounts_reserved_balance_non_negative", "reserved_balance >= 0");
+                    table.ForeignKey(
+                        name: "FK_wallet_accounts_users_user_id",
+                        column: x => x.user_id,
+                        principalTable: "users",
+                        principalColumn: "id",
+                        onDelete: ReferentialAction.Restrict);
+                });
+
+            migrationBuilder.CreateTable(
                 name: "rooming_houses",
                 columns: table => new
                 {
@@ -387,6 +414,89 @@ namespace SmartRentalPlatform.Infrastructure.Persistence.Migrations
                         principalTable: "users",
                         principalColumn: "id",
                         onDelete: ReferentialAction.SetNull);
+                });
+
+            migrationBuilder.CreateTable(
+                name: "payment_transactions",
+                columns: table => new
+                {
+                    id = table.Column<Guid>(type: "uuid", nullable: false),
+                    wallet_account_id = table.Column<Guid>(type: "uuid", nullable: false),
+                    payer_user_id = table.Column<Guid>(type: "uuid", nullable: false),
+                    idempotency_key = table.Column<string>(type: "character varying(120)", maxLength: 120, nullable: false),
+                    amount = table.Column<decimal>(type: "numeric(18,2)", precision: 18, scale: 2, nullable: false),
+                    currency = table.Column<string>(type: "character varying(3)", maxLength: 3, nullable: false, defaultValue: "VND"),
+                    payment_purpose = table.Column<string>(type: "character varying(50)", maxLength: 50, nullable: false),
+                    payment_method = table.Column<string>(type: "character varying(30)", maxLength: 30, nullable: false),
+                    provider_order_code = table.Column<string>(type: "character varying(100)", maxLength: 100, nullable: false),
+                    provider_transaction_code = table.Column<string>(type: "character varying(100)", maxLength: 100, nullable: true),
+                    provider_checkout_url = table.Column<string>(type: "text", nullable: true),
+                    provider_qr_code = table.Column<string>(type: "text", nullable: true),
+                    gateway_response_code = table.Column<string>(type: "character varying(100)", maxLength: 100, nullable: true),
+                    gateway_response_message = table.Column<string>(type: "text", nullable: true),
+                    status = table.Column<string>(type: "character varying(30)", maxLength: 30, nullable: false),
+                    expires_at = table.Column<DateTimeOffset>(type: "timestamp with time zone", nullable: true),
+                    paid_at = table.Column<DateTimeOffset>(type: "timestamp with time zone", nullable: true),
+                    failed_at = table.Column<DateTimeOffset>(type: "timestamp with time zone", nullable: true),
+                    confirmed_at = table.Column<DateTimeOffset>(type: "timestamp with time zone", nullable: true),
+                    created_at = table.Column<DateTimeOffset>(type: "timestamp with time zone", nullable: false),
+                    updated_at = table.Column<DateTimeOffset>(type: "timestamp with time zone", nullable: false)
+                },
+                constraints: table =>
+                {
+                    table.PrimaryKey("PK_payment_transactions", x => x.id);
+                    table.CheckConstraint("ck_payment_transactions_amount_positive", "amount > 0");
+                    table.ForeignKey(
+                        name: "FK_payment_transactions_users_payer_user_id",
+                        column: x => x.payer_user_id,
+                        principalTable: "users",
+                        principalColumn: "id",
+                        onDelete: ReferentialAction.Restrict);
+                    table.ForeignKey(
+                        name: "FK_payment_transactions_wallet_accounts_wallet_account_id",
+                        column: x => x.wallet_account_id,
+                        principalTable: "wallet_accounts",
+                        principalColumn: "id",
+                        onDelete: ReferentialAction.Restrict);
+                });
+
+            migrationBuilder.CreateTable(
+                name: "wallet_transactions",
+                columns: table => new
+                {
+                    id = table.Column<Guid>(type: "uuid", nullable: false),
+                    wallet_account_id = table.Column<Guid>(type: "uuid", nullable: false),
+                    user_id = table.Column<Guid>(type: "uuid", nullable: false),
+                    transfer_group_id = table.Column<Guid>(type: "uuid", nullable: true),
+                    transaction_type = table.Column<string>(type: "character varying(50)", maxLength: 50, nullable: false),
+                    direction = table.Column<string>(type: "character varying(20)", maxLength: 20, nullable: false),
+                    amount = table.Column<decimal>(type: "numeric(18,2)", precision: 18, scale: 2, nullable: false),
+                    balance_before = table.Column<decimal>(type: "numeric(18,2)", precision: 18, scale: 2, nullable: false),
+                    balance_after = table.Column<decimal>(type: "numeric(18,2)", precision: 18, scale: 2, nullable: false),
+                    reserved_balance_before = table.Column<decimal>(type: "numeric(18,2)", precision: 18, scale: 2, nullable: false),
+                    reserved_balance_after = table.Column<decimal>(type: "numeric(18,2)", precision: 18, scale: 2, nullable: false),
+                    related_entity_type = table.Column<string>(type: "character varying(50)", maxLength: 50, nullable: true),
+                    related_entity_id = table.Column<Guid>(type: "uuid", nullable: true),
+                    description = table.Column<string>(type: "text", nullable: true),
+                    status = table.Column<string>(type: "character varying(30)", maxLength: 30, nullable: false),
+                    created_at = table.Column<DateTimeOffset>(type: "timestamp with time zone", nullable: false)
+                },
+                constraints: table =>
+                {
+                    table.PrimaryKey("PK_wallet_transactions", x => x.id);
+                    table.CheckConstraint("ck_wallet_transactions_amount_positive", "amount > 0");
+                    table.ForeignKey(
+                        name: "FK_wallet_transactions_users_user_id",
+                        column: x => x.user_id,
+                        principalTable: "users",
+                        principalColumn: "id",
+                        onDelete: ReferentialAction.Restrict);
+                    table.ForeignKey(
+                        name: "FK_wallet_transactions_wallet_accounts_wallet_account_id",
+                        column: x => x.wallet_account_id,
+                        principalTable: "wallet_accounts",
+                        principalColumn: "id",
+                        onDelete: ReferentialAction.Restrict);
                 });
 
             migrationBuilder.CreateTable(
@@ -505,8 +615,7 @@ namespace SmartRentalPlatform.Infrastructure.Persistence.Migrations
                     id = table.Column<Guid>(type: "uuid", nullable: false),
                     rooming_house_id = table.Column<Guid>(type: "uuid", nullable: false),
                     service_type_id = table.Column<Guid>(type: "uuid", nullable: false),
-                    billing_method = table.Column<string>(type: "character varying(30)", maxLength: 30, nullable: false),
-                    unit_name = table.Column<string>(type: "character varying(50)", maxLength: 50, nullable: false),
+                    pricing_unit = table.Column<string>(type: "character varying(30)", maxLength: 30, nullable: false),
                     unit_price = table.Column<decimal>(type: "numeric(12,2)", precision: 12, scale: 2, nullable: false),
                     effective_from = table.Column<DateOnly>(type: "date", nullable: false),
                     effective_to = table.Column<DateOnly>(type: "date", nullable: true),
@@ -556,6 +665,38 @@ namespace SmartRentalPlatform.Infrastructure.Persistence.Migrations
                         name: "FK_rooms_rooming_houses_rooming_house_id",
                         column: x => x.rooming_house_id,
                         principalTable: "rooming_houses",
+                        principalColumn: "id",
+                        onDelete: ReferentialAction.Restrict);
+                });
+
+            migrationBuilder.CreateTable(
+                name: "payment_webhook_logs",
+                columns: table => new
+                {
+                    id = table.Column<Guid>(type: "uuid", nullable: false),
+                    payment_transaction_id = table.Column<Guid>(type: "uuid", nullable: true),
+                    payment_method = table.Column<string>(type: "character varying(30)", maxLength: 30, nullable: false),
+                    provider_event_id = table.Column<string>(type: "character varying(120)", maxLength: 120, nullable: true),
+                    provider_order_code = table.Column<string>(type: "character varying(100)", maxLength: 100, nullable: true),
+                    provider_transaction_code = table.Column<string>(type: "character varying(100)", maxLength: 100, nullable: true),
+                    idempotency_key = table.Column<string>(type: "character varying(120)", maxLength: 120, nullable: true),
+                    raw_payload = table.Column<string>(type: "text", nullable: false),
+                    raw_payload_hash = table.Column<string>(type: "text", nullable: false),
+                    signature_status = table.Column<string>(type: "character varying(30)", maxLength: 30, nullable: false),
+                    processing_status = table.Column<string>(type: "character varying(30)", maxLength: 30, nullable: false),
+                    error_message = table.Column<string>(type: "text", nullable: true),
+                    retry_count = table.Column<int>(type: "integer", nullable: false),
+                    received_at = table.Column<DateTimeOffset>(type: "timestamp with time zone", nullable: false),
+                    processed_at = table.Column<DateTimeOffset>(type: "timestamp with time zone", nullable: true),
+                    created_at = table.Column<DateTimeOffset>(type: "timestamp with time zone", nullable: false)
+                },
+                constraints: table =>
+                {
+                    table.PrimaryKey("PK_payment_webhook_logs", x => x.id);
+                    table.ForeignKey(
+                        name: "FK_payment_webhook_logs_payment_transactions_payment_transacti~",
+                        column: x => x.payment_transaction_id,
+                        principalTable: "payment_transactions",
                         principalColumn: "id",
                         onDelete: ReferentialAction.Restrict);
                 });
@@ -795,6 +936,8 @@ namespace SmartRentalPlatform.Infrastructure.Persistence.Migrations
                     room_snapshot = table.Column<string>(type: "jsonb", nullable: true),
                     signature_deadline_at = table.Column<DateTimeOffset>(type: "timestamp with time zone", nullable: true),
                     activated_at = table.Column<DateTimeOffset>(type: "timestamp with time zone", nullable: true),
+                    termination_date = table.Column<DateOnly>(type: "date", nullable: true),
+                    termination_type = table.Column<string>(type: "character varying(30)", maxLength: 30, nullable: true),
                     status_reason = table.Column<string>(type: "text", nullable: true),
                     created_at = table.Column<DateTimeOffset>(type: "timestamp with time zone", nullable: false),
                     updated_at = table.Column<DateTimeOffset>(type: "timestamp with time zone", nullable: false),
@@ -840,6 +983,7 @@ namespace SmartRentalPlatform.Infrastructure.Persistence.Migrations
                     status = table.Column<string>(type: "character varying(40)", maxLength: 40, nullable: false),
                     created_by_user_id = table.Column<Guid>(type: "uuid", nullable: false),
                     activated_at = table.Column<DateTimeOffset>(type: "timestamp with time zone", nullable: true),
+                    applied_at = table.Column<DateTimeOffset>(type: "timestamp with time zone", nullable: true),
                     status_reason = table.Column<string>(type: "text", nullable: true),
                     created_at = table.Column<DateTimeOffset>(type: "timestamp with time zone", nullable: false),
                     updated_at = table.Column<DateTimeOffset>(type: "timestamp with time zone", nullable: false)
@@ -921,8 +1065,6 @@ namespace SmartRentalPlatform.Infrastructure.Persistence.Migrations
                     service_amount = table.Column<decimal>(type: "numeric(12,2)", precision: 12, scale: 2, nullable: false),
                     discount_amount = table.Column<decimal>(type: "numeric(12,2)", precision: 12, scale: 2, nullable: false),
                     total_amount = table.Column<decimal>(type: "numeric(12,2)", precision: 12, scale: 2, nullable: false),
-                    paid_amount = table.Column<decimal>(type: "numeric(12,2)", precision: 12, scale: 2, nullable: false),
-                    remaining_amount = table.Column<decimal>(type: "numeric(12,2)", precision: 12, scale: 2, nullable: false),
                     status = table.Column<string>(type: "character varying(30)", maxLength: 30, nullable: false, defaultValue: "Draft"),
                     note = table.Column<string>(type: "text", nullable: true),
                     sent_at = table.Column<DateTimeOffset>(type: "timestamp with time zone", nullable: true),
@@ -930,7 +1072,8 @@ namespace SmartRentalPlatform.Infrastructure.Persistence.Migrations
                     cancelled_at = table.Column<DateTimeOffset>(type: "timestamp with time zone", nullable: true),
                     cancel_reason = table.Column<string>(type: "text", nullable: true),
                     created_at = table.Column<DateTimeOffset>(type: "timestamp with time zone", nullable: false),
-                    updated_at = table.Column<DateTimeOffset>(type: "timestamp with time zone", nullable: false)
+                    updated_at = table.Column<DateTimeOffset>(type: "timestamp with time zone", nullable: false),
+                    wallet_transfer_group_id = table.Column<Guid>(type: "uuid", nullable: true)
                 },
                 constraints: table =>
                 {
@@ -975,7 +1118,6 @@ namespace SmartRentalPlatform.Infrastructure.Persistence.Migrations
                     current_reading = table.Column<decimal>(type: "numeric(12,2)", precision: 12, scale: 2, nullable: false),
                     consumption = table.Column<decimal>(type: "numeric(12,2)", precision: 12, scale: 2, nullable: false),
                     proof_image_object_key = table.Column<string>(type: "text", nullable: true),
-                    status = table.Column<string>(type: "character varying(30)", maxLength: 30, nullable: false, defaultValue: "Draft"),
                     recorded_by_landlord_user_id = table.Column<Guid>(type: "uuid", nullable: false),
                     reading_at = table.Column<DateTimeOffset>(type: "timestamp with time zone", nullable: false),
                     created_at = table.Column<DateTimeOffset>(type: "timestamp with time zone", nullable: false),
@@ -1134,43 +1276,6 @@ namespace SmartRentalPlatform.Infrastructure.Persistence.Migrations
                 });
 
             migrationBuilder.CreateTable(
-                name: "invoice_payments",
-                columns: table => new
-                {
-                    id = table.Column<Guid>(type: "uuid", nullable: false),
-                    invoice_id = table.Column<Guid>(type: "uuid", nullable: false),
-                    tenant_user_id = table.Column<Guid>(type: "uuid", nullable: false),
-                    landlord_user_id = table.Column<Guid>(type: "uuid", nullable: false),
-                    amount = table.Column<decimal>(type: "numeric(12,2)", precision: 12, scale: 2, nullable: false),
-                    wallet_transfer_group_id = table.Column<Guid>(type: "uuid", nullable: false),
-                    status = table.Column<string>(type: "character varying(30)", maxLength: 30, nullable: false, defaultValue: "Succeeded"),
-                    paid_at = table.Column<DateTimeOffset>(type: "timestamp with time zone", nullable: false),
-                    created_at = table.Column<DateTimeOffset>(type: "timestamp with time zone", nullable: false)
-                },
-                constraints: table =>
-                {
-                    table.PrimaryKey("PK_invoice_payments", x => x.id);
-                    table.ForeignKey(
-                        name: "FK_invoice_payments_invoices_invoice_id",
-                        column: x => x.invoice_id,
-                        principalTable: "invoices",
-                        principalColumn: "id",
-                        onDelete: ReferentialAction.Restrict);
-                    table.ForeignKey(
-                        name: "FK_invoice_payments_users_landlord_user_id",
-                        column: x => x.landlord_user_id,
-                        principalTable: "users",
-                        principalColumn: "id",
-                        onDelete: ReferentialAction.Restrict);
-                    table.ForeignKey(
-                        name: "FK_invoice_payments_users_tenant_user_id",
-                        column: x => x.tenant_user_id,
-                        principalTable: "users",
-                        principalColumn: "id",
-                        onDelete: ReferentialAction.Restrict);
-                });
-
-            migrationBuilder.CreateTable(
                 name: "invoice_items",
                 columns: table => new
                 {
@@ -1266,13 +1371,13 @@ namespace SmartRentalPlatform.Infrastructure.Persistence.Migrations
 
             migrationBuilder.InsertData(
                 table: "billing_service_types",
-                columns: new[] { "id", "code", "created_at", "is_active", "is_metered", "name" },
+                columns: new[] { "id", "created_at", "is_active", "meter_unit_name", "name", "supports_meter_reading" },
                 values: new object[,]
                 {
-                    { new Guid("60000000-0000-0000-0000-000000000001"), "Electric", new DateTimeOffset(new DateTime(2026, 1, 1, 0, 0, 0, 0, DateTimeKind.Unspecified), new TimeSpan(0, 0, 0, 0, 0)), true, true, "Electric" },
-                    { new Guid("60000000-0000-0000-0000-000000000002"), "Water", new DateTimeOffset(new DateTime(2026, 1, 1, 0, 0, 0, 0, DateTimeKind.Unspecified), new TimeSpan(0, 0, 0, 0, 0)), true, true, "Water" },
-                    { new Guid("60000000-0000-0000-0000-000000000003"), "Wifi", new DateTimeOffset(new DateTime(2026, 1, 1, 0, 0, 0, 0, DateTimeKind.Unspecified), new TimeSpan(0, 0, 0, 0, 0)), true, false, "Wifi" },
-                    { new Guid("60000000-0000-0000-0000-000000000004"), "Trash", new DateTimeOffset(new DateTime(2026, 1, 1, 0, 0, 0, 0, DateTimeKind.Unspecified), new TimeSpan(0, 0, 0, 0, 0)), true, false, "Trash" }
+                    { new Guid("60000000-0000-0000-0000-000000000001"), new DateTimeOffset(new DateTime(2026, 1, 1, 0, 0, 0, 0, DateTimeKind.Unspecified), new TimeSpan(0, 0, 0, 0, 0)), true, "kWh", "Điện", true },
+                    { new Guid("60000000-0000-0000-0000-000000000002"), new DateTimeOffset(new DateTime(2026, 1, 1, 0, 0, 0, 0, DateTimeKind.Unspecified), new TimeSpan(0, 0, 0, 0, 0)), true, "m3", "Nước", true },
+                    { new Guid("60000000-0000-0000-0000-000000000003"), new DateTimeOffset(new DateTime(2026, 1, 1, 0, 0, 0, 0, DateTimeKind.Unspecified), new TimeSpan(0, 0, 0, 0, 0)), true, null, "Internet", false },
+                    { new Guid("60000000-0000-0000-0000-000000000004"), new DateTimeOffset(new DateTime(2026, 1, 1, 0, 0, 0, 0, DateTimeKind.Unspecified), new TimeSpan(0, 0, 0, 0, 0)), true, null, "Rác", false }
                 });
 
             migrationBuilder.InsertData(
@@ -4634,9 +4739,9 @@ namespace SmartRentalPlatform.Infrastructure.Persistence.Migrations
                 column: "created_at");
 
             migrationBuilder.CreateIndex(
-                name: "IX_billing_service_types_code",
+                name: "IX_billing_service_types_name",
                 table: "billing_service_types",
-                column: "code",
+                column: "name",
                 unique: true);
 
             migrationBuilder.CreateIndex(
@@ -4800,27 +4905,6 @@ namespace SmartRentalPlatform.Infrastructure.Persistence.Migrations
                 column: "service_type_id");
 
             migrationBuilder.CreateIndex(
-                name: "IX_invoice_payments_invoice_id",
-                table: "invoice_payments",
-                column: "invoice_id");
-
-            migrationBuilder.CreateIndex(
-                name: "IX_invoice_payments_landlord_user_id",
-                table: "invoice_payments",
-                column: "landlord_user_id");
-
-            migrationBuilder.CreateIndex(
-                name: "IX_invoice_payments_tenant_user_id",
-                table: "invoice_payments",
-                column: "tenant_user_id");
-
-            migrationBuilder.CreateIndex(
-                name: "IX_invoice_payments_wallet_transfer_group_id",
-                table: "invoice_payments",
-                column: "wallet_transfer_group_id",
-                unique: true);
-
-            migrationBuilder.CreateIndex(
                 name: "IX_invoices_contract_id_billing_period_start_billing_period_end",
                 table: "invoices",
                 columns: new[] { "contract_id", "billing_period_start", "billing_period_end" },
@@ -4886,8 +4970,7 @@ namespace SmartRentalPlatform.Infrastructure.Persistence.Migrations
             migrationBuilder.CreateIndex(
                 name: "IX_meter_readings_contract_id_service_type_id_billing_period_s~",
                 table: "meter_readings",
-                columns: new[] { "contract_id", "service_type_id", "billing_period_start", "billing_period_end" },
-                unique: true);
+                columns: new[] { "contract_id", "service_type_id", "billing_period_start", "billing_period_end" });
 
             migrationBuilder.CreateIndex(
                 name: "IX_meter_readings_recorded_by_landlord_user_id",
@@ -4903,6 +4986,64 @@ namespace SmartRentalPlatform.Infrastructure.Persistence.Migrations
                 name: "IX_meter_readings_service_type_id",
                 table: "meter_readings",
                 column: "service_type_id");
+
+            migrationBuilder.CreateIndex(
+                name: "IX_payment_transactions_created_at",
+                table: "payment_transactions",
+                column: "created_at");
+
+            migrationBuilder.CreateIndex(
+                name: "IX_payment_transactions_idempotency_key",
+                table: "payment_transactions",
+                column: "idempotency_key",
+                unique: true);
+
+            migrationBuilder.CreateIndex(
+                name: "IX_payment_transactions_payer_user_id",
+                table: "payment_transactions",
+                column: "payer_user_id");
+
+            migrationBuilder.CreateIndex(
+                name: "IX_payment_transactions_provider_order_code",
+                table: "payment_transactions",
+                column: "provider_order_code",
+                unique: true);
+
+            migrationBuilder.CreateIndex(
+                name: "IX_payment_transactions_status",
+                table: "payment_transactions",
+                column: "status");
+
+            migrationBuilder.CreateIndex(
+                name: "IX_payment_transactions_wallet_account_id",
+                table: "payment_transactions",
+                column: "wallet_account_id");
+
+            migrationBuilder.CreateIndex(
+                name: "IX_payment_webhook_logs_payment_transaction_id",
+                table: "payment_webhook_logs",
+                column: "payment_transaction_id");
+
+            migrationBuilder.CreateIndex(
+                name: "IX_payment_webhook_logs_processing_status",
+                table: "payment_webhook_logs",
+                column: "processing_status");
+
+            migrationBuilder.CreateIndex(
+                name: "IX_payment_webhook_logs_provider_order_code",
+                table: "payment_webhook_logs",
+                column: "provider_order_code");
+
+            migrationBuilder.CreateIndex(
+                name: "IX_payment_webhook_logs_raw_payload_hash",
+                table: "payment_webhook_logs",
+                column: "raw_payload_hash",
+                unique: true);
+
+            migrationBuilder.CreateIndex(
+                name: "IX_payment_webhook_logs_received_at",
+                table: "payment_webhook_logs",
+                column: "received_at");
 
             migrationBuilder.CreateIndex(
                 name: "IX_property_images_room_id",
@@ -5085,6 +5226,42 @@ namespace SmartRentalPlatform.Infrastructure.Persistence.Migrations
                 name: "IX_viewing_appointments_tenant_user_id",
                 table: "viewing_appointments",
                 column: "tenant_user_id");
+
+            migrationBuilder.CreateIndex(
+                name: "IX_wallet_accounts_status",
+                table: "wallet_accounts",
+                column: "status");
+
+            migrationBuilder.CreateIndex(
+                name: "IX_wallet_accounts_user_id",
+                table: "wallet_accounts",
+                column: "user_id",
+                unique: true);
+
+            migrationBuilder.CreateIndex(
+                name: "IX_wallet_transactions_created_at",
+                table: "wallet_transactions",
+                column: "created_at");
+
+            migrationBuilder.CreateIndex(
+                name: "IX_wallet_transactions_related_entity_type_related_entity_id",
+                table: "wallet_transactions",
+                columns: new[] { "related_entity_type", "related_entity_id" });
+
+            migrationBuilder.CreateIndex(
+                name: "IX_wallet_transactions_transfer_group_id",
+                table: "wallet_transactions",
+                column: "transfer_group_id");
+
+            migrationBuilder.CreateIndex(
+                name: "IX_wallet_transactions_user_id",
+                table: "wallet_transactions",
+                column: "user_id");
+
+            migrationBuilder.CreateIndex(
+                name: "IX_wallet_transactions_wallet_account_id",
+                table: "wallet_transactions",
+                column: "wallet_account_id");
         }
 
         /// <inheritdoc />
@@ -5112,13 +5289,13 @@ namespace SmartRentalPlatform.Infrastructure.Persistence.Migrations
                 name: "invoice_items");
 
             migrationBuilder.DropTable(
-                name: "invoice_payments");
-
-            migrationBuilder.DropTable(
                 name: "kyc_verifications");
 
             migrationBuilder.DropTable(
                 name: "login_logs");
+
+            migrationBuilder.DropTable(
+                name: "payment_webhook_logs");
 
             migrationBuilder.DropTable(
                 name: "property_images");
@@ -5157,16 +5334,22 @@ namespace SmartRentalPlatform.Infrastructure.Persistence.Migrations
                 name: "viewing_appointments");
 
             migrationBuilder.DropTable(
+                name: "wallet_transactions");
+
+            migrationBuilder.DropTable(
                 name: "contract_occupants");
 
             migrationBuilder.DropTable(
                 name: "contract_appendices");
 
             migrationBuilder.DropTable(
+                name: "invoices");
+
+            migrationBuilder.DropTable(
                 name: "meter_readings");
 
             migrationBuilder.DropTable(
-                name: "invoices");
+                name: "payment_transactions");
 
             migrationBuilder.DropTable(
                 name: "amenities");
@@ -5179,6 +5362,9 @@ namespace SmartRentalPlatform.Infrastructure.Persistence.Migrations
 
             migrationBuilder.DropTable(
                 name: "contracts");
+
+            migrationBuilder.DropTable(
+                name: "wallet_accounts");
 
             migrationBuilder.DropTable(
                 name: "room_deposits");

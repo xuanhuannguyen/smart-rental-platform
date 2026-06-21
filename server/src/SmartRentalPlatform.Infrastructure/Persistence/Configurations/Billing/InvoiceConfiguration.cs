@@ -34,6 +34,7 @@ public class InvoiceConfiguration : IEntityTypeConfiguration<Invoice>
         builder.Property(x => x.PaidAt).HasColumnName("paid_at");
         builder.Property(x => x.CancelledAt).HasColumnName("cancelled_at");
         builder.Property(x => x.CancelReason).HasColumnName("cancel_reason").HasColumnType("text");
+        builder.Property(x => x.WalletTransferGroupId).HasColumnName("wallet_transfer_group_id");
         builder.Property(x => x.CreatedAt).HasColumnName("created_at").IsRequired();
         builder.Property(x => x.UpdatedAt).HasColumnName("updated_at").IsRequired();
 

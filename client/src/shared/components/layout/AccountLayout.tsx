@@ -17,6 +17,13 @@ export function AccountLayout() {
         <h2>Quản lý tài khoản</h2>
         
         <NavLink
+          to={ROUTE_PATHS.ACCOUNT.WALLET}
+          className={({ isActive }) => `account-sidebar-item ${isActive ? 'active' : ''}`}
+        >
+          Ví của tôi
+        </NavLink>
+
+        <NavLink
           to={ROUTE_PATHS.ACCOUNT.PROFILE}
           className={({ isActive }) => `account-sidebar-item ${isActive ? 'active' : ''}`}
         >
@@ -56,6 +63,13 @@ export function AccountLayout() {
           className={({ isActive }) => `account-sidebar-item ${isActive ? 'active' : ''}`}
         >
           Hóa đơn của tôi
+        </NavLink>
+
+        <NavLink
+          to={ROUTE_PATHS.ACCOUNT.TRANSACTIONS}
+          className={({ isActive }) => `account-sidebar-item ${isActive ? 'active' : ''}`}
+        >
+          Lịch sử giao dịch
         </NavLink>
 
         <button

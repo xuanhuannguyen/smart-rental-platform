@@ -112,7 +112,7 @@ export const contractApi = {
 
     if (!response.ok) {
       const payload = await response.json().catch(() => null);
-      throw new Error(getApiErrorMessage(payload, 'Khong tai duoc file hop dong.'));
+      throw new Error(getApiErrorMessage(payload, 'Không tải được file hợp đồng.'));
     }
 
     return response.blob();
@@ -186,7 +186,7 @@ export const contractApi = {
 
     if (!response.ok) {
       const payload = await response.json().catch(() => null);
-      throw new Error(getApiErrorMessage(payload, 'Khong tai duoc preview phu luc.'));
+      throw new Error(getApiErrorMessage(payload, 'Không tải được preview phụ lục.'));
     }
 
     return response.blob();

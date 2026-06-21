@@ -153,15 +153,6 @@ export interface InvoiceItem {
   amount: number;
 }
 
-export interface InvoicePayment {
-  id: string;
-  invoiceId: string;
-  amount: number;
-  walletTransferGroupId: string;
-  status: string;
-  paidAt: string;
-}
-
 export interface Invoice {
   id: string;
   contractId: string;
@@ -188,5 +179,5 @@ export interface Invoice {
   sentAt?: string | null;
   paidAt?: string | null;
   items: InvoiceItem[];
-  payment?: InvoicePayment | null;
+  walletTransferGroupId?: string | null;
 }

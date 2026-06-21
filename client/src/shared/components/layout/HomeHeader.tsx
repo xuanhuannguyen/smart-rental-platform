@@ -118,6 +118,9 @@ export function HomeHeader({ centerContent }: HomeHeaderProps) {
                   <strong>{currentUser.displayName}</strong>
                   <span>{currentUser.email}</span>
                 </div>
+                <button className="dropdown-item" onClick={() => { setShowDropdown(false); navigate(ROUTE_PATHS.ACCOUNT.WALLET); }}>
+                  Ví của tôi
+                </button>
                 <button className="dropdown-item" onClick={() => { setShowDropdown(false); navigate(ROUTE_PATHS.ACCOUNT.PROFILE); }}>
                   Chỉnh sửa thông tin
                 </button>
@@ -135,6 +138,9 @@ export function HomeHeader({ centerContent }: HomeHeaderProps) {
                 </button>
                 <button className="dropdown-item" onClick={() => { setShowDropdown(false); navigate(ROUTE_PATHS.ACCOUNT.INVOICES); }}>
                   Hóa đơn của tôi
+                </button>
+                <button className="dropdown-item" onClick={() => { setShowDropdown(false); navigate(ROUTE_PATHS.ACCOUNT.TRANSACTIONS); }}>
+                  Lịch sử giao dịch
                 </button>
                 {isAdmin && (
                   <button className="dropdown-item" onClick={() => { setShowDropdown(false); navigate(ROUTE_PATHS.ADMIN.APPROVALS); }}>

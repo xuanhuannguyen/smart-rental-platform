@@ -60,9 +60,8 @@ public static class DependencyInjection
         services.AddScoped<IPaymentWebhookService, PaymentWebhookService>();
         services.AddScoped<IMockPaymentService, MockPaymentService>();
         services.AddScoped<IBillingContractReadService, ContractBillingReadService>();
-        services.AddScoped<IInvoiceWalletPaymentService, PendingInvoiceWalletPaymentService>();
+        services.AddScoped<IInvoiceWalletPaymentService, InvoiceWalletPaymentService>();
         services.AddScoped<IBillingService, BillingService>();
-        services.AddScoped<IInvoiceWalletPaymentService, PendingInvoiceWalletPaymentService>();
         services.AddScoped<IViewingAppointmentService, ViewingAppointmentService>();
         return services;
     }

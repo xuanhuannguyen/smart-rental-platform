@@ -4,7 +4,7 @@ namespace SmartRentalPlatform.Application.RoomDeposits;
 
 public interface IRoomDepositService
 {
-    Task<RoomDepositResponse?> MarkPaidAsync(
+    Task<RoomDepositResponse?> PayAsync(
         Guid tenantUserId,
         Guid roomDepositId,
         CancellationToken cancellationToken = default);

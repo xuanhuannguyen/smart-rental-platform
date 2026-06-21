@@ -26,4 +26,4 @@ public sealed record InvoiceResponse(
     DateTimeOffset? SentAt,
     DateTimeOffset? PaidAt,
     List<InvoiceItemResponse> Items,
-    InvoicePaymentResponse? Payment);
+    Guid? WalletTransferGroupId);

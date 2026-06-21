@@ -42,6 +42,22 @@ public class WalletTopUpsController : ControllerBase
         });
     }
 
+    [HttpGet("{id:guid}")]
+    public async Task<ActionResult<ApiResponse<WalletTopUpHistoryResponse>>> GetTopUp(
+        Guid id,
+        CancellationToken cancellationToken = default)
+    {
+        var userId = GetCurrentUserId();
+        var result = await payOSTopUpService.GetTopUpAsync(userId, id, cancellationToken);
+
+        return Ok(new ApiResponse<WalletTopUpHistoryResponse>
+        {
+            Success = true,
+            Message = "Lấy thông tin giao dịch nạp ví thành công.",
+            Data = result
+        });
+    }
+
     [HttpPost("payos")]
     public async Task<ActionResult<ApiResponse<CreatePayOSTopUpResponse>>> CreatePayOSTopUp(
         CreatePayOSTopUpRequest request,

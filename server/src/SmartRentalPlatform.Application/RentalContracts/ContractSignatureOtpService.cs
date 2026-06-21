@@ -122,7 +122,8 @@ public class ContractSignatureOtpService : IContractSignatureOtpService
             .Include(x => x.Changes)
             .Where(x =>
                 x.RentalContractId == contractId &&
-                x.Status == ContractAppendixStatus.Active &&
+                (x.Status == ContractAppendixStatus.Active ||
+                 x.Status == ContractAppendixStatus.Cancelled) &&
                 x.AppliedAt.HasValue)
             .LoadAsync(cancellationToken);
 
@@ -411,7 +412,9 @@ public class ContractSignatureOtpService : IContractSignatureOtpService
         var currentMainTenantUserId = contract.MainTenantUserId;
 
         foreach (var appendix in contract.Appendices
-            .Where(x => x.Status == ContractAppendixStatus.Active && x.AppliedAt.HasValue)
+            .Where(x =>
+                x.AppliedAt.HasValue &&
+                x.Status is ContractAppendixStatus.Active or ContractAppendixStatus.Cancelled)
             .OrderBy(x => x.AppliedAt ?? x.ActivatedAt ?? x.UpdatedAt)
             .ThenBy(x => x.CreatedAt))
         {

@@ -37,7 +37,7 @@ public class WalletService : IWalletService
 
         try
         {
-            var user = await LoadUserByIdAsync(userId, cancellationToken);
+            var user = await rowLockService.LockUserAsync(userId, cancellationToken);
             if (user is null)
             {
                 throw new NotFoundException(ErrorCodes.NotFound, "User not found.");
@@ -243,6 +243,152 @@ public class WalletService : IWalletService
         WalletTransactionMetadata? metadata = null,
         CancellationToken cancellationToken = default)
     {
+        await using var transaction = await context.BeginTransactionAsync(cancellationToken);
+
+        try
+        {
+            var result = await TransferWithinTransactionAsync(
+                sourceWalletAccountId,
+                targetWalletAccountId,
+                amount,
+                debitTransactionType,
+                creditTransactionType,
+                metadata,
+                cancellationToken);
+
+            await context.SaveChangesAsync(cancellationToken);
+            await transaction.CommitAsync(cancellationToken);
+
+            return result;
+        }
+        catch
+        {
+            await transaction.RollbackAsync(cancellationToken);
+            throw;
+        }
+    }
+
+    public async Task<WalletTransferResponse> TransferWithinTransactionAsync(
+        Guid sourceWalletAccountId,
+        Guid targetWalletAccountId,
+        decimal amount,
+        WalletTransactionType debitTransactionType,
+        WalletTransactionType creditTransactionType,
+        WalletTransactionMetadata? metadata = null,
+        CancellationToken cancellationToken = default)
+    {
+        return await TransferWithinTransactionCoreAsync(
+            sourceWalletAccountId,
+            targetWalletAccountId,
+            amount,
+            debitTransactionType,
+            creditTransactionType,
+            sourceReservedBalanceDelta: 0,
+            targetReservedBalanceDelta: 0,
+            metadata,
+            cancellationToken);
+    }
+
+    public async Task<WalletTransferResponse> TransferToReservedWithinTransactionAsync(
+        Guid sourceWalletAccountId,
+        Guid targetWalletAccountId,
+        decimal amount,
+        WalletTransactionType debitTransactionType,
+        WalletTransactionType creditTransactionType,
+        WalletTransactionMetadata? metadata = null,
+        CancellationToken cancellationToken = default)
+    {
+        return await TransferWithinTransactionCoreAsync(
+            sourceWalletAccountId,
+            targetWalletAccountId,
+            amount,
+            debitTransactionType,
+            creditTransactionType,
+            sourceReservedBalanceDelta: 0,
+            targetReservedBalanceDelta: amount,
+            metadata,
+            cancellationToken);
+    }
+
+    public async Task<WalletTransferResponse> TransferFromReservedWithinTransactionAsync(
+        Guid sourceWalletAccountId,
+        Guid targetWalletAccountId,
+        decimal amount,
+        decimal reservedAmountToRelease,
+        WalletTransactionType debitTransactionType,
+        WalletTransactionType creditTransactionType,
+        WalletTransactionMetadata? metadata = null,
+        CancellationToken cancellationToken = default)
+    {
+        if (reservedAmountToRelease < 0 || reservedAmountToRelease > amount)
+        {
+            throw new BadRequestException(
+                ErrorCodes.ValidationError,
+                "Reserved amount to release must be between zero and the transfer amount.");
+        }
+
+        return await TransferWithinTransactionCoreAsync(
+            sourceWalletAccountId,
+            targetWalletAccountId,
+            amount,
+            debitTransactionType,
+            creditTransactionType,
+            sourceReservedBalanceDelta: -reservedAmountToRelease,
+            targetReservedBalanceDelta: 0,
+            metadata,
+            cancellationToken);
+    }
+
+    public async Task<WalletMutationResponse> ReleaseReservedWithinTransactionAsync(
+        Guid walletAccountId,
+        decimal amount,
+        WalletTransactionType transactionType,
+        WalletTransactionMetadata? metadata = null,
+        CancellationToken cancellationToken = default)
+    {
+        ValidateAmount(amount);
+
+        var wallet = await rowLockService.LockWalletAccountAsync(walletAccountId, cancellationToken)
+            ?? throw new NotFoundException(ErrorCodes.NotFound, "Wallet account not found.");
+
+        EnsureWalletActive(wallet);
+        if (wallet.ReservedBalance < amount)
+        {
+            throw new ConflictException(
+                ErrorCodes.WalletInsufficientReservedBalance,
+                "Số dư đang giữ trong ví không đủ để tất toán tiền cọc.",
+                new { walletAccountId, wallet.ReservedBalance, requiredAmount = amount });
+        }
+
+        var transferGroupId = metadata?.TransferGroupId ?? Guid.NewGuid();
+        var releaseMetadata = CopyMetadata(metadata, transferGroupId, "WalletReserveRelease");
+        var walletTransaction = ApplyWalletMutation(
+            wallet,
+            amount,
+            transactionType,
+            WalletTransactionDirection.Debit,
+            balanceDelta: 0,
+            reservedBalanceDelta: -amount,
+            releaseMetadata);
+
+        return new WalletMutationResponse
+        {
+            Wallet = ToWalletResponse(wallet),
+            Transaction = ToWalletTransactionResponse(walletTransaction)
+        };
+    }
+
+    private async Task<WalletTransferResponse> TransferWithinTransactionCoreAsync(
+        Guid sourceWalletAccountId,
+        Guid targetWalletAccountId,
+        decimal amount,
+        WalletTransactionType debitTransactionType,
+        WalletTransactionType creditTransactionType,
+        decimal sourceReservedBalanceDelta,
+        decimal targetReservedBalanceDelta,
+        WalletTransactionMetadata? metadata,
+        CancellationToken cancellationToken)
+    {
         ValidateAmount(amount);
 
         if (sourceWalletAccountId == targetWalletAccountId)
@@ -250,70 +396,89 @@ public class WalletService : IWalletService
             throw new BadRequestException(ErrorCodes.ValidationError, "Source and target wallets must be different.");
         }
 
-        await using var transaction = await context.BeginTransactionAsync(cancellationToken);
+        var firstWalletId = sourceWalletAccountId.CompareTo(targetWalletAccountId) <= 0
+            ? sourceWalletAccountId
+            : targetWalletAccountId;
+        var secondWalletId = firstWalletId == sourceWalletAccountId
+            ? targetWalletAccountId
+            : sourceWalletAccountId;
 
-        try
+        var firstWallet = await rowLockService.LockWalletAccountAsync(firstWalletId, cancellationToken);
+        var secondWallet = await rowLockService.LockWalletAccountAsync(secondWalletId, cancellationToken);
+
+        var sourceWallet = firstWallet?.Id == sourceWalletAccountId ? firstWallet : secondWallet;
+        var targetWallet = firstWallet?.Id == targetWalletAccountId ? firstWallet : secondWallet;
+
+        if (sourceWallet is null)
         {
-            var firstWalletId = sourceWalletAccountId.CompareTo(targetWalletAccountId) <= 0
-                ? sourceWalletAccountId
-                : targetWalletAccountId;
-            var secondWalletId = firstWalletId == sourceWalletAccountId
-                ? targetWalletAccountId
-                : sourceWalletAccountId;
-
-            var firstWallet = await rowLockService.LockWalletAccountAsync(firstWalletId, cancellationToken);
-            var secondWallet = await rowLockService.LockWalletAccountAsync(secondWalletId, cancellationToken);
-
-            var sourceWallet = firstWallet?.Id == sourceWalletAccountId ? firstWallet : secondWallet;
-            var targetWallet = firstWallet?.Id == targetWalletAccountId ? firstWallet : secondWallet;
-
-            if (sourceWallet is null)
-            {
-                throw new NotFoundException(ErrorCodes.NotFound, "Source wallet account not found.");
-            }
-
-            if (targetWallet is null)
-            {
-                throw new NotFoundException(ErrorCodes.NotFound, "Target wallet account not found.");
-            }
-
-            var transferGroupId = metadata?.TransferGroupId ?? Guid.NewGuid();
-            var debitMetadata = CopyMetadata(metadata, transferGroupId, "DevTestTransfer");
-            var creditMetadata = CopyMetadata(metadata, transferGroupId, "DevTestTransfer");
-
-            var debitTransaction = ApplyWalletMutation(
-                sourceWallet,
-                amount,
-                debitTransactionType,
-                WalletTransactionDirection.Debit,
-                balanceDelta: -amount,
-                reservedBalanceDelta: 0,
-                debitMetadata);
-
-            var creditTransaction = ApplyWalletMutation(
-                targetWallet,
-                amount,
-                creditTransactionType,
-                WalletTransactionDirection.Credit,
-                balanceDelta: amount,
-                reservedBalanceDelta: 0,
-                creditMetadata);
-
-            await context.SaveChangesAsync(cancellationToken);
-            await transaction.CommitAsync(cancellationToken);
-
-            return new WalletTransferResponse
-            {
-                TransferGroupId = transferGroupId,
-                DebitTransaction = ToWalletTransactionResponse(debitTransaction),
-                CreditTransaction = ToWalletTransactionResponse(creditTransaction)
-            };
+            throw new NotFoundException(ErrorCodes.NotFound, "Source wallet account not found.");
         }
-        catch
+
+        if (targetWallet is null)
         {
-            await transaction.RollbackAsync(cancellationToken);
-            throw;
+            throw new NotFoundException(ErrorCodes.NotFound, "Target wallet account not found.");
         }
+
+        EnsureWalletActive(sourceWallet);
+        EnsureWalletActive(targetWallet);
+
+        var reservedAmountToRelease = -sourceReservedBalanceDelta;
+        if (reservedAmountToRelease > sourceWallet.ReservedBalance)
+        {
+            throw new ConflictException(
+                ErrorCodes.WalletInsufficientReservedBalance,
+                "Số dư đang giữ trong ví không đủ để hoàn tiền cọc.",
+                new
+                {
+                    sourceWalletAccountId,
+                    sourceWallet.ReservedBalance,
+                    requiredReservedAmount = reservedAmountToRelease
+                });
+        }
+
+        var availableBalance = sourceWallet.Balance - sourceWallet.ReservedBalance;
+        var requiredAvailableBalance = amount - reservedAmountToRelease;
+        if (availableBalance < requiredAvailableBalance)
+        {
+            throw new ConflictException(
+                ErrorCodes.WalletInsufficientBalance,
+                "Số dư khả dụng trong ví không đủ để thực hiện giao dịch.",
+                new
+                {
+                    sourceWalletAccountId,
+                    availableBalance,
+                    requiredAmount = requiredAvailableBalance
+                });
+        }
+
+        var transferGroupId = metadata?.TransferGroupId ?? Guid.NewGuid();
+        var debitMetadata = CopyMetadata(metadata, transferGroupId, "WalletTransfer");
+        var creditMetadata = CopyMetadata(metadata, transferGroupId, "WalletTransfer");
+
+        var debitTransaction = ApplyWalletMutation(
+            sourceWallet,
+            amount,
+            debitTransactionType,
+            WalletTransactionDirection.Debit,
+            balanceDelta: -amount,
+            reservedBalanceDelta: sourceReservedBalanceDelta,
+            debitMetadata);
+
+        var creditTransaction = ApplyWalletMutation(
+            targetWallet,
+            amount,
+            creditTransactionType,
+            WalletTransactionDirection.Credit,
+            balanceDelta: amount,
+            reservedBalanceDelta: targetReservedBalanceDelta,
+            creditMetadata);
+
+        return new WalletTransferResponse
+        {
+            TransferGroupId = transferGroupId,
+            DebitTransaction = ToWalletTransactionResponse(debitTransaction),
+            CreditTransaction = ToWalletTransactionResponse(creditTransaction)
+        };
     }
 
     private WalletTransaction ApplyWalletMutation(
@@ -374,12 +539,6 @@ public class WalletService : IWalletService
             RelatedEntityId = metadata?.RelatedEntityId,
             Description = metadata?.Description
         };
-    }
-
-    private Task<User?> LoadUserByIdAsync(Guid userId, CancellationToken cancellationToken)
-    {
-        return context.Users
-            .FirstOrDefaultAsync(x => x.Id == userId, cancellationToken);
     }
 
     private Task<WalletAccount?> LoadWalletByIdAsync(Guid walletAccountId, CancellationToken cancellationToken)

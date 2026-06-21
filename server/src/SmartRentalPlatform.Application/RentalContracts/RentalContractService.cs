@@ -11,6 +11,7 @@ using Microsoft.EntityFrameworkCore.Query;
 using SmartRentalPlatform.Application.Billing;
 using SmartRentalPlatform.Application.Common.Exceptions;
 using SmartRentalPlatform.Application.Common.Interfaces;
+using SmartRentalPlatform.Application.Wallets;
 using SmartRentalPlatform.Contracts.Common;
 using SmartRentalPlatform.Contracts.RentalContracts;
 using SmartRentalPlatform.Contracts.RentalContracts.Requests;
@@ -21,6 +22,7 @@ using SmartRentalPlatform.Domain.Entities.RentalContracts;
 using SmartRentalPlatform.Domain.Entities.Users;
 using SmartRentalPlatform.Domain.Enums.Billing;
 using SmartRentalPlatform.Domain.Enums.Properties;
+using SmartRentalPlatform.Domain.Enums.Payments;
 using SmartRentalPlatform.Domain.Enums.Rental;
 using SmartRentalPlatform.Domain.Enums.RentalContracts;
 
@@ -50,7 +52,11 @@ public class RentalContractService : IRentalContractService
 
 	private readonly IBillingService billingService;
 
-	public RentalContractService(IAppDbContext context, IHashService hashService, IContractPdfRenderer contractPdfRenderer, IContractSignatureOtpService contractSignatureOtpService, IContractFileService contractFileService, ISensitiveDataProtector sensitiveDataProtector, IBillingService billingService)
+	private readonly IWalletService walletService;
+
+	private readonly IPaymentRowLockService rowLockService;
+
+	public RentalContractService(IAppDbContext context, IHashService hashService, IContractPdfRenderer contractPdfRenderer, IContractSignatureOtpService contractSignatureOtpService, IContractFileService contractFileService, ISensitiveDataProtector sensitiveDataProtector, IBillingService billingService, IWalletService walletService, IPaymentRowLockService rowLockService)
 	{
 		this.context = context;
 		this.hashService = hashService;
@@ -59,6 +65,8 @@ public class RentalContractService : IRentalContractService
 		this.contractFileService = contractFileService;
 		this.sensitiveDataProtector = sensitiveDataProtector;
 		this.billingService = billingService;
+		this.walletService = walletService;
+		this.rowLockService = rowLockService;
 	}
 
 	public async Task<ContractDetailResponse?> GetByIdAsync(Guid userId, Guid contractId, CancellationToken cancellationToken = default(CancellationToken))
@@ -389,18 +397,82 @@ public class RentalContractService : IRentalContractService
 			return null;
 		}
 		DateTimeOffset now = DateTimeOffset.UtcNow;
-		if (contract.Room.RoomingHouse.LandlordUserId == userId)
+		bool isLandlord = contract.Room.RoomingHouse.LandlordUserId == userId;
+		if (isLandlord)
 		{
 			EnsureLandlordCanReject(contract);
+		}
+		else
+		{
+			EnsureMainTenant(userId, contract);
+			EnsureStatus(contract, RentalContractStatus.PendingTenantSignature);
+		}
+
+		RoomDeposit deposit = contract.RoomDeposit;
+		EnsureDepositReadyForSettlement(deposit);
+		var landlordWallet = await walletService.GetOrCreateWalletAsync(deposit.LandlordUserId, cancellationToken);
+		var tenantWallet = await walletService.GetOrCreateWalletAsync(deposit.TenantUserId, cancellationToken);
+
+		await using IAppDbContextTransaction transaction = await context.BeginTransactionAsync(cancellationToken);
+		try
+		{
+			await rowLockService.LockRentalContractAsync(contractId, cancellationToken);
+			await rowLockService.LockRoomDepositAsync(deposit.Id, cancellationToken);
+			contract = await BaseQuery().FirstAsync((RentalContract x) => x.Id == contractId && x.DeletedAt == null, cancellationToken);
+			deposit = contract.RoomDeposit;
+			isLandlord = contract.Room.RoomingHouse.LandlordUserId == userId;
+			if (isLandlord)
+			{
+				EnsureLandlordCanReject(contract);
+				EnsureDepositReadyForSettlement(deposit);
+
+				var settlementGroupId = Guid.NewGuid();
+				await walletService.TransferFromReservedWithinTransactionAsync(
+					landlordWallet.Id,
+					tenantWallet.Id,
+					deposit.DepositAmount,
+					deposit.DepositAmount,
+					WalletTransactionType.DepositRefundDebit,
+					WalletTransactionType.DepositRefundCredit,
+					CreateDepositSettlementMetadata(deposit, settlementGroupId, "Landlord contract rejection deposit refund."),
+					cancellationToken);
+
+				contract.RoomDeposit.Status = RoomDepositStatus.Refunded;
+				contract.RoomDeposit.RefundedAt = now;
+				contract.RoomDeposit.RefundAmount = contract.RoomDeposit.DepositAmount;
+				contract.RoomDeposit.ForfeitedAt = null;
+				contract.RoomDeposit.ForfeitedAmount = default(decimal);
+				contract.RoomDeposit.RefundTransferGroupId = settlementGroupId;
+				contract.RentalRequest.Status = RentalRequestStatus.Rejected;
+			}
+			else
+			{
+				EnsureMainTenant(userId, contract);
+				EnsureStatus(contract, RentalContractStatus.PendingTenantSignature);
+				EnsureDepositReadyForSettlement(deposit);
+
+				var settlementGroupId = Guid.NewGuid();
+				await walletService.ReleaseReservedWithinTransactionAsync(
+					landlordWallet.Id,
+					deposit.DepositAmount,
+					WalletTransactionType.DepositForfeitRelease,
+					CreateDepositSettlementMetadata(deposit, settlementGroupId, "Tenant contract rejection deposit forfeiture."),
+					cancellationToken);
+
+				contract.RoomDeposit.Status = RoomDepositStatus.Forfeited;
+				contract.RoomDeposit.RefundedAt = null;
+				contract.RoomDeposit.RefundAmount = default(decimal);
+				contract.RoomDeposit.ForfeitedAt = now;
+				contract.RoomDeposit.ForfeitedAmount = contract.RoomDeposit.DepositAmount;
+				contract.RoomDeposit.RefundTransferGroupId = null;
+				contract.RentalRequest.Status = RentalRequestStatus.Cancelled;
+			}
+
 			contract.Status = RentalContractStatus.Rejected;
 			contract.StatusReason = reason;
 			contract.SignatureDeadlineAt = null;
 			contract.UpdatedAt = now;
-			contract.RoomDeposit.Status = RoomDepositStatus.Refunded;
-			contract.RoomDeposit.RefundedAt = now;
-			contract.RoomDeposit.RefundAmount = contract.RoomDeposit.DepositAmount;
 			contract.RoomDeposit.UpdatedAt = now;
-			contract.RentalRequest.Status = RentalRequestStatus.Rejected;
 			contract.RentalRequest.RejectedReason = reason;
 			contract.RentalRequest.UpdatedAt = now;
 			if (contract.Room.Status == RoomStatus.Reserved)
@@ -409,27 +481,13 @@ public class RentalContractService : IRentalContractService
 				contract.Room.UpdatedAt = now;
 			}
 			await context.SaveChangesAsync(cancellationToken);
-			return await GetByIdAsync(userId, contract.Id, cancellationToken);
+			await transaction.CommitAsync(cancellationToken);
 		}
-		EnsureMainTenant(userId, contract);
-		EnsureStatus(contract, RentalContractStatus.PendingTenantSignature);
-		contract.Status = RentalContractStatus.Rejected;
-		contract.StatusReason = reason;
-		contract.SignatureDeadlineAt = null;
-		contract.UpdatedAt = now;
-		contract.RoomDeposit.Status = RoomDepositStatus.Forfeited;
-		contract.RoomDeposit.ForfeitedAt = now;
-		contract.RoomDeposit.ForfeitedAmount = contract.RoomDeposit.DepositAmount;
-		contract.RoomDeposit.UpdatedAt = now;
-		contract.RentalRequest.Status = RentalRequestStatus.Cancelled;
-		contract.RentalRequest.RejectedReason = reason;
-		contract.RentalRequest.UpdatedAt = now;
-		if (contract.Room.Status == RoomStatus.Reserved)
+		catch
 		{
-			contract.Room.Status = RoomStatus.Available;
-			contract.Room.UpdatedAt = now;
+			await transaction.RollbackAsync(cancellationToken);
+			throw;
 		}
-		await context.SaveChangesAsync(cancellationToken);
 		return await GetByIdAsync(userId, contract.Id, cancellationToken);
 	}
 
@@ -545,8 +603,25 @@ public class RentalContractService : IRentalContractService
 				"Hợp đồng chưa đến ngày bắt đầu thuê nên không thể tạo hóa đơn kỳ cuối.");
 		}
 		RoomDeposit deposit = contract.RoomDeposit;
+		EnsureDepositReadyForSettlement(deposit);
+		var landlordWallet = await walletService.GetOrCreateWalletAsync(deposit.LandlordUserId, cancellationToken);
+		var tenantWallet = await walletService.GetOrCreateWalletAsync(deposit.TenantUserId, cancellationToken);
 		string reasonText = (string.IsNullOrWhiteSpace(request.Reason) ? string.Empty : request.Reason.Trim());
 		await using IAppDbContextTransaction transaction = await context.BeginTransactionAsync(cancellationToken);
+
+		await rowLockService.LockRentalContractAsync(contractId, cancellationToken);
+		await rowLockService.LockRoomDepositAsync(deposit.Id, cancellationToken);
+		contract = await BaseQuery().FirstAsync(x => x.Id == contractId && x.DeletedAt == null, cancellationToken);
+		deposit = contract.RoomDeposit;
+		isLandlord = contract.Room.RoomingHouse.LandlordUserId == userId;
+		isTenant = GetCurrentMainTenantUserId(contract) == userId;
+		if (!isLandlord && !isTenant)
+		{
+			throw new ForbiddenException(ErrorCodes.RentalContractForbidden, "Bạn không có quyền thao tác với hợp đồng này.", new { contractId });
+		}
+		EnsureStatus(contract, RentalContractStatus.Active);
+		EnsureDepositReadyForSettlement(deposit);
+
 		if (request.CreateFinalInvoice)
 		{
 			await billingService.CreateFinalInvoiceForTerminationAsync(
@@ -561,29 +636,55 @@ public class RentalContractService : IRentalContractService
 		switch (request.TerminationType)
 		{
 		case ContractTerminationType.LandlordUnilateral:
+		{
 			if (!isLandlord)
 			{
 				throw new ForbiddenException("RENTAL_CONTRACT_FORBIDDEN", "Chỉ chủ trọ mới có quyền dùng thao tác này.");
 			}
+			var settlementGroupId = Guid.NewGuid();
+			var totalRefundAmount = deposit.DepositAmount * 2m;
+			await walletService.TransferFromReservedWithinTransactionAsync(
+				landlordWallet.Id,
+				tenantWallet.Id,
+				totalRefundAmount,
+				deposit.DepositAmount,
+				WalletTransactionType.DepositRefundDebit,
+				WalletTransactionType.DepositRefundCredit,
+				CreateDepositSettlementMetadata(deposit, settlementGroupId, "Landlord unilateral termination deposit refund."),
+				cancellationToken);
 			contract.Status = RentalContractStatus.Cancelled;
 			deposit.Status = RoomDepositStatus.Refunded;
-			deposit.RefundAmount = deposit.DepositAmount * 2m;
+			deposit.RefundAmount = totalRefundAmount;
 			deposit.ForfeitedAmount = default(decimal);
 			deposit.RefundedAt = now;
+			deposit.ForfeitedAt = null;
+			deposit.RefundTransferGroupId = settlementGroupId;
 			contract.StatusReason = $"Chủ trọ đơn phương chấm dứt. Hoàn cọc gốc: {deposit.DepositAmount:N0} VNĐ, đền bù: {deposit.DepositAmount:N0} VNĐ. Tổng hoàn: {deposit.RefundAmount:N0} VNĐ. Lý do: {reasonText}";
 			break;
+		}
 		case ContractTerminationType.TenantUnilateral:
+		{
 			if (!isTenant && !isLandlord)
 			{
 				throw new ForbiddenException("RENTAL_CONTRACT_FORBIDDEN", "Không có quyền thao tác.");
 			}
+			var settlementGroupId = Guid.NewGuid();
+			await walletService.ReleaseReservedWithinTransactionAsync(
+				landlordWallet.Id,
+				deposit.DepositAmount,
+				WalletTransactionType.DepositForfeitRelease,
+				CreateDepositSettlementMetadata(deposit, settlementGroupId, "Tenant unilateral termination deposit forfeiture."),
+				cancellationToken);
 			contract.Status = RentalContractStatus.Cancelled;
 			deposit.Status = RoomDepositStatus.Forfeited;
 			deposit.RefundAmount = default(decimal);
 			deposit.ForfeitedAmount = deposit.DepositAmount;
 			deposit.ForfeitedAt = now;
+			deposit.RefundedAt = null;
+			deposit.RefundTransferGroupId = null;
 			contract.StatusReason = $"Người thuê đơn phương chấm dứt. Tịch thu cọc: {deposit.DepositAmount:N0} VNĐ. Lý do: {reasonText}";
 			break;
+		}
 		case ContractTerminationType.NormalExpiration:
 		case ContractTerminationType.MutualAgreement:
 		{
@@ -600,7 +701,31 @@ public class RentalContractService : IRentalContractService
 			}
 			deposit.ForfeitedAmount = damageFee;
 			deposit.RefundAmount = deposit.DepositAmount - damageFee;
+			var settlementGroupId = Guid.NewGuid();
+			if (deposit.RefundAmount > 0m)
+			{
+				await walletService.TransferFromReservedWithinTransactionAsync(
+					landlordWallet.Id,
+					tenantWallet.Id,
+					deposit.RefundAmount.Value,
+					deposit.RefundAmount.Value,
+					WalletTransactionType.DepositRefundDebit,
+					WalletTransactionType.DepositRefundCredit,
+					CreateDepositSettlementMetadata(deposit, settlementGroupId, "Contract termination deposit refund."),
+					cancellationToken);
+			}
+			if (damageFee > 0m)
+			{
+				await walletService.ReleaseReservedWithinTransactionAsync(
+					landlordWallet.Id,
+					damageFee,
+					WalletTransactionType.DepositForfeitRelease,
+					CreateDepositSettlementMetadata(deposit, settlementGroupId, "Contract termination retained deposit release."),
+					cancellationToken);
+			}
 			deposit.RefundedAt = now;
+			deposit.ForfeitedAt = damageFee > 0m ? now : null;
+			deposit.RefundTransferGroupId = settlementGroupId;
 			string typeStr = ((request.TerminationType == ContractTerminationType.NormalExpiration) ? "Đáo hạn hợp đồng" : "Hai bên thỏa thuận chấm dứt");
 			contract.StatusReason = $"{typeStr}. Trừ hư hỏng/dọn dẹp: {damageFee:N0} VNĐ. Hoàn cọc thực tế: {deposit.RefundAmount:N0} VNĐ. Lý do bổ sung: {reasonText}";
 			break;
@@ -622,6 +747,39 @@ public class RentalContractService : IRentalContractService
 		await context.SaveChangesAsync(cancellationToken);
 		await transaction.CommitAsync(cancellationToken);
 		return await GetByIdAsync(userId, contract.Id, cancellationToken);
+	}
+
+	private static void EnsureDepositReadyForSettlement(RoomDeposit deposit)
+	{
+		if (deposit.Status != RoomDepositStatus.Paid ||
+			!deposit.PaymentTransferGroupId.HasValue ||
+			deposit.RefundTransferGroupId.HasValue)
+		{
+			throw new ConflictException(
+				ErrorCodes.RoomDepositInvalidStatus,
+				"Khoản cọc không ở trạng thái sẵn sàng để tất toán.",
+				new
+				{
+					deposit.Id,
+					currentStatus = deposit.Status.ToString(),
+					deposit.PaymentTransferGroupId,
+					deposit.RefundTransferGroupId
+				});
+		}
+	}
+
+	private static WalletTransactionMetadata CreateDepositSettlementMetadata(
+		RoomDeposit deposit,
+		Guid transferGroupId,
+		string description)
+	{
+		return new WalletTransactionMetadata
+		{
+			TransferGroupId = transferGroupId,
+			RelatedEntityType = "RoomDeposit",
+			RelatedEntityId = deposit.Id,
+			Description = description
+		};
 	}
 
 	private static void CancelOpenAppendices(RentalContract contract, DateTimeOffset now)
@@ -656,23 +814,94 @@ public class RentalContractService : IRentalContractService
 	public async Task<int> ExpireOverdueTenantSignaturesAsync(CancellationToken cancellationToken = default(CancellationToken))
 	{
 		DateTimeOffset now = DateTimeOffset.UtcNow;
-		int count;
+		var overdueContractSnapshots = await BaseQuery()
+			.AsNoTracking()
+			.Where((RentalContract x) => x.Status == RentalContractStatus.PendingTenantSignature &&
+				x.SignatureDeadlineAt.HasValue &&
+				x.SignatureDeadlineAt.Value <= now &&
+				x.DeletedAt == null)
+			.Select((RentalContract x) => new
+			{
+				x.Id,
+				x.RoomDeposit.LandlordUserId
+			})
+			.ToListAsync(cancellationToken);
+
+		if (overdueContractSnapshots.Count == 0)
+		{
+			return 0;
+		}
+
+		Dictionary<Guid, Guid> landlordWalletIdsByUserId = new Dictionary<Guid, Guid>();
+		foreach (Guid landlordUserId in overdueContractSnapshots
+			.Select(x => x.LandlordUserId)
+			.Distinct())
+		{
+			var landlordWallet = await walletService.GetOrCreateWalletAsync(landlordUserId, cancellationToken);
+			landlordWalletIdsByUserId[landlordUserId] = landlordWallet.Id;
+		}
+
+		int count = 0;
 		await using (IAppDbContextTransaction transaction = await context.BeginTransactionAsync(cancellationToken))
 		{
 			try
 			{
-				List<RentalContract> overdueContracts = await (from x in BaseQuery()
-					where (int)x.Status == 4 && x.SignatureDeadlineAt.HasValue && x.SignatureDeadlineAt.Value <= now && x.DeletedAt == null
-					select x).ToListAsync(cancellationToken);
-				foreach (RentalContract contract in overdueContracts)
+				foreach (Guid contractId in overdueContractSnapshots
+					.Select(x => x.Id)
+					.Distinct()
+					.OrderBy(x => x))
 				{
+					await rowLockService.LockRentalContractAsync(contractId, cancellationToken);
+					RentalContract? contract = await BaseQuery()
+						.FirstOrDefaultAsync((RentalContract x) => x.Id == contractId && x.DeletedAt == null, cancellationToken);
+					if (contract is null)
+					{
+						continue;
+					}
+
+					await rowLockService.LockRoomDepositAsync(contract.RoomDepositId, cancellationToken);
+					contract = await BaseQuery()
+						.FirstAsync((RentalContract x) => x.Id == contractId && x.DeletedAt == null, cancellationToken);
+
+					if (contract.Status != RentalContractStatus.PendingTenantSignature ||
+						!contract.SignatureDeadlineAt.HasValue ||
+						contract.SignatureDeadlineAt.Value > now)
+					{
+						continue;
+					}
+
+					EnsureDepositReadyForSettlement(contract.RoomDeposit);
+					if (!landlordWalletIdsByUserId.TryGetValue(contract.RoomDeposit.LandlordUserId, out Guid landlordWalletId))
+					{
+						throw new NotFoundException(
+							ErrorCodes.NotFound,
+							"Không tìm thấy ví chủ trọ để tất toán khoản cọc quá hạn ký hợp đồng.",
+							new
+							{
+								contract.Id,
+								contract.RoomDepositId,
+								contract.RoomDeposit.LandlordUserId
+							});
+					}
+
+					var settlementGroupId = Guid.NewGuid();
+					await walletService.ReleaseReservedWithinTransactionAsync(
+						landlordWalletId,
+						contract.RoomDeposit.DepositAmount,
+						WalletTransactionType.DepositForfeitRelease,
+						CreateDepositSettlementMetadata(contract.RoomDeposit, settlementGroupId, "Tenant signature deadline deposit forfeiture."),
+						cancellationToken);
+
 					contract.Status = RentalContractStatus.Expired;
 					contract.StatusReason = "Người thuê không ký hợp đồng trong thời hạn quy định.";
 					contract.SignatureDeadlineAt = null;
 					contract.UpdatedAt = now;
 					contract.RoomDeposit.Status = RoomDepositStatus.Forfeited;
+					contract.RoomDeposit.RefundAmount = default(decimal);
 					contract.RoomDeposit.ForfeitedAt = now;
 					contract.RoomDeposit.ForfeitedAmount = contract.RoomDeposit.DepositAmount;
+					contract.RoomDeposit.RefundedAt = null;
+					contract.RoomDeposit.RefundTransferGroupId = null;
 					contract.RoomDeposit.UpdatedAt = now;
 					contract.RentalRequest.Status = RentalRequestStatus.Expired;
 					contract.RentalRequest.RejectedReason = "Người thuê không ký hợp đồng trong thời hạn quy định.";
@@ -682,10 +911,11 @@ public class RentalContractService : IRentalContractService
 						contract.Room.Status = RoomStatus.Available;
 						contract.Room.UpdatedAt = now;
 					}
+
+					count++;
 				}
 				await context.SaveChangesAsync(cancellationToken);
 				await transaction.CommitAsync(cancellationToken);
-				count = overdueContracts.Count;
 			}
 			catch
 			{

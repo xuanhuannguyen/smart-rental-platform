@@ -49,8 +49,8 @@ export const rentalRequestApi = {
       auth: true
     }),
 
-  markDepositPaid: (id: string) =>
-    apiClient<ApiResponse<RoomDepositResponse>>(ENDPOINTS.ROOM_DEPOSITS.MARK_PAID(id), {
+  payDeposit: (id: string) =>
+    apiClient<ApiResponse<RoomDepositResponse>>(ENDPOINTS.ROOM_DEPOSITS.PAY(id), {
       method: 'POST',
       auth: true
     })

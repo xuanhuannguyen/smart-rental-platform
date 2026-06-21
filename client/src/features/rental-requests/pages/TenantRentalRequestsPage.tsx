@@ -91,16 +91,6 @@ export function TenantRentalRequestsPage() {
     }
   };
 
-  const handlePayDeposit = async (depositId: string) => {
-    try {
-      await rentalRequestApi.markDepositPaid(depositId);
-      alert('Thanh toán cọc thành công (Mô phỏng)!');
-      void fetchRequests();
-    } catch (err: any) {
-      alert('Không thể thanh toán cọc.');
-    }
-  };
-
   const getStatusBadge = (status: string) => {
     switch (status) {
       case 'Pending':

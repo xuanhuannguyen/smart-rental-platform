@@ -53,4 +53,39 @@ public interface IWalletService
         WalletTransactionType creditTransactionType,
         WalletTransactionMetadata? metadata = null,
         CancellationToken cancellationToken = default);
+
+    Task<WalletTransferResponse> TransferWithinTransactionAsync(
+        Guid sourceWalletAccountId,
+        Guid targetWalletAccountId,
+        decimal amount,
+        WalletTransactionType debitTransactionType,
+        WalletTransactionType creditTransactionType,
+        WalletTransactionMetadata? metadata = null,
+        CancellationToken cancellationToken = default);
+
+    Task<WalletTransferResponse> TransferToReservedWithinTransactionAsync(
+        Guid sourceWalletAccountId,
+        Guid targetWalletAccountId,
+        decimal amount,
+        WalletTransactionType debitTransactionType,
+        WalletTransactionType creditTransactionType,
+        WalletTransactionMetadata? metadata = null,
+        CancellationToken cancellationToken = default);
+
+    Task<WalletTransferResponse> TransferFromReservedWithinTransactionAsync(
+        Guid sourceWalletAccountId,
+        Guid targetWalletAccountId,
+        decimal amount,
+        decimal reservedAmountToRelease,
+        WalletTransactionType debitTransactionType,
+        WalletTransactionType creditTransactionType,
+        WalletTransactionMetadata? metadata = null,
+        CancellationToken cancellationToken = default);
+
+    Task<WalletMutationResponse> ReleaseReservedWithinTransactionAsync(
+        Guid walletAccountId,
+        decimal amount,
+        WalletTransactionType transactionType,
+        WalletTransactionMetadata? metadata = null,
+        CancellationToken cancellationToken = default);
 }

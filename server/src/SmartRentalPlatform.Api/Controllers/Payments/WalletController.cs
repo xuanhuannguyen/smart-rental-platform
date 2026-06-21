@@ -34,7 +34,7 @@ public class WalletController : ControllerBase
         return Ok(new ApiResponse<WalletResponse>
         {
             Success = true,
-            Message = "Lay thong tin vi thanh cong.",
+            Message = "Lấy thông tin ví thành công.",
             Data = result
         });
     }
@@ -51,7 +51,7 @@ public class WalletController : ControllerBase
         return Ok(new ApiResponse<PagedResult<WalletTransactionResponse>>
         {
             Success = true,
-            Message = "Lay lich su giao dich vi thanh cong.",
+            Message = "Lấy lịch sử giao dịch ví thành công.",
             Data = result
         });
     }
@@ -62,7 +62,7 @@ public class WalletController : ControllerBase
         {
             throw new UnauthorizedException(
                 ErrorCodes.Unauthorized,
-                "Ban can dang nhap de thuc hien thao tac nay.");
+                "Bạn cần đăng nhập để thực hiện thao tác này.");
         }
 
         return currentUserService.UserId.Value;

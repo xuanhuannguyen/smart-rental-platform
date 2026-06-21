@@ -20,6 +20,13 @@ export const ENDPOINTS = {
     SESSIONS: '/api/users/me/sessions',
     REVOKE_SESSION: (id: string) => `/api/users/me/sessions/${id}`
   },
+  WALLET: {
+    ROOT: '/api/me/wallet',
+    TRANSACTIONS: '/api/me/wallet/transactions',
+    TOP_UPS: '/api/me/wallet/topups',
+    TOP_UP_BY_ID: (id: string) => `/api/me/wallet/topups/${id}`,
+    CREATE_PAYOS_TOPUP: '/api/me/wallet/topups/payos'
+  },
   KYC: {
     SUBMISSIONS: '/api/kyc/submissions',
     MY_STATUS: '/api/kyc/my-status',
@@ -48,7 +55,7 @@ export const ENDPOINTS = {
   },
   BILLING: {
     SERVICE_TYPES: '/api/billing/service-types',
-    SERVICE_PRICES: (roomingHouseId: string) => `/api/landlord/rooming-houses/${roomingHouseId}/service-prices`,
+    SERVICE_PRICES: (roomingHouseId: string) => `/api/rooming-houses/${roomingHouseId}/service-prices`,
     ROOM_BILLING_CONTEXT: (roomId: string) => `/api/landlord/rooms/${roomId}/billing-context`,
     ROOM_INVOICE_PREVIEW: (roomId: string) => `/api/landlord/rooms/${roomId}/invoice-preview`,
     TERMINATION_INVOICE_PREVIEW: (contractId: string) => `/api/landlord/contracts/${contractId}/termination-invoice-preview`,
@@ -78,7 +85,7 @@ export const ENDPOINTS = {
     CANCEL: (id: string) => `/api/rental-requests/${id}/cancel`
   },
   ROOM_DEPOSITS: {
-    MARK_PAID: (id: string) => `/api/room-deposits/${id}/mark-paid`
+    PAY: (id: string) => `/api/room-deposits/${id}/pay`
   },
   CONTRACTS: {
     MY_HISTORY: '/api/contracts/my-history',

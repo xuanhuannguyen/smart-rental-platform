@@ -1,4 +1,4 @@
-namespace SmartRentalPlatform.Contracts.Billing.Requests;
+namespace SmartRentalPlatform.Contracts.RoomingHouses.Requests;
 
 public sealed record CreateServicePriceRequest(
     Guid ServiceTypeId,

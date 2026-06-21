@@ -13,6 +13,10 @@ const ERROR_MESSAGES: Record<string, string> = {
   OTP_EXPIRED: 'Mã OTP đã hết hạn.',
   OTP_RESEND_TOO_SOON: 'Bạn vừa yêu cầu OTP. Vui lòng thử lại sau.',
   INVOICE_DUPLICATE_PERIOD: 'Hợp đồng đã có hóa đơn trong kỳ này.',
+  WALLET_INSUFFICIENT_BALANCE: 'Số dư khả dụng trong ví không đủ để thanh toán.',
+  ROOM_DEPOSIT_EXPIRED: 'Khoản cọc đã quá hạn thanh toán.',
+  ROOM_DEPOSIT_INVALID_STATUS: 'Khoản cọc không còn ở trạng thái có thể thanh toán.',
+  ROOM_DEPOSIT_FORBIDDEN: 'Bạn không có quyền thanh toán khoản cọc này.',
 };
 
 export class ApiClientError extends Error {

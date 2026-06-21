@@ -15,8 +15,8 @@ namespace SmartRentalPlatform.Infrastructure.Persistence.Seed;
 public static class DevelopmentDataSeed
 {
     public const string AdminEmail = "admin.demo@example.com";
-    public const string TenantEmail = "lquanglinh15@gmail.com"; // "tenant.demo@example.com";
-    public const string LandlordEmail = "lequanglinh1033@gmail.com"; // "landlord.demo@example.com";
+    public const string TenantEmail = "tenant.demo@example.com"; // "tenant.demo@example.com";
+    public const string LandlordEmail = "landlord.demo@example.com"; // "landlord.demo@example.com";
     public const string CoTenantEmail = "cotenant.demo@example.com";
     public const string DemoPassword = "Demo@123456";
 
@@ -24,6 +24,7 @@ public static class DevelopmentDataSeed
     private static readonly Guid TenantUserId = Guid.Parse("10000000-0000-0000-0000-000000000001");
     private static readonly Guid LandlordUserId = Guid.Parse("10000000-0000-0000-0000-000000000002");
     private static readonly Guid CoTenantUserId = Guid.Parse("10000000-0000-0000-0000-000000000003");
+    private static readonly Guid TenantApprovedKycId = Guid.Parse("50000000-0000-0000-0000-000000000001");
     private static readonly Guid ApprovedHouseId = Guid.Parse("20000000-0000-0000-0000-000000000001");
     private static readonly Guid DraftHouseId = Guid.Parse("20000000-0000-0000-0000-000000000002");
     private static readonly Guid SunriseHouseId = Guid.Parse("20000000-0000-0000-0000-000000000003");
@@ -523,14 +524,14 @@ public static class DevelopmentDataSeed
             SunriseHouseId,
             LandlordUserId,
             "Sunrise Mini House",
-            "Can ho mini moi, gan khu cong nghe va sieu thi, phu hop sinh vien va nhan vien van phong.",
+            "Căn hộ mini mới, gần khu công nghệ và siêu thị, phù hợp sinh viên và nhân viên văn phòng.",
             "88 Duong So 7",
             10.841021m,
             106.809847m,
             RoomingHouseApprovalStatus.Approved,
             RoomingHouseVisibilityStatus.Visible,
             "demo/houses/sunrise/cover.jpg",
-            "Mat tien Sunrise Mini House",
+            "Mặt tiền Sunrise Mini House",
             cancellationToken,
             AmenitySeed.WifiId,
             AmenitySeed.ParkingId,
@@ -543,14 +544,14 @@ public static class DevelopmentDataSeed
             GreenViewHouseId,
             LandlordUserId,
             "Green View Residence",
-            "Khu tro yen tinh, co ban cong, may giat chung va khu de xe rieng.",
+            "Khu trọ yên tĩnh, có ban công, máy giặt chung và khu để xe riêng.",
             "12 Pham Van Dong",
             10.821903m,
             106.682179m,
             RoomingHouseApprovalStatus.Approved,
             RoomingHouseVisibilityStatus.Visible,
             "demo/houses/green-view/cover.jpg",
-            "Khong gian chung Green View Residence",
+            "Không gian chung Green View Residence",
             cancellationToken,
             AmenitySeed.WifiId,
             AmenitySeed.WashingMachineId,
@@ -563,7 +564,7 @@ public static class DevelopmentDataSeed
             PendingHouseId,
             LandlordUserId,
             "Garden House Pending",
-            "Ho so nha tro dang cho admin duyet, dung de test luong kiem duyet.",
+            "Hồ sơ nhà trọ đang chờ admin duyệt, dùng để test luồng kiểm duyệt.",
             "36 Nguyen Huu Tho",
             10.732681m,
             106.702184m,
@@ -581,7 +582,7 @@ public static class DevelopmentDataSeed
             RejectedHouseId,
             LandlordUserId,
             "Old Town Rooms",
-            "Ho so bi tu choi de test man hinh ly do va gui lai ho so.",
+            "Hồ sơ bị từ chối để test màn hình lý do và gửi lại hồ sơ.",
             "7 Tran Hung Dao",
             10.776901m,
             106.700914m,
@@ -797,7 +798,7 @@ public static class DevelopmentDataSeed
     {
         var room = CreateRoom(id, roomNumber, floor, areaM2, maxOccupants, status);
         room.RoomingHouseId = roomingHouseId;
-        room.Description = $"Phong {roomNumber} mock data cho nha tro demo.";
+        room.Description = $"Phòng {roomNumber} mock data cho nhà trọ demo.";
         room.IsTieredPricing = maxOccupants > 1;
         return room;
     }
@@ -833,7 +834,7 @@ public static class DevelopmentDataSeed
         context.PropertyImages.Add(CreateRoomImage(
             room.Id,
             $"demo/rooms/{imageSlug}/cover.jpg",
-            $"Phong {room.RoomNumber}"));
+            $"Phòng {room.RoomNumber}"));
     }
 
     private static RoomPriceTier CreatePriceTier(Guid roomId, int occupantCount, decimal monthlyRent)

@@ -1,3 +1,5 @@
+using SmartRentalPlatform.Domain.Entities.Properties;
+
 namespace SmartRentalPlatform.Domain.Entities.Billing;
 
 public class BillingServiceType

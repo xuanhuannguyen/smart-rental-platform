@@ -7,6 +7,7 @@ using SmartRentalPlatform.Contracts.Billing.Requests;
 using SmartRentalPlatform.Contracts.Billing.Responses;
 using SmartRentalPlatform.Contracts.Common;
 using SmartRentalPlatform.Domain.Entities.Billing;
+using SmartRentalPlatform.Domain.Entities.Properties;
 using SmartRentalPlatform.Domain.Enums.Billing;
 using SmartRentalPlatform.Domain.Enums.Properties;
 using SmartRentalPlatform.Domain.Enums.RentalContracts;
@@ -39,24 +40,6 @@ public class BillingService : IBillingService
             .ToListAsync(cancellationToken);
 
         return serviceTypes.Select(ToBillingServiceTypeResponse).ToList();
-    }
-
-    public async Task<List<ServicePriceResponse>> GetServicePricesAsync(
-        Guid landlordUserId,
-        Guid roomingHouseId,
-        CancellationToken cancellationToken = default)
-    {
-        await EnsureRoomingHouseOwnerAsync(landlordUserId, roomingHouseId, cancellationToken);
-
-        var prices = await context.RoomingHouseServicePrices
-            .AsNoTracking()
-            .Include(x => x.ServiceType)
-            .Where(x => x.RoomingHouseId == roomingHouseId)
-            .OrderBy(x => x.ServiceType.Name)
-            .ThenByDescending(x => x.EffectiveFrom)
-            .ToListAsync(cancellationToken);
-
-        return prices.Select(ToServicePriceResponse).ToList();
     }
 
     public async Task<RoomBillingContextResponse> GetRoomBillingContextAsync(
@@ -400,117 +383,6 @@ public class BillingService : IBillingService
             generationBlockReason);
     }
 
-    public async Task<ServicePriceResponse> CreateServicePriceAsync(
-        Guid landlordUserId,
-        Guid roomingHouseId,
-        CreateServicePriceRequest request,
-        CancellationToken cancellationToken = default)
-    {
-        await EnsureRoomingHouseOwnerAsync(landlordUserId, roomingHouseId, cancellationToken);
-
-        var pricingUnit = ParsePricingUnit(request.PricingUnit);
-        var serviceType = await GetServiceTypeAsync(request.ServiceTypeId, cancellationToken);
-        ValidatePricingUnitForServiceType(serviceType, pricingUnit);
-
-        if (request.UnitPrice < 0)
-        {
-            throw new BadRequestException(ErrorCodes.BillingPriceInvalid, "Đơn giá dịch vụ không được âm.");
-        }
-
-        var now = DateTimeOffset.UtcNow;
-        var nowUtc = now.UtcDateTime;
-
-        var activePrice = await context.RoomingHouseServicePrices
-            .Where(x => x.RoomingHouseId == roomingHouseId &&
-                        x.ServiceTypeId == serviceType.Id &&
-                        x.IsActive)
-            .OrderByDescending(x => x.EffectiveFrom)
-            .FirstOrDefaultAsync(cancellationToken);
-
-        var effectiveFrom = activePrice is null
-            ? new DateOnly(nowUtc.Year, nowUtc.Month, 1)
-            : (nowUtc.Day == 1
-                ? new DateOnly(nowUtc.Year, nowUtc.Month, 1)
-                : GetNextBillingPeriodStart(DateOnly.FromDateTime(nowUtc)));
-
-        var scheduledPrice = await context.RoomingHouseServicePrices
-            .Where(x => x.RoomingHouseId == roomingHouseId &&
-                        x.ServiceTypeId == serviceType.Id &&
-                        x.EffectiveFrom == effectiveFrom)
-            .FirstOrDefaultAsync(cancellationToken);
-
-        if (scheduledPrice is not null)
-        {
-            scheduledPrice.PricingUnit = pricingUnit;
-            scheduledPrice.UnitPrice = request.UnitPrice;
-            scheduledPrice.Note = request.Note;
-            scheduledPrice.IsActive = true;
-            scheduledPrice.EffectiveTo = null;
-            scheduledPrice.UpdatedAt = now;
-
-            var otherActivePrices = await context.RoomingHouseServicePrices
-                .Where(x => x.RoomingHouseId == roomingHouseId &&
-                            x.ServiceTypeId == serviceType.Id &&
-                            x.Id != scheduledPrice.Id &&
-                            x.IsActive)
-                .ToListAsync(cancellationToken);
-
-            foreach (var otherPrice in otherActivePrices)
-            {
-                otherPrice.IsActive = false;
-                otherPrice.EffectiveTo = effectiveFrom.AddDays(-1);
-                otherPrice.UpdatedAt = now;
-            }
-
-            await context.SaveChangesAsync(cancellationToken);
-
-            scheduledPrice.ServiceType = serviceType;
-            return ToServicePriceResponse(scheduledPrice);
-        }
-
-        if (activePrice is not null)
-        {
-            if (effectiveFrom <= activePrice.EffectiveFrom)
-            {
-                activePrice.PricingUnit = pricingUnit;
-                activePrice.UnitPrice = request.UnitPrice;
-                activePrice.EffectiveFrom = effectiveFrom;
-                activePrice.EffectiveTo = null;
-                activePrice.IsActive = true;
-                activePrice.Note = request.Note;
-                activePrice.UpdatedAt = now;
-
-                await context.SaveChangesAsync(cancellationToken);
-
-                activePrice.ServiceType = serviceType;
-                return ToServicePriceResponse(activePrice);
-            }
-
-            activePrice.IsActive = false;
-            activePrice.EffectiveTo = effectiveFrom.AddDays(-1);
-            activePrice.UpdatedAt = now;
-        }
-
-        var price = new RoomingHouseServicePrice
-        {
-            Id = Guid.NewGuid(),
-            RoomingHouseId = roomingHouseId,
-            ServiceTypeId = serviceType.Id,
-            PricingUnit = pricingUnit,
-            UnitPrice = request.UnitPrice,
-            EffectiveFrom = effectiveFrom,
-            IsActive = true,
-            Note = request.Note,
-            CreatedAt = now,
-            UpdatedAt = now
-        };
-
-        context.RoomingHouseServicePrices.Add(price);
-        await context.SaveChangesAsync(cancellationToken);
-
-        price.ServiceType = serviceType;
-        return ToServicePriceResponse(price);
-    }
 
     public async Task<List<InvoiceResponse>> GetLandlordInvoicesAsync(
         Guid landlordUserId,
@@ -715,64 +587,19 @@ public class BillingService : IBillingService
     {
         await MarkOverdueInvoicesAsync(landlordUserId: null, tenantUserId: tenantUserId, invoiceId: invoiceId, contractId: null, cancellationToken: cancellationToken);
 
-        var invoice = await context.Invoices
-            .Include(x => x.Payment)
-            .FirstOrDefaultAsync(x => x.Id == invoiceId, cancellationToken)
-            ?? throw new NotFoundException(ErrorCodes.InvoiceNotFound, "Không tìm thấy hóa đơn.");
-
-        if (invoice.TenantUserId != tenantUserId)
-        {
-            throw new ForbiddenException(ErrorCodes.Forbidden, "Bạn không có quyền thanh toán hóa đơn này.");
-        }
-
-        if (invoice.Status == InvoiceStatus.Paid || invoice.Payment is not null)
-        {
-            throw new BadRequestException(ErrorCodes.InvoiceInvalidStatus, "Hóa đơn đã được thanh toán.");
-        }
-
-        if (invoice.Status != InvoiceStatus.Issued &&
-            invoice.Status != InvoiceStatus.Overdue)
-        {
-            throw new BadRequestException(ErrorCodes.InvoiceInvalidStatus, "Chỉ có thể thanh toán hóa đơn đã phát hành.");
-        }
-
         var paymentResult = await walletPaymentService.PayInvoiceAsync(
-            invoice.Id,
-            invoice.TenantUserId,
-            invoice.LandlordUserId,
-            invoice.TotalAmount,
+            invoiceId,
+            tenantUserId,
             cancellationToken);
 
-        if (!paymentResult.Success || paymentResult.TransferGroupId is null)
+        if (!paymentResult.Success)
         {
             throw new BadRequestException(
                 ErrorCodes.WalletPaymentFailed,
                 paymentResult.ErrorMessage ?? "Thanh toán ví thất bại.");
         }
 
-        await using var transaction = await context.BeginTransactionAsync(cancellationToken);
-        var now = DateTimeOffset.UtcNow;
-        context.InvoicePayments.Add(new InvoicePayment
-        {
-            Id = Guid.NewGuid(),
-            InvoiceId = invoice.Id,
-            TenantUserId = invoice.TenantUserId,
-            LandlordUserId = invoice.LandlordUserId,
-            Amount = invoice.TotalAmount,
-            WalletTransferGroupId = paymentResult.TransferGroupId.Value,
-            Status = InvoicePaymentStatus.Succeeded,
-            PaidAt = now,
-            CreatedAt = now
-        });
-
-        invoice.Status = InvoiceStatus.Paid;
-        invoice.PaidAt = now;
-        invoice.UpdatedAt = now;
-
-        await context.SaveChangesAsync(cancellationToken);
-        await transaction.CommitAsync(cancellationToken);
-
-        return await GetInvoiceResponseAsync(invoice.Id, cancellationToken);
+        return await GetInvoiceResponseAsync(invoiceId, cancellationToken);
     }
 
     public async Task<InvoiceResponse> GenerateInvoiceWithReadingsAsync(
@@ -2285,8 +2112,7 @@ public class BillingService : IBillingService
                 .ThenInclude(x => x.RoomingHouse)
             .Include(x => x.Tenant)
             .Include(x => x.Items)
-                .ThenInclude(x => x.ServiceType)
-            .Include(x => x.Payment);
+                .ThenInclude(x => x.ServiceType);
     }
 
     private static PricingUnit ParsePricingUnit(string value)
@@ -2461,7 +2287,7 @@ public class BillingService : IBillingService
             invoice.SentAt,
             invoice.PaidAt,
             invoice.Items.OrderBy(x => x.CreatedAt).Select(ToInvoiceItemResponse).ToList(),
-            invoice.Payment is null ? null : ToInvoicePaymentResponse(invoice.Payment));
+            invoice.WalletTransferGroupId);
     }
 
     private static InvoiceItemResponse ToInvoiceItemResponse(InvoiceItem item)
@@ -2478,14 +2304,4 @@ public class BillingService : IBillingService
             item.Amount);
     }
 
-    private static InvoicePaymentResponse ToInvoicePaymentResponse(InvoicePayment payment)
-    {
-        return new InvoicePaymentResponse(
-            payment.Id,
-            payment.InvoiceId,
-            payment.Amount,
-            payment.WalletTransferGroupId,
-            payment.Status.ToString(),
-            payment.PaidAt);
-    }
 }

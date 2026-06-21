@@ -35,6 +35,9 @@ import { TenantRentalRequestDetailPage } from '../../features/rental-requests/pa
 import { TenantRentalHistoryPage } from '../../features/rental-history/pages/TenantRentalHistoryPage';
 import { TenantRentalHistoryDetailPage } from '../../features/rental-history/pages/TenantRentalHistoryDetailPage';
 import { LandlordRentalRequestDetailPage } from '../../features/landlord/pages/LandlordRentalRequestDetailPage';
+import { MyWalletPage } from '../../features/wallet/pages/MyWalletPage';
+import { TransactionHistoryPage } from '../../features/wallet/pages/TransactionHistoryPage';
+import { TopUpResultPage } from '../../features/wallet/pages/TopUpResultPage';
 
 export const router = createBrowserRouter([
     {
@@ -102,6 +105,18 @@ export const router = createBrowserRouter([
                             {
                                 path: ROUTE_PATHS.ACCOUNT.SECURITY,
                                 element: <SecurityPage />
+                            },
+                            {
+                                path: ROUTE_PATHS.ACCOUNT.WALLET,
+                                element: <MyWalletPage />
+                            },
+                            {
+                                path: ROUTE_PATHS.ACCOUNT.TRANSACTIONS,
+                                element: <TransactionHistoryPage />
+                            },
+                            {
+                                path: ROUTE_PATHS.ACCOUNT.TOPUP_RESULT,
+                                element: <TopUpResultPage />
                             },
                             {
                                 path: ROUTE_PATHS.ACCOUNT.RENTAL_REQUESTS,

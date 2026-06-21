@@ -53,12 +53,14 @@ export interface RequestContractSignatureOtpResponse {
   maskedEmail: string;
 }
 
+export type ContractFileVariant = 'Raw' | 'Masked';
+
 export interface ContractFileResponse {
   id: string;
   rentalContractId: string;
   rentalContractAppendixId?: string | null;
   storageObjectKey: string;
-  fileVariant: string;
+  fileVariant: ContractFileVariant;
   fileUrl?: string | null;
   createdAt: string;
 }
@@ -114,10 +116,12 @@ export interface ContractOccupantResponse {
 export interface ContractSignatureResponse {
   id: string;
   signerUserId: string;
-  signerRole: string;
+  signerRole: ContractSignerRole;
   signatureMethod: string;
   signedAt: string;
 }
+
+export type ContractSignerRole = 'Landlord' | 'Tenant';
 
 export interface ContractDetailResponse {
   id: string;
@@ -227,12 +231,21 @@ export interface ContractAppendixChangeResponse {
   createdAt: string;
 }
 
+export type ContractAppendixStatus =
+  | 'Draft'
+  | 'PendingSignature'
+  | 'Active'
+  | 'Rejected'
+  | 'Cancelled'
+  | 'LandlordRevisionRequested'
+  | 'TenantRevisionRequested';
+
 export interface ContractAppendixResponse {
   id: string;
   rentalContractId: string;
   appendixNumber: string;
   effectiveDate: string;
-  status: string;
+  status: ContractAppendixStatus;
   createdByUserId: string;
   activatedAt?: string | null;
   appliedAt?: string | null;

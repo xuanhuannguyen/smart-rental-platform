@@ -8,7 +8,6 @@ using SmartRentalPlatform.Domain.Entities.Users;
 using SmartRentalPlatform.Domain.Entities.Payments;
 using SmartRentalPlatform.Domain.Entities.Billing;
 
-using SmartRentalPlatform.Domain.Entities.Leasing;
 
 namespace SmartRentalPlatform.Application.Common.Interfaces;
 
@@ -91,9 +90,8 @@ public interface IAppDbContext {
 
     DbSet<InvoiceItem> InvoiceItems { get; }
 
-    DbSet<InvoicePayment> InvoicePayments { get; }
 
-    DbSet<Contract> Contracts { get; }
+
 
     DbSet<ViewingAppointment> ViewingAppointments { get; }
 

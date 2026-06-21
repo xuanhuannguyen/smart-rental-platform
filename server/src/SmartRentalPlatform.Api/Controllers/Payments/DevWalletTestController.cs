@@ -180,7 +180,7 @@ public class DevWalletTestController : ControllerBase
         {
             throw new UnauthorizedException(
                 ErrorCodes.Unauthorized,
-                "Ban can dang nhap de thuc hien thao tac nay.");
+                "Bạn cần đăng nhập để thực hiện thao tác này.");
         }
 
         return currentUserService.UserId.Value;

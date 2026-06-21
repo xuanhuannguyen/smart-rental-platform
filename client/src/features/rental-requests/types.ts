@@ -31,6 +31,8 @@ export interface RoomDepositResponse {
   refundAmount?: number | null;
   forfeitedAmount?: number | null;
   note?: string | null;
+  paymentTransferGroupId?: string | null;
+  refundTransferGroupId?: string | null;
   createdAt: string;
   updatedAt: string;
 }

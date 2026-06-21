@@ -410,6 +410,8 @@ public class RentalRequestService : IRentalRequestService
             RefundAmount = deposit.RefundAmount,
             ForfeitedAmount = deposit.ForfeitedAmount,
             Note = deposit.Note,
+            PaymentTransferGroupId = deposit.PaymentTransferGroupId,
+            RefundTransferGroupId = deposit.RefundTransferGroupId,
             CreatedAt = deposit.CreatedAt,
             UpdatedAt = deposit.UpdatedAt
         };

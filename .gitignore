@@ -27,11 +27,17 @@
 secrets/
 **/secrets/
 
-# App settings that can contain personal/local connection strings or keys
-**/appsettings.Development.json
-**/appsettings.Local.json
-**/appsettings.*.local.json
-**/appsettings.Production.json
+# Commit appsettings files with safe defaults/placeholders only.
+# Store real local values in .NET User Secrets or environment variables.
+
+# Private keys, certificate bundles, and provider credential exports
+*.pem
+*.key
+*.pfx
+*.p12
+*.keystore
+credentials*.json
+service-account*.json
 
 # Frontend dependencies, build output, and caches
 node_modules/

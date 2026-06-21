@@ -11,7 +11,7 @@ import {
 import type { ViewingAppointment, ViewingAppointmentStatus, ConflictCheckResponse } from '../types';
 import { Alert } from '../../../shared/components/ui/Alert';
 import { getApiErrorMessage } from '../../../shared/api/apiError';
-import { formatDateVi } from '../../../shared/utils/format';
+import { formatDateTimeVi } from '../../../shared/utils/format';
 import '../../landlord/pages/LandlordDashboardPage.css';
 import './LandlordAppointmentsPage.css';
 
@@ -287,7 +287,7 @@ export default function LandlordAppointmentsPage() {
                   </div>
 
                   <div className="landlord-card__body">
-                    <p><strong>Thời gian hẹn:</strong> {formatDateVi(item.scheduledAt)} ({item.durationMinutes} phút)</p>
+                    <p><strong>Thời gian hẹn:</strong> {formatDateTimeVi(item.scheduledAt)} ({item.durationMinutes} phút)</p>
                     {item.tenantNote && <p className="note-text"><strong>Lời nhắn khách thuê:</strong> "{item.tenantNote}"</p>}
                     {item.landlordNote && <p className="note-text"><strong>Ghi chú phản hồi:</strong> "{item.landlordNote}"</p>}
                     {item.cancelReason && <p className="cancel-reason"><strong>Lý do hủy/từ chối:</strong> "{item.cancelReason}"</p>}
@@ -299,7 +299,7 @@ export default function LandlordAppointmentsPage() {
                         <ul>
                           {conflict.conflictingAppointments.map((c) => (
                             <li key={c.id}>
-                              Trùng với lịch đã xác nhận ở <strong>{c.roomingHouseName} - Phòng {c.roomNumber}</strong> ({formatDateVi(c.scheduledAt)})
+                              Trùng với lịch đã xác nhận ở <strong>{c.roomingHouseName} - Phòng {c.roomNumber}</strong> ({formatDateTimeVi(c.scheduledAt)})
                             </li>
                           ))}
                         </ul>

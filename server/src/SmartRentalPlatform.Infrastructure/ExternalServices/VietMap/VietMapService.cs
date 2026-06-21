@@ -110,7 +110,7 @@ public class VietMapService : IVietMapService
 
             throw new InternalServerException(
                 ErrorCodes.InternalServerError,
-                $"{message} Status {(int)response.StatusCode}: {body}",
+                $"{message} Status {(int)response.StatusCode}.",
                 null);
         }
 

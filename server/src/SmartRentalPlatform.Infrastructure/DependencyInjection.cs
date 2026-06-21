@@ -54,6 +54,7 @@ public static class DependencyInjection
         services.AddScoped<IHashService, Sha256HashService>();
         services.AddScoped<ISensitiveDataProtector, DataProtectionSensitiveDataProtector>();
         services.AddHostedService<RoomDepositExpirationWorker>();
+        services.AddHostedService<PaymentTransactionExpirationWorker>();
         services.AddHostedService<RentalContractExpirationWorker>();
         services.AddHostedService<RentalContractMoveInActivationWorker>();
         services.AddHostedService<ContractAppendixApplicationWorker>();

@@ -11,6 +11,8 @@ using SmartRentalPlatform.Contracts.RentalPolicies.Responses;
 using SmartRentalPlatform.Contracts.RoomingHouses;
 using SmartRentalPlatform.Contracts.RoomingHouseRules.Requests;
 using SmartRentalPlatform.Contracts.RoomingHouseRules.Responses;
+using SmartRentalPlatform.Contracts.RoomingHouses.Requests;
+using SmartRentalPlatform.Contracts.RoomingHouses.Responses;
 
 namespace SmartRentalPlatform.Api.Controllers;
 
@@ -24,6 +26,7 @@ public class RoomingHousesController : ControllerBase
     private readonly IRoomingHouseSubmissionService roomingHouseSubmissionService;
     private readonly IRoomingHouseRentalPolicyService roomingHouseRentalPolicyService;
     private readonly IRoomingHouseRuleService roomingHouseRuleService;
+    private readonly IRoomingHouseServicePriceService roomingHouseServicePriceService;
     private readonly ICurrentUserService currentUserService;
 
     public RoomingHousesController(
@@ -33,6 +36,7 @@ public class RoomingHousesController : ControllerBase
         IRoomingHouseSubmissionService roomingHouseSubmissionService,
         IRoomingHouseRentalPolicyService roomingHouseRentalPolicyService,
         IRoomingHouseRuleService roomingHouseRuleService,
+        IRoomingHouseServicePriceService roomingHouseServicePriceService,
         ICurrentUserService currentUserService)
     {
         this.roomingHouseQueryService = roomingHouseQueryService;
@@ -41,6 +45,7 @@ public class RoomingHousesController : ControllerBase
         this.roomingHouseSubmissionService = roomingHouseSubmissionService;
         this.roomingHouseRentalPolicyService = roomingHouseRentalPolicyService;
         this.roomingHouseRuleService = roomingHouseRuleService;
+        this.roomingHouseServicePriceService = roomingHouseServicePriceService;
         this.currentUserService = currentUserService;
     }
 
@@ -309,6 +314,39 @@ public class RoomingHousesController : ControllerBase
         {
             Success = true,
             Message = "Lưu luật khu trọ thành công.",
+            Data = result
+        });
+    }
+
+    [Authorize]
+    [HttpGet("{id:guid}/service-prices")]
+    public async Task<ActionResult<ApiResponse<List<ServicePriceResponse>>>> GetServicePrices(
+        Guid id,
+        CancellationToken cancellationToken)
+    {
+        var result = await roomingHouseServicePriceService.GetServicePricesAsync(GetCurrentUserId(), id, cancellationToken);
+
+        return Ok(new ApiResponse<List<ServicePriceResponse>>
+        {
+            Success = true,
+            Message = "Tải bảng giá dịch vụ thành công.",
+            Data = result
+        });
+    }
+
+    [Authorize]
+    [HttpPost("{id:guid}/service-prices")]
+    public async Task<ActionResult<ApiResponse<ServicePriceResponse>>> CreateServicePrice(
+        Guid id,
+        CreateServicePriceRequest request,
+        CancellationToken cancellationToken)
+    {
+        var result = await roomingHouseServicePriceService.CreateServicePriceAsync(GetCurrentUserId(), id, request, cancellationToken);
+
+        return Ok(new ApiResponse<ServicePriceResponse>
+        {
+            Success = true,
+            Message = "Tạo bảng giá dịch vụ mới thành công.",
             Data = result
         });
     }

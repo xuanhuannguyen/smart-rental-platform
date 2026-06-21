@@ -26,21 +26,21 @@ public class EmailSender : IEmailSender
         string otp,
         CancellationToken cancellationToken = default)
     {
-        var subject = "Ma OTP xac thuc email Smart Rental Platform";
+        var subject = "Mã OTP xác thực email Smart Rental Platform";
         var textBody = $"""
             Xin chao {displayName},
 
-            Ma OTP xac thuc email cua ban la: {otp}
+            Mã OTP xác thực email của bạn là: {otp}
 
-            Ma nay chi co hieu luc trong thoi gian ngan. Neu ban khong thuc hien yeu cau nay, vui long bo qua email.
+            Mã này chỉ có hiệu lực trong thời gian ngắn. Nếu bạn không thực hiện yêu cầu này, vui lòng bỏ qua email.
 
             Smart Rental Platform
             """;
         var htmlBody = BuildOtpHtml(
             displayName,
             otp,
-            "Xac thuc email",
-            "Dung ma OTP ben duoi de hoan tat dang ky tai khoan.");
+            "Xác thực email",
+            "Dùng mã OTP bên dưới để hoàn tất đăng ký tài khoản.");
 
         return SendAsync(email, displayName, subject, textBody, htmlBody, cancellationToken);
     }
@@ -51,21 +51,21 @@ public class EmailSender : IEmailSender
         string otp,
         CancellationToken cancellationToken = default)
     {
-        var subject = "Ma OTP dat lai mat khau Smart Rental Platform";
+        var subject = "Mã OTP đặt lại mật khẩu Smart Rental Platform";
         var textBody = $"""
             Xin chao {displayName},
 
-            Ma OTP dat lai mat khau cua ban la: {otp}
+            Mã OTP đặt lại mật khẩu của bạn là: {otp}
 
-            Neu ban khong yeu cau dat lai mat khau, vui long bo qua email nay.
+            Nếu bạn không yêu cầu đặt lại mật khẩu, vui lòng bỏ qua email này.
 
             Smart Rental Platform
             """;
         var htmlBody = BuildOtpHtml(
             displayName,
             otp,
-            "Dat lai mat khau",
-            "Dung ma OTP ben duoi de xac nhan yeu cau dat lai mat khau.");
+            "Đặt lại mật khẩu",
+            "Dùng mã OTP bên dưới để xác nhận yêu cầu đặt lại mật khẩu.");
 
         return SendAsync(email, displayName, subject, textBody, htmlBody, cancellationToken);
     }
@@ -78,23 +78,23 @@ public class EmailSender : IEmailSender
         string otp,
         CancellationToken cancellationToken = default)
     {
-        var subject = "Ma OTP ky hop dong Smart Rental Platform";
+        var subject = "Mã OTP ký hợp đồng Smart Rental Platform";
         var textBody = $"""
             Xin chao {displayName},
 
-            Ma OTP ky hop dong {contractNumber} cua ban la: {otp}
+            Mã OTP ký hợp đồng {contractNumber} của bạn là: {otp}
 
             Vai tro ky: {signerRole}
 
-            Neu ban khong thuc hien yeu cau ky hop dong nay, vui long bo qua email.
+            Nếu bạn không thực hiện yêu cầu ký hợp đồng này, vui lòng bỏ qua email.
 
             Smart Rental Platform
             """;
         var htmlBody = BuildOtpHtml(
             displayName,
             otp,
-            "Ky hop dong",
-            $"Dung ma OTP ben duoi de xac nhan ky hop dong {contractNumber} voi vai tro {signerRole}.");
+            "Ký hợp đồng",
+            $"Dùng mã OTP bên dưới để xác nhận ký hợp đồng {contractNumber} với vai trò {signerRole}.");
 
         return SendAsync(email, displayName, subject, textBody, htmlBody, cancellationToken);
     }
@@ -121,10 +121,8 @@ public class EmailSender : IEmailSender
             string.IsNullOrWhiteSpace(fromEmail))
         {
             _logger.LogWarning(
-                "Email SMTP is not configured. Fallback log email to {Email}. Subject: {Subject}. Body: {Body}",
-                toEmail,
-                subject,
-                textBody);
+                "Email SMTP is not configured. Email delivery was skipped. Subject: {Subject}",
+                subject);
 
             return;
         }
@@ -147,7 +145,7 @@ public class EmailSender : IEmailSender
         await smtpClient.SendAsync(message, cancellationToken);
         await smtpClient.DisconnectAsync(true, cancellationToken);
 
-        _logger.LogInformation("Sent email OTP to {Email} with subject {Subject}", toEmail, subject);
+        _logger.LogInformation("Sent email with subject {Subject}", subject);
     }
 
     private static string BuildOtpHtml(
@@ -164,7 +162,7 @@ public class EmailSender : IEmailSender
                 <p>Xin chao {displayName},</p>
                 <p>{description}</p>
                 <p style="font-size: 28px; font-weight: 700; letter-spacing: 6px; color: #0f172a;">{otp}</p>
-                <p>Neu ban khong thuc hien yeu cau nay, vui long bo qua email.</p>
+                <p>Nếu bạn không thực hiện yêu cầu này, vui lòng bỏ qua email.</p>
                 <p>Smart Rental Platform</p>
             </body>
             </html>

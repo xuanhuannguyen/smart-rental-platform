@@ -1,6 +1,7 @@
+using SmartRentalPlatform.Domain.Entities.Billing;
 using SmartRentalPlatform.Domain.Entities.Properties;
 
-namespace SmartRentalPlatform.Domain.Entities.Billing;
+namespace SmartRentalPlatform.Domain.Entities.Properties;
 
 public class RoomingHouseServicePrice
 {

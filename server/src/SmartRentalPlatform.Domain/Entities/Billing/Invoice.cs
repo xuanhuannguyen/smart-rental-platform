@@ -35,5 +35,5 @@ public class Invoice
     public User Tenant { get; set; } = null!;
     public User Landlord { get; set; } = null!;
     public ICollection<InvoiceItem> Items { get; set; } = new List<InvoiceItem>();
-    public InvoicePayment? Payment { get; set; }
+    public Guid? WalletTransferGroupId { get; set; }
 }

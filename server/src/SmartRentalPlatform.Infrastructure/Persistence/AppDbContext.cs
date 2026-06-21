@@ -55,9 +55,7 @@ public class AppDbContext : DbContext, IAppDbContext
     public DbSet<MeterReading> MeterReadings => Set<MeterReading>();
     public DbSet<Invoice> Invoices => Set<Invoice>();
     public DbSet<InvoiceItem> InvoiceItems => Set<InvoiceItem>();
-    public DbSet<InvoicePayment> InvoicePayments => Set<InvoicePayment>();
-    // Leasing
-    public DbSet<Contract> Contracts => Set<Contract>();
+
     // Viewing appointments
     public DbSet<ViewingAppointment> ViewingAppointments => Set<ViewingAppointment>();
     // Rental

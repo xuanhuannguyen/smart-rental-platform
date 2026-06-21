@@ -7,8 +7,6 @@ public interface IBillingService
 {
     Task<List<BillingServiceTypeResponse>> GetBillingServiceTypesAsync(CancellationToken cancellationToken = default);
 
-    Task<List<ServicePriceResponse>> GetServicePricesAsync(Guid landlordUserId, Guid roomingHouseId, CancellationToken cancellationToken = default);
-
     Task<RoomBillingContextResponse> GetRoomBillingContextAsync(Guid landlordUserId, Guid roomId, CancellationToken cancellationToken = default);
 
     Task<RoomInvoicePreviewResponse> GetRoomInvoicePreviewAsync(
@@ -22,8 +20,6 @@ public interface IBillingService
         Guid landlordUserId,
         Guid contractId,
         CancellationToken cancellationToken = default);
-
-    Task<ServicePriceResponse> CreateServicePriceAsync(Guid landlordUserId, Guid roomingHouseId, CreateServicePriceRequest request, CancellationToken cancellationToken = default);
 
     Task<List<InvoiceResponse>> GetLandlordInvoicesAsync(Guid landlordUserId, string? status = null, string? search = null, Guid? contractId = null, CancellationToken cancellationToken = default);
 

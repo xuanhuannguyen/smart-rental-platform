@@ -23,13 +23,13 @@ public class RoomDepositsController : ControllerBase
     }
 
     [Authorize]
-    [HttpPost("{id:guid}/mark-paid")]
-    public async Task<ActionResult<ApiResponse<RoomDepositResponse>>> MarkPaid(
+    [HttpPost("{id:guid}/pay")]
+    public async Task<ActionResult<ApiResponse<RoomDepositResponse>>> Pay(
         Guid id,
         CancellationToken cancellationToken)
     {
         var userId = GetCurrentUserId();
-        var result = await roomDepositService.MarkPaidAsync(userId, id, cancellationToken);
+        var result = await roomDepositService.PayAsync(userId, id, cancellationToken);
 
         if (result is null)
         {

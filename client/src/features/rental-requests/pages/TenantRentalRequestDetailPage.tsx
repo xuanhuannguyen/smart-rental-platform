@@ -1,12 +1,14 @@
 import { useEffect, useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { ROUTE_PATHS } from '../../../app/router/routePaths';
+import { getApiErrorMessage } from '../../../shared/api/apiError';
 import { Alert } from '../../../shared/components/ui/Alert';
 import { Button } from '../../../shared/components/ui/Button';
 import { Toast } from '../../../shared/components/ui/Toast';
 import type { ContractBriefResponse } from '../../contracts/types';
 import { ContractOccupantsSetupModal } from '../../rental-contracts/components/ContractOccupantsSetupModal';
 import { ContractPreviewModal } from '../../rental-contracts/components/ContractPreviewModal';
+import { WalletPaymentConfirmModal } from '../../wallet/components/WalletPaymentConfirmModal';
 import { rentalRequestApi } from '../api';
 import type { RentalRequestResponse, RoomDepositResponse } from '../types';
 import './TenantRentalRequestDetailPage.css';
@@ -24,6 +26,8 @@ export const TenantRentalRequestDetailPage = () => {
   const [selectedContractIdForSetup, setSelectedContractIdForSetup] = useState<string | null>(null);
   const [previewContractId, setPreviewContractId] = useState<string | null>(null);
   const [showCancelModal, setShowCancelModal] = useState(false);
+  const [showDepositPaymentConfirm, setShowDepositPaymentConfirm] = useState(false);
+  const [isPayingDeposit, setIsPayingDeposit] = useState(false);
   const [toast, setToast] = useState<{ message: string; type: 'success' | 'error' } | null>(null);
 
   useEffect(() => {
@@ -59,17 +63,27 @@ export const TenantRentalRequestDetailPage = () => {
   };
 
   const handlePayDeposit = async () => {
-    if (!request?.deposit) return;
+    if (!request?.deposit || isPayingDeposit) return;
 
+    setIsPayingDeposit(true);
     try {
-      const response = await rentalRequestApi.markDepositPaid(request.deposit.id);
-      setRequest({
+      const paymentResponse = await rentalRequestApi.payDeposit(request.deposit.id);
+      const requestsResponse = await rentalRequestApi.getMyRentalRequests();
+      const refreshedRequest = requestsResponse.data.find((item) => item.id === request.id);
+
+      setRequest(refreshedRequest ?? {
         ...request,
-        deposit: response.data
+        deposit: paymentResponse.data
       });
-      setToast({ message: 'Đã thanh toán cọc thành công (mock).', type: 'success' });
-    } catch {
-      setToast({ message: 'Không thể thanh toán cọc.', type: 'error' });
+      setToast({ message: 'Đã thanh toán cọc thành công.', type: 'success' });
+    } catch (err) {
+      setToast({
+        message: getApiErrorMessage(err, 'Không thể thanh toán cọc. Vui lòng thử lại.'),
+        type: 'error'
+      });
+    } finally {
+      setIsPayingDeposit(false);
+      setShowDepositPaymentConfirm(false);
     }
   };
 
@@ -125,7 +139,8 @@ export const TenantRentalRequestDetailPage = () => {
 
           <DepositInfoBlock
             deposit={request.deposit}
-            onPay={request.deposit?.status === 'PendingPayment' ? handlePayDeposit : undefined}
+            onPay={request.deposit?.status === 'PendingPayment' ? () => setShowDepositPaymentConfirm(true) : undefined}
+            isPaying={isPayingDeposit}
           />
 
           <ContractProgressBlock
@@ -176,6 +191,17 @@ export const TenantRentalRequestDetailPage = () => {
         </div>
       )}
 
+      <WalletPaymentConfirmModal
+        isOpen={showDepositPaymentConfirm}
+        title="Xác nhận thanh toán tiền cọc"
+        description={request.deposit ? `Thanh toán tiền cọc phòng ${request.roomNumber}` : undefined}
+        amount={request.deposit?.depositAmount ?? 0}
+        confirmLabel="Thanh toán cọc"
+        isSubmitting={isPayingDeposit}
+        onConfirm={handlePayDeposit}
+        onClose={() => setShowDepositPaymentConfirm(false)}
+      />
+
       {toast && (
         <Toast
           message={toast.message}
@@ -207,7 +233,15 @@ function RequestInfoBlock({ request }: { request: RentalRequestResponse }) {
   );
 }
 
-function DepositInfoBlock({ deposit, onPay }: { deposit?: RoomDepositResponse | null; onPay?: () => void }) {
+function DepositInfoBlock({
+  deposit,
+  onPay,
+  isPaying = false
+}: {
+  deposit?: RoomDepositResponse | null;
+  onPay?: () => void;
+  isPaying?: boolean;
+}) {
   const tone = getDepositTone(deposit?.status);
 
   return (
@@ -230,7 +264,9 @@ function DepositInfoBlock({ deposit, onPay }: { deposit?: RoomDepositResponse | 
 
         {onPay && (
           <div style={{ display: 'flex', justifyContent: 'flex-start' }}>
-            <Button onClick={onPay}>Thanh toán ngay</Button>
+            <Button onClick={onPay} disabled={isPaying}>
+              {isPaying ? 'Đang thanh toán...' : 'Thanh toán ngay'}
+            </Button>
           </div>
         )}
       </div>

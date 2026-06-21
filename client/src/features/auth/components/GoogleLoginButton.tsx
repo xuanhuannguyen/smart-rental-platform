@@ -66,12 +66,12 @@ export function GoogleLoginButton({ onCredential }: GoogleLoginButtonProps) {
     script.async = true;
     script.defer = true;
     script.onload = render;
-    script.onerror = () => setScriptError('Khong tai duoc Google Sign-In. Kiem tra internet, ad blocker hoac OAuth origin.');
+    script.onerror = () => setScriptError('Không tải được Google Sign-In. Kiểm tra internet, ad blocker hoặc OAuth origin.');
     document.head.appendChild(script);
   }, [onCredential]);
 
   if (!env.googleClientId) {
-    return <p className="auth-note">Thieu VITE_GOOGLE_CLIENT_ID trong file .env.</p>;
+    return <p className="auth-note">Thiếu VITE_GOOGLE_CLIENT_ID trong file .env.</p>;
   }
 
   return (

@@ -102,6 +102,8 @@ public static class ErrorCodes
     public const string InvoiceDuplicatePeriod = "INVOICE_DUPLICATE_PERIOD";
     public const string FinalInvoiceNotAllowed = "FINAL_INVOICE_NOT_ALLOWED";
     public const string WalletPaymentFailed = "WALLET_PAYMENT_FAILED";
+    public const string WalletInsufficientBalance = "WALLET_INSUFFICIENT_BALANCE";
+    public const string WalletInsufficientReservedBalance = "WALLET_INSUFFICIENT_RESERVED_BALANCE";
 
     // Viewing Appointment
     public const string ViewingAppointmentNotFound = "VIEWING_APPOINTMENT_NOT_FOUND";

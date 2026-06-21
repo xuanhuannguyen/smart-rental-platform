@@ -24,10 +24,22 @@ import type { Room, CreateRoomRequest, RoomPriceTierRequest } from '../../rooms/
 import type {
   ContractAppendixChangeRequest,
   ContractAppendixResponse,
+  ContractAppendixStatus,
   ContractDetailResponse,
   ContractFileResponse,
   ContractOccupantResponse
 } from '../../contracts/types';
+import {
+  canLandlordOpenAppendixForSigning,
+  formatAppendixStatus,
+  isBlockingAppendix,
+  shouldShowAppendixToCurrentUser,
+} from '../../contracts/appendixRules';
+import {
+  findAccessibleAppendixFile,
+  loadAccessibleContractFiles,
+} from '../../contracts/appendixFiles';
+import { AppendixFileActions } from '../../contracts/components/AppendixFileActions';
 import type { Amenity, PropertyImageRequest } from '../../rooming-houses/types';
 import { getAmenities } from '../../rooming-houses/api';
 import PropertyImageEditor from '../../rooming-houses/components/PropertyImageEditor';
@@ -96,6 +108,8 @@ export default function RoomDetailPage() {
   const [isTerminateModalOpen, setIsTerminateModalOpen] = useState(false);
   const [appendices, setAppendices] = useState<ContractAppendixResponse[] | null>(null);
   const [appendicesError, setAppendicesError] = useState<string | null>(null);
+  const [accessibleContractFiles, setAccessibleContractFiles] = useState<ContractFileResponse[]>([]);
+  const [appendixFilesError, setAppendixFilesError] = useState<string | null>(null);
   const [isAppendixModalOpen, setIsAppendixModalOpen] = useState(false);
   const [editingAppendix, setEditingAppendix] = useState<ContractAppendixResponse | null>(null);
   const [signingAppendixId, setSigningAppendixId] = useState<string | null>(null);
@@ -117,6 +131,8 @@ export default function RoomDetailPage() {
       setActiveContract(null);
       setActiveTenants([]);
       setAppendices(null);
+      setAccessibleContractFiles([]);
+      setAppendixFilesError(null);
       setContractInvoices([]);
       return;
     }
@@ -349,6 +365,9 @@ export default function RoomDetailPage() {
   }
 
   async function refreshAppendices(contractId: string) {
+    setAppendicesError(null);
+    setAppendixFilesError(null);
+    setAccessibleContractFiles([]);
     try {
       const response = await contractApi.getAppendices(contractId);
       setAppendices(response.data ?? []);
@@ -356,6 +375,13 @@ export default function RoomDetailPage() {
     } catch (err) {
       setAppendices([]);
       setAppendicesError(getApiErrorMessage(err, 'Không thể tải danh sách phụ lục.'));
+    }
+
+    try {
+      setAccessibleContractFiles(await loadAccessibleContractFiles(contractId));
+    } catch (err) {
+      setAccessibleContractFiles([]);
+      setAppendixFilesError(getApiErrorMessage(err, 'Không thể tải danh sách file phụ lục đã ký.'));
     }
   }
 
@@ -800,6 +826,11 @@ export default function RoomDetailPage() {
                     {appendicesError}
                   </div>
                 )}
+                {appendixFilesError && (
+                  <div style={{ color: '#b91c1c', marginBottom: '16px', padding: '12px', background: '#fef2f2', borderRadius: '8px' }}>
+                    {appendixFilesError}
+                  </div>
+                )}
 
                 <div className="appendices-list">
                   {visibleAppendices === null ? (
@@ -832,10 +863,16 @@ export default function RoomDetailPage() {
                               </Button>
                             )}
                           </div>
+                          <AppendixFileActions
+                            contractId={activeContract.id}
+                            contractNumber={activeContract.contractNumber}
+                            appendix={appendix}
+                            file={findAccessibleAppendixFile(accessibleContractFiles, appendix.id)}
+                          />
                         </div>
                         <div className="appendix-status-badge" style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: '8px' }}>
                           <span className={`status-badge ${getAppendixStatusClass(appendix.status)}`} style={{ padding: '6px 16px', fontSize: '0.85rem' }}>
-                            {formatAppendixStatus(appendix)}
+                            {formatAppendixStatus(appendix, 'Landlord')}
                           </span>
                         </div>
                       </div>
@@ -2035,36 +2072,7 @@ function LandlordCreateAppendixModal({
   );
 }
 
-function formatAppendixStatus(appendix: ContractAppendixResponse) {
-  if (appendix.status === 'PendingSignature') {
-    const hasTenantSigned = appendix.signatures.some((signature) => signature.signerRole === 'Tenant');
-    const hasLandlordSigned = appendix.signatures.some((signature) => signature.signerRole === 'Landlord');
-
-    if (!hasLandlordSigned) return 'Chờ bạn ký';
-    if (!hasTenantSigned) return 'Chờ khách thuê ký';
-    return 'Chờ ký';
-  }
-
-  if (appendix.status === 'LandlordRevisionRequested') return 'Đang chờ khách sửa';
-  if (appendix.status === 'TenantRevisionRequested') return 'Đang chờ bạn sửa';
-
-  switch (appendix.status) {
-    case 'Active':
-      return 'Đang hiệu lực';
-    case 'Rejected':
-      return 'Từ chối';
-    case 'Cancelled':
-      return 'Đã kết thúc';
-    case 'LandlordRevisionRequested':
-      return 'Yêu cầu sửa (Chủ nhà)';
-    case 'TenantRevisionRequested':
-      return 'Yêu cầu sửa (Khách thuê)';
-    default:
-      return appendix.status;
-  }
-}
-
-function getAppendixStatusClass(status: string) {
+function getAppendixStatusClass(status: ContractAppendixStatus) {
   switch (status) {
     case 'Active':
       return 'active';
@@ -2078,23 +2086,6 @@ function getAppendixStatusClass(status: string) {
     default:
       return '';
   }
-}
-
-function isBlockingAppendix(appendix: ContractAppendixResponse) {
-  return appendix.status === 'PendingSignature' ||
-    appendix.status === 'LandlordRevisionRequested' ||
-    appendix.status === 'TenantRevisionRequested';
-}
-
-function shouldShowAppendixToCurrentUser(appendix: ContractAppendixResponse, currentUserId: string) {
-  if (appendix.createdByUserId === currentUserId) return true;
-  if (appendix.status !== 'PendingSignature') return true;
-  return appendix.signatures.some((signature) => signature.signerUserId === appendix.createdByUserId);
-}
-
-function canLandlordOpenAppendixForSigning(appendix: ContractAppendixResponse) {
-  return appendix.status === 'PendingSignature' &&
-    !appendix.signatures.some((signature) => signature.signerRole === 'Landlord');
 }
 
 function resolveAppendixFieldValue(appendix: ContractAppendixResponse | undefined, fieldName: string) {

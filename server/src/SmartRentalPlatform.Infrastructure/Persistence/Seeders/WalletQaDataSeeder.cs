@@ -134,7 +134,9 @@ public static class WalletQaDataSeeder
     {
         var normalizedEmail = NormalizeEmail(email);
         var user = await context.Users
-            .FirstOrDefaultAsync(x => x.NormalizedEmail == normalizedEmail, cancellationToken);
+            .FirstOrDefaultAsync(
+                x => x.Id == fallbackId || x.NormalizedEmail == normalizedEmail,
+                cancellationToken);
 
         if (user is null)
         {

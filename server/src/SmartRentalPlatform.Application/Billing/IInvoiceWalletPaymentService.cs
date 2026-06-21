@@ -5,8 +5,6 @@ public interface IInvoiceWalletPaymentService
     Task<InvoiceWalletPaymentResult> PayInvoiceAsync(
         Guid invoiceId,
         Guid tenantUserId,
-        Guid landlordUserId,
-        decimal amount,
         CancellationToken cancellationToken = default);
 }
 

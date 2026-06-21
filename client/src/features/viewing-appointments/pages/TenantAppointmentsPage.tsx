@@ -4,7 +4,7 @@ import { getTenantAppointments, cancelViewingAppointmentByTenant } from '../api'
 import type { ViewingAppointment, ViewingAppointmentStatus } from '../types';
 import { Alert } from '../../../shared/components/ui/Alert';
 import { getApiErrorMessage } from '../../../shared/api/apiError';
-import { formatDateVi } from '../../../shared/utils/format';
+import { formatDateTimeVi, formatDateVi } from '../../../shared/utils/format';
 import './TenantAppointmentsPage.css';
 
 export default function TenantAppointmentsPage() {
@@ -143,7 +143,7 @@ export default function TenantAppointmentsPage() {
                   </div>
 
                   <div className="appointment-card__body">
-                    <p><strong>Thời gian xem:</strong> {formatDateVi(item.scheduledAt)} ({item.durationMinutes} phút)</p>
+                    <p><strong>Thời gian xem:</strong> {formatDateTimeVi(item.scheduledAt)} ({item.durationMinutes} phút)</p>
                     {item.tenantNote && <p><strong>Ghi chú của bạn:</strong> "{item.tenantNote}"</p>}
                     {item.landlordNote && <p><strong>Phản hồi chủ nhà:</strong> "{item.landlordNote}"</p>}
                     {item.cancelReason && <p className="cancel-reason"><strong>Lý do hủy/từ chối:</strong> "{item.cancelReason}"</p>}

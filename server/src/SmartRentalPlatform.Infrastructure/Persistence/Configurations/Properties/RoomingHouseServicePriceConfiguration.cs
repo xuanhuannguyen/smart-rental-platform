@@ -1,9 +1,9 @@
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Metadata.Builders;
-using SmartRentalPlatform.Domain.Entities.Billing;
+using SmartRentalPlatform.Domain.Entities.Properties;
 using SmartRentalPlatform.Domain.Enums.Billing;
 
-namespace SmartRentalPlatform.Infrastructure.Persistence.Configurations.Billing;
+namespace SmartRentalPlatform.Infrastructure.Persistence.Configurations.Properties;
 
 public class RoomingHouseServicePriceConfiguration : IEntityTypeConfiguration<RoomingHouseServicePrice>
 {

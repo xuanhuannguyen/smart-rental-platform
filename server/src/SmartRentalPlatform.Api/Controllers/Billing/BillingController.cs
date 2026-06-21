@@ -38,38 +38,6 @@ public class BillingController : ControllerBase
         });
     }
 
-    [Authorize]
-    [HttpGet("landlord/rooming-houses/{id:guid}/service-prices")]
-    public async Task<ActionResult<ApiResponse<List<ServicePriceResponse>>>> GetServicePrices(
-        Guid id,
-        CancellationToken cancellationToken)
-    {
-        var result = await billingService.GetServicePricesAsync(GetCurrentUserId(), id, cancellationToken);
-
-        return Ok(new ApiResponse<List<ServicePriceResponse>>
-        {
-            Success = true,
-            Message = "Tai bang gia dich vu thanh cong.",
-            Data = result
-        });
-    }
-
-    [Authorize]
-    [HttpPost("landlord/rooming-houses/{id:guid}/service-prices")]
-    public async Task<ActionResult<ApiResponse<ServicePriceResponse>>> CreateServicePrice(
-        Guid id,
-        CreateServicePriceRequest request,
-        CancellationToken cancellationToken)
-    {
-        var result = await billingService.CreateServicePriceAsync(GetCurrentUserId(), id, request, cancellationToken);
-
-        return Ok(new ApiResponse<ServicePriceResponse>
-        {
-            Success = true,
-            Message = "Tao bang gia dich vu moi thanh cong.",
-            Data = result
-        });
-    }
 
     [Authorize]
     [HttpGet("landlord/rooms/{roomId:guid}/billing-context")]
