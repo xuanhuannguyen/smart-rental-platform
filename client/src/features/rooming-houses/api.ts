@@ -1,11 +1,17 @@
 import { apiClient } from '../../shared/api/apiClient';
 import type { ApiResponse } from '../../shared/api/apiResponse.types';
+import { ENDPOINTS } from '../../shared/api/endpoints';
 import type {
   Amenity,
+  GuestRoomingHouseRecommendationRequest,
   LocationSuggestion,
   LocationSearchResult,
   PagedResult,
   PropertyImageRequest,
+  RoomingHouseListingItem,
+  RoomingHouseRecommendationResponse,
+  RoomingHouseAiChatRequest,
+  RoomingHouseAiChatResponse,
   RoomingHouseSearchItem,
   RoomingHouseSearchParams,
   RentalPolicy,
@@ -74,12 +80,39 @@ export async function getPublicRoomingHouses(): Promise<RoomingHouseDetail[]> {
   return data.data;
 }
 
+export async function getPublicRoomingHouseListing(): Promise<RoomingHouseListingItem[]> {
+  const data = await apiClient<ApiResponse<RoomingHouseListingItem[]>>(
+    '/api/public/rooming-houses/listing'
+  );
+  return data.data;
+}
+
 export async function searchPublicRoomingHouses(
   params: RoomingHouseSearchParams = {}
 ): Promise<PagedResult<RoomingHouseSearchItem>> {
   const query = buildSearchQuery(params);
   const data = await apiClient<ApiResponse<PagedResult<RoomingHouseSearchItem>>>(
-    `/api/public/rooming-houses/search${query ? `?${query}` : ''}`
+    `${ENDPOINTS.PUBLIC.ROOMING_HOUSE_SEARCH}${query ? `?${query}` : ''}`
+  );
+  return data.data;
+}
+
+export async function getGuestRoomingHouseRecommendations(
+  request: GuestRoomingHouseRecommendationRequest
+): Promise<RoomingHouseRecommendationResponse> {
+  const data = await apiClient<ApiResponse<RoomingHouseRecommendationResponse>>(
+    ENDPOINTS.PUBLIC.GUEST_ROOMING_HOUSE_RECOMMENDATIONS,
+    { method: 'POST', body: request }
+  );
+  return data.data;
+}
+
+export async function chatRoomingHouseAssistant(
+  request: RoomingHouseAiChatRequest
+): Promise<RoomingHouseAiChatResponse> {
+  const data = await apiClient<ApiResponse<RoomingHouseAiChatResponse>>(
+    ENDPOINTS.PUBLIC.ROOMING_HOUSE_AI_CHAT,
+    { method: 'POST', body: request }
   );
   return data.data;
 }

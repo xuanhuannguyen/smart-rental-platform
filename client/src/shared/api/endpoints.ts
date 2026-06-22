@@ -72,6 +72,9 @@ export const ENDPOINTS = {
   },
   PUBLIC: {
     ROOMING_HOUSES: '/api/public/rooming-houses',
+    ROOMING_HOUSE_SEARCH: '/api/public/rooming-houses/search',
+    ROOMING_HOUSE_AI_CHAT: '/api/public/rooming-houses/ai-chat',
+    GUEST_ROOMING_HOUSE_RECOMMENDATIONS: '/api/public/rooming-houses/recommendations/guest',
     ROOMS: (houseId: string) => `/api/public/rooming-houses/${houseId}/rooms`,
     ROOM_BY_ID: (roomId: string) => `/api/public/rooms/${roomId}`
   },
@@ -136,6 +139,14 @@ export const ENDPOINTS = {
     REJECT: (id: string) => `/api/landlord/viewing-appointments/${id}/reject`,
     CANCEL_BY_TENANT: (id: string) => `/api/viewing-appointments/${id}/cancel`,
     CANCEL_BY_LANDLORD: (id: string) => `/api/landlord/viewing-appointments/${id}/cancel`,
-    COMPLETE: (id: string) => `/api/landlord/viewing-appointments/${id}/complete`
+    COMPLETE: (id: string) => `/api/landlord/viewing-appointments/${id}/complete`,
+    ACCEPT_PROPOSAL: (id: string) => `/api/viewing-appointments/${id}/accept-proposal`,
+    REJECT_PROPOSAL: (id: string) => `/api/viewing-appointments/${id}/reject-proposal`
+  },
+  NOTIFICATIONS: {
+    LIST: '/api/notifications',
+    UNREAD_COUNT: '/api/notifications/unread-count',
+    MARK_READ: (id: string) => `/api/notifications/${id}/read`,
+    MARK_ALL_READ: '/api/notifications/read-all',
   }
 } as const;

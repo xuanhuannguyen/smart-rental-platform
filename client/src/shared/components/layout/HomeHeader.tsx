@@ -6,6 +6,7 @@ import { Button } from '../ui/Button';
 import { Toast } from '../ui/Toast';
 import { toAssetUrl } from '../../api/assets';
 import { getMyRoomingHouseOnboarding } from '../../../features/rooming-houses/api';
+import { NotificationBell } from '../../../features/notifications/components/NotificationBell';
 import './HomeHeader.css';
 
 interface HomeHeaderProps {
@@ -70,7 +71,13 @@ export function HomeHeader({ centerContent }: HomeHeaderProps) {
   return (
     <header className="home-header">
       <div className="header-logo" onClick={() => navigate(ROUTE_PATHS.ME.ROOT)}>
-        Smart Rental
+        <div className="logo-icon-container">
+          <svg viewBox="0 0 24 24" fill="none" stroke="#ffffff" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" className="logo-svg-icon">
+            <path d="m3 9 9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z" />
+            <polyline points="9 22 9 12 15 12 15 22" />
+          </svg>
+        </div>
+        <span className="logo-text">Smart Rental</span>
       </div>
 
       {centerContent && (
@@ -83,16 +90,24 @@ export function HomeHeader({ centerContent }: HomeHeaderProps) {
         {currentUser && (
           <div className="header-role-action">
             {isAdmin ? (
-              <Button type="button" variant="secondary" onClick={() => navigate(ROUTE_PATHS.ADMIN.APPROVALS)}>
+              <Button type="button" className="admin-channel-btn" onClick={() => navigate(ROUTE_PATHS.ADMIN.APPROVALS)}>
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" className="btn-icon">
+                  <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z" />
+                </svg>
                 Duyệt hồ sơ
               </Button>
             ) : isLandlord ? (
-              <Button type="button" variant="secondary" onClick={() => navigate(ROUTE_PATHS.LANDLORD.ROOMING_HOUSES)}>
+              <Button type="button" className="landlord-channel-btn" onClick={() => navigate(ROUTE_PATHS.LANDLORD.ROOMING_HOUSES)}>
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" className="btn-icon">
+                  <path d="m3 9 9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z" />
+                  <polyline points="9 22 9 12 15 12 15 22" />
+                </svg>
                 Kênh chủ trọ
               </Button>
             ) : (
               <Button
                 type="button"
+                className="landlord-register-btn"
                 disabled={isCheckingLandlord}
                 onClick={handleLandlordRegister}
               >
@@ -103,7 +118,9 @@ export function HomeHeader({ centerContent }: HomeHeaderProps) {
         )}
 
         {currentUser ? (
-          <div className="avatar-wrapper" ref={dropdownRef}>
+          <>
+            <NotificationBell />
+            <div className="avatar-wrapper" ref={dropdownRef}>
             <button className="avatar-btn" onClick={() => setShowDropdown(!showDropdown)}>
               {currentUser.avatarUrl && currentUser.avatarUrl.trim() !== '' ? (
                 <img src={toAssetUrl(currentUser.avatarUrl)} alt="Avatar" className="avatar-image" />
@@ -111,6 +128,9 @@ export function HomeHeader({ centerContent }: HomeHeaderProps) {
                 <span className="avatar-initials">{avatarInitials}</span>
               )}
               <span className="avatar-name">{currentUser.displayName}</span>
+              <svg className="avatar-chevron" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                <polyline points="6 9 12 15 18 9" />
+              </svg>
             </button>
             {showDropdown && (
               <div className="avatar-dropdown">
@@ -153,7 +173,7 @@ export function HomeHeader({ centerContent }: HomeHeaderProps) {
                 </button>
               </div>
             )}
-          </div>
+          </div></>
         ) : (
           <div className="auth-buttons">
             <Button type="button" variant="secondary" onClick={() => navigate(ROUTE_PATHS.AUTH.LOGIN)}>

@@ -26,6 +26,7 @@ export type PagedResult<T> = {
   pageSize: number;
   totalItems: number;
   totalPages: number;
+  metadata?: unknown;
 };
 
 export type PropertyImage = {
@@ -181,6 +182,13 @@ export type RoomingHouseSearchItem = {
   createdAt: string;
 };
 
+export type RoomingHouseSearchMetadata = {
+  aiAssisted: boolean;
+  originalQuery?: string | null;
+  interpretedQuery?: string | null;
+  relaxedFields: string[];
+};
+
 export type RoomingHouseSearchParams = {
   q?: string;
   provinceCode?: string;
@@ -192,12 +200,82 @@ export type RoomingHouseSearchParams = {
   minOccupants?: number;
   amenityIds?: number[];
   roomAmenityIds?: number[];
+  recentRoomingHouseIds?: string[];
+  preferredAmenityIds?: number[];
+  preferredRoomAmenityIds?: number[];
   centerLat?: number;
   centerLng?: number;
   radiusKm?: number;
   sortBy?: string;
   page?: number;
   pageSize?: number;
+};
+
+export type GuestRoomingHouseRecommendationRequest = {
+  recentQueries: string[];
+  recentRoomingHouseIds: string[];
+  clickedRoomingHouseIds: string[];
+  preferredAmenityIds: number[];
+  preferredRoomAmenityIds: number[];
+  provinceCode?: string | null;
+  wardCode?: string | null;
+  minPrice?: number | null;
+  maxPrice?: number | null;
+  minAreaM2?: number | null;
+  maxAreaM2?: number | null;
+  pageSize: number;
+};
+
+export type RoomingHouseRecommendationResponse = {
+  items: RoomingHouseSearchItem[];
+  reasons: Record<string, string>;
+  aiAssisted: boolean;
+  fallbackReason?: string | null;
+};
+
+export type RoomingHouseAiChatRequest = {
+  message: string;
+  context: 'home' | 'search' | 'detail';
+  roomingHouseId?: string | null;
+  mode?: 'fast' | 'detailed';
+  conversationId?: string | null;
+};
+
+export type NearbyPlace = {
+  name: string;
+  address?: string | null;
+  displayAddress?: string | null;
+  latitude?: number | null;
+  longitude?: number | null;
+  distanceKm?: number | null;
+  category?: string | null;
+};
+
+export type RoomingHouseAiChatResponse = {
+  reply: string;
+  intent: string;
+  confidence: number;
+  aiAssisted: boolean;
+  roomingHouses: RoomingHouseSearchItem[];
+  nearbyPlaces: NearbyPlace[];
+  followUpQuestions: string[];
+  missingInformation: string[];
+  usedSources: string[];
+};
+
+/** Lightweight listing item for home page cards. */
+export type RoomingHouseListingItem = {
+  id: string;
+  name: string;
+  addressDisplay: string;
+  coverImageUrl?: string | null;
+  availableRooms: number;
+  minMonthlyRent?: number | null;
+  maxMonthlyRent?: number | null;
+  minAreaM2?: number | null;
+  maxAreaM2?: number | null;
+  amenities: Amenity[];
+  createdAt: string;
 };
 
 export type LocationSearchResult = {

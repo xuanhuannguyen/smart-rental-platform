@@ -183,6 +183,40 @@ namespace SmartRentalPlatform.Api.Controllers.Properties
             });
         }
 
+        [Authorize]
+        [HttpPost("viewing-appointments/{id:guid}/accept-proposal")]
+        public async Task<ActionResult<ApiResponse<ViewingAppointmentResponse>>> AcceptProposal(
+            Guid id,
+            CancellationToken cancellationToken)
+        {
+            var tenantUserId = GetCurrentUserId();
+            var result = await _viewingAppointmentService.AcceptProposalAsync(tenantUserId, id, cancellationToken);
+
+            return Ok(new ApiResponse<ViewingAppointmentResponse>
+            {
+                Success = true,
+                Message = "Bạn đã chấp nhận đề xuất lịch xem phòng mới.",
+                Data = result
+            });
+        }
+
+        [Authorize]
+        [HttpPost("viewing-appointments/{id:guid}/reject-proposal")]
+        public async Task<ActionResult<ApiResponse<ViewingAppointmentResponse>>> RejectProposal(
+            Guid id,
+            CancellationToken cancellationToken)
+        {
+            var tenantUserId = GetCurrentUserId();
+            var result = await _viewingAppointmentService.RejectProposalAsync(tenantUserId, id, cancellationToken);
+
+            return Ok(new ApiResponse<ViewingAppointmentResponse>
+            {
+                Success = true,
+                Message = "Bạn đã từ chối đề xuất lịch xem phòng.",
+                Data = result
+            });
+        }
+
         private Guid GetCurrentUserId()
         {
             if (!_currentUserService.IsAuthenticated || _currentUserService.UserId is null)

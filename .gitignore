@@ -29,6 +29,8 @@ secrets/
 
 # Commit appsettings files with safe defaults/placeholders only.
 # Store real local values in .NET User Secrets or environment variables.
+server/src/SmartRentalPlatform.Api/appsettings.Local.json
+server/src/SmartRentalPlatform.Api/appsettings.*.Local.json
 
 # Private keys, certificate bundles, and provider credential exports
 *.pem

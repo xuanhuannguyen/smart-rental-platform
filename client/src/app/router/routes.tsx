@@ -19,6 +19,7 @@ import LandlordBillingPage from '../../features/billing/pages/LandlordBillingPag
 import { AccountTenantInvoicesPage } from '../../features/billing/pages/TenantInvoicesPage';
 import TenantAppointmentsPage from '../../features/viewing-appointments/pages/TenantAppointmentsPage';
 import LandlordAppointmentsPage from '../../features/viewing-appointments/pages/LandlordAppointmentsPage';
+import NotificationsPage from '../../features/notifications/pages/NotificationsPage';
 import LandlordContractsPage from '../../features/contracts/pages/LandlordContractsPage';
 import LandlordContractDetailPage from '../../features/contracts/pages/LandlordContractDetailPage';
 import { AdminHomePage } from '../../features/admin/pages/AdminHomePage';
@@ -146,7 +147,6 @@ export const router = createBrowserRouter([
                                 path: ROUTE_PATHS.ACCOUNT.VIEWING_APPOINTMENTS,
                                 element: <TenantAppointmentsPage />
                             },
-
                         ]
                     },
                     {
@@ -156,6 +156,10 @@ export const router = createBrowserRouter([
                     {
                         path: ROUTE_PATHS.ME.KYC_STATUS,
                         element: <KycStatusPage />
+                    },
+                    {
+                        path: ROUTE_PATHS.ACCOUNT.NOTIFICATIONS,
+                        element: <NotificationsPage />
                     },
                     {
                         path: ROUTE_PATHS.ME.VIEWING_APPOINTMENTS,

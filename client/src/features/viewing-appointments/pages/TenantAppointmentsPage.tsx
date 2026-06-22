@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { getTenantAppointments, cancelViewingAppointmentByTenant } from '../api';
+import { getTenantAppointments, cancelViewingAppointmentByTenant, acceptProposal, rejectProposal } from '../api';
 import type { ViewingAppointment, ViewingAppointmentStatus } from '../types';
 import { Alert } from '../../../shared/components/ui/Alert';
 import { getApiErrorMessage } from '../../../shared/api/apiError';
@@ -19,6 +19,10 @@ export default function TenantAppointmentsPage() {
   const [cancellingId, setCancellingId] = useState<string | null>(null);
   const [cancelReason, setCancelReason] = useState('');
   const [cancelling, setCancelling] = useState(false);
+
+  // Proposal states
+  const [proposalActionId, setProposalActionId] = useState<string | null>(null);
+  const [proposalLoading, setProposalLoading] = useState(false);
 
   const loadData = async () => {
     setLoading(true);
@@ -62,18 +66,57 @@ export default function TenantAppointmentsPage() {
     }
   };
 
+  const handleAcceptProposal = async (id: string) => {
+    setProposalActionId(id);
+    setProposalLoading(true);
+    setError('');
+    try {
+      await acceptProposal(id);
+      setSuccess('Bạn đã chấp nhận đề xuất lịch xem phòng mới.');
+      setProposalActionId(null);
+      void loadData();
+      setTimeout(() => setSuccess(''), 5000);
+    } catch (err) {
+      setError(getApiErrorMessage(err, 'Không thể chấp nhận đề xuất.'));
+      setProposalActionId(null);
+    } finally {
+      setProposalLoading(false);
+    }
+  };
+
+  const handleRejectProposal = async (id: string) => {
+    setProposalActionId(id);
+    setProposalLoading(true);
+    setError('');
+    try {
+      await rejectProposal(id);
+      setSuccess('Bạn đã từ chối đề xuất lịch xem phòng.');
+      setProposalActionId(null);
+      void loadData();
+      setTimeout(() => setSuccess(''), 5000);
+    } catch (err) {
+      setError(getApiErrorMessage(err, 'Không thể từ chối đề xuất.'));
+      setProposalActionId(null);
+    } finally {
+      setProposalLoading(false);
+    }
+  };
+
+  const hasProposal = (app: ViewingAppointment) =>
+    app.status === 'Rejected' && !!app.proposedScheduledAt;
+
   // Filter logic
   const filteredAppointments = appointments.filter((appointment) => {
     if (activeTab === 'pending') {
-      return appointment.status === 'Pending';
+      return appointment.status === 'Pending' || hasProposal(appointment);
     }
     if (activeTab === 'confirmed') {
       return appointment.status === 'Confirmed';
     }
     if (activeTab === 'history') {
-      return ['Rejected', 'CancelledByTenant', 'CancelledByLandlord', 'Completed', 'Expired'].includes(
+      return ['CancelledByTenant', 'CancelledByLandlord', 'Completed', 'Expired'].includes(
         appointment.status
-      );
+      ) || (appointment.status === 'Rejected' && !appointment.proposedScheduledAt);
     }
     return true;
   });
@@ -90,6 +133,8 @@ export default function TenantAppointmentsPage() {
       default: return status;
     }
   };
+
+  const pendingCount = appointments.filter(a => a.status === 'Pending' || hasProposal(a)).length;
 
   return (
     <div className="tenant-appointments-page">
@@ -110,7 +155,7 @@ export default function TenantAppointmentsPage() {
             Tất cả
           </button>
           <button className={activeTab === 'pending' ? 'active' : ''} onClick={() => setActiveTab('pending')}>
-            Chờ duyệt
+            Cần phản hồi ({pendingCount})
           </button>
           <button className={activeTab === 'confirmed' ? 'active' : ''} onClick={() => setActiveTab('confirmed')}>
             Đã xác nhận
@@ -134,11 +179,11 @@ export default function TenantAppointmentsPage() {
               const isCancellable = item.status === 'Pending' || item.status === 'Confirmed';
 
               return (
-                <div key={item.id} className={`appointment-card appointment-card--${item.status.toLowerCase()}`}>
+                <div key={item.id} className={`appointment-card appointment-card--${item.status.toLowerCase()}${hasProposal(item) ? ' appointment-card--proposal' : ''}`}>
                   <div className="appointment-card__header">
                     <h3>{houseName} - Phòng {roomNumber}</h3>
-                    <span className={`status-tag status-tag--${item.status.toLowerCase()}`}>
-                      {getStatusText(item.status)}
+                    <span className={`status-tag ${hasProposal(item) ? 'status-tag--proposal' : `status-tag--${item.status.toLowerCase()}`}`}>
+                      {hasProposal(item) ? 'Chờ phản hồi' : getStatusText(item.status)}
                     </span>
                   </div>
 
@@ -147,8 +192,34 @@ export default function TenantAppointmentsPage() {
                     {item.tenantNote && <p><strong>Ghi chú của bạn:</strong> "{item.tenantNote}"</p>}
                     {item.landlordNote && <p><strong>Phản hồi chủ nhà:</strong> "{item.landlordNote}"</p>}
                     {item.cancelReason && <p className="cancel-reason"><strong>Lý do hủy/từ chối:</strong> "{item.cancelReason}"</p>}
+                    {item.proposedScheduledAt && item.status === 'Rejected' && (
+                      <div className="proposal-banner">
+                        <p className="proposal-title">📅 Chủ trọ đề xuất khung giờ mới</p>
+                        <p><strong>Giờ đề xuất:</strong> {formatDateTimeVi(item.proposedScheduledAt)} ({item.proposedDurationMinutes ?? item.durationMinutes} phút)</p>
+                      </div>
+                    )}
                     <p className="created-at">Được tạo ngày: {formatDateVi(item.createdAt)}</p>
                   </div>
+
+                  {/* Proposal actions for Rejected appointment with proposal */}
+                  {item.status === 'Rejected' && item.proposedScheduledAt && (
+                    <div className="appointment-card__footer proposal-actions">
+                      <button
+                        className="btn btn-accept-proposal"
+                        disabled={proposalLoading}
+                        onClick={() => handleAcceptProposal(item.id)}
+                      >
+                        {proposalActionId === item.id && proposalLoading ? 'Đang xử lý...' : '✅ Chấp nhận lịch mới'}
+                      </button>
+                      <button
+                        className="btn btn-reject-proposal"
+                        disabled={proposalLoading}
+                        onClick={() => handleRejectProposal(item.id)}
+                      >
+                        {proposalActionId === item.id && proposalLoading ? 'Đang xử lý...' : '❌ Từ chối đề xuất'}
+                      </button>
+                    </div>
+                  )}
 
                   {isCancellable && (
                     <div className="appointment-card__footer">

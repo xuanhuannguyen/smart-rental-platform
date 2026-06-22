@@ -4,9 +4,11 @@ using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Options;
 using SmartRentalPlatform.Application.Common.Interfaces;
+using SmartRentalPlatform.Application.Common.Options;
 using SmartRentalPlatform.Infrastructure.BackgroundServices;
 using SmartRentalPlatform.Infrastructure.ExternalServices.Ekyc;
 using SmartRentalPlatform.Infrastructure.ExternalServices.Email;
+using SmartRentalPlatform.Infrastructure.ExternalServices.Gemini;
 using SmartRentalPlatform.Infrastructure.ExternalServices.Google;
 using SmartRentalPlatform.Infrastructure.ExternalServices.PayOS;
 using SmartRentalPlatform.Infrastructure.ExternalServices.VietMap;
@@ -45,6 +47,13 @@ public static class DependencyInjection
         {
             var options = provider.GetRequiredService<IOptions<VietMapOptions>>().Value;
             client.BaseAddress = new Uri(options.BaseUrl.TrimEnd('/') + "/");
+            client.Timeout = TimeSpan.FromSeconds(options.TimeoutSeconds);
+        });
+        services.Configure<GeminiOptions>(configuration.GetSection(GeminiOptions.SectionName));
+        services.AddHttpClient<IAiStructuredOutputService, GeminiStructuredOutputService>((provider, client) =>
+        {
+            var options = provider.GetRequiredService<IOptions<GeminiOptions>>().Value;
+            client.BaseAddress = new Uri("https://generativelanguage.googleapis.com/v1beta/");
             client.Timeout = TimeSpan.FromSeconds(options.TimeoutSeconds);
         });
         services.Configure<VnptEkycOptions>(configuration.GetSection(VnptEkycOptions.SectionName));

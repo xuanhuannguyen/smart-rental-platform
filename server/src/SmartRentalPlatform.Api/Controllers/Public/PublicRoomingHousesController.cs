@@ -12,10 +12,14 @@ namespace SmartRentalPlatform.Api.Controllers.Public;
 public class PublicRoomingHousesController : ControllerBase
 {
     private readonly IRoomingHouseQueryService roomingHouseQueryService;
+    private readonly IRoomingHouseAiChatService aiChatService;
 
-    public PublicRoomingHousesController(IRoomingHouseQueryService roomingHouseQueryService)
+    public PublicRoomingHousesController(
+        IRoomingHouseQueryService roomingHouseQueryService,
+        IRoomingHouseAiChatService aiChatService)
     {
         this.roomingHouseQueryService = roomingHouseQueryService;
+        this.aiChatService = aiChatService;
     }
 
     [HttpGet]
@@ -32,6 +36,20 @@ public class PublicRoomingHousesController : ControllerBase
         });
     }
 
+    [HttpGet("listing")]
+    public async Task<ActionResult<ApiResponse<List<RoomingHouseListingResponse>>>> GetListing(
+        CancellationToken cancellationToken)
+    {
+        var result = await roomingHouseQueryService.GetPublicListingAsync(cancellationToken);
+
+        return Ok(new ApiResponse<List<RoomingHouseListingResponse>>
+        {
+            Success = true,
+            Message = "Tải danh sách khu trọ thành công.",
+            Data = result
+        });
+    }
+
     [HttpGet("search")]
     public async Task<ActionResult<ApiResponse<PagedResult<RoomingHouseSearchItemResponse>>>> Search(
         [FromQuery] RoomingHouseSearchRequest request,
@@ -43,6 +61,36 @@ public class PublicRoomingHousesController : ControllerBase
         {
             Success = true,
             Message = "Tìm kiếm khu trọ thành công.",
+            Data = result
+        });
+    }
+
+    [HttpPost("recommendations/guest")]
+    public async Task<ActionResult<ApiResponse<RoomingHouseRecommendationResponse>>> GetGuestRecommendations(
+        [FromBody] GuestRoomingHouseRecommendationRequest request,
+        CancellationToken cancellationToken)
+    {
+        var result = await roomingHouseQueryService.GetGuestRecommendationsAsync(request, cancellationToken);
+
+        return Ok(new ApiResponse<RoomingHouseRecommendationResponse>
+        {
+            Success = true,
+            Message = "Tải gợi ý khu trọ phù hợp thành công.",
+            Data = result
+        });
+    }
+
+    [HttpPost("ai-chat")]
+    public async Task<ActionResult<ApiResponse<RoomingHouseAiChatResponse>>> Chat(
+        [FromBody] RoomingHouseAiChatRequest request,
+        CancellationToken cancellationToken)
+    {
+        var result = await aiChatService.ChatAsync(request, cancellationToken);
+
+        return Ok(new ApiResponse<RoomingHouseAiChatResponse>
+        {
+            Success = true,
+            Message = "Chatbot AI đã phản hồi thành công.",
             Data = result
         });
     }

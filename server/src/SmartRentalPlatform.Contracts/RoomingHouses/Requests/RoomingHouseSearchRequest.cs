@@ -22,6 +22,12 @@ public class RoomingHouseSearchRequest
 
     public List<int> RoomAmenityIds { get; set; } = new();
 
+    public List<Guid> RecentRoomingHouseIds { get; set; } = new();
+
+    public List<int> PreferredAmenityIds { get; set; } = new();
+
+    public List<int> PreferredRoomAmenityIds { get; set; } = new();
+
     public decimal? CenterLat { get; set; }
 
     public decimal? CenterLng { get; set; }

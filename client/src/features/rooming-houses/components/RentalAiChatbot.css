@@ -1,0 +1,286 @@
+.rental-ai-chatbot {
+  bottom: 24px;
+  pointer-events: none;
+  position: fixed;
+  right: 24px;
+  z-index: 60;
+}
+
+.rental-ai-chatbot__launcher,
+.rental-ai-chatbot__panel {
+  pointer-events: auto;
+}
+
+.rental-ai-chatbot__launcher {
+  align-items: center;
+  background: #0f766e;
+  border: 0;
+  border-radius: 999px;
+  box-shadow: 0 18px 40px rgba(15, 118, 110, 0.28);
+  color: #fff;
+  cursor: pointer;
+  display: flex;
+  gap: 10px;
+  height: 52px;
+  justify-content: center;
+  padding: 0 18px 0 12px;
+}
+
+.rental-ai-chatbot__launcher span {
+  align-items: center;
+  background: rgba(255, 255, 255, 0.18);
+  border-radius: 50%;
+  display: inline-flex;
+  font-size: 13px;
+  font-weight: 800;
+  height: 32px;
+  justify-content: center;
+  width: 32px;
+}
+
+.rental-ai-chatbot__launcher strong {
+  font-size: 14px;
+  letter-spacing: 0;
+  white-space: nowrap;
+}
+
+.rental-ai-chatbot__panel {
+  background: #ffffff;
+  border: 1px solid #dbe7e4;
+  border-radius: 8px;
+  box-shadow: 0 24px 70px rgba(15, 23, 42, 0.22);
+  display: flex;
+  flex-direction: column;
+  height: min(680px, calc(100vh - 110px));
+  margin-bottom: 14px;
+  overflow: hidden;
+  width: min(420px, calc(100vw - 32px));
+}
+
+.rental-ai-chatbot__header {
+  align-items: center;
+  background: #0f766e;
+  color: #fff;
+  display: flex;
+  justify-content: space-between;
+  padding: 16px 18px;
+}
+
+.rental-ai-chatbot__eyebrow {
+  color: rgba(255, 255, 255, 0.74);
+  display: block;
+  font-size: 12px;
+  font-weight: 700;
+  margin-bottom: 4px;
+  text-transform: uppercase;
+}
+
+.rental-ai-chatbot__header h2 {
+  font-size: 18px;
+  line-height: 1.2;
+  margin: 0;
+}
+
+.rental-ai-chatbot__close {
+  background: rgba(255, 255, 255, 0.16);
+  border: 0;
+  border-radius: 50%;
+  color: #fff;
+  cursor: pointer;
+  font-size: 24px;
+  height: 34px;
+  line-height: 1;
+  width: 34px;
+}
+
+.rental-ai-chatbot__messages {
+  background: #f7faf9;
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  gap: 12px;
+  overflow-y: auto;
+  padding: 16px;
+}
+
+.rental-ai-chatbot__message {
+  border-radius: 8px;
+  font-size: 14px;
+  line-height: 1.55;
+  max-width: 94%;
+  padding: 12px;
+}
+
+.rental-ai-chatbot__message p {
+  margin: 0;
+  white-space: pre-line;
+}
+
+.rental-ai-chatbot__message--assistant {
+  align-self: flex-start;
+  background: #ffffff;
+  border: 1px solid #e2ece9;
+  color: #163832;
+}
+
+.rental-ai-chatbot__message--user {
+  align-self: flex-end;
+  background: #155e75;
+  color: #ffffff;
+}
+
+.rental-ai-chatbot__cards,
+.rental-ai-chatbot__nearby,
+.rental-ai-chatbot__followups {
+  display: grid;
+  gap: 8px;
+  margin-top: 10px;
+}
+
+.rental-ai-chatbot__house {
+  align-items: center;
+  background: #f8fcfb;
+  border: 1px solid #dcebe7;
+  border-radius: 8px;
+  color: inherit;
+  display: grid;
+  gap: 10px;
+  grid-template-columns: 64px 1fr;
+  padding: 8px;
+  text-decoration: none;
+}
+
+.rental-ai-chatbot__house:hover {
+  border-color: #0f766e;
+}
+
+.rental-ai-chatbot__house-image {
+  align-items: center;
+  aspect-ratio: 1;
+  background: #dbeafe;
+  border-radius: 6px;
+  color: #155e75;
+  display: flex;
+  font-size: 12px;
+  font-weight: 800;
+  justify-content: center;
+  overflow: hidden;
+}
+
+.rental-ai-chatbot__house-image img {
+  height: 100%;
+  object-fit: cover;
+  width: 100%;
+}
+
+.rental-ai-chatbot__house strong,
+.rental-ai-chatbot__place strong {
+  display: block;
+  font-size: 13px;
+  line-height: 1.3;
+}
+
+.rental-ai-chatbot__house small,
+.rental-ai-chatbot__place small,
+.rental-ai-chatbot__house em,
+.rental-ai-chatbot__place em {
+  color: #58706a;
+  display: block;
+  font-size: 12px;
+  font-style: normal;
+  line-height: 1.35;
+  margin-top: 3px;
+}
+
+.rental-ai-chatbot__place {
+  background: #f8fcfb;
+  border: 1px solid #dcebe7;
+  border-radius: 8px;
+  padding: 9px 10px;
+}
+
+.rental-ai-chatbot__followups span {
+  background: #e9f7f4;
+  border-radius: 999px;
+  color: #0f5f58;
+  font-size: 12px;
+  padding: 7px 10px;
+}
+
+.rental-ai-chatbot__quick {
+  background: #ffffff;
+  border-top: 1px solid #edf3f1;
+  display: flex;
+  gap: 8px;
+  overflow-x: auto;
+  padding: 10px 12px;
+}
+
+.rental-ai-chatbot__quick button {
+  background: #eef8f5;
+  border: 1px solid #cfe8e1;
+  border-radius: 999px;
+  color: #0f5f58;
+  cursor: pointer;
+  flex: 0 0 auto;
+  font-size: 12px;
+  padding: 8px 10px;
+}
+
+.rental-ai-chatbot__quick button:disabled {
+  cursor: wait;
+  opacity: 0.58;
+}
+
+.rental-ai-chatbot__form {
+  background: #ffffff;
+  border-top: 1px solid #edf3f1;
+  display: grid;
+  gap: 8px;
+  grid-template-columns: 1fr auto;
+  padding: 12px;
+}
+
+.rental-ai-chatbot__form input {
+  border: 1px solid #cfdeda;
+  border-radius: 8px;
+  font: inherit;
+  min-width: 0;
+  padding: 11px 12px;
+}
+
+.rental-ai-chatbot__form button {
+  background: #0f766e;
+  border: 0;
+  border-radius: 8px;
+  color: #fff;
+  cursor: pointer;
+  font-weight: 700;
+  padding: 0 16px;
+}
+
+.rental-ai-chatbot__form button:disabled {
+  cursor: not-allowed;
+  opacity: 0.58;
+}
+
+@media (max-width: 640px) {
+  .rental-ai-chatbot {
+    bottom: 16px;
+    right: 16px;
+  }
+
+  .rental-ai-chatbot__panel {
+    height: min(620px, calc(100vh - 96px));
+  }
+
+  .rental-ai-chatbot__launcher strong {
+    display: none;
+  }
+
+  .rental-ai-chatbot__launcher {
+    height: 52px;
+    padding: 0 10px;
+    width: 52px;
+  }
+}

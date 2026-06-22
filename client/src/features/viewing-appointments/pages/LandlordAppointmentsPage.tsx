@@ -32,6 +32,9 @@ export default function LandlordAppointmentsPage() {
 
   const [rejectingId, setRejectingId] = useState<string | null>(null);
   const [rejectReason, setRejectReason] = useState('');
+  const [proposeNewTime, setProposeNewTime] = useState(false);
+  const [proposedDate, setProposedDate] = useState('');
+  const [proposedTime, setProposedTime] = useState('');
 
   const [cancellingId, setCancellingId] = useState<string | null>(null);
   const [cancelReason, setCancelReason] = useState('');
@@ -122,6 +125,9 @@ export default function LandlordAppointmentsPage() {
   const handleRejectClick = (id: string) => {
     setRejectingId(id);
     setRejectReason('');
+    setProposeNewTime(false);
+    setProposedDate('');
+    setProposedTime('');
     setModalError('');
   };
 
@@ -131,9 +137,18 @@ export default function LandlordAppointmentsPage() {
 
     setActionLoading(true);
     setModalError('');
+
+    let proposedScheduledAt: string | null = null;
+    let proposedDurationMinutes: number | null = null;
+    if (proposeNewTime && proposedDate && proposedTime) {
+      proposedScheduledAt = new Date(`${proposedDate}T${proposedTime}`).toISOString();
+    }
+
     try {
       await rejectViewingAppointment(rejectingId, {
         rejectReason: rejectReason.trim(),
+        proposedScheduledAt,
+        proposedDurationMinutes,
       });
       setSuccess('Đã từ chối lịch hẹn xem phòng.');
       setRejectingId(null);
@@ -197,18 +212,21 @@ export default function LandlordAppointmentsPage() {
     }
   };
 
+  const hasProposal = (app: ViewingAppointment) =>
+    app.status === 'Rejected' && !!app.proposedScheduledAt;
+
   // Filter
   const filteredAppointments = appointments.filter((appointment) => {
     if (activeTab === 'pending') {
-      return appointment.status === 'Pending';
+      return appointment.status === 'Pending' || hasProposal(appointment);
     }
     if (activeTab === 'confirmed') {
       return appointment.status === 'Confirmed';
     }
     if (activeTab === 'history') {
-      return ['Rejected', 'CancelledByTenant', 'CancelledByLandlord', 'Completed', 'Expired'].includes(
+      return ['CancelledByTenant', 'CancelledByLandlord', 'Completed', 'Expired'].includes(
         appointment.status
-      );
+      ) || (appointment.status === 'Rejected' && !appointment.proposedScheduledAt);
     }
     return true;
   });
@@ -230,6 +248,8 @@ export default function LandlordAppointmentsPage() {
     return new Date(scheduledAt) <= new Date();
   };
 
+  const pendingCount = appointments.filter(a => a.status === 'Pending' || hasProposal(a)).length;
+
   return (
     <div className="landlord-dashboard-page landlord-appointments-page" style={{ display: 'contents' }}>
       <main className="dashboard-main">
@@ -246,7 +266,7 @@ export default function LandlordAppointmentsPage() {
 
         <div className="landlord-tabs">
           <button className={activeTab === 'pending' ? 'active' : ''} onClick={() => setActiveTab('pending')}>
-            Chờ duyệt ({appointments.filter(a => a.status === 'Pending').length})
+            Chờ xử lý ({pendingCount})
           </button>
           <button className={activeTab === 'confirmed' ? 'active' : ''} onClick={() => setActiveTab('confirmed')}>
             Đã xác nhận ({appointments.filter(a => a.status === 'Confirmed').length})
@@ -275,14 +295,14 @@ export default function LandlordAppointmentsPage() {
               const isPast = isAppointmentInPast(item.scheduledAt);
 
               return (
-                <div key={item.id} className={`landlord-card status-${item.status.toLowerCase()}`}>
+                <div key={item.id} className={`landlord-card ${hasProposal(item) ? 'status-proposal' : `status-${item.status.toLowerCase()}`}`}>
                   <div className="landlord-card__header">
                     <div>
                       <h3>{houseName} - Phòng {roomNumber}</h3>
                       <p className="tenant-info">👤 Khách hẹn: {tenantName}</p>
                     </div>
-                    <span className={`status-tag status-tag--${item.status.toLowerCase()}`}>
-                      {getStatusText(item.status)}
+                    <span className={`status-tag ${hasProposal(item) ? 'status-tag--proposal' : `status-tag--${item.status.toLowerCase()}`}`}>
+                      {hasProposal(item) ? 'Chờ phản hồi' : getStatusText(item.status)}
                     </span>
                   </div>
 
@@ -291,6 +311,14 @@ export default function LandlordAppointmentsPage() {
                     {item.tenantNote && <p className="note-text"><strong>Lời nhắn khách thuê:</strong> "{item.tenantNote}"</p>}
                     {item.landlordNote && <p className="note-text"><strong>Ghi chú phản hồi:</strong> "{item.landlordNote}"</p>}
                     {item.cancelReason && <p className="cancel-reason"><strong>Lý do hủy/từ chối:</strong> "{item.cancelReason}"</p>}
+
+                    {/* Show proposal info on rejected appointments */}
+                    {item.status === 'Rejected' && item.proposedScheduledAt && (
+                      <div className="proposal-banner">
+                        <p className="proposal-title">🕐 Đã đề xuất giờ mới — đang chờ khách phản hồi</p>
+                        <p><strong>Giờ đề xuất:</strong> {formatDateTimeVi(item.proposedScheduledAt)} ({item.proposedDurationMinutes ?? item.durationMinutes} phút)</p>
+                      </div>
+                    )}
 
                     {/* Visual overlap check warning for Pending state */}
                     {item.status === 'Pending' && conflict?.hasConflict && (
@@ -430,6 +458,42 @@ export default function LandlordAppointmentsPage() {
                   required
                 />
               </div>
+
+              {/* Proposal toggle */}
+              <div className="viewing-modal-field" style={{ marginTop: '12px' }}>
+                <label className="checkbox-field">
+                  <input
+                    type="checkbox"
+                    checked={proposeNewTime}
+                    onChange={(e) => setProposeNewTime(e.target.checked)}
+                    disabled={actionLoading}
+                  />
+                  <span>Đề xuất khung giờ khác cho người thuê</span>
+                </label>
+              </div>
+
+              {proposeNewTime && (
+                <div className="viewing-modal-field" style={{ marginTop: '12px' }}>
+                  <label htmlFor="proposedDateInput">Ngày đề xuất <span className="required">*</span></label>
+                  <input
+                    id="proposedDateInput"
+                    type="date"
+                    value={proposedDate}
+                    onChange={(e) => setProposedDate(e.target.value)}
+                    disabled={actionLoading}
+                    required={proposeNewTime}
+                  />
+                  <label htmlFor="proposedTimeInput" style={{ marginTop: '8px' }}>Giờ đề xuất <span className="required">*</span></label>
+                  <input
+                    id="proposedTimeInput"
+                    type="time"
+                    value={proposedTime}
+                    onChange={(e) => setProposedTime(e.target.value)}
+                    disabled={actionLoading}
+                    required={proposeNewTime}
+                  />
+                </div>
+              )}
 
               <footer className="viewing-modal-footer">
                 <button

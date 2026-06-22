@@ -1,6 +1,7 @@
 using Microsoft.EntityFrameworkCore;
 using SmartRentalPlatform.Domain.Entities.AdminApproval;
 using SmartRentalPlatform.Domain.Entities.Administrative;
+using SmartRentalPlatform.Domain.Entities.Notifications;
 using SmartRentalPlatform.Domain.Entities.RentalContracts;
 using SmartRentalPlatform.Domain.Entities.Properties;
 using SmartRentalPlatform.Domain.Entities.Rental;
@@ -92,6 +93,8 @@ public interface IAppDbContext {
 
 
 
+
+    DbSet<Notification> Notifications { get; }
 
     DbSet<ViewingAppointment> ViewingAppointments { get; }
 

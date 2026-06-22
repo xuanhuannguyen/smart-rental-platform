@@ -2,6 +2,7 @@ import { useCallback, useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { ROUTE_PATHS } from '../../../app/router/routePaths';
 import { Alert } from '../../../shared/components/ui/Alert';
+import { AuthLayout } from '../components/AuthLayout';
 import { ForgotPasswordForm } from '../components/ForgotPasswordForm';
 import { authApi } from '../services/authApi';
 import type { ForgotPasswordRequest } from '../types/auth.types';
@@ -36,20 +37,17 @@ export function ForgotPasswordPage() {
   );
 
   return (
-    <main className="auth-page">
-      <section className="auth-panel">
-        <p className="eyebrow">Smart Rental Platform</p>
-        <h1>Quên mật khẩu</h1>
-        <p className="subtle">Nhận OTP qua email để tạo mật khẩu mới cho tài khoản.</p>
+    <AuthLayout
+      title="Quên mật khẩu"
+      subtitle="Nhập email tài khoản để nhận OTP và tạo mật khẩu mới an toàn."
+    >
+      {error ? <Alert type="error">{error}</Alert> : <Alert type="info">{message}</Alert>}
 
-        {error ? <Alert type="error">{error}</Alert> : <Alert type="info">{message}</Alert>}
+      <ForgotPasswordForm isSubmitting={isSubmitting} onSubmit={handleForgotPassword} />
 
-        <ForgotPasswordForm isSubmitting={isSubmitting} onSubmit={handleForgotPassword} />
-
-        <div className="auth-links single-link">
-          <Link to={ROUTE_PATHS.AUTH.LOGIN}>Quay lại đăng nhập</Link>
-        </div>
-      </section>
-    </main>
+      <div className="auth-links single-link">
+        <Link to={ROUTE_PATHS.AUTH.LOGIN}>Quay lại đăng nhập</Link>
+      </div>
+    </AuthLayout>
   );
 }

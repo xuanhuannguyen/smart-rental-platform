@@ -111,14 +111,42 @@ export const MyWalletPage: React.FC = () => {
 
   const getTopUpStatusClass = (status: WalletTopUpStatus) => {
     switch (status) {
-      case 'Succeeded': return 'completed';
+      case 'Succeeded': return 'success';
       case 'Pending': return 'pending';
+      case 'Expired': return 'expired';
+      case 'Failed':
+      case 'Cancelled':
+      default:
+        return 'failed';
+    }
+  };
+
+  const getTopUpStatusIcon = (status: WalletTopUpStatus) => {
+    switch (status) {
+      case 'Succeeded':
+        return (
+          <svg className="wallet-status-icon" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round" style={{ marginRight: '4px' }}>
+            <polyline points="20 6 9 17 4 12" />
+          </svg>
+        );
+      case 'Pending':
+        return (
+          <svg className="wallet-status-icon" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" style={{ marginRight: '4px' }}>
+            <circle cx="12" cy="12" r="10" />
+            <polyline points="12 6 12 12 16 14" />
+          </svg>
+        );
       case 'Failed':
       case 'Expired':
       case 'Cancelled':
-        return 'failed';
       default:
-        return 'failed';
+        return (
+          <svg className="wallet-status-icon" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" style={{ marginRight: '4px' }}>
+            <circle cx="12" cy="12" r="10" />
+            <line x1="12" y1="8" x2="12" y2="12" />
+            <line x1="12" y1="16" x2="12.01" y2="16" />
+          </svg>
+        );
     }
   };
 
@@ -139,13 +167,31 @@ export const MyWalletPage: React.FC = () => {
 
   return (
     <div className="wallet-page-container">
-      <section className="overview-band">
-        <div className="overview-left">
-          <p className="eyebrow">QUẢN LÝ</p>
-        <h2>Ví của tôi</h2>
-        <p className="text-secondary">Quản lý số dư và nạp tiền vào ví của bạn</p>
+      <div className="wallet-header-band">
+        <div className="wallet-header-title-row">
+          <div className="wallet-header-icon-box">
+            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
+              <rect x="2" y="5" width="20" height="14" rx="2" ry="2" />
+              <line x1="2" y1="10" x2="22" y2="10" />
+            </svg>
+          </div>
+          <div>
+            <p className="wallet-modal-eyebrow" style={{ margin: '0 0 4px 0', fontSize: '11px', color: '#246bfe', fontWeight: 'bold' }}>QUẢN LÝ</p>
+            <h2 style={{ margin: 0, fontSize: '24px', fontWeight: 'bold', color: '#0f172a' }}>Ví của tôi</h2>
+            <p className="text-secondary" style={{ margin: '4px 0 0 0', fontSize: '13px', color: '#64748b' }}>Quản lý số dư và nạp tiền vào ví của bạn</p>
+          </div>
         </div>
-      </section>
+        <div className="wallet-header-illustration">
+          <svg width="120" height="80" viewBox="0 0 120 80" fill="none" xmlns="http://www.w3.org/2000/svg">
+            <rect x="15" y="20" width="90" height="55" rx="8" fill="#eff6ff" stroke="#cbd5e1" strokeWidth="1.5" />
+            <rect x="25" y="10" width="70" height="15" rx="4" fill="#3b82f6" opacity="0.15" />
+            <path d="M85 35H105C107.761 35 110 37.2386 110 40V50C110 52.7614 107.761 55 105 55H85V35Z" fill="#eff6ff" stroke="#cbd5e1" strokeWidth="1.5" />
+            <circle cx="95" cy="45" r="3" fill="#3b82f6" />
+            <circle cx="50" cy="45" r="10" fill="#fbcfe8" opacity="0.25" />
+            <circle cx="50" cy="45" r="6" fill="#ec4899" opacity="0.15" />
+          </svg>
+        </div>
+      </div>
 
       {error && <Alert type="error">{error}</Alert>}
 
@@ -153,35 +199,94 @@ export const MyWalletPage: React.FC = () => {
         <>
         <div className="wallet-card">
           <div className="wallet-summary-grid">
-            <div className="wallet-balance-item wallet-balance-primary">
-              <span>Số dư khả dụng</span>
-              <strong>{formatCurrency(wallet.availableBalance)}</strong>
-            </div>
             <div className="wallet-balance-item">
-              <span>Tổng số dư</span>
-              <strong>{formatCurrency(wallet.balance)}</strong>
+              <div className="balance-item-icon-box available">
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
+                  <rect x="2" y="5" width="20" height="14" rx="2" ry="2" />
+                  <line x1="2" y1="10" x2="22" y2="10" />
+                </svg>
+              </div>
+              <div className="balance-item-details">
+                <span className="balance-item-label">Số dư khả dụng</span>
+                <strong className="balance-item-value available-blue">{formatCurrency(wallet.availableBalance)}</strong>
+              </div>
             </div>
+
             <div className="wallet-balance-item">
-              <span>Số tiền đang giữ</span>
-              <strong>{formatCurrency(wallet.reservedBalance)}</strong>
+              <div className="balance-item-icon-box total">
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
+                  <ellipse cx="12" cy="5" rx="9" ry="3" />
+                  <path d="M3 5v14c0 1.66 4 3 9 3s9-1.34 9-3V5" />
+                  <path d="M3 12c0 1.66 4 3 9 3s9-1.34 9-3" />
+                </svg>
+              </div>
+              <div className="balance-item-details">
+                <span className="balance-item-label">Tổng số dư</span>
+                <strong className="balance-item-value">{formatCurrency(wallet.balance)}</strong>
+              </div>
+            </div>
+
+            <div className="wallet-balance-item">
+              <div className="balance-item-icon-box reserved">
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
+                  <rect x="3" y="11" width="18" height="11" rx="2" ry="2" />
+                  <path d="M7 11V7a5 5 0 0 1 10 0v4" />
+                </svg>
+              </div>
+              <div className="balance-item-details">
+                <span className="balance-item-label">Số tiền đang giữ</span>
+                <strong className="balance-item-value">{formatCurrency(wallet.reservedBalance)}</strong>
+              </div>
             </div>
           </div>
 
           <div className="wallet-card-footer">
-            <p className="wallet-balance-note">
-              Số tiền đang giữ là khoản đã được khóa cho các giao dịch như tiền cọc, chưa thể sử dụng cho thanh toán khác.
-            </p>
+            <div className="wallet-card-footer-left">
+              <div className="wallet-info-banner">
+                <svg className="wallet-info-icon" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
+                  <circle cx="12" cy="12" r="10" />
+                  <line x1="12" y1="16" x2="12" y2="12" />
+                  <line x1="12" y1="8" x2="12.01" y2="8" />
+                </svg>
+                <span className="wallet-info-text">
+                  Số tiền đang giữ là khoản đã được khóa cho các giao dịch như tiền cọc, chưa thể sử dụng cho thanh toán khác.
+                </span>
+              </div>
+            </div>
 
-            <div className="wallet-card-actions">
-              <div className={`wallet-status ${wallet.status.toLowerCase()}`}>
-                Trạng thái: {wallet.status === 'Active' ? 'Đang hoạt động' : 'Bị khóa'}
+            <div className="wallet-card-footer-right">
+              <div className={`wallet-status-tag ${wallet.status === 'Active' ? 'active' : 'locked'}`}>
+                {wallet.status === 'Active' ? (
+                  <>
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" style={{ marginRight: '4px' }}>
+                      <polyline points="20 6 9 17 4 12" />
+                    </svg>
+                    Trạng thái: Đang hoạt động
+                  </>
+                ) : (
+                  <>
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" style={{ marginRight: '4px' }}>
+                      <rect x="3" y="11" width="18" height="11" rx="2" ry="2" />
+                      <path d="M7 11V7a5 5 0 0 1 10 0v4" />
+                    </svg>
+                    Trạng thái: Bị khóa
+                  </>
+                )}
               </div>
 
               <Button
                 variant="primary"
+                className="wallet-topup-btn"
                 onClick={() => setShowTopUp(true)}
                 disabled={wallet.status !== 'Active'}
               >
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" style={{ marginRight: '6px' }}>
+                  <path d="M20 12V8H6a2 2 0 0 1-2-2c0-1.1.9-2 2-2h12v4" />
+                  <path d="M4 6v12c0 1.1.9 2 2 2h14v-4" />
+                  <path d="M18 12a2 2 0 0 0-2 2v2a2 2 0 0 0 2 2h4v-6Z" />
+                  <line x1="12" y1="11" x2="12" y2="17" />
+                  <line x1="9" y1="14" x2="15" y2="14" />
+                </svg>
                 Nạp tiền vào ví
               </Button>
             </div>
@@ -256,20 +361,31 @@ export const MyWalletPage: React.FC = () => {
         </>
       )}
 
-      <div className="transaction-list-container">
+      <div className="transaction-list-card">
         <div className="topup-history-header">
-          <div>
-            <h3>Lịch sử yêu cầu nạp ví</h3>
-            <p className="text-secondary">Theo dõi các yêu cầu nạp tiền đang chờ, đã hết hạn hoặc đã hoàn tất</p>
+          <div className="topup-history-header-left">
+            <div className="topup-history-icon-box">
+              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
+                <circle cx="12" cy="12" r="10" />
+                <polyline points="12 6 12 12 16 14" />
+              </svg>
+            </div>
+            <div className="topup-history-header-text">
+              <h3>Lịch sử yêu cầu nạp ví</h3>
+              <p className="text-secondary">Theo dõi các yêu cầu nạp tiền đang chờ, đã hết hạn hoặc đã hoàn tất</p>
+            </div>
           </div>
-          <Button
-            variant="outline"
+          <button
             type="button"
+            className="wallet-refresh-btn"
             onClick={() => fetchTopUps(1, true)}
             disabled={isTopUpsLoading}
           >
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" style={{ marginRight: '6px' }} className={isTopUpsLoading ? 'spin' : ''}>
+              <path d="M21.5 2v6h-6M21.34 15.57a10 10 0 1 1-.57-8.38l5.67-5.67" />
+            </svg>
             Làm mới
-          </Button>
+          </button>
         </div>
 
         <div className="table-responsive">
@@ -296,20 +412,22 @@ export const MyWalletPage: React.FC = () => {
                     <td>{topUp.providerOrderCode || topUp.id.substring(0, 8)}</td>
                     <td>{formatCurrency(topUp.amount)}</td>
                     <td>
-                      <span className={`status-badge status-${getTopUpStatusClass(topUp.status)}`}>
+                      <span className={`wallet-status-badge ${getTopUpStatusClass(topUp.status)}`}>
+                        {getTopUpStatusIcon(topUp.status)}
                         {getTopUpStatusText(topUp.status)}
                       </span>
                     </td>
                     <td>{formatDateTime(topUp.expiresAt)}</td>
                     <td>
                       {topUp.status === 'Pending' && topUp.providerCheckoutUrl ? (
-                        <Button
-                          variant="outline"
+                        <button
                           type="button"
+                          className="wallet-refresh-btn"
                           onClick={() => continueTopUpPayment(topUp)}
+                          style={{ padding: '6px 12px', fontSize: '12px' }}
                         >
                           Tiếp tục thanh toán
-                        </Button>
+                        </button>
                       ) : (
                         <span className="text-secondary">-</span>
                       )}

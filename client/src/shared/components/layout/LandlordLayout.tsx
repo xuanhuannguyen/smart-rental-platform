@@ -1,6 +1,7 @@
 import { NavLink, Outlet, useNavigate, useLocation } from 'react-router-dom';
 import { useAuth } from '../../../app/providers/AuthProvider';
 import { ROUTE_PATHS } from '../../../app/router/routePaths';
+import { NotificationBell } from '../../../features/notifications/components/NotificationBell';
 
 export function LandlordLayout() {
   const navigate = useNavigate();
@@ -14,7 +15,10 @@ export function LandlordLayout() {
   return (
     <div className="landlord-dashboard">
       <aside className="dashboard-sidebar">
-        <h1>Chủ trọ</h1>
+        <div className="landlord-sidebar-header">
+          <h1>Chủ trọ</h1>
+          <NotificationBell />
+        </div>
         <NavLink
           to={ROUTE_PATHS.LANDLORD.DASHBOARD}
           end

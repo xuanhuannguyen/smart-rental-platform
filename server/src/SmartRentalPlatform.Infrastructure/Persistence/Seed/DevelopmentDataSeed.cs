@@ -72,6 +72,7 @@ public static class DevelopmentDataSeed
         await SeedBillingServiceTypesAsync(context, cancellationToken);
         await SeedRoomingHousesAsync(context, location, cancellationToken);
         await SeedRoomsAsync(context, cancellationToken);
+        await LargeScaleRoomingHouseSeeder.SeedAsync(context, cancellationToken);
         // await SeedAdditionalRoomsAsync(context, cancellationToken);
         // await SeedBillingAsync(context, cancellationToken);
     }
@@ -523,15 +524,15 @@ public static class DevelopmentDataSeed
             location,
             SunriseHouseId,
             LandlordUserId,
-            "Sunrise Mini House",
-            "Căn hộ mini mới, gần khu công nghệ và siêu thị, phù hợp sinh viên và nhân viên văn phòng.",
+            "Nhà trọ Sunrise",
+            "Nhà trọ mini mới, gần khu công nghệ và siêu thị, phù hợp sinh viên và nhân viên văn phòng.",
             "88 Duong So 7",
             10.841021m,
             106.809847m,
             RoomingHouseApprovalStatus.Approved,
             RoomingHouseVisibilityStatus.Visible,
             "demo/houses/sunrise/cover.jpg",
-            "Mặt tiền Sunrise Mini House",
+            "Mặt tiền Nhà trọ Sunrise",
             cancellationToken,
             AmenitySeed.WifiId,
             AmenitySeed.ParkingId,
@@ -543,7 +544,7 @@ public static class DevelopmentDataSeed
             location,
             GreenViewHouseId,
             LandlordUserId,
-            "Green View Residence",
+            "Nhà trọ Green View",
             "Khu trọ yên tĩnh, có ban công, máy giặt chung và khu để xe riêng.",
             "12 Pham Van Dong",
             10.821903m,
@@ -551,7 +552,7 @@ public static class DevelopmentDataSeed
             RoomingHouseApprovalStatus.Approved,
             RoomingHouseVisibilityStatus.Visible,
             "demo/houses/green-view/cover.jpg",
-            "Không gian chung Green View Residence",
+            "Không gian chung Nhà trọ Green View",
             cancellationToken,
             AmenitySeed.WifiId,
             AmenitySeed.WashingMachineId,
@@ -563,7 +564,7 @@ public static class DevelopmentDataSeed
             location,
             PendingHouseId,
             LandlordUserId,
-            "Garden House Pending",
+            "Nhà trọ Garden Pending",
             "Hồ sơ nhà trọ đang chờ admin duyệt, dùng để test luồng kiểm duyệt.",
             "36 Nguyen Huu Tho",
             10.732681m,
@@ -571,7 +572,7 @@ public static class DevelopmentDataSeed
             RoomingHouseApprovalStatus.Pending,
             RoomingHouseVisibilityStatus.Hidden,
             "demo/houses/garden-pending/cover.jpg",
-            "Anh tong quan Garden House Pending",
+            "Ảnh tổng quan Nhà trọ Garden Pending",
             cancellationToken,
             AmenitySeed.WifiId,
             AmenitySeed.PrivateBathroomId);
@@ -581,7 +582,7 @@ public static class DevelopmentDataSeed
             location,
             RejectedHouseId,
             LandlordUserId,
-            "Old Town Rooms",
+            "Nhà trọ Old Town",
             "Hồ sơ bị từ chối để test màn hình lý do và gửi lại hồ sơ.",
             "7 Tran Hung Dao",
             10.776901m,
@@ -589,7 +590,7 @@ public static class DevelopmentDataSeed
             RoomingHouseApprovalStatus.Rejected,
             RoomingHouseVisibilityStatus.Hidden,
             "demo/houses/old-town/cover.jpg",
-            "Anh hien trang Old Town Rooms",
+            "Ảnh hiện trạng Nhà trọ Old Town",
             cancellationToken,
             AmenitySeed.WifiId,
             AmenitySeed.ParkingId);
@@ -614,8 +615,18 @@ public static class DevelopmentDataSeed
         CancellationToken cancellationToken,
         params int[] amenityIds)
     {
-        if (await context.RoomingHouses.AnyAsync(x => x.Id == roomingHouseId, cancellationToken))
+        var existing = await context.RoomingHouses.FirstOrDefaultAsync(x => x.Id == roomingHouseId, cancellationToken);
+        if (existing is not null)
         {
+            existing.Name = name;
+            existing.Description = description;
+
+            var coverImage = await context.PropertyImages
+                .FirstOrDefaultAsync(x => x.RoomingHouseId == roomingHouseId && x.IsCover, cancellationToken);
+            if (coverImage is not null)
+            {
+                coverImage.Caption = coverCaption;
+            }
             return;
         }
 

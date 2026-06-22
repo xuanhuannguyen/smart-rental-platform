@@ -1,0 +1,565 @@
+.notifications-page-container {
+  width: 100%;
+  max-width: 1000px;
+  margin: 0 auto;
+  padding: 8px 0;
+  display: flex;
+  flex-direction: column;
+  gap: 24px;
+}
+
+/* Header styling */
+.notifications-header-wrapper {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 16px;
+  padding-bottom: 8px;
+}
+
+.notifications-header-left {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+}
+
+.notifications-bell-icon-container {
+  width: 48px;
+  height: 48px;
+  border-radius: 12px;
+  background: #edf5ff;
+  color: #246bfe;
+  display: grid;
+  place-items: center;
+  flex-shrink: 0;
+  box-shadow: 0 4px 10px rgba(36, 107, 254, 0.08);
+}
+
+.notifications-bell-icon-container svg {
+  width: 22px;
+  height: 22px;
+}
+
+.notifications-header-info {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.notifications-header-info h1 {
+  margin: 0;
+  font-size: 26px;
+  font-weight: 800;
+  color: #0f172a;
+  letter-spacing: -0.01em;
+}
+
+.notifications-header-info p.subtle {
+  margin: 0;
+  color: #64748b;
+  font-size: 14px;
+  font-weight: 500;
+}
+
+.notifications-header-actions {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+/* Outlined settings button */
+.notifications-settings-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 18px;
+  background: #ffffff;
+  border: 1.5px solid #dce4ef;
+  color: #475569;
+  border-radius: 10px;
+  font-size: 13.5px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.15s ease;
+  outline: none;
+}
+
+.notifications-settings-btn:hover {
+  border-color: #cbd5e1;
+  color: #0f172a;
+  background: #f8fafc;
+}
+
+.notifications-settings-btn svg {
+  width: 16px;
+  height: 16px;
+  color: #64748b;
+}
+
+/* Solid Blue Mark All Read Button */
+.notifications-mark-read-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 20px;
+  background: #246bfe;
+  border: 1.5px solid #246bfe;
+  color: #ffffff;
+  border-radius: 10px;
+  font-size: 13.5px;
+  font-weight: 700;
+  cursor: pointer;
+  transition: all 0.15s ease;
+  outline: none;
+  box-shadow: 0 4px 12px rgba(36, 107, 254, 0.15);
+}
+
+.notifications-mark-read-btn:hover:not(:disabled) {
+  background: #1d5edb;
+  border-color: #1d5edb;
+  transform: translateY(-1px);
+}
+
+.notifications-mark-read-btn:active:not(:disabled) {
+  transform: translateY(0);
+}
+
+.notifications-mark-read-btn:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+.notifications-mark-read-btn svg {
+  width: 16px;
+  height: 16px;
+}
+
+/* Tabs container styling */
+.notifications-tabs-bar {
+  display: flex;
+  gap: 12px;
+  padding: 4px;
+  background: #ffffff;
+  border: 1px solid #eef2f6;
+  border-radius: 14px;
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.02);
+  overflow-x: auto;
+}
+
+.notifications-tab-item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 12px 18px;
+  border-radius: 10px;
+  border: none;
+  background: transparent;
+  color: #64748b;
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+  white-space: nowrap;
+  outline: none;
+  position: relative;
+  flex: 1;
+  justify-content: center;
+}
+
+.notifications-tab-item::after {
+  content: '';
+  position: absolute;
+  bottom: 0;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 0;
+  height: 3px;
+  background: #246bfe;
+  border-radius: 99px;
+  transition: width 0.2s ease;
+}
+
+.notifications-tab-item:hover {
+  color: #0f172a;
+  background: #f8fafc;
+}
+
+.notifications-tab-item.active {
+  color: #246bfe;
+}
+
+.notifications-tab-item.active::after {
+  width: 40px;
+}
+
+.notifications-tab-item svg {
+  width: 16px;
+  height: 16px;
+}
+
+/* Badge counts inside tabs */
+.tab-badge-count {
+  font-size: 11px;
+  font-weight: 700;
+  padding: 2px 8px;
+  border-radius: 20px;
+  min-width: 18px;
+  text-align: center;
+}
+
+/* Distinct color themes for badges */
+.tab-badge-count.blue {
+  background: #edf5ff;
+  color: #246bfe;
+}
+
+.tab-badge-count.orange {
+  background: #fff7ed;
+  color: #f97316;
+}
+
+.tab-badge-count.sky {
+  background: #f0f9ff;
+  color: #0284c7;
+}
+
+.tab-badge-count.green {
+  background: #edfbf0;
+  color: #10b981;
+}
+
+/* Filter controls row */
+.notifications-list-section-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-top: 8px;
+  padding: 0 4px;
+}
+
+.notifications-date-group-title {
+  font-size: 14px;
+  font-weight: 700;
+  color: #475569;
+}
+
+.notifications-filter-controls {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+}
+
+/* Toggle Switch Styling */
+.unread-toggle-wrapper {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  cursor: pointer;
+  user-select: none;
+}
+
+.unread-toggle-label {
+  font-size: 13px;
+  font-weight: 600;
+  color: #64748b;
+}
+
+.toggle-switch-input {
+  display: none;
+}
+
+.toggle-switch-slider {
+  width: 38px;
+  height: 20px;
+  background-color: #cbd5e1;
+  border-radius: 10px;
+  position: relative;
+  transition: background-color 0.2s ease;
+}
+
+.toggle-switch-slider::before {
+  content: '';
+  position: absolute;
+  width: 16px;
+  height: 16px;
+  border-radius: 50%;
+  background-color: #ffffff;
+  top: 2px;
+  left: 2px;
+  transition: transform 0.2s ease;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.15);
+}
+
+.toggle-switch-input:checked + .toggle-switch-slider {
+  background-color: #246bfe;
+}
+
+.toggle-switch-input:checked + .toggle-switch-slider::before {
+  transform: translateX(18px);
+}
+
+/* Filter Icon Button */
+.notifications-filter-icon-btn {
+  background: transparent;
+  border: none;
+  color: #64748b;
+  cursor: pointer;
+  padding: 4px;
+  display: grid;
+  place-items: center;
+  transition: color 0.15s;
+  outline: none;
+}
+
+.notifications-filter-icon-btn:hover {
+  color: #0f172a;
+}
+
+.notifications-filter-icon-btn svg {
+  width: 18px;
+  height: 18px;
+}
+
+/* Date Grouping Wrapper */
+.notifications-date-group {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+/* Notification Item Card */
+.notification-card-item {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  padding: 16px 20px;
+  background: #ffffff;
+  border: 1.5px solid #eef2f6;
+  border-radius: 14px;
+  transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.01);
+  cursor: pointer;
+  position: relative;
+}
+
+.notification-card-item:hover {
+  border-color: #cbd5e1;
+  transform: translateY(-1px);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.02);
+}
+
+.notification-card-item.unread {
+  background-color: #f8fafc;
+  border-color: #edf2f7;
+}
+
+/* Icon box inside card */
+.notification-card-icon-wrapper {
+  width: 44px;
+  height: 44px;
+  border-radius: 10px;
+  display: grid;
+  place-items: center;
+  flex-shrink: 0;
+}
+
+.notification-card-icon-wrapper svg {
+  width: 18px;
+  height: 18px;
+}
+
+/* Category Color Themes for Card Icon wrappers */
+.icon-theme--sky {
+  background: #f0f9ff;
+  color: #0284c7;
+}
+
+.icon-theme--green {
+  background: #edfbf0;
+  color: #10b981;
+}
+
+.icon-theme--orange {
+  background: #fff7ed;
+  color: #f97316;
+}
+
+.icon-theme--slate {
+  background: #f1f5f9;
+  color: #475569;
+}
+
+/* Content details inside card */
+.notification-card-content {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  text-align: left;
+}
+
+.notification-card-title {
+  margin: 0;
+  font-size: 15px;
+  font-weight: 700;
+  color: #0f172a;
+  line-height: 1.4;
+}
+
+.notification-card-description {
+  margin: 0;
+  font-size: 13.5px;
+  color: #475569;
+  line-height: 1.45;
+}
+
+.notification-card-time {
+  font-size: 12px;
+  color: #94a3b8;
+  font-weight: 500;
+  margin-top: 2px;
+}
+
+/* Category Tag Pill on the right */
+.notification-category-tag {
+  font-size: 11px;
+  font-weight: 700;
+  padding: 4px 12px;
+  border-radius: 20px;
+  text-transform: capitalize;
+  letter-spacing: 0.02em;
+  white-space: nowrap;
+}
+
+.notification-category-tag.sky {
+  background: #f0f9ff;
+  color: #0284c7;
+  border: 1px solid #bae6fd;
+}
+
+.notification-category-tag.green {
+  background: #edfbf0;
+  color: #10b981;
+  border: 1px solid #bbf7d0;
+}
+
+.notification-category-tag.orange {
+  background: #fff7ed;
+  color: #f97316;
+  border: 1px solid #fed7aa;
+}
+
+.notification-category-tag.slate {
+  background: #f1f5f9;
+  color: #475569;
+  border: 1px solid #e2e8f0;
+}
+
+/* Unread dot on the right edge */
+.notification-card-unread-indicator {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  flex-shrink: 0;
+  margin-left: 8px;
+  transition: all 0.2s ease;
+}
+
+.notification-card-unread-indicator.active {
+  background-color: #246bfe;
+  box-shadow: 0 0 6px rgba(36, 107, 254, 0.4);
+}
+
+.notification-card-unread-indicator.inactive {
+  background-color: transparent;
+  border: 1.5px solid #cbd5e1;
+}
+
+/* View More Button Centered */
+.notifications-view-more-container {
+  display: flex;
+  justify-content: center;
+  margin-top: 12px;
+  padding-bottom: 24px;
+}
+
+.notifications-view-more-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  background: transparent;
+  border: none;
+  color: #246bfe;
+  font-size: 14px;
+  font-weight: 700;
+  cursor: pointer;
+  transition: all 0.15s ease;
+  outline: none;
+}
+
+.notifications-view-more-btn:hover {
+  transform: translateY(1px);
+  color: #1d5edb;
+}
+
+.notifications-view-more-btn svg {
+  width: 16px;
+  height: 16px;
+}
+
+/* Responsive adjustments */
+@media (max-width: 768px) {
+  .notifications-header-wrapper {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 16px;
+  }
+  
+  .notifications-header-actions {
+    width: 100%;
+    justify-content: space-between;
+  }
+  
+  .notifications-settings-btn,
+  .notifications-mark-read-btn {
+    flex: 1;
+    justify-content: center;
+  }
+  
+  .notifications-tab-item {
+    padding: 10px 12px;
+    font-size: 13px;
+  }
+}
+
+/* Role Switcher tabs */
+.role-switcher-container {
+  display: flex;
+  gap: 16px;
+  border-bottom: 2px solid #e2e8f0;
+  padding-bottom: 4px;
+  margin-bottom: 8px;
+}
+
+.role-switch-btn {
+  padding: 12px 28px;
+  background: transparent;
+  border: none;
+  border-bottom: 3.5px solid transparent;
+  color: #64748b;
+  font-size: 15px;
+  font-weight: 700;
+  cursor: pointer;
+  transition: all 0.15s ease;
+  outline: none;
+  margin-bottom: -6px;
+}
+
+.role-switch-btn:hover {
+  color: #246bfe;
+}
+
+.role-switch-btn.active {
+  color: #246bfe;
+  border-bottom-color: #246bfe;
+}

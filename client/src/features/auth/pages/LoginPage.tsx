@@ -4,6 +4,7 @@ import { useAuth } from '../../../app/providers/AuthProvider';
 import { ROUTE_PATHS } from '../../../app/router/routePaths';
 import { getApiErrorMessage } from '../../../shared/api/apiError';
 import { Alert } from '../../../shared/components/ui/Alert';
+import { AuthLayout } from '../components/AuthLayout';
 import { GoogleLoginButton } from '../components/GoogleLoginButton';
 import { LoginForm } from '../components/LoginForm';
 import { authApi } from '../services/authApi';
@@ -82,28 +83,25 @@ export function LoginPage() {
   );
 
   return (
-    <main className="auth-page">
-      <section className="auth-panel">
-        <p className="eyebrow">Smart Rental Platform</p>
-        <h1>Đăng nhập</h1>
+    <AuthLayout
+      title="Đăng nhập"
+      subtitle="Nền tảng thuê trọ và quản lý trọ kết nối người thuê với chủ trọ."
+    >
+      {error ? (
+        <Alert type="error">{error}</Alert>
+      ) : (
+        isSubmitting && message && <Alert type="info">{message}</Alert>
+      )}
 
-        {error ? (
-          <Alert type="error">{error}</Alert>
-        ) : (
-          isSubmitting && message && <Alert type="info">{message}</Alert>
-        )}
+      <LoginForm isSubmitting={isSubmitting} onSubmit={handleLocalLogin} />
 
-        <LoginForm isSubmitting={isSubmitting} onSubmit={handleLocalLogin} />
+      <div className="auth-divider">hoặc</div>
 
-        <div className="auth-divider">hoặc</div>
+      <GoogleLoginButton onCredential={handleGoogleCredential} />
 
-        <GoogleLoginButton onCredential={handleGoogleCredential} />
-
-        <div className="auth-links">
-          <Link to={ROUTE_PATHS.AUTH.REGISTER}>Tạo tài khoản</Link>
-          <Link to={ROUTE_PATHS.AUTH.FORGOT_PASSWORD}>Quên mật khẩu?</Link>
-        </div>
-      </section>
-    </main>
+      <div className="auth-links">
+        <Link to={ROUTE_PATHS.AUTH.REGISTER}>Tạo tài khoản</Link>
+      </div>
+    </AuthLayout>
   );
 }

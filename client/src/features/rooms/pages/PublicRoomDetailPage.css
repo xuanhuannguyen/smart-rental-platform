@@ -1,23 +1,26 @@
+@import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap');
+
 .public-room-detail {
-  width: min(100% - 40px, 1120px);
+  font-family: 'Plus Jakarta Sans', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+  width: min(100% - 40px, 980px); /* Compact layout width */
   margin: 0 auto;
-  padding: 32px 0 56px;
+  padding: 24px 0 56px;
   display: grid;
-  gap: 24px;
+  gap: 20px;
 }
 
 .public-room-detail--state {
   min-height: 60vh;
+  display: grid;
   place-content: center;
   text-align: center;
-  font-size: 16px;
-  color: #64748b;
+  gap: 12px;
 }
 
 .public-room-detail__error-text {
-  font-size: 18px;
+  font-size: 16px;
   color: #ef4444;
-  margin-bottom: 16px;
+  margin-bottom: 12px;
   font-weight: 600;
 }
 
@@ -25,27 +28,35 @@
   color: #246bfe;
   text-decoration: none;
   font-weight: 700;
+  font-size: 14px;
 }
 
 .public-room-detail__back {
   width: fit-content;
+  display: flex;
+  align-items: center;
+  gap: 6px;
   color: #246bfe;
-  font-weight: 800;
-  text-decoration: none;
+  font-weight: 700;
   font-size: 14px;
-  transition: transform 0.2s ease, color 0.2s ease;
+  text-decoration: none;
+  transition: opacity 0.2s ease, transform 0.2s ease;
 }
 
 .public-room-detail__back:hover {
-  color: #1d4ed8;
-  transform: translateX(-4px);
+  opacity: 0.8;
+  transform: translateX(-2px);
 }
 
-/* Container Layout - Asymmetric staggered style */
+.public-room-detail__back svg {
+  flex-shrink: 0;
+}
+
+/* Container Layout - Asymmetric Staggered */
 .public-room-detail__container {
   display: grid;
-  grid-template-columns: 1.1fr 0.9fr;
-  gap: 40px;
+  grid-template-columns: minmax(0, 1.15fr) minmax(0, 1fr);
+  gap: 28px;
   align-items: start;
 }
 
@@ -56,226 +67,322 @@
   width: 100%;
 }
 
-/* Right Column: Info Details */
+/* Right Column: Info Details Card */
 .public-room-detail__info-section {
-  display: grid;
-  gap: 32px;
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
   padding: 24px;
   background: #ffffff;
-  border: 1px solid #dbe3ef;
-  border-radius: 8px;
-  box-shadow: 0 4px 12px rgba(15, 23, 42, 0.03);
+  border: 1px solid #f1f5f9;
+  border-radius: 18px;
+  box-shadow: 0 8px 24px -12px rgba(15, 23, 42, 0.04);
 }
 
-/* Header */
+/* Header Section */
 .public-room-detail__header {
-  display: grid;
-  gap: 8px;
-  border-bottom: 1px solid #f1f5f9;
-  padding-bottom: 20px;
-}
-
-.public-room-detail__badge-row {
   display: flex;
-  gap: 8px;
-}
-
-.public-room-detail__badge {
-  padding: 4px 10px;
-  border-radius: 4px;
-  background: #f1f5f9;
-  color: #475569;
-  font-size: 12px;
-  font-weight: 700;
-}
-
-.public-room-detail__badge--accent {
-  background: #ecfdf5;
-  color: #059669;
+  flex-direction: column;
+  gap: 10px;
 }
 
 .public-room-detail__header h1 {
-  margin: 4px 0 0;
-  font-size: 32px;
+  margin: 0;
+  font-size: 28px;
   color: #0f172a;
   font-weight: 800;
+  line-height: 1.25;
 }
 
-.public-room-detail__house-name {
-  margin: 4px 0 0;
-  font-size: 16px;
-  color: #475569;
+.public-room-detail__house-name,
+.public-room-detail__address {
+  margin: 0;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 14px;
   font-weight: 600;
+  color: #475569;
 }
 
 .public-room-detail__address {
-  margin: 2px 0 0;
-  font-size: 14px;
   color: #64748b;
+  font-weight: 500;
+}
+
+.public-room-detail__house-name svg,
+.public-room-detail__address svg {
+  color: #246bfe;
+  flex-shrink: 0;
 }
 
 .public-room-detail__actions {
   display: flex;
   flex-wrap: wrap;
-  gap: 12px;
-  margin-top: 14px;
+  gap: 10px;
+  margin-top: 6px;
 }
 
 .public-room-detail__action {
-  min-height: 44px;
-  padding: 0 20px;
-  border-radius: 999px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  height: 40px;
+  padding: 0 18px;
+  border-radius: 10px;
   border: 1px solid transparent;
   font: inherit;
-  font-size: 14px;
-  font-weight: 800;
+  font-size: 13px;
+  font-weight: 700;
   cursor: pointer;
-  transition: background-color 0.2s ease, border-color 0.2s ease, box-shadow 0.2s ease, transform 0.2s ease;
+  transition: all 0.2s ease, transform 0.1s ease;
 }
 
 .public-room-detail__action:hover {
   transform: translateY(-1px);
 }
 
+.public-room-detail__action:active {
+  transform: translateY(1px);
+}
+
+.public-room-detail__action svg {
+  flex-shrink: 0;
+}
+
 .public-room-detail__action--primary {
   background: #246bfe;
   color: #ffffff;
-  box-shadow: 0 8px 18px rgba(36, 107, 254, 0.2);
+  box-shadow: 0 4px 12px rgba(36, 107, 254, 0.2);
 }
 
 .public-room-detail__action--primary:hover {
-  background: #1d4ed8;
+  background: #1a5ce0;
+  box-shadow: 0 6px 16px rgba(36, 107, 254, 0.28);
 }
 
 .public-room-detail__action--secondary {
   background: #ffffff;
   color: #246bfe;
-  border-color: #bfdbfe;
+  border-color: #c2e0ff;
 }
 
 .public-room-detail__action--secondary:hover {
-  background: #eff6ff;
+  background: #f0f7ff;
   border-color: #93c5fd;
 }
 
-/* Specs layout */
+/* Specs Block - Diện tích & Sức chứa */
 .public-room-detail__specs {
   display: flex;
-  gap: 32px;
+  align-items: center;
   background: #f8fafc;
-  border-radius: 6px;
-  padding: 16px 20px;
-  border: 1px solid #e2e8f0;
+  border-radius: 12px;
+  padding: 12px 18px;
+  border: 1px solid #f1f5f9;
 }
 
 .public-room-detail__spec-item {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex: 1;
+}
+
+.spec-icon-wrapper {
+  width: 36px;
+  height: 36px;
+  border-radius: 8px;
+  background: #ffffff;
+  border: 1px solid #f1f5f9;
+  color: #246bfe;
   display: grid;
-  gap: 4px;
+  place-items: center;
+  flex-shrink: 0;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.01);
+}
+
+.spec-icon-wrapper svg {
+  width: 18px;
+  height: 18px;
+  stroke-width: 2.2;
+}
+
+.spec-text {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
 }
 
 .spec-label {
-  font-size: 12px;
-  color: #64748b;
+  font-size: 10px;
+  color: #94a3b8;
   text-transform: uppercase;
   letter-spacing: 0.05em;
-  font-weight: 600;
+  font-weight: 700;
 }
 
 .spec-value {
-  font-size: 18px;
+  font-size: 15px;
   color: #0f172a;
   font-weight: 700;
 }
 
-/* Pricing List */
-.public-room-detail__pricing h2,
-.public-room-detail__amenities-container h2,
-.public-room-detail__description-container h2 {
-  margin: 0 0 14px;
-  font-size: 16px;
-  color: #334155;
-  font-weight: 700;
-  text-transform: uppercase;
-  letter-spacing: 0.05em;
-  border-left: 3px solid #246bfe;
-  padding-left: 8px;
+.public-room-detail__spec-divider {
+  width: 1px;
+  height: 32px;
+  background: #e2e8f0;
+  margin: 0 8px;
 }
 
+/* Section Common Layouts */
+.public-room-detail__section {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  border-top: 1px solid #f1f5f9;
+  padding-top: 20px;
+  margin-top: 4px;
+}
+
+.section-title-with-icon {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.section-title-icon-wrapper {
+  width: 24px;
+  height: 24px;
+  color: #246bfe;
+  display: grid;
+  place-items: center;
+  flex-shrink: 0;
+}
+
+.section-title-icon-wrapper svg {
+  width: 18px;
+  height: 18px;
+  stroke-width: 2.5;
+}
+
+.section-title-with-icon h2 {
+  margin: 0;
+  font-size: 13px;
+  color: #0f172a;
+  font-weight: 800;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+}
+
+/* Pricing Section */
 .public-room-detail__price-list {
   display: grid;
-  gap: 10px;
+  gap: 8px;
 }
 
 .public-room-detail__price-row {
   display: flex;
   justify-content: space-between;
   align-items: center;
-  padding: 12px 16px;
-  background: #ffffff;
-  border: 1px solid #e2e8f0;
-  border-radius: 6px;
-  transition: border-color 0.2s ease, box-shadow 0.2s ease;
+  padding: 10px 14px;
+  background: #f8fafc;
+  border: 1px solid #f1f5f9;
+  border-radius: 10px;
+  transition: all 0.2s ease;
 }
 
 .public-room-detail__price-row:hover {
-  border-color: #cbd5e1;
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.02);
+  background: #ffffff;
+  border-color: #c2e0ff;
+  box-shadow: 0 4px 12px -4px rgba(15, 23, 42, 0.04);
 }
 
 .price-occupants {
-  font-size: 14px;
-  color: #475569;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 13px;
+  color: #334155;
   font-weight: 600;
 }
 
+.price-occupant-icon-wrapper {
+  width: 28px;
+  height: 28px;
+  border-radius: 6px;
+  background: #ffffff;
+  border: 1px solid #f1f5f9;
+  color: #246bfe;
+  display: grid;
+  place-items: center;
+  flex-shrink: 0;
+}
+
+.price-occupant-icon-wrapper svg {
+  width: 14px;
+  height: 14px;
+  stroke-width: 2.5;
+}
+
 .price-value-text {
-  font-size: 16px;
-  color: #b45309;
+  font-size: 14px;
+  color: #ea580c;
   font-weight: 800;
 }
 
-/* Amenities */
+/* Amenities Section */
 .public-room-detail__amenities {
   display: flex;
   flex-wrap: wrap;
-  gap: 8px;
+  gap: 6px;
 }
 
 .public-room-detail__amenity-badge {
-  padding: 8px 12px;
-  background: #eff6ff;
-  color: #1d4ed8;
-  border-radius: 6px;
-  font-size: 13px;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 12px;
+  background: #f0f7ff;
+  color: #246bfe;
+  border-radius: 8px;
+  font-size: 12px;
   font-weight: 700;
-  transition: transform 0.2s ease, background-color 0.2s ease;
+  transition: all 0.2s ease;
 }
 
 .public-room-detail__amenity-badge:hover {
-  transform: translateY(-2px);
-  background: #dbeafe;
+  background: #e0eeff;
+  transform: translateY(-1px);
 }
 
-/* Description */
+.amenity-icon {
+  width: 14px;
+  height: 14px;
+  color: #246bfe;
+  flex-shrink: 0;
+}
+
+/* Description Section */
 .public-room-detail__description {
   margin: 0;
-  font-size: 14px;
+  font-size: 13px;
   color: #475569;
-  line-height: 1.6;
+  line-height: 1.55;
 }
 
 .public-room-detail__muted {
   margin: 0;
-  font-size: 14px;
+  font-size: 13px;
   color: #94a3b8;
   font-style: italic;
 }
 
-/* Responsive adjustment */
-@media (max-width: 960px) {
+/* Responsive adjustments */
+@media (max-width: 860px) {
   .public-room-detail__container {
     grid-template-columns: 1fr;
-    gap: 32px;
+    gap: 24px;
   }
   
   .public-room-detail__gallery-section {
@@ -283,9 +390,41 @@
   }
 }
 
-@media (max-width: 540px) {
+@media (max-width: 500px) {
+  .public-room-detail {
+    padding: 16px 0 40px;
+    gap: 16px;
+  }
+
+  .public-room-detail__info-section {
+    padding: 16px;
+    border-radius: 14px;
+  }
+
+  .public-room-detail__header h1 {
+    font-size: 24px;
+  }
+
   .public-room-detail__actions {
     display: grid;
     grid-template-columns: 1fr;
+    gap: 8px;
+  }
+
+  .public-room-detail__action {
+    justify-content: center;
+  }
+
+  .public-room-detail__specs {
+    flex-direction: column;
+    align-items: stretch;
+    gap: 12px;
+    padding: 12px;
+  }
+
+  .public-room-detail__spec-divider {
+    width: 100%;
+    height: 1px;
+    margin: 0;
   }
 }

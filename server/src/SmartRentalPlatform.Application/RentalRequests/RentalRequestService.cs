@@ -10,6 +10,7 @@ using SmartRentalPlatform.Domain.Enums.Billing;
 using SmartRentalPlatform.Domain.Enums.Properties;
 using SmartRentalPlatform.Domain.Enums.Rental;
 using SmartRentalPlatform.Domain.Enums.RentalContracts;
+using SmartRentalPlatform.Domain.Enums.Notifications;
 using System.Text.Json;
 
 namespace SmartRentalPlatform.Application.RentalRequests;
@@ -33,10 +34,14 @@ public class RentalRequestService : IRentalRequestService
     ];
 
     private readonly IAppDbContext context;
+    private readonly INotificationService notificationService;
 
-    public RentalRequestService(IAppDbContext context)
+    public RentalRequestService(
+        IAppDbContext context,
+        INotificationService notificationService)
     {
         this.context = context;
+        this.notificationService = notificationService;
     }
 
     public async Task<RentalRequestResponse> CreateAsync(
@@ -119,6 +124,19 @@ public class RentalRequestService : IRentalRequestService
 
         context.RentalRequests.Add(rentalRequest);
         await context.SaveChangesAsync(cancellationToken);
+
+        var tenantUser = await context.Users.AsNoTracking()
+            .FirstOrDefaultAsync(x => x.Id == tenantUserId, cancellationToken);
+        var tenantDisplayName = tenantUser?.DisplayName ?? "Người thuê";
+
+        await notificationService.CreateAsync(
+            room.RoomingHouse.LandlordUserId,
+            NotificationType.NewRentalRequest,
+            "Yêu cầu thuê phòng mới",
+            $"{tenantDisplayName} muốn thuê phòng {room.RoomNumber} tại {room.RoomingHouse.Name} từ {request.DesiredStartDate:dd/MM/yyyy}.",
+            rentalRequest.Id.ToString(),
+            "RentalRequest",
+            cancellationToken);
 
         return await GetByIdAsync(tenantUserId, rentalRequest.Id, cancellationToken)
             ?? throw new InternalServerException(
@@ -265,6 +283,15 @@ public class RentalRequestService : IRentalRequestService
             await context.SaveChangesAsync(cancellationToken);
             await transaction.CommitAsync(cancellationToken);
 
+            await notificationService.CreateAsync(
+                rentalRequest.TenantUserId,
+                NotificationType.RentalRequestApproved,
+                "Yêu cầu thuê đã được chấp nhận",
+                $"Chủ trọ đã chấp nhận yêu cầu thuê phòng {rentalRequest.Room.RoomNumber} tại {rentalRequest.Room.RoomingHouse.Name}. Vui lòng thanh toán cọc {rentalRequest.DepositAmountSnapshot:N0} VND trước {request.PaymentDeadlineAt:HH:mm dd/MM/yyyy} để hoàn tất.",
+                rentalRequest.Id.ToString(),
+                "RentalRequest",
+                cancellationToken);
+
             return await GetByIdAsync(landlordUserId, rentalRequest.Id, cancellationToken);
         }
         catch
@@ -306,6 +333,16 @@ public class RentalRequestService : IRentalRequestService
         rentalRequest.UpdatedAt = now;
 
         await context.SaveChangesAsync(cancellationToken);
+
+        await notificationService.CreateAsync(
+            rentalRequest.TenantUserId,
+            NotificationType.RentalRequestRejected,
+            "Yêu cầu thuê đã bị từ chối",
+            $"Chủ trọ đã từ chối yêu cầu thuê phòng {rentalRequest.Room.RoomNumber} tại {rentalRequest.Room.RoomingHouse.Name}. Lý do: {rejectedReason}",
+            rentalRequest.Id.ToString(),
+            "RentalRequest",
+            cancellationToken);
+
         return await GetByIdAsync(landlordUserId, rentalRequest.Id, cancellationToken);
     }
 

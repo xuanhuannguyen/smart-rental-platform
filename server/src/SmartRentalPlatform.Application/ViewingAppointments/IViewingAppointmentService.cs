@@ -56,5 +56,21 @@ namespace SmartRentalPlatform.Application.ViewingAppointments
             Guid landlordUserId,
             Guid appointmentId,
             CancellationToken cancellationToken = default);
+
+        /// <summary>
+        /// Tenant accepts the landlord's proposed time for a rejected appointment.
+        /// </summary>
+        Task<ViewingAppointmentResponse> AcceptProposalAsync(
+            Guid tenantUserId,
+            Guid appointmentId,
+            CancellationToken cancellationToken = default);
+
+        /// <summary>
+        /// Tenant rejects the landlord's proposed time for a rejected appointment.
+        /// </summary>
+        Task<ViewingAppointmentResponse> RejectProposalAsync(
+            Guid tenantUserId,
+            Guid appointmentId,
+            CancellationToken cancellationToken = default);
     }
 }

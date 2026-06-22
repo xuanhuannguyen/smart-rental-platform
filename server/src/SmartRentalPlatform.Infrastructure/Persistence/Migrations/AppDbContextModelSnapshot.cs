@@ -34015,6 +34015,64 @@ namespace SmartRentalPlatform.Infrastructure.Persistence.Migrations
                     b.ToTable("meter_readings", (string)null);
                 });
 
+            modelBuilder.Entity("SmartRentalPlatform.Domain.Entities.Notifications.Notification", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid")
+                        .HasColumnName("id");
+
+                    b.Property<string>("Body")
+                        .IsRequired()
+                        .HasColumnType("text")
+                        .HasColumnName("body");
+
+                    b.Property<DateTimeOffset>("CreatedAt")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("created_at")
+                        .HasDefaultValueSql("now()");
+
+                    b.Property<bool>("IsRead")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("boolean")
+                        .HasDefaultValue(false)
+                        .HasColumnName("is_read");
+
+                    b.Property<string>("ReferenceId")
+                        .HasMaxLength(100)
+                        .HasColumnType("character varying(100)")
+                        .HasColumnName("reference_id");
+
+                    b.Property<string>("ReferenceType")
+                        .HasMaxLength(50)
+                        .HasColumnType("character varying(50)")
+                        .HasColumnName("reference_type");
+
+                    b.Property<string>("Title")
+                        .IsRequired()
+                        .HasMaxLength(255)
+                        .HasColumnType("character varying(255)")
+                        .HasColumnName("title");
+
+                    b.Property<string>("Type")
+                        .IsRequired()
+                        .HasMaxLength(50)
+                        .HasColumnType("character varying(50)")
+                        .HasColumnName("type");
+
+                    b.Property<Guid>("UserId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("user_id");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("UserId", "IsRead")
+                        .HasDatabaseName("ix_notifications_user_id_is_read");
+
+                    b.ToTable("notifications", (string)null);
+                });
+
             modelBuilder.Entity("SmartRentalPlatform.Domain.Entities.Payments.PaymentTransaction", b =>
                 {
                     b.Property<Guid>("Id")
@@ -35104,6 +35162,14 @@ namespace SmartRentalPlatform.Infrastructure.Persistence.Migrations
                     b.Property<string>("LandlordNote")
                         .HasColumnType("text")
                         .HasColumnName("landlord_note");
+
+                    b.Property<int?>("ProposedDurationMinutes")
+                        .HasColumnType("integer")
+                        .HasColumnName("proposed_duration_minutes");
+
+                    b.Property<DateTimeOffset?>("ProposedScheduledAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("proposed_scheduled_at");
 
                     b.Property<DateTimeOffset?>("RespondedAt")
                         .HasColumnType("timestamp with time zone")
@@ -36533,6 +36599,17 @@ namespace SmartRentalPlatform.Infrastructure.Persistence.Migrations
                     b.Navigation("Room");
 
                     b.Navigation("ServiceType");
+                });
+
+            modelBuilder.Entity("SmartRentalPlatform.Domain.Entities.Notifications.Notification", b =>
+                {
+                    b.HasOne("SmartRentalPlatform.Domain.Entities.Users.User", "User")
+                        .WithMany()
+                        .HasForeignKey("UserId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.Navigation("User");
                 });
 
             modelBuilder.Entity("SmartRentalPlatform.Domain.Entities.Payments.PaymentTransaction", b =>

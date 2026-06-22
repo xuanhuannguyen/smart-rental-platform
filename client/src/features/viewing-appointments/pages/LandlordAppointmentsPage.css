@@ -75,6 +75,9 @@
 .landlord-card.status-expired {
   border-left: 4px solid #cbd5e1;
 }
+.landlord-card.status-proposal {
+  border-left: 4px solid #0ea5e9;
+}
 
 .landlord-card__header {
   display: flex;
@@ -256,4 +259,26 @@
 .checkbox-field input[type="checkbox"] {
   width: auto;
   cursor: pointer;
+}
+
+/* Proposal tag */
+.status-tag--proposal {
+  background-color: #e0f2fe;
+  color: #0369a1;
+}
+
+/* Proposal banner in landlord card */
+.proposal-banner {
+  background-color: #f0f9ff;
+  border: 1px solid #bae6fd;
+  border-radius: 8px;
+  padding: 12px 14px;
+  margin: 4px 0;
+}
+
+.proposal-title {
+  font-weight: 700;
+  color: #0369a1;
+  font-size: 0.95rem;
+  margin-bottom: 4px;
 }

@@ -1,5 +1,6 @@
 global using SmartRentalPlatform.Domain.Enums.Common;
 global using SmartRentalPlatform.Domain.Enums.Kyc;
+global using SmartRentalPlatform.Domain.Enums.Notifications;
 global using SmartRentalPlatform.Domain.Enums.Properties;
 global using SmartRentalPlatform.Domain.Enums.Users;
 global using SmartRentalPlatform.Contracts.Admin.Requests;
@@ -25,3 +26,4 @@ global using SmartRentalPlatform.Contracts.Users.Requests;
 global using SmartRentalPlatform.Contracts.Users.Responses;
 global using SmartRentalPlatform.Contracts.ViewingAppointments.Requests;
 global using SmartRentalPlatform.Contracts.ViewingAppointments.Responses;
+global using SmartRentalPlatform.Contracts.Notifications.Responses;

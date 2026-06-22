@@ -3,6 +3,7 @@ using SmartRentalPlatform.Application.Common.Interfaces;
 using SmartRentalPlatform.Domain.Entities.AdminApproval;
 using SmartRentalPlatform.Domain.Entities.Administrative;
 
+using SmartRentalPlatform.Domain.Entities.Notifications;
 using SmartRentalPlatform.Domain.Entities.Payments;
 using SmartRentalPlatform.Domain.Entities.Billing;
 using SmartRentalPlatform.Domain.Entities.RentalContracts;
@@ -58,6 +59,8 @@ public class AppDbContext : DbContext, IAppDbContext
 
     // Viewing appointments
     public DbSet<ViewingAppointment> ViewingAppointments => Set<ViewingAppointment>();
+    // Notifications
+    public DbSet<Notification> Notifications => Set<Notification>();
     // Rental
     public DbSet<RentalRequest> RentalRequests => Set<RentalRequest>();
     public DbSet<RoomDeposit> RoomDeposits => Set<RoomDeposit>();

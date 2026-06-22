@@ -13,6 +13,8 @@ import type { Province, Ward } from '../administrative/types';
 import type { PagedResult, RoomingHouseSearchItem, RoomingHouseSearchParams, Amenity, LocationSuggestion } from './types';
 import { env } from '../../config/env';
 import SearchSuggestionBox from './components/SearchSuggestionBox';
+import { LocationFilterPanel } from './components/LocationFilterPanel';
+import RentalAiChatbot from './components/RentalAiChatbot';
 import { saveRecentSearch } from './searchRecentStorage';
 import './SearchRoomingHousesPage.css';
 
@@ -31,7 +33,7 @@ let metadataCache: { provinces: Province[]; amenities: Amenity[] } | null = null
 export default function SearchRoomingHousesPage() {
   const navigate = useNavigate();
   const location = useLocation();
-  const [searchParams] = useSearchParams();
+  const [searchParams, setSearchParams] = useSearchParams();
   const currentSearchPath = `${location.pathname}${location.search}`;
   const query = useMemo(() => buildSearchParams(searchParams), [searchParams]);
   const searchCacheKey = useMemo(() => paramsToUrl(query).toString(), [query]);
@@ -71,12 +73,6 @@ export default function SearchRoomingHousesPage() {
   const [localCenterLng, setLocalCenterLng] = useState<number | null>(query.centerLng ?? null);
   const [localRadiusKm, setLocalRadiusKm] = useState<number>(query.radiusKm ?? 3);
   const [activeLocationPanel, setActiveLocationPanel] = useState<LocationPanel>(null);
-  const [nearbyAddress, setNearbyAddress] = useState('');
-  const [nearbyError, setNearbyError] = useState('');
-  const [nearbySearching, setNearbySearching] = useState(false);
-  const [nearbySuggestions, setNearbySuggestions] = useState<LocationSuggestion[]>([]);
-  const [nearbySuggesting, setNearbySuggesting] = useState(false);
-  const [showNearbySuggestions, setShowNearbySuggestions] = useState(false);
   const [activeSidebarFilter, setActiveSidebarFilter] = useState<SidebarFilterPanel>(null);
   const [sidebarPanelTop, setSidebarPanelTop] = useState<number | null>(null);
   const filtersSidebarRef = useRef<HTMLElement | null>(null);
@@ -220,55 +216,7 @@ export default function SearchRoomingHousesPage() {
     setLocalCenterLng(query.centerLng ?? null);
     setLocalRadiusKm(query.radiusKm ?? 3);
     setShowRadiusSearch(query.centerLat != null && query.centerLng != null);
-    if (query.centerLat != null && query.centerLng != null && nearbyLabelParam) {
-      setNearbyAddress(nearbyLabelParam);
-    }
-  }, [nearbyLabelParam, query]);
-
-  useEffect(() => {
-    if (activeLocationPanel !== 'nearby') {
-      setNearbySuggestions([]);
-      setShowNearbySuggestions(false);
-      setNearbySuggesting(false);
-      return;
-    }
-
-    const text = nearbyAddress.trim();
-    if (text.length < 2 || text === 'Vị trí hiện tại của tôi') {
-      setNearbySuggestions([]);
-      setShowNearbySuggestions(false);
-      setNearbySuggesting(false);
-      return;
-    }
-
-    let cancelled = false;
-    setNearbySuggesting(true);
-    const timeoutId = window.setTimeout(() => {
-      suggestLocationAddresses(text, 5)
-        .then((items) => {
-          if (!cancelled) {
-            setNearbySuggestions(items);
-            setShowNearbySuggestions(items.length > 0);
-          }
-        })
-        .catch(() => {
-          if (!cancelled) {
-            setNearbySuggestions([]);
-            setShowNearbySuggestions(false);
-          }
-        })
-        .finally(() => {
-          if (!cancelled) {
-            setNearbySuggesting(false);
-          }
-        });
-    }, 350);
-
-    return () => {
-      cancelled = true;
-      window.clearTimeout(timeoutId);
-    };
-  }, [activeLocationPanel, nearbyAddress]);
+  }, [query]);
 
   useEffect(() => {
     if (!activeSidebarFilter) {
@@ -513,29 +461,7 @@ export default function SearchRoomingHousesPage() {
     }
   }, [currentSearchPath, result]);
 
-  // Browser Geolocation integration
-  function handleUseCurrentLocation() {
-    if (!navigator.geolocation) {
-      alert('Trình duyệt của bạn không hỗ trợ định vị.');
-      return;
-    }
 
-    navigator.geolocation.getCurrentPosition(
-      (position) => {
-        const lat = position.coords.latitude;
-        const lng = position.coords.longitude;
-        setLocalCenterLat(lat);
-        setLocalCenterLng(lng);
-        setShowRadiusSearch(true);
-        setLocalProvinceCode('');
-        setLocalWardCode('');
-        setNearbyAddress('Vị trí hiện tại của tôi');
-      },
-      (err) => {
-        setError(`Không thể lấy vị trí hiện tại: ${err.message}`);
-      }
-    );
-  }
 
   // Handle checkboxes change
   const handleAmenityChange = (id: number) => {
@@ -587,87 +513,6 @@ export default function SearchRoomingHousesPage() {
     navigate({ search: newSearchParams.toString() });
   }
 
-  async function handleFindNearbyAddress() {
-    const text = nearbyAddress.trim();
-    if (!text) {
-      setNearbyError('Vui lòng nhập vị trí muốn tìm.');
-      return;
-    }
-
-    setNearbySearching(true);
-    setNearbyError('');
-    try {
-      const locationResult = await searchLocationAddress(text);
-      setLocalCenterLat(locationResult.latitude);
-      setLocalCenterLng(locationResult.longitude);
-      setNearbyAddress(locationResult.displayAddress || text);
-      setNearbySuggestions([]);
-      setShowNearbySuggestions(false);
-      setShowRadiusSearch(true);
-      setLocalProvinceCode('');
-      setLocalWardCode('');
-    } catch (err) {
-      setNearbyError(getApiErrorMessage(err, 'Không tìm thấy vị trí phù hợp.'));
-    } finally {
-      setNearbySearching(false);
-    }
-  }
-
-  function handleSelectNearbySuggestion(suggestion: LocationSuggestion) {
-    setNearbyAddress(suggestion.displayAddress);
-    setLocalCenterLat(suggestion.latitude);
-    setLocalCenterLng(suggestion.longitude);
-    setShowRadiusSearch(true);
-    setLocalProvinceCode('');
-    setLocalWardCode('');
-    setNearbyError('');
-    setNearbySuggestions([]);
-    setShowNearbySuggestions(false);
-  }
-
-  function handleApplyAreaSearch() {
-    const updatedParams: RoomingHouseSearchParams = {
-      ...buildCurrentFilterParams(searchQuery),
-      provinceCode: localProvinceCode || undefined,
-      wardCode: localWardCode || undefined,
-      centerLat: undefined,
-      centerLng: undefined,
-      radiusKm: undefined,
-      sortBy: query.sortBy === 'distanceAsc' ? 'relevance' : query.sortBy,
-      page: 1,
-    };
-    setShowRadiusSearch(false);
-    setLocalCenterLat(null);
-    setLocalCenterLng(null);
-    const newSearchParams = paramsToUrl(updatedParams);
-    newSearchParams.delete('nearbyLabel');
-    navigate({ search: newSearchParams.toString() });
-    setActiveLocationPanel(null);
-  }
-
-  function handleApplyNearbySearch() {
-    if (localCenterLat == null || localCenterLng == null) {
-      setNearbyError('Vui lòng nhập vị trí hoặc dùng vị trí hiện tại trước khi áp dụng.');
-      return;
-    }
-
-    const updatedParams: RoomingHouseSearchParams = {
-      ...buildCurrentFilterParams(searchQuery),
-      provinceCode: undefined,
-      wardCode: undefined,
-      centerLat: localCenterLat,
-      centerLng: localCenterLng,
-      radiusKm: localRadiusKm,
-      page: 1,
-    };
-    setShowRadiusSearch(true);
-    setLocalProvinceCode('');
-    setLocalWardCode('');
-    const newSearchParams = paramsToUrl(updatedParams);
-    preserveNearbyLabel(newSearchParams, updatedParams, nearbyAddress.trim() || searchQuery.trim());
-    navigate({ search: newSearchParams.toString() });
-    setActiveLocationPanel(null);
-  }
 
   function handleSuggestionSearch(nextQuery: string) {
     const updatedParams = buildCurrentFilterParams(nextQuery);
@@ -697,23 +542,13 @@ export default function SearchRoomingHousesPage() {
     navigate({ search: '' });
   }
 
-  function handleClearAreaSearch() {
+  function handleClearLocationFilters() {
     setLocalProvinceCode('');
     setLocalWardCode('');
-  }
-
-  function handleClearNearbySearch() {
-    setNearbyAddress('');
-    setNearbyError('');
     setLocalCenterLat(null);
     setLocalCenterLng(null);
     setLocalRadiusKm(3);
     setShowRadiusSearch(false);
-  }
-
-  function handleClearLocationFilters() {
-    handleClearAreaSearch();
-    handleClearNearbySearch();
 
     const updatedParams: RoomingHouseSearchParams = {
       ...query,
@@ -727,7 +562,7 @@ export default function SearchRoomingHousesPage() {
     };
     const newSearchParams = paramsToUrl(updatedParams);
     newSearchParams.delete('nearbyLabel');
-    navigate({ search: newSearchParams.toString() });
+    setSearchParams(newSearchParams);
     setActiveLocationPanel(null);
   }
 
@@ -891,13 +726,54 @@ export default function SearchRoomingHousesPage() {
     });
   }
 
-  function handleApplyLocationPanel() {
-    if (activeLocationPanel === 'nearby') {
-      handleApplyNearbySearch();
-      return;
+  function handleLocationApply(filters: {
+    provinceCode: string;
+    wardCode: string;
+    centerLat: number | null;
+    centerLng: number | null;
+    radiusKm: number;
+    address: string;
+  }) {
+    const params = new URLSearchParams(location.search);
+    if (filters.centerLat != null && filters.centerLng != null) {
+      params.set('centerLat', filters.centerLat.toString());
+      params.set('centerLng', filters.centerLng.toString());
+      params.set('radiusKm', filters.radiusKm.toString());
+      params.set('nearbyLabel', filters.address);
+      params.delete('provinceCode');
+      params.delete('wardCode');
+    } else {
+      if (filters.provinceCode) {
+        params.set('provinceCode', filters.provinceCode);
+      } else {
+        params.delete('provinceCode');
+      }
+      if (filters.wardCode) {
+        params.set('wardCode', filters.wardCode);
+      } else {
+        params.delete('wardCode');
+      }
+      params.delete('centerLat');
+      params.delete('centerLng');
+      params.delete('radiusKm');
+      params.delete('nearbyLabel');
     }
+    params.set('page', '1');
+    setSearchParams(params);
+    setActiveLocationPanel(null);
+  }
 
-    handleApplyAreaSearch();
+  function handleLocationClear() {
+    const params = new URLSearchParams(location.search);
+    params.delete('provinceCode');
+    params.delete('wardCode');
+    params.delete('centerLat');
+    params.delete('centerLng');
+    params.delete('radiusKm');
+    params.delete('nearbyLabel');
+    params.set('page', '1');
+    setSearchParams(params);
+    setActiveLocationPanel(null);
   }
 
   function handleToggleSidebarFilter(panel: Exclude<SidebarFilterPanel, null>) {
@@ -915,210 +791,48 @@ export default function SearchRoomingHousesPage() {
         centerContent={
           <>
             <form className="search-header__search-form" onSubmit={handleApplyFilters}>
+              <svg className="search-form-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                <circle cx="11" cy="11" r="8"></circle>
+                <line x1="21" y1="21" x2="16.65" y2="16.65"></line>
+              </svg>
               <SearchSuggestionBox
                 placeholder="VD: gần đại học FPT dưới 3tr có máy lạnh"
                 value={searchQuery}
                 onChange={setSearchQuery}
                 onSearch={handleSuggestionSearch}
               />
-              <Button type="submit">Tìm</Button>
+              <button type="submit" className="search-submit-btn">Tìm</button>
             </form>
             <div className="search-location-actions" ref={locationPanelRef}>
               <button
                 type="button"
-                className={`search-location-action ${hasAppliedLocationSearch ? 'is-active' : ''}`}
+                className={`search-location-action ${ (hasAppliedLocationSearch || activeLocationPanel) ? 'is-active' : ''}`}
                 onClick={handleOpenLocationPanel}
                 aria-expanded={activeLocationPanel != null}
               >
-                <span>{locationButtonLabel}</span>
-                <span>{activeLocationPanel ? '▲' : '▼'}</span>
+                <svg className="location-pin-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                  <path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z" />
+                  <circle cx="12" cy="10" r="3" />
+                </svg>
+                <span className="location-btn-label">{locationButtonLabel}</span>
+                <svg className="location-chevron-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" style={{ transform: activeLocationPanel ? 'rotate(180deg)' : 'none', transition: 'transform 0.2s' }}>
+                  <polyline points="6 9 12 15 18 9" />
+                </svg>
               </button>
 
               {activeLocationPanel && (
-                <div className="search-location-panel" role="dialog" aria-label="Tùy chọn vị trí tìm kiếm">
-                  <button
-                    type="button"
-                    className="location-panel-close"
-                    onClick={() => setActiveLocationPanel(null)}
-                    aria-label="Đóng bộ lọc vị trí"
-                  >
-                    ×
-                  </button>
-
-                  {activeLocationPanel === 'nearby' ? (
-                    <>
-                      <div className="location-panel-subheader">
-                        <button type="button" className="location-back-button" onClick={() => setActiveLocationPanel('area')}>
-                          ‹
-                        </button>
-                        <strong>Nhập vị trí quanh bạn</strong>
-                      </div>
-                      <div className="nearby-search-details">
-                        <div className="location-panel-field">
-                          <label htmlFor="nearby-address-input">Vị trí tìm kiếm</label>
-                          <div className="nearby-address-row">
-                            <input
-                              id="nearby-address-input"
-                              value={nearbyAddress}
-                              onChange={(e) => {
-                                setNearbyAddress(e.target.value);
-                                setNearbyError('');
-                              }}
-                              onFocus={() => {
-                                if (nearbySuggestions.length > 0) {
-                                  setShowNearbySuggestions(true);
-                                }
-                              }}
-                              onBlur={() => {
-                                window.setTimeout(() => setShowNearbySuggestions(false), 120);
-                              }}
-                              onKeyDown={(e) => {
-                                if (e.key === 'Enter') {
-                                  e.preventDefault();
-                                  void handleFindNearbyAddress();
-                                }
-                              }}
-                              placeholder="Nhập địa điểm, tên đường, khu vực muốn tìm"
-                            />
-                            <Button type="button" variant="secondary" onClick={handleFindNearbyAddress} disabled={nearbySearching}>
-                              {nearbySearching ? 'Đang tìm...' : 'Lấy vị trí'}
-                            </Button>
-                          </div>
-                          {(showNearbySuggestions || nearbySuggesting) && (
-                            <div className="nearby-suggestions" role="listbox" aria-label="Gợi ý vị trí">
-                              {nearbySuggesting && nearbySuggestions.length === 0 ? (
-                                <div className="nearby-suggestions__state">Đang tìm gợi ý...</div>
-                              ) : (
-                                nearbySuggestions.map((suggestion) => (
-                                  <button
-                                    key={suggestion.refId ?? suggestion.displayAddress}
-                                    type="button"
-                                    className="nearby-suggestion-item"
-                                    role="option"
-                                    aria-selected="false"
-                                    onMouseDown={(event) => event.preventDefault()}
-                                    onClick={() => handleSelectNearbySuggestion(suggestion)}
-                                  >
-                                    <strong>{suggestion.name || suggestion.displayAddress}</strong>
-                                    <small>{suggestion.address}</small>
-                                  </button>
-                                ))
-                              )}
-                            </div>
-                          )}
-                        </div>
-                        <div className="location-panel-field">
-                          <label htmlFor="nearby-radius-input">
-                            Bán kính xung quanh: {localRadiusKm} km
-                          </label>
-                          <input
-                            id="nearby-radius-input"
-                            type="range"
-                            min="0.5"
-                            max="30"
-                            step="0.5"
-                            value={localRadiusKm}
-                            onChange={(e) => setLocalRadiusKm(Number(e.target.value))}
-                          />
-                        </div>
-                        {nearbyError && <p className="nearby-error-text">{nearbyError}</p>}
-                      </div>
-                    </>
-                  ) : (
-                    <>
-                      <section className="location-panel-section">
-                        <button type="button" className="location-section-heading" onClick={() => setActiveLocationPanel('nearby')}>
-                          <span className="location-section-icon">◎</span>
-                          <strong>Tìm kiếm quanh bạn</strong>
-                        </button>
-                        <button type="button" className="nearby-search-trigger" onClick={() => setActiveLocationPanel('nearby')}>
-                          <span>
-                            {hasAppliedRadiusSearch
-                              ? nearbyAddress || `Bán kính ${localRadiusKm}km`
-                              : 'Nhập vị trí và khoảng cách tìm kiếm'}
-                          </span>
-                          <span>›</span>
-                        </button>
-                      </section>
-
-                      <section className="location-panel-section">
-                        <div className="location-section-heading">
-                          <span className="location-section-icon">▦</span>
-                          <strong>Tìm theo khu vực</strong>
-                        </div>
-                        <div className="area-quick-list">
-                          {quickLocationProvinces.map((province) => (
-                            <button
-                              key={province.code}
-                              type="button"
-                              className={localProvinceCode === province.code ? 'is-selected' : ''}
-                              onClick={() => {
-                                setActiveLocationPanel('area');
-                                setLocalProvinceCode(province.code);
-                                setLocalWardCode('');
-                              }}
-                            >
-                              {province.name}
-                            </button>
-                          ))}
-                        </div>
-                        <div className="location-select-list">
-                          <label className="location-select-card" htmlFor="location-province-select">
-                            <span>
-                              <strong>Chọn tỉnh thành</strong>
-                              <small>{selectedProvinceName || 'Tất cả tỉnh/thành phố'}</small>
-                            </span>
-                            <span>›</span>
-                            <select
-                              id="location-province-select"
-                              value={localProvinceCode}
-                              onChange={(e) => {
-                                setActiveLocationPanel('area');
-                                setLocalProvinceCode(e.target.value);
-                                setLocalWardCode('');
-                              }}
-                            >
-                              <option value="">Tất cả tỉnh/thành phố</option>
-                              {provinces.map((province) => (
-                                <option key={province.code} value={province.code}>
-                                  {province.name}
-                                </option>
-                              ))}
-                            </select>
-                          </label>
-                          <label className="location-select-card" htmlFor="location-ward-select">
-                            <span>
-                              <strong>Chọn khu vực</strong>
-                              <small>{selectedWardName || 'Tất cả khu vực trong tỉnh/thành'}</small>
-                            </span>
-                            <span>›</span>
-                            <select
-                              id="location-ward-select"
-                              value={localWardCode}
-                              disabled={!localProvinceCode}
-                              onChange={(e) => {
-                                setActiveLocationPanel('area');
-                                setLocalWardCode(e.target.value);
-                              }}
-                            >
-                              <option value="">Tất cả khu vực trong tỉnh/thành</option>
-                              {wards.map((ward) => (
-                                <option key={ward.code} value={ward.code}>
-                                  {ward.name}
-                                </option>
-                              ))}
-                            </select>
-                          </label>
-                        </div>
-                      </section>
-                    </>
-                  )}
-
-                  <div className="location-panel-actions">
-                    <Button type="button" variant="secondary" onClick={handleClearLocationFilters}>Xóa Lọc</Button>
-                    <Button type="button" onClick={handleApplyLocationPanel}>Áp dụng</Button>
-                  </div>
-                </div>
+                <LocationFilterPanel
+                  initialProvinceCode={query.provinceCode ?? ''}
+                  initialWardCode={query.wardCode ?? ''}
+                  initialRadiusKm={query.radiusKm ?? 5}
+                  initialAddress={nearbyLabelParam}
+                  initialLatitude={query.centerLat ?? null}
+                  initialLongitude={query.centerLng ?? null}
+                  initialTab={activeLocationPanel === 'nearby' ? 'nearby' : 'area'}
+                  onClose={() => setActiveLocationPanel(null)}
+                  onApply={handleLocationApply}
+                  onClear={handleLocationClear}
+                />
               )}
             </div>
           </>
@@ -1130,8 +844,12 @@ export default function SearchRoomingHousesPage() {
         <aside className="search-filters-sidebar" ref={filtersSidebarRef}>
           <div className="search-filters-header">
             <h2>Bộ lọc nâng cao</h2>
-            <button className="search-clear-btn" onClick={handleClearFilters}>
-              Xóa tất cả
+            <button type="button" className="search-clear-btn" onClick={handleClearFilters}>
+              <span>Xóa tất cả</span>
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <polyline points="3 6 5 6 21 6" />
+                <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2" />
+              </svg>
             </button>
           </div>
 
@@ -1141,15 +859,25 @@ export default function SearchRoomingHousesPage() {
               <button
                 type="button"
                 ref={(node) => { filterButtonRefs.current.price = node; }}
-                className={`filter-toggle ${activeSidebarFilter === 'price' ? 'is-open' : ''}`}
+                className={`filter-toggle ${activeSidebarFilter === 'price' ? 'is-open' : ''} ${(localMinPrice || localMaxPrice) ? 'has-value' : ''}`}
                 onClick={() => handleToggleSidebarFilter('price')}
                 aria-expanded={activeSidebarFilter === 'price'}
               >
-                <span>
-                  <strong>Giá thuê</strong>
-                  <small>{formatRangeSummary(localMinPrice, localMaxPrice, 'price')}</small>
+                <span className="filter-toggle-content">
+                  <div className="filter-toggle-icon">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                      <line x1="12" y1="1" x2="12" y2="23"></line>
+                      <path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"></path>
+                    </svg>
+                  </div>
+                  <span className="filter-toggle-text">
+                    <strong>Giá thuê</strong>
+                    <small>{formatRangeSummary(localMinPrice, localMaxPrice, 'price')}</small>
+                  </span>
                 </span>
-                <span className="filter-toggle__chevron">⌄</span>
+                <svg className="filter-toggle__chevron" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                  <polyline points="6 9 12 15 18 9" />
+                </svg>
               </button>
               {activeSidebarFilter === 'price' && (
                 <div className="filter-panel price-filter-panel" style={sidebarPanelStyle}>
@@ -1235,8 +963,21 @@ export default function SearchRoomingHousesPage() {
                   )}
 
                   <div className="price-filter-actions">
-                    <Button type="button" variant="secondary" onClick={handleClearPriceFilter}>Xóa lọc</Button>
-                    <Button type="button" onClick={handleSavePriceFilter}>Lưu</Button>
+                    <Button type="button" variant="secondary" onClick={handleClearPriceFilter} className="btn-clear-filter">
+                      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="btn-icon">
+                        <polyline points="3 6 5 6 21 6" />
+                        <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2" />
+                      </svg>
+                      <span>Xóa lọc</span>
+                    </Button>
+                    <Button type="button" onClick={handleSavePriceFilter} className="btn-save-filter">
+                      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="btn-icon">
+                        <path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z" />
+                        <polyline points="17 21 17 13 7 13 7 21" />
+                        <polyline points="7 3 7 8 15 8" />
+                      </svg>
+                      <span>Lưu</span>
+                    </Button>
                   </div>
                 </div>
               )}
@@ -1247,15 +988,27 @@ export default function SearchRoomingHousesPage() {
               <button
                 type="button"
                 ref={(node) => { filterButtonRefs.current.area = node; }}
-                className={`filter-toggle ${activeSidebarFilter === 'area' ? 'is-open' : ''}`}
+                className={`filter-toggle ${activeSidebarFilter === 'area' ? 'is-open' : ''} ${(localMinArea || localMaxArea) ? 'has-value' : ''}`}
                 onClick={() => handleToggleSidebarFilter('area')}
                 aria-expanded={activeSidebarFilter === 'area'}
               >
-                <span>
-                  <strong>Diện tích</strong>
-                  <small>{formatRangeSummary(localMinArea, localMaxArea, 'area')}</small>
+                <span className="filter-toggle-content">
+                  <div className="filter-toggle-icon">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                      <polyline points="4 8 4 4 8 4" />
+                      <polyline points="16 4 20 4 20 8" />
+                      <polyline points="20 16 20 20 16 20" />
+                      <polyline points="8 20 4 20 4 16" />
+                    </svg>
+                  </div>
+                  <span className="filter-toggle-text">
+                    <strong>Diện tích</strong>
+                    <small>{formatRangeSummary(localMinArea, localMaxArea, 'area')}</small>
+                  </span>
                 </span>
-                <span className="filter-toggle__chevron">⌄</span>
+                <svg className="filter-toggle__chevron" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                  <polyline points="6 9 12 15 18 9" />
+                </svg>
               </button>
               {activeSidebarFilter === 'area' && (
                 <div className="filter-panel" style={sidebarPanelStyle}>
@@ -1277,8 +1030,21 @@ export default function SearchRoomingHousesPage() {
                     />
                   </div>
                   <div className="filter-panel-actions">
-                    <Button type="button" variant="secondary" onClick={handleClearAreaFilter}>Xóa lọc</Button>
-                    <Button type="button" onClick={handleSaveAreaFilter}>Lưu</Button>
+                    <Button type="button" variant="secondary" onClick={handleClearAreaFilter} className="btn-clear-filter">
+                      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="btn-icon">
+                        <polyline points="3 6 5 6 21 6" />
+                        <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2" />
+                      </svg>
+                      <span>Xóa lọc</span>
+                    </Button>
+                    <Button type="button" onClick={handleSaveAreaFilter} className="btn-save-filter">
+                      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="btn-icon">
+                        <path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z" />
+                        <polyline points="17 21 17 13 7 13 7 21" />
+                        <polyline points="7 3 7 8 15 8" />
+                      </svg>
+                      <span>Lưu</span>
+                    </Button>
                   </div>
                 </div>
               )}
@@ -1289,15 +1055,27 @@ export default function SearchRoomingHousesPage() {
               <button
                 type="button"
                 ref={(node) => { filterButtonRefs.current.occupants = node; }}
-                className={`filter-toggle ${activeSidebarFilter === 'occupants' ? 'is-open' : ''}`}
+                className={`filter-toggle ${activeSidebarFilter === 'occupants' ? 'is-open' : ''} ${localMinOccupants ? 'has-value' : ''}`}
                 onClick={() => handleToggleSidebarFilter('occupants')}
                 aria-expanded={activeSidebarFilter === 'occupants'}
               >
-                <span>
-                  <strong>Số người ở</strong>
-                  <small>{formatOccupantsSummary(localMinOccupants)}</small>
+                <span className="filter-toggle-content">
+                  <div className="filter-toggle-icon">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                      <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2" />
+                      <circle cx="9" cy="7" r="4" />
+                      <path d="M23 21v-2a4 4 0 0 0-3-3.87" />
+                      <path d="M16 3.13a4 4 0 0 1 0 7.75" />
+                    </svg>
+                  </div>
+                  <span className="filter-toggle-text">
+                    <strong>Số người ở</strong>
+                    <small>{formatOccupantsSummary(localMinOccupants)}</small>
+                  </span>
                 </span>
-                <span className="filter-toggle__chevron">⌄</span>
+                <svg className="filter-toggle__chevron" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                  <polyline points="6 9 12 15 18 9" />
+                </svg>
               </button>
               {activeSidebarFilter === 'occupants' && (
                 <div className="filter-panel" style={sidebarPanelStyle}>
@@ -1314,8 +1092,21 @@ export default function SearchRoomingHousesPage() {
                     <option value="4">4 người trở lên</option>
                   </select>
                   <div className="filter-panel-actions">
-                    <Button type="button" variant="secondary" onClick={handleClearOccupantsFilter}>Xóa lọc</Button>
-                    <Button type="button" onClick={handleSaveOccupantsFilter}>Lưu</Button>
+                    <Button type="button" variant="secondary" onClick={handleClearOccupantsFilter} className="btn-clear-filter">
+                      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="btn-icon">
+                        <polyline points="3 6 5 6 21 6" />
+                        <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2" />
+                      </svg>
+                      <span>Xóa lọc</span>
+                    </Button>
+                    <Button type="button" onClick={handleSaveOccupantsFilter} className="btn-save-filter">
+                      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="btn-icon">
+                        <path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z" />
+                        <polyline points="17 21 17 13 7 13 7 21" />
+                        <polyline points="7 3 7 8 15 8" />
+                      </svg>
+                      <span>Lưu</span>
+                    </Button>
                   </div>
                 </div>
               )}
@@ -1327,15 +1118,28 @@ export default function SearchRoomingHousesPage() {
                 <button
                   type="button"
                   ref={(node) => { filterButtonRefs.current.houseAmenities = node; }}
-                  className={`filter-toggle ${activeSidebarFilter === 'houseAmenities' ? 'is-open' : ''}`}
+                  className={`filter-toggle ${activeSidebarFilter === 'houseAmenities' ? 'is-open' : ''} ${localAmenityIds.length > 0 ? 'has-value' : ''}`}
                   onClick={() => handleToggleSidebarFilter('houseAmenities')}
                   aria-expanded={activeSidebarFilter === 'houseAmenities'}
                 >
-                  <span>
-                    <strong>Tiện ích khu trọ</strong>
-                    <small>{formatAmenitySummary(localAmenityIds, houseAmenitiesList)}</small>
+                  <span className="filter-toggle-content">
+                    <div className="filter-toggle-icon">
+                      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                        <rect x="4" y="2" width="16" height="20" rx="2" ry="2" />
+                        <line x1="9" y1="22" x2="9" y2="16" />
+                        <line x1="15" y1="22" x2="15" y2="16" />
+                        <line x1="9" y1="16" x2="15" y2="16" />
+                        <path d="M8 6h2M14 6h2M8 10h2M14 10h2" />
+                      </svg>
+                    </div>
+                    <span className="filter-toggle-text">
+                      <strong>Tiện ích khu trọ</strong>
+                      <small>{formatAmenitySummary(localAmenityIds, houseAmenitiesList)}</small>
+                    </span>
                   </span>
-                  <span className="filter-toggle__chevron">⌄</span>
+                  <svg className="filter-toggle__chevron" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                    <polyline points="6 9 12 15 18 9" />
+                  </svg>
                 </button>
                 {activeSidebarFilter === 'houseAmenities' && (
                   <div className="filter-panel" style={sidebarPanelStyle}>
@@ -1352,8 +1156,21 @@ export default function SearchRoomingHousesPage() {
                       ))}
                     </div>
                     <div className="filter-panel-actions">
-                      <Button type="button" variant="secondary" onClick={() => handleClearAmenityFilter('house')}>Xóa lọc</Button>
-                      <Button type="button" onClick={handleSaveAmenityFilter}>Lưu</Button>
+                      <Button type="button" variant="secondary" onClick={() => handleClearAmenityFilter('house')} className="btn-clear-filter">
+                        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="btn-icon">
+                          <polyline points="3 6 5 6 21 6" />
+                          <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2" />
+                        </svg>
+                        <span>Xóa lọc</span>
+                      </Button>
+                      <Button type="button" onClick={handleSaveAmenityFilter} className="btn-save-filter">
+                        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="btn-icon">
+                          <path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z" />
+                          <polyline points="17 21 17 13 7 13 7 21" />
+                          <polyline points="7 3 7 8 15 8" />
+                        </svg>
+                        <span>Lưu</span>
+                      </Button>
                     </div>
                   </div>
                 )}
@@ -1366,15 +1183,28 @@ export default function SearchRoomingHousesPage() {
                 <button
                   type="button"
                   ref={(node) => { filterButtonRefs.current.roomAmenities = node; }}
-                  className={`filter-toggle ${activeSidebarFilter === 'roomAmenities' ? 'is-open' : ''}`}
+                  className={`filter-toggle ${activeSidebarFilter === 'roomAmenities' ? 'is-open' : ''} ${localRoomAmenityIds.length > 0 ? 'has-value' : ''}`}
                   onClick={() => handleToggleSidebarFilter('roomAmenities')}
                   aria-expanded={activeSidebarFilter === 'roomAmenities'}
                 >
-                  <span>
-                    <strong>Tiện ích phòng trọ</strong>
-                    <small>{formatAmenitySummary(localRoomAmenityIds, roomAmenitiesList)}</small>
+                  <span className="filter-toggle-content">
+                    <div className="filter-toggle-icon">
+                      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                        <path d="M2 4v16" />
+                        <path d="M2 11h20" />
+                        <path d="M22 4v16" />
+                        <path d="M2 17h20" />
+                        <path d="M4 8h14a2 2 0 0 1 2 2v7H4V10a2 2 0 0 1 2-2z" />
+                      </svg>
+                    </div>
+                    <span className="filter-toggle-text">
+                      <strong>Tiện ích phòng trọ</strong>
+                      <small>{formatAmenitySummary(localRoomAmenityIds, roomAmenitiesList)}</small>
+                    </span>
                   </span>
-                  <span className="filter-toggle__chevron">⌄</span>
+                  <svg className="filter-toggle__chevron" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                    <polyline points="6 9 12 15 18 9" />
+                  </svg>
                 </button>
                 {activeSidebarFilter === 'roomAmenities' && (
                   <div className="filter-panel" style={sidebarPanelStyle}>
@@ -1391,8 +1221,21 @@ export default function SearchRoomingHousesPage() {
                       ))}
                     </div>
                     <div className="filter-panel-actions">
-                      <Button type="button" variant="secondary" onClick={() => handleClearAmenityFilter('room')}>Xóa lọc</Button>
-                      <Button type="button" onClick={handleSaveAmenityFilter}>Lưu</Button>
+                      <Button type="button" variant="secondary" onClick={() => handleClearAmenityFilter('room')} className="btn-clear-filter">
+                        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="btn-icon">
+                          <polyline points="3 6 5 6 21 6" />
+                          <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2" />
+                        </svg>
+                        <span>Xóa lọc</span>
+                      </Button>
+                      <Button type="button" onClick={handleSaveAmenityFilter} className="btn-save-filter">
+                        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="btn-icon">
+                          <path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z" />
+                          <polyline points="17 21 17 13 7 13 7 21" />
+                          <polyline points="7 3 7 8 15 8" />
+                        </svg>
+                        <span>Lưu</span>
+                      </Button>
                     </div>
                   </div>
                 )}
@@ -1400,7 +1243,10 @@ export default function SearchRoomingHousesPage() {
             )}
 
             <Button type="submit" className="apply-filters-btn">
-              Áp dụng bộ lọc
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" className="apply-filters-icon">
+                <polygon points="22 3 2 3 10 12.46 10 19 14 21 14 12.46 22 3" />
+              </svg>
+              <span>Áp dụng bộ lọc</span>
             </Button>
           </form>
         </aside>
@@ -1486,32 +1332,52 @@ export default function SearchRoomingHousesPage() {
                     </div>
 
                     <div className="search-result-card__body">
-                      <div>
-                        <h3>{item.name}</h3>
-                        <span className="address-text">{item.addressDisplay}</span>
-                      </div>
+                      <h3 className="search-result-card__title">{item.name}</h3>
+                      <p className="search-result-card__address">
+                        <svg className="address-pin-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                          <path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z" />
+                          <circle cx="12" cy="10" r="3" />
+                        </svg>
+                        <span>{item.addressDisplay}</span>
+                      </p>
 
-                      <div className="search-result-card__meta">
-                        <span>{item.availableRooms} phòng trống</span>
-                        <span className="price-tag">
-                          {formatPriceRange(item.minMonthlyRent, item.maxMonthlyRent)}
+                      <div className="card-badges-grid">
+                        <span className="card-badge badge-blue">
+                          <svg className="badge-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                            <path d="M13 4h3a2 2 0 0 1 2 2v14M2 20h20M5 4h8v16H5z" />
+                          </svg>
+                          <span>{item.availableRooms} phòng trống</span>
                         </span>
-                        <span>{formatAreaRange(item.minAreaM2, item.maxAreaM2)}</span>
+                        
+                        <span className="card-badge badge-orange">
+                          <svg className="badge-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                            <path d="M12 2H2v10l9.29 9.29a1 1 0 0 0 1.41 0l7.29-7.29a1 1 0 0 0 0-1.41L12 2z" />
+                            <circle cx="5" cy="5" r="1.5" fill="currentColor" />
+                          </svg>
+                          <span>{formatPriceRange(item.minMonthlyRent, item.maxMonthlyRent)}</span>
+                        </span>
+
+                        <span className="card-badge badge-green">
+                          <svg className="badge-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                            <rect x="3" y="3" width="18" height="18" rx="2" />
+                            <path d="M9 3v18M15 3v18M3 9h18M3 15h18" />
+                          </svg>
+                          <span>{formatAreaRange(item.minAreaM2, item.maxAreaM2)}</span>
+                        </span>
                       </div>
 
-                      {item.amenities.length > 0 && (
-                        <div className="search-result-card__amenities">
-                          {item.amenities.slice(0, 4).map((a) => (
-                            <span key={a.id} className="amenity-tag">
-                              {a.name}
-                            </span>
-                          ))}
-                          {item.amenities.length > 4 && (
-                            <span className="amenity-tag amenity-tag--more">
-                              +{item.amenities.length - 4}
-                            </span>
-                          )}
-                        </div>
+                      {item.amenities && item.amenities.length > 0 && (
+                        <>
+                          <hr className="search-card-divider" />
+                          <div className="search-card-amenities-list">
+                            {item.amenities.slice(0, 3).map((a) => (
+                              <span key={a.id} className="search-card-amenity-item">
+                                {getAmenityIcon(a.name)}
+                                <span>{a.name}</span>
+                              </span>
+                            ))}
+                          </div>
+                        </>
                       )}
                     </div>
                   </button>
@@ -1558,6 +1424,7 @@ export default function SearchRoomingHousesPage() {
           )}
         </main>
       </div>
+      <RentalAiChatbot context="search" />
     </div>
   );
 }
@@ -1854,4 +1721,97 @@ function escapeHtml(value: string) {
     .replaceAll('>', '&gt;')
     .replaceAll('"', '&quot;')
     .replaceAll("'", '&#039;');
+}
+
+function getAmenityIcon(name: string) {
+  const normalized = name.toLowerCase();
+  if (normalized.includes('wifi') || normalized.includes('internet')) {
+    return (
+      <svg className="amenity-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+        <path d="M12 20h.01" />
+        <path d="M8.5 16.5a5 5 0 0 1 7 0" />
+        <path d="M5 13a10 10 0 0 1 14 0" />
+        <path d="M1.5 9.5a15 15 0 0 1 21 0" />
+      </svg>
+    );
+  }
+  if (normalized.includes('camera') || normalized.includes('an ninh')) {
+    return (
+      <svg className="amenity-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+        <path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z" />
+        <circle cx="12" cy="13" r="4" />
+      </svg>
+    );
+  }
+  if (normalized.includes('xe') || normalized.includes('đỗ xe') || normalized.includes('gửi xe')) {
+    return (
+      <svg className="amenity-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+        <circle cx="12" cy="12" r="10" />
+        <path d="M9 17V7h4a3 3 0 0 1 0 6H9" />
+      </svg>
+    );
+  }
+  if (normalized.includes('điều hòa') || normalized.includes('lạnh') || normalized.includes('ac')) {
+    return (
+      <svg className="amenity-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+        <path d="M2 12h20M12 2v20M20 7l-3.5 3.5M4 17l3.5-3.5M17 17l-3.5-3.5M7 7l3.5 3.5" />
+      </svg>
+    );
+  }
+  if (normalized.includes('gác') || normalized.includes('lửng')) {
+    return (
+      <svg className="amenity-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+        <polyline points="22 17 13.5 8.5 8.5 13.5 2 7" />
+        <polyline points="16 17 22 17 22 11" />
+      </svg>
+    );
+  }
+  if (normalized.includes('máy giặt') || normalized.includes('giặt')) {
+    return (
+      <svg className="amenity-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+        <path d="M3 6V3a1 1 0 0 1 1-1h16a1 1 0 0 1 1 1v3M3 6v15a1 1 0 0 0 1 1h16a1 1 0 0 0 1-1V6M3 6h18" />
+        <circle cx="12" cy="14" r="4" />
+        <path d="M12 12a2.5 2.5 0 0 0 0 4" />
+      </svg>
+    );
+  }
+  if (normalized.includes('tủ lạnh')) {
+    return (
+      <svg className="amenity-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+        <rect x="5" y="2" width="14" height="20" rx="2" ry="2" />
+        <line x1="5" y1="10" x2="19" y2="10" />
+        <line x1="9" y1="6" x2="9" y2="8" />
+        <line x1="9" y1="14" x2="9" y2="18" />
+      </svg>
+    );
+  }
+  if (normalized.includes('bếp') || normalized.includes('nấu ăn')) {
+    return (
+      <svg className="amenity-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+        <path d="M6 18h12M6 6h12M6 10h12M6 14h12" />
+      </svg>
+    );
+  }
+  if (normalized.includes('wc riêng') || normalized.includes('khép kín') || normalized.includes('vệ sinh riêng') || normalized.includes('phòng tắm')) {
+    return (
+      <svg className="amenity-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+        <path d="M4 4h16v16H4zM10 8h4v4h-4zM6 16h12" />
+      </svg>
+    );
+  }
+  if (normalized.includes('ban công') || normalized.includes('cửa sổ')) {
+    return (
+      <svg className="amenity-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+        <path d="M3 3h18v18H3zM9 9h6v12H9z" />
+      </svg>
+    );
+  }
+  // Default fallback icon
+  return (
+    <svg className="amenity-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+      <circle cx="12" cy="12" r="10" />
+      <line x1="12" y1="8" x2="12" y2="16" />
+      <line x1="8" y1="12" x2="12" y2="12" />
+    </svg>
+  );
 }

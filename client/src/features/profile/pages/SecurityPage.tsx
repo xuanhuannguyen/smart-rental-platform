@@ -13,14 +13,33 @@ import type { UserSession } from '../types/profile.types';
 import { getApiErrorMessage } from '../../../shared/api/apiError';
 import './MyProfilePage.css'; // Reuse CSS
 
-type SecurityMode = 'current-password' | 'email-otp' | 'devices';
+type SecurityTab = 'change-password' | 'devices' | 'activity-logs';
+type PasswordMethod = 'current-password' | 'email-otp';
+
+function getPasswordStrength(password: string): number {
+  if (!password) return 0;
+  let strength = 0;
+  if (password.length >= 6) strength++;
+  if (password.length >= 8) strength++;
+  if (/[A-Z]/.test(password) || /[^A-Za-z0-9]/.test(password)) strength++;
+  if (/[0-9]/.test(password) && /[a-z]/.test(password)) strength++;
+  return strength;
+}
 
 export function SecurityPage() {
   const { currentUser, clearSession } = useAuth();
   const navigate = useNavigate();
 
-  const [securityMode, setSecurityMode] = useState<SecurityMode>('current-password');
-  
+  const [activeTab, setActiveTab] = useState<SecurityTab>('change-password');
+  const [passwordMethod, setPasswordMethod] = useState<PasswordMethod>('current-password');
+
+  // Password visibility states
+  const [showCurrentPassword, setShowCurrentPassword] = useState(false);
+  const [showNewPassword, setShowNewPassword] = useState(false);
+  const [showConfirmPassword, setShowConfirmPassword] = useState(false);
+  const [showOtpNewPassword, setShowOtpNewPassword] = useState(false);
+  const [showOtpConfirmPassword, setShowOtpConfirmPassword] = useState(false);
+
   const [sessions, setSessions] = useState<UserSession[]>([]);
   const [isLoadingSessions, setIsLoadingSessions] = useState(false);
   const [sessionsError, setSessionsError] = useState<string | null>(null);
@@ -60,10 +79,10 @@ export function SecurityPage() {
   }, []);
 
   useEffect(() => {
-    if (securityMode === 'devices') {
+    if (activeTab === 'devices') {
       void loadSessions();
     }
-  }, [securityMode, loadSessions]);
+  }, [activeTab, loadSessions]);
 
   if (!currentUser) {
     return null;
@@ -234,246 +253,542 @@ export function SecurityPage() {
 
   return (
     <div>
-      <section className="overview-band">
-        <div className="overview-left">
-          <p className="eyebrow">TÀI KHOẢN</p>
-          <h2>Quản lý bảo mật</h2>
-          <p className="overview-description">Quản lý mật khẩu và các thiết bị đã đăng nhập của bạn</p>
+      <div className="security-header-row">
+        <div className="security-header-icon-box">
+          <svg viewBox="0 0 24 24" width="24" height="24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
+            <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z" />
+            <path d="m9 11 2 2 4-4" />
+          </svg>
         </div>
-      </section>
-
-      <div className="mode-tabs" style={{ marginBottom: '24px', display: 'flex', gap: '12px' }}>
-        <button
-          type="button"
-          className={securityMode === 'current-password' ? 'mode-tab active' : 'mode-tab'}
-          style={{
-            padding: '10px 16px',
-            border: 'none',
-            borderRadius: '6px',
-            cursor: 'pointer',
-            fontWeight: 600,
-            fontSize: '14px',
-            background: securityMode === 'current-password' ? '#eff6ff' : 'transparent',
-            color: securityMode === 'current-password' ? '#246bfe' : '#475569',
-            transition: 'all 0.15s'
-          }}
-          onClick={() => { setSecurityMode('current-password'); setOtpVerified(false); setSecurityError(null); setSecurityMessage(null); }}
-        >
-          Còn nhớ mật khẩu
-        </button>
-        <button
-          type="button"
-          className={securityMode === 'email-otp' ? 'mode-tab active' : 'mode-tab'}
-          style={{
-            padding: '10px 16px',
-            border: 'none',
-            borderRadius: '6px',
-            cursor: 'pointer',
-            fontWeight: 600,
-            fontSize: '14px',
-            background: securityMode === 'email-otp' ? '#eff6ff' : 'transparent',
-            color: securityMode === 'email-otp' ? '#246bfe' : '#475569',
-            transition: 'all 0.15s'
-          }}
-          onClick={() => { setSecurityMode('email-otp'); setOtpVerified(false); setOtpForm(c => ({ ...c, otp: '', newPassword: '', confirmPassword: '' })); setSecurityError(null); setSecurityMessage(null); }}
-        >
-          Không nhớ mật khẩu
-        </button>
-        <button
-          type="button"
-          className={securityMode === 'devices' ? 'mode-tab active' : 'mode-tab'}
-          style={{
-            padding: '10px 16px',
-            border: 'none',
-            borderRadius: '6px',
-            cursor: 'pointer',
-            fontWeight: 600,
-            fontSize: '14px',
-            background: securityMode === 'devices' ? '#eff6ff' : 'transparent',
-            color: securityMode === 'devices' ? '#246bfe' : '#475569',
-            transition: 'all 0.15s'
-          }}
-          onClick={() => { setSecurityMode('devices'); setOtpVerified(false); setSecurityError(null); setSecurityMessage(null); }}
-        >
-          Thiết bị đã đăng nhập
-        </button>
+        <div>
+          <p className="eyebrow" style={{ margin: 0 }}>TÀI KHOẢN</p>
+          <h2 style={{ fontSize: '24px', fontWeight: 700, color: '#0f172a', margin: '4px 0 0 0' }}>Quản lý bảo mật</h2>
+          <p className="overview-description" style={{ margin: '4px 0 0 0', color: '#64748b', fontSize: '14px' }}>
+            Quản lý mật khẩu và các thiết bị đã đăng nhập của bạn
+          </p>
+        </div>
       </div>
 
-      {securityError ? <Alert type="error">{securityError}</Alert> : null}
-      {securityMessage ? <Alert type="success">{securityMessage}</Alert> : null}
+      <nav className="security-tabs-nav">
+        <button
+          type="button"
+          className={`security-tab-btn ${activeTab === 'change-password' ? 'active' : ''}`}
+          onClick={() => {
+            setActiveTab('change-password');
+            setSecurityError(null);
+            setSecurityMessage(null);
+          }}
+        >
+          <svg className="security-tab-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
+            <rect x="3" y="11" width="18" height="11" rx="2" ry="2" />
+            <path d="M7 11V7a5 5 0 0 1 10 0v4" />
+          </svg>
+          Đổi mật khẩu
+        </button>
+        <button
+          type="button"
+          className={`security-tab-btn ${activeTab === 'devices' ? 'active' : ''}`}
+          onClick={() => {
+            setActiveTab('devices');
+            setSecurityError(null);
+            setSecurityMessage(null);
+          }}
+        >
+          <svg className="security-tab-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
+            <rect x="2" y="3" width="20" height="14" rx="2" ry="2" />
+            <line x1="8" y1="21" x2="16" y2="21" />
+            <line x1="12" y1="17" x2="12" y2="21" />
+          </svg>
+          Thiết bị đăng nhập
+        </button>
+        <button
+          type="button"
+          className={`security-tab-btn ${activeTab === 'activity-logs' ? 'active' : ''}`}
+          onClick={() => {
+            setActiveTab('activity-logs');
+            setSecurityError(null);
+            setSecurityMessage(null);
+          }}
+        >
+          <svg className="security-tab-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
+            <circle cx="12" cy="12" r="10" />
+            <polyline points="12 6 12 12 16 14" />
+            <path d="M12 2a10 10 0 1 0 10 10" />
+          </svg>
+          Lịch sử hoạt động
+        </button>
+      </nav>
 
-      {securityMode === 'current-password' && (
-        <form className="auth-form" style={{ maxWidth: '500px' }} onSubmit={handleChangeWithCurrentPassword}>
-          <FormField label="Mật khẩu hiện tại" htmlFor="change-current-password">
-            <input
-              id="change-current-password"
-              className="ui-input"
-              type="password"
-              value={currentPasswordForm.currentPassword}
-              disabled={isSubmitting}
-              onChange={e => setCurrentPasswordForm(c => ({ ...c, currentPassword: e.target.value }))}
-            />
-          </FormField>
-          <FormField label="Mật khẩu mới" htmlFor="change-new-password">
-            <input
-              id="change-new-password"
-              className="ui-input"
-              type="password"
-              value={currentPasswordForm.newPassword}
-              disabled={isSubmitting}
-              onChange={e => setCurrentPasswordForm(c => ({ ...c, newPassword: e.target.value }))}
-            />
-          </FormField>
-          <FormField label="Xác nhận mật khẩu mới" htmlFor="change-confirm-password">
-            <input
-              id="change-confirm-password"
-              className="ui-input"
-              type="password"
-              value={currentPasswordForm.confirmPassword}
-              disabled={isSubmitting}
-              onChange={e => setCurrentPasswordForm(c => ({ ...c, confirmPassword: e.target.value }))}
-            />
-          </FormField>
-          <div className="auth-actions" style={{ marginTop: '16px' }}>
-            <Button type="submit" disabled={isSubmitting}>
-              {isSubmitting ? 'Đang lưu...' : 'Lưu mật khẩu mới'}
-            </Button>
-          </div>
-        </form>
+      {(securityError || securityMessage) && (
+        <div style={{ maxWidth: '760px', margin: '0 auto 16px auto' }}>
+          {securityError ? <Alert type="error">{securityError}</Alert> : null}
+          {securityMessage ? <Alert type="success">{securityMessage}</Alert> : null}
+        </div>
       )}
 
-      {securityMode === 'email-otp' && (
-        <div className="auth-form" style={{ maxWidth: '500px' }}>
-          <FormField label="Email" htmlFor="reset-email">
-            <input
-              id="reset-email"
-              className="ui-input"
-              value={otpForm.email}
-              disabled
-            />
-          </FormField>
+      {activeTab === 'change-password' && (
+        <div className="security-card">
+          <div className="security-card-icon-box">
+            <svg viewBox="0 0 24 24" width="24" height="24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
+              <rect x="3" y="11" width="18" height="11" rx="2" ry="2" />
+              <path d="M7 11V7a5 5 0 0 1 10 0v4" />
+            </svg>
+          </div>
+          <h3>Đổi mật khẩu</h3>
+          <p className="card-desc">Vui lòng tạo mật khẩu mới mạnh và không sử dụng lại mật khẩu cũ.</p>
 
-          {!otpVerified && (
-            <div style={{ display: 'flex', gap: '8px', alignItems: 'flex-end' }}>
-              <div style={{ flex: 1 }}>
-                <FormField label="Mã OTP từ Email" htmlFor="reset-otp">
-                  <OtpInput
-                    value={otpForm.otp}
-                    onChange={val => setOtpForm(c => ({ ...c, otp: val }))}
-                    disabled={isVerifyingOtp}
+          <div className="security-method-selector">
+            <button
+              type="button"
+              className={`method-pill ${passwordMethod === 'current-password' ? 'active' : ''}`}
+              onClick={() => {
+                setPasswordMethod('current-password');
+                setOtpVerified(false);
+                setSecurityError(null);
+                setSecurityMessage(null);
+              }}
+            >
+              Dùng mật khẩu hiện tại
+            </button>
+            <button
+              type="button"
+              className={`method-pill ${passwordMethod === 'email-otp' ? 'active' : ''}`}
+              onClick={() => {
+                setPasswordMethod('email-otp');
+                setOtpVerified(false);
+                setOtpForm(c => ({ ...c, otp: '', newPassword: '', confirmPassword: '' }));
+                setSecurityError(null);
+                setSecurityMessage(null);
+              }}
+            >
+              Nhận mã OTP qua Email
+            </button>
+          </div>
+
+          {passwordMethod === 'current-password' && (
+            <form onSubmit={handleChangeWithCurrentPassword} className="security-form-fields">
+              <FormField label="Mật khẩu hiện tại *" htmlFor="security-current-password">
+                <div className="input-with-actions">
+                  <svg className="input-icon-left" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+                    <rect x="3" y="11" width="18" height="11" rx="2" ry="2" />
+                    <path d="M7 11V7a5 5 0 0 1 10 0v4" />
+                  </svg>
+                  <input
+                    id="security-current-password"
+                    className="ui-input"
+                    type={showCurrentPassword ? 'text' : 'password'}
+                    placeholder="Nhập mật khẩu hiện tại"
+                    value={currentPasswordForm.currentPassword}
+                    disabled={isSubmitting}
+                    onChange={e => setCurrentPasswordForm(c => ({ ...c, currentPassword: e.target.value }))}
                   />
-                </FormField>
-              </div>
-              <div style={{ marginBottom: '8px' }}>
-                <Button type="button" variant="secondary" onClick={() => void handleSendOtp()} disabled={isSendingOtp}>
-                  {isSendingOtp ? 'Đang gửi...' : 'Gửi mã OTP'}
-                </Button>
-              </div>
-            </div>
-          )}
-
-          {!otpVerified && (
-            <div className="auth-actions" style={{ marginTop: '16px' }}>
-              <Button type="button" onClick={() => void handleVerifyOtp()} disabled={isVerifyingOtp}>
-                {isVerifyingOtp ? 'Đang xác minh...' : 'Xác minh OTP'}
-              </Button>
-            </div>
-          )}
-
-          {otpVerified && (
-            <form onSubmit={handleResetWithOtp} style={{ display: 'flex', flexDirection: 'column', gap: '16px', marginTop: '16px' }}>
-              <FormField label="Mật khẩu mới" htmlFor="reset-new-password">
-                <input
-                  id="reset-new-password"
-                  className="ui-input"
-                  type="password"
-                  value={otpForm.newPassword}
-                  disabled={isSubmitting}
-                  onChange={e => setOtpForm(c => ({ ...c, newPassword: e.target.value }))}
-                />
+                  <button
+                    type="button"
+                    className="input-action-right"
+                    onClick={() => setShowCurrentPassword(!showCurrentPassword)}
+                    title={showCurrentPassword ? 'Ẩn mật khẩu' : 'Hiển thị mật khẩu'}
+                  >
+                    {showCurrentPassword ? (
+                      <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                        <path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19m-6.72-1.07a3 3 0 1 1-4.24-4.24" />
+                        <line x1="1" y1="1" x2="23" y2="23" />
+                      </svg>
+                    ) : (
+                      <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                        <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z" />
+                        <circle cx="12" cy="12" r="3" />
+                      </svg>
+                    )}
+                  </button>
+                </div>
               </FormField>
-              <FormField label="Xác nhận mật khẩu mới" htmlFor="reset-confirm-password">
-                <input
-                  id="reset-confirm-password"
-                  className="ui-input"
-                  type="password"
-                  value={otpForm.confirmPassword}
-                  disabled={isSubmitting}
-                  onChange={e => setOtpForm(c => ({ ...c, confirmPassword: e.target.value }))}
-                />
+
+              <FormField label="Mật khẩu mới *" htmlFor="security-new-password">
+                <div className="input-with-actions">
+                  <svg className="input-icon-left" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+                    <rect x="3" y="11" width="18" height="11" rx="2" ry="2" />
+                    <path d="M7 11V7a5 5 0 0 1 10 0v4" />
+                  </svg>
+                  <input
+                    id="security-new-password"
+                    className="ui-input"
+                    type={showNewPassword ? 'text' : 'password'}
+                    placeholder="Nhập mật khẩu mới"
+                    value={currentPasswordForm.newPassword}
+                    disabled={isSubmitting}
+                    onChange={e => setCurrentPasswordForm(c => ({ ...c, newPassword: e.target.value }))}
+                  />
+                  <button
+                    type="button"
+                    className="input-action-right"
+                    onClick={() => setShowNewPassword(!showNewPassword)}
+                    title={showNewPassword ? 'Ẩn mật khẩu' : 'Hiển thị mật khẩu'}
+                  >
+                    {showNewPassword ? (
+                      <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                        <path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19m-6.72-1.07a3 3 0 1 1-4.24-4.24" />
+                        <line x1="1" y1="1" x2="23" y2="23" />
+                      </svg>
+                    ) : (
+                      <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                        <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z" />
+                        <circle cx="12" cy="12" r="3" />
+                      </svg>
+                    )}
+                  </button>
+                </div>
+                
+                <div className="password-strength-section">
+                  <div className="strength-indicator-row">
+                    <div className="strength-bars">
+                      {(() => {
+                        const score = getPasswordStrength(currentPasswordForm.newPassword);
+                        return (
+                          <>
+                            <div className={`strength-bar ${score >= 1 ? `active level-${score}` : ''}`} />
+                            <div className={`strength-bar ${score >= 2 ? `active level-${score}` : ''}`} />
+                            <div className={`strength-bar ${score >= 3 ? `active level-${score}` : ''}`} />
+                            <div className={`strength-bar ${score >= 4 ? `active level-${score}` : ''}`} />
+                          </>
+                        );
+                      })()}
+                    </div>
+                    <span className="strength-hint-text">Mật khẩu phải có ít nhất 8 ký tự</span>
+                  </div>
+                </div>
               </FormField>
-              <div className="auth-actions">
-                <Button type="submit" disabled={isSubmitting}>
-                  {isSubmitting ? 'Đang lưu...' : 'Đặt lại mật khẩu'}
+
+              <FormField label="Xác nhận mật khẩu mới *" htmlFor="security-confirm-password">
+                <div className="input-with-actions">
+                  <svg className="input-icon-left" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+                    <rect x="3" y="11" width="18" height="11" rx="2" ry="2" />
+                    <path d="M7 11V7a5 5 0 0 1 10 0v4" />
+                  </svg>
+                  <input
+                    id="security-confirm-password"
+                    className="ui-input"
+                    type={showConfirmPassword ? 'text' : 'password'}
+                    placeholder="Nhập lại mật khẩu mới"
+                    value={currentPasswordForm.confirmPassword}
+                    disabled={isSubmitting}
+                    onChange={e => setCurrentPasswordForm(c => ({ ...c, confirmPassword: e.target.value }))}
+                  />
+                  <button
+                    type="button"
+                    className="input-action-right"
+                    onClick={() => setShowConfirmPassword(!showConfirmPassword)}
+                    title={showConfirmPassword ? 'Ẩn mật khẩu' : 'Hiển thị mật khẩu'}
+                  >
+                    {showConfirmPassword ? (
+                      <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                        <path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19m-6.72-1.07a3 3 0 1 1-4.24-4.24" />
+                        <line x1="1" y1="1" x2="23" y2="23" />
+                      </svg>
+                    ) : (
+                      <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                        <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z" />
+                        <circle cx="12" cy="12" r="3" />
+                      </svg>
+                    )}
+                  </button>
+                </div>
+              </FormField>
+
+              <div className="auth-actions" style={{ marginTop: '8px', display: 'flex', justifyContent: 'center', width: '100%' }}>
+                <Button type="submit" disabled={isSubmitting} style={{ display: 'inline-flex', alignItems: 'center', gap: '6px', padding: '12px 32px' }}>
+                  <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                    <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z" />
+                    <path d="m9 11 2 2 4-4" />
+                  </svg>
+                  {isSubmitting ? 'Đang lưu...' : 'Lưu mật khẩu mới'}
                 </Button>
               </div>
             </form>
           )}
+
+          {passwordMethod === 'email-otp' && (
+            <div className="security-form-fields">
+              <FormField label="Email" htmlFor="reset-email">
+                <div className="input-with-actions">
+                  <svg className="input-icon-left" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+                    <path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z" />
+                    <polyline points="22,6 12,13 2,6" />
+                  </svg>
+                  <input
+                    id="reset-email"
+                    className="ui-input"
+                    value={otpForm.email}
+                    disabled
+                  />
+                </div>
+              </FormField>
+
+              {!otpVerified && (
+                <div style={{ display: 'flex', gap: '12px', alignItems: 'flex-end', width: '100%' }}>
+                  <div style={{ flex: 1 }}>
+                    <FormField label="Mã OTP từ Email" htmlFor="reset-otp">
+                      <OtpInput
+                        value={otpForm.otp}
+                        onChange={val => setOtpForm(c => ({ ...c, otp: val }))}
+                        disabled={isVerifyingOtp}
+                      />
+                    </FormField>
+                  </div>
+                  <div style={{ marginBottom: '0px' }}>
+                    <Button type="button" variant="secondary" onClick={() => void handleSendOtp()} disabled={isSendingOtp} style={{ height: '46px' }}>
+                      {isSendingOtp ? 'Đang gửi...' : 'Gửi mã OTP'}
+                    </Button>
+                  </div>
+                </div>
+              )}
+
+              {!otpVerified && (
+                <div className="auth-actions" style={{ display: 'flex', justifyContent: 'center', width: '100%' }}>
+                  <Button type="button" onClick={() => void handleVerifyOtp()} disabled={isVerifyingOtp} style={{ padding: '12px 32px' }}>
+                    {isVerifyingOtp ? 'Đang xác minh...' : 'Xác minh OTP'}
+                  </Button>
+                </div>
+              )}
+
+              {otpVerified && (
+                <form onSubmit={handleResetWithOtp} style={{ display: 'flex', flexDirection: 'column', gap: '20px', width: '100%' }}>
+                  <FormField label="Mật khẩu mới *" htmlFor="reset-new-password">
+                    <div className="input-with-actions">
+                      <svg className="input-icon-left" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+                        <rect x="3" y="11" width="18" height="11" rx="2" ry="2" />
+                        <path d="M7 11V7a5 5 0 0 1 10 0v4" />
+                      </svg>
+                      <input
+                        id="reset-new-password"
+                        className="ui-input"
+                        type={showOtpNewPassword ? 'text' : 'password'}
+                        placeholder="Nhập mật khẩu mới"
+                        value={otpForm.newPassword}
+                        disabled={isSubmitting}
+                        onChange={e => setOtpForm(c => ({ ...c, newPassword: e.target.value }))}
+                      />
+                      <button
+                        type="button"
+                        className="input-action-right"
+                        onClick={() => setShowOtpNewPassword(!showOtpNewPassword)}
+                        title={showOtpNewPassword ? 'Ẩn mật khẩu' : 'Hiển thị mật khẩu'}
+                      >
+                        {showOtpNewPassword ? (
+                          <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                            <path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19m-6.72-1.07a3 3 0 1 1-4.24-4.24" />
+                            <line x1="1" y1="1" x2="23" y2="23" />
+                          </svg>
+                        ) : (
+                          <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                            <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z" />
+                            <circle cx="12" cy="12" r="3" />
+                          </svg>
+                        )}
+                      </button>
+                    </div>
+
+                    <div className="password-strength-section">
+                      <div className="strength-indicator-row">
+                        <div className="strength-bars">
+                          {(() => {
+                            const score = getPasswordStrength(otpForm.newPassword);
+                            return (
+                              <>
+                                <div className={`strength-bar ${score >= 1 ? `active level-${score}` : ''}`} />
+                                <div className={`strength-bar ${score >= 2 ? `active level-${score}` : ''}`} />
+                                <div className={`strength-bar ${score >= 3 ? `active level-${score}` : ''}`} />
+                                <div className={`strength-bar ${score >= 4 ? `active level-${score}` : ''}`} />
+                              </>
+                            );
+                          })()}
+                        </div>
+                        <span className="strength-hint-text">Mật khẩu phải có ít nhất 8 ký tự</span>
+                      </div>
+                    </div>
+                  </FormField>
+
+                  <FormField label="Xác nhận mật khẩu mới *" htmlFor="reset-confirm-password">
+                    <div className="input-with-actions">
+                      <svg className="input-icon-left" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+                        <rect x="3" y="11" width="18" height="11" rx="2" ry="2" />
+                        <path d="M7 11V7a5 5 0 0 1 10 0v4" />
+                      </svg>
+                      <input
+                        id="reset-confirm-password"
+                        className="ui-input"
+                        type={showOtpConfirmPassword ? 'text' : 'password'}
+                        placeholder="Nhập lại mật khẩu mới"
+                        value={otpForm.confirmPassword}
+                        disabled={isSubmitting}
+                        onChange={e => setOtpForm(c => ({ ...c, confirmPassword: e.target.value }))}
+                      />
+                      <button
+                        type="button"
+                        className="input-action-right"
+                        onClick={() => setShowOtpConfirmPassword(!showOtpConfirmPassword)}
+                        title={showOtpConfirmPassword ? 'Ẩn mật khẩu' : 'Hiển thị mật khẩu'}
+                      >
+                        {showOtpConfirmPassword ? (
+                          <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                            <path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19m-6.72-1.07a3 3 0 1 1-4.24-4.24" />
+                            <line x1="1" y1="1" x2="23" y2="23" />
+                          </svg>
+                        ) : (
+                          <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                            <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z" />
+                            <circle cx="12" cy="12" r="3" />
+                          </svg>
+                        )}
+                      </button>
+                    </div>
+                  </FormField>
+
+                  <div className="auth-actions" style={{ display: 'flex', justifyContent: 'center', width: '100%' }}>
+                    <Button type="submit" disabled={isSubmitting} style={{ display: 'inline-flex', alignItems: 'center', gap: '6px', padding: '12px 32px' }}>
+                      <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                        <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z" />
+                        <path d="m9 11 2 2 4-4" />
+                      </svg>
+                      {isSubmitting ? 'Đang lưu...' : 'Đặt lại mật khẩu'}
+                    </Button>
+                  </div>
+                </form>
+              )}
+            </div>
+          )}
         </div>
       )}
 
-      {securityMode === 'devices' && (
-        <div className="sessions-list" style={{ marginTop: '16px' }}>
+      {activeTab === 'devices' && (
+        <div className="security-devices-card">
+          <h3>Thiết bị đang đăng nhập</h3>
+          <p className="card-desc">Quản lý và đăng xuất khỏi các phiên đăng nhập hoạt động trên các thiết bị khác nhau.</p>
+
           {isLoadingSessions ? (
             <LoadingState message="Đang tải thiết bị..." />
           ) : sessionsError ? (
             <Alert type="error">{sessionsError}</Alert>
           ) : sessions.length === 0 ? (
-            <p className="subtle">Không có thiết bị nào đang đăng nhập.</p>
+            <p className="subtle" style={{ textAlign: 'left' }}>Không có thiết bị nào đang đăng nhập.</p>
           ) : (
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+            <div className="device-list" style={{ marginTop: '0' }}>
               {sessions.map(session => (
-                <div 
-                  key={session.id} 
-                  style={{ 
-                    display: 'flex', 
-                    justifyContent: 'space-between', 
-                    alignItems: 'center',
-                    padding: '16px',
-                    borderRadius: '8px',
-                    border: session.isCurrentSession ? '2px solid #3b82f6' : '1px solid #e2e8f0',
-                    background: session.isCurrentSession ? '#eff6ff' : '#ffffff'
-                  }}
-                >
-                  <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
-                    <div style={{ fontWeight: 600, color: '#0f172a', display: 'flex', alignItems: 'center', gap: '8px' }}>
-                      {parseUserAgent(session.userAgent)}
-                      {session.isCurrentSession && (
-                        <span style={{ fontSize: '0.75rem', padding: '2px 8px', background: '#3b82f6', color: 'white', borderRadius: '12px' }}>Hiện tại</span>
+                <div key={session.id} className="device-item">
+                  <div className="device-info">
+                    <div className="device-icon">
+                      {session.userAgent?.toLowerCase().includes('iphone') || session.userAgent?.toLowerCase().includes('android') ? (
+                        <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                          <rect x="5" y="2" width="14" height="20" rx="2" ry="2" />
+                          <line x1="12" y1="18" x2="12.01" y2="18" />
+                        </svg>
+                      ) : (
+                        <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                          <rect x="2" y="3" width="20" height="14" rx="2" ry="2" />
+                          <line x1="8" y1="21" x2="16" y2="21" />
+                          <line x1="12" y1="17" x2="12" y2="21" />
+                        </svg>
                       )}
                     </div>
-                    <div style={{ fontSize: '0.85rem', color: '#64748b' }}>
-                      IP: {session.ipAddress || 'Không xác định'}
-                    </div>
-                    <div style={{ fontSize: '0.85rem', color: '#64748b' }}>
-                      Đăng nhập lúc: {new Date(session.createdAt).toLocaleString()}
-                    </div>
-                    <div style={{ fontSize: '0.85rem', color: '#64748b' }}>
-                      Hết hạn: {new Date(session.expiresAt).toLocaleString()}
+                    <div className="device-details">
+                      <div className="device-name">
+                        {parseUserAgent(session.userAgent)}
+                      </div>
+                      <div className="device-meta">
+                        IP: {session.ipAddress || 'Không xác định'} • Đăng nhập: {new Date(session.createdAt).toLocaleString()}
+                      </div>
+                      <div className="device-meta" style={{ fontSize: '11px', color: '#94a3b8' }}>
+                        Hết hạn: {new Date(session.expiresAt).toLocaleString()}
+                      </div>
                     </div>
                   </div>
-                  <button
-                    type="button"
-                    style={{
-                      background: 'transparent',
-                      border: '1px solid #ef4444',
-                      color: '#ef4444',
-                      padding: '8px 16px',
-                      borderRadius: '6px',
-                      cursor: 'pointer',
-                      fontWeight: 500,
-                      transition: 'all 0.15s'
-                    }}
-                    onMouseEnter={e => { e.currentTarget.style.background = '#fef2f2'; }}
-                    onMouseLeave={e => { e.currentTarget.style.background = 'transparent'; }}
-                    onClick={() => void handleRevokeSession(session.id, session.isCurrentSession)}
-                  >
-                    Đăng xuất
-                  </button>
+                  <div className="device-action">
+                    {session.isCurrentSession ? (
+                      <span className="device-current-badge">Thiết bị hiện tại</span>
+                    ) : (
+                      <button
+                        type="button"
+                        className="device-revoke-btn"
+                        onClick={() => void handleRevokeSession(session.id, session.isCurrentSession)}
+                      >
+                        Đăng xuất
+                      </button>
+                    )}
+                  </div>
                 </div>
               ))}
             </div>
           )}
+        </div>
+      )}
+
+      {activeTab === 'activity-logs' && (
+        <div className="security-devices-card">
+          <h3>Lịch sử hoạt động</h3>
+          <p className="card-desc">Xem nhật ký các hoạt động bảo mật gần đây trên tài khoản của bạn để đảm bảo an toàn.</p>
+
+          <div className="activity-logs-list">
+            <div className="activity-log-item">
+              <div className="activity-log-icon-box login">
+                <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
+                  <path d="M15 3h4a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2h-4" />
+                  <polyline points="10 17 15 12 10 7" />
+                  <line x1="15" y1="12" x2="3" y2="12" />
+                </svg>
+              </div>
+              <div className="activity-log-details">
+                <div className="activity-log-title">Đăng nhập hệ thống thành công</div>
+                <div className="activity-log-meta">Chrome trên Windows • IP: 113.161.x.x • Hà Nội, Việt Nam</div>
+              </div>
+              <div className="activity-log-time">10 phút trước</div>
+            </div>
+
+            <div className="activity-log-item">
+              <div className="activity-log-icon-box security">
+                <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
+                  <rect x="3" y="11" width="18" height="11" rx="2" ry="2" />
+                  <path d="M7 11V7a5 5 0 0 1 10 0v4" />
+                </svg>
+              </div>
+              <div className="activity-log-details">
+                <div className="activity-log-title">Đổi mật khẩu tài khoản</div>
+                <div className="activity-log-meta">Firefox trên macOS • IP: 14.161.x.x • Đà Nẵng, Việt Nam</div>
+              </div>
+              <div className="activity-log-time">Hôm qua, 18:24</div>
+            </div>
+
+            <div className="activity-log-item">
+              <div className="activity-log-icon-box logout">
+                <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
+                  <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4" />
+                  <polyline points="16 17 21 12 16 7" />
+                  <line x1="21" y1="12" x2="9" y2="12" />
+                </svg>
+              </div>
+              <div className="activity-log-details">
+                <div className="activity-log-title">Đăng xuất khỏi thiết bị (Revoke session)</div>
+                <div className="activity-log-meta">Safari trên iOS • IP: 171.244.x.x • TP. Hồ Chí Minh, Việt Nam</div>
+              </div>
+              <div className="activity-log-time">3 ngày trước</div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {activeTab === 'change-password' && (
+        <div className="security-info-banner">
+          <div className="security-info-banner-icon">
+            <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
+              <circle cx="12" cy="12" r="10" />
+              <line x1="12" y1="16" x2="12" y2="12" />
+              <line x1="12" y1="8" x2="12.01" y2="8" />
+            </svg>
+          </div>
+          <div className="security-info-banner-content">
+            <span className="security-info-banner-title">Mẹo bảo mật</span>
+            <span className="security-info-banner-desc">
+              Sử dụng mật khẩu mạnh với chữ hoa, chữ thường, số và ký tự đặc biệt để bảo vệ tài khoản của bạn.
+            </span>
+          </div>
         </div>
       )}
     </div>

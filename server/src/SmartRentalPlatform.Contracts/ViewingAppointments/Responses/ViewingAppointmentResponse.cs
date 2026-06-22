@@ -15,6 +15,11 @@ namespace SmartRentalPlatform.Contracts.ViewingAppointments.Responses
         public string? LandlordNote { get; set; }
         public string? CancelReason { get; set; }
         public DateTimeOffset? RespondedAt { get; set; }
+
+        // Landlord proposal after rejection
+        public DateTimeOffset? ProposedScheduledAt { get; set; }
+        public int? ProposedDurationMinutes { get; set; }
+
         public DateTimeOffset CreatedAt { get; set; }
         public DateTimeOffset UpdatedAt { get; set; }
 

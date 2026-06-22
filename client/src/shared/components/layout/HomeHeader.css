@@ -3,22 +3,50 @@
   display: flex;
   justify-content: space-between;
   align-items: center;
-  padding: 0 40px;
+  padding: 10px 32px;
   min-height: 72px;
   background: #ffffff;
-  border-bottom: 1px solid #e2e8f0;
+  border: none;
+  border-bottom: 1px solid #f1f5f9;
+  border-radius: 0;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.02), 0 1px 2px rgba(0, 0, 0, 0.01);
+  margin: 0;
   position: sticky;
   top: 0;
   z-index: 1200;
+  transition: all 0.3s ease;
 }
 
 .header-logo {
-  font-size: 22px;
-  font-weight: 800;
-  color: #246bfe;
+  display: flex;
+  align-items: center;
   cursor: pointer;
-  letter-spacing: -0.02em;
   flex-shrink: 0;
+}
+
+.logo-icon-container {
+  background: #246bfe;
+  border-radius: 8px;
+  padding: 6px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  height: 32px;
+  margin-right: 10px;
+  box-shadow: 0 2px 8px rgba(36, 107, 254, 0.2);
+}
+
+.logo-svg-icon {
+  width: 18px;
+  height: 18px;
+}
+
+.logo-text {
+  font-size: 20px;
+  font-weight: 800;
+  color: #0f172a;
+  letter-spacing: -0.02em;
 }
 
 .header-center {
@@ -57,6 +85,44 @@
   gap: 10px;
 }
 
+/* Custom Channel Buttons */
+.landlord-channel-btn,
+.admin-channel-btn {
+  background: #eff6ff !important;
+  color: #246bfe !important;
+  border: none !important;
+  border-radius: 999px !important;
+  padding: 10px 20px !important;
+  font-size: 14px !important;
+  font-weight: 700 !important;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  transition: all 0.2s ease;
+  height: 42px;
+}
+
+.landlord-channel-btn:hover,
+.admin-channel-btn:hover {
+  background: #dbeafe !important;
+  transform: translateY(-1px);
+}
+
+.landlord-register-btn {
+  border-radius: 999px !important;
+  padding: 10px 20px !important;
+  font-size: 14px !important;
+  font-weight: 700 !important;
+  height: 42px;
+}
+
+.btn-icon {
+  width: 16px;
+  height: 16px;
+  stroke-width: 2.5;
+}
+
 /* Avatar Dropdown */
 .avatar-wrapper {
   position: relative;
@@ -65,13 +131,13 @@
 .avatar-btn {
   display: flex;
   align-items: center;
-  gap: 10px;
+  gap: 8px;
   background: transparent;
   border: none;
   cursor: pointer;
-  padding: 6px 12px;
+  padding: 6px 14px 6px 6px;
   border-radius: 999px;
-  transition: background 0.15s;
+  transition: all 0.2s ease;
 }
 
 .avatar-btn:hover {
@@ -96,13 +162,20 @@
   height: 36px;
   border-radius: 50%;
   object-fit: cover;
-  border: 1px solid #e2e8f0;
+  border: 1.5px solid #e2e8f0;
 }
 
 .avatar-name {
   font-size: 14px;
   font-weight: 600;
-  color: #1e293b;
+  color: #0f172a;
+}
+
+.avatar-chevron {
+  width: 12px;
+  height: 12px;
+  color: #64748b;
+  margin-left: 2px;
 }
 
 .avatar-dropdown {
