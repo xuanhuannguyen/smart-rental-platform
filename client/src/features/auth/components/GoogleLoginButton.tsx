@@ -25,7 +25,7 @@ export function GoogleLoginButton({ onCredential }: GoogleLoginButtonProps) {
   const containerRef = useRef<HTMLDivElement>(null);
   const buttonRef = useRef<HTMLDivElement>(null);
   const [scriptError, setScriptError] = useState('');
-  const [width, setWidth] = useState(0);
+  const [width, setWidth] = useState(280);
 
   // Measure parent width using ResizeObserver to ensure exact calculated width
   useEffect(() => {
@@ -95,7 +95,7 @@ export function GoogleLoginButton({ onCredential }: GoogleLoginButtonProps) {
   return (
     <>
       <div className="auth-google-button" ref={containerRef} style={{ width: '100%', display: 'flex', justifyContent: 'center' }}>
-        {width > 0 && <div key={width} ref={buttonRef} style={{ width: '100%', display: 'flex', justifyContent: 'center' }} />}
+        <div key={width} ref={buttonRef} style={{ width: '100%', display: 'flex', justifyContent: 'center' }} />
       </div>
       {scriptError && <p className="auth-note">{scriptError}</p>}
     </>

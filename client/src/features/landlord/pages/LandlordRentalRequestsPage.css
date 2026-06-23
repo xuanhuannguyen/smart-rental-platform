@@ -1,159 +1,333 @@
-/* client/src/features/landlord/pages/LandlordRentalRequestsPage.css */
+/* =====================================================
+   LANDLORD RENTAL REQUESTS PAGE — Premium UI
+   ===================================================== */
 
-.landlord-dashboard-page .dashboard-main {
-  padding: 32px;
-  background-color: #f8fafc;
-}
-
-.overview-band {
+/* ── Page Header ── */
+.rr-page-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  background: #ffffff;
+  border: 1px solid #e8edf5;
+  border-radius: 16px;
+  padding: 28px 32px;
   margin-bottom: 24px;
+  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.04);
+  overflow: hidden;
 }
 
-.overview-band .eyebrow {
-  font-size: 0.875rem;
-  font-weight: 600;
-  color: #475569;
-  letter-spacing: 0.05em;
-  margin: 0 0 4px 0;
+.rr-page-header__left {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
 }
 
-.overview-band h2 {
-  font-size: 1.875rem;
-  color: #1e293b;
-  margin: 0 0 8px 0;
-}
-
-.overview-description {
-  color: #64748b;
-  font-size: 1rem;
+.rr-eyebrow {
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.1em;
+  color: #246bfe;
+  text-transform: uppercase;
   margin: 0;
 }
 
-.landlord-tabs {
-  display: flex;
-  gap: 8px;
-  margin-bottom: 24px;
-  overflow-x: auto;
-  padding-bottom: 8px;
+.rr-page-title {
+  font-size: 32px;
+  font-weight: 800;
+  color: #0f172a;
+  margin: 0;
+  line-height: 1.15;
 }
 
-.landlord-tabs button {
+.rr-page-subtitle {
+  font-size: 14px;
+  color: #64748b;
+  margin: 0;
+}
+
+.rr-page-header__illus {
+  flex-shrink: 0;
+  opacity: 0.9;
+}
+
+/* ── Tabs ── */
+.rr-tabs {
+  display: flex;
+  gap: 6px;
+  margin-bottom: 24px;
+  overflow-x: auto;
+  padding-bottom: 2px;
+  scrollbar-width: none;
+}
+
+.rr-tabs::-webkit-scrollbar { display: none; }
+
+.rr-tab {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
   padding: 8px 16px;
-  border: none;
-  background-color: #f1f5f9;
-  color: #475569;
-  border-radius: 8px;
+  border: 1.5px solid #e2e8f0;
+  background: #ffffff;
+  color: #64748b;
+  border-radius: 10px;
+  font-size: 13.5px;
+  font-weight: 600;
   cursor: pointer;
-  font-weight: 500;
-  transition: all 0.2s;
+  transition: all 0.2s ease;
   white-space: nowrap;
 }
 
-.landlord-tabs button:hover {
-  background-color: #e2e8f0;
+.rr-tab:hover {
+  border-color: #246bfe;
+  color: #246bfe;
+  background: #f0f6ff;
 }
 
-.landlord-tabs button.active {
-  background-color: #3b82f6;
-  color: white;
+.rr-tab--active {
+  background: #246bfe;
+  border-color: #246bfe;
+  color: #ffffff;
+  box-shadow: 0 4px 12px rgba(36, 107, 254, 0.25);
 }
 
-.requests-grid {
-  display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
-  gap: 24px;
+.rr-tab--active:hover {
+  background: #1a5ce0;
+  border-color: #1a5ce0;
+  color: #ffffff;
 }
 
-.request-card {
-  background: white;
-  border-radius: 12px;
-  border: 1px solid #e2e8f0;
-  padding: 20px;
+.rr-tab-count {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 20px;
+  height: 18px;
+  padding: 0 5px;
+  border-radius: 9px;
+  font-size: 11px;
+  font-weight: 700;
+  background: rgba(255,255,255,0.25);
+  color: inherit;
+  line-height: 1;
+}
+
+.rr-tab:not(.rr-tab--active) .rr-tab-count {
+  background: #f1f5f9;
+  color: #475569;
+}
+
+/* ── State Boxes ── */
+.rr-section { }
+
+.rr-state-box {
   display: flex;
   flex-direction: column;
+  align-items: center;
+  gap: 14px;
+  padding: 64px 24px;
+  color: #94a3b8;
+  font-size: 15px;
+  text-align: center;
+}
+
+.rr-state-box p { margin: 0; }
+
+@keyframes rrSpin {
+  from { transform: rotate(0deg); }
+  to   { transform: rotate(360deg); }
+}
+
+/* ── Grid ── */
+.rr-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(340px, 1fr));
+  gap: 20px;
+}
+
+/* ── Card ── */
+.rr-card {
+  background: #ffffff;
+  border: 1px solid #e8edf5;
+  border-left: 4px solid #e8edf5;
+  border-radius: 16px;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.04);
   transition: transform 0.2s ease, box-shadow 0.2s ease;
 }
 
-.request-card:hover {
+.rr-card:hover {
   transform: translateY(-2px);
-  box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05);
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.08);
 }
 
-.request-card-header {
+/* Status accent left border */
+.rr-card--accepted { border-left-color: #22c55e; }
+.rr-card--rejected { border-left-color: #ef4444; }
+.rr-card--neutral  { border-left-color: #94a3b8; }
+.rr-card--pending  { border-left-color: #f59e0b; }
+
+/* ── Card Header ── */
+.rr-card__header {
   display: flex;
-  justify-content: space-between;
   align-items: flex-start;
-  margin-bottom: 16px;
-  padding-bottom: 12px;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 18px 20px 14px;
   border-bottom: 1px solid #f1f5f9;
 }
 
-.request-card-title h3 {
-  margin: 0 0 4px 0;
-  font-size: 1.125rem;
+.rr-card__title-row {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+}
+
+.rr-card__icon {
+  width: 36px;
+  height: 36px;
+  background: #f0f6ff;
+  border-radius: 8px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: #246bfe;
+  flex-shrink: 0;
+  margin-top: 2px;
+}
+
+.rr-card__room {
+  font-size: 15px;
+  font-weight: 700;
   color: #0f172a;
+  margin: 0 0 4px 0;
+  line-height: 1.3;
 }
 
-.tenant-name {
-  margin: 0;
-  font-size: 0.9rem;
+.rr-card__tenant {
+  font-size: 13px;
   color: #64748b;
+  margin: 0;
 }
 
-.request-card-body {
+/* ── Status Badge ── */
+.rr-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 5px 12px;
+  border-radius: 20px;
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 0.02em;
+  white-space: nowrap;
+  flex-shrink: 0;
+}
+
+.rr-badge--pending {
+  background: #fff7ed;
+  color: #c2410c;
+  border: 1px solid #fed7aa;
+}
+
+.rr-badge--accepted {
+  background: #f0fdf4;
+  color: #15803d;
+  border: 1px solid #bbf7d0;
+}
+
+.rr-badge--rejected {
+  background: #fef2f2;
+  color: #b91c1c;
+  border: 1px solid #fecaca;
+}
+
+.rr-badge--cancelled {
+  background: #f8fafc;
+  color: #64748b;
+  border: 1px solid #e2e8f0;
+}
+
+.rr-badge--expired {
+  background: #f8fafc;
+  color: #94a3b8;
+  border: 1px solid #e2e8f0;
+}
+
+/* ── Card Body — Info Rows ── */
+.rr-card__body {
+  padding: 14px 20px;
   display: flex;
   flex-direction: column;
-  gap: 12px;
-  margin-bottom: 20px;
-  flex-grow: 1;
+  gap: 10px;
+  flex: 1;
 }
 
-.info-row {
+.rr-info-row {
   display: flex;
-  justify-content: space-between;
-  font-size: 0.95rem;
+  align-items: center;
+  gap: 8px;
+  font-size: 14px;
 }
 
-.info-row .label {
+.rr-info-row__icon {
+  color: #94a3b8;
+  display: flex;
+  align-items: center;
+  flex-shrink: 0;
+}
+
+.rr-info-row__label {
   color: #64748b;
-}
-
-.info-row .value {
-  color: #1e293b;
+  white-space: nowrap;
   font-weight: 500;
+  min-width: 100px;
 }
 
-.request-card-footer {
-  display: flex;
-  justify-content: flex-end;
-  padding-top: 16px;
+.rr-info-row__value {
+  color: #1e293b;
+  font-weight: 600;
+  margin-left: auto;
+  text-align: right;
+}
+
+.rr-info-row__value--price {
+  color: #0f172a;
+  font-weight: 700;
+}
+
+/* ── Card Footer ── */
+.rr-card__footer {
+  padding: 14px 20px 18px;
   border-top: 1px solid #f1f5f9;
 }
 
-.status-badge {
-  padding: 6px 12px;
-  border-radius: 9999px;
-  font-size: 0.85rem;
-  font-weight: 600;
-  white-space: nowrap;
+.rr-btn-detail {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  width: 100%;
+  padding: 11px 20px;
+  background: #246bfe;
+  color: #ffffff;
+  border: none;
+  border-radius: 10px;
+  font-size: 14px;
+  font-weight: 700;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  box-shadow: 0 4px 12px rgba(36, 107, 254, 0.25);
 }
 
-.status-badge.pending {
-  background-color: #eff6ff;
-  color: #2563eb;
+.rr-btn-detail:hover {
+  background: #1a5ce0;
+  box-shadow: 0 6px 16px rgba(36, 107, 254, 0.35);
+  transform: translateY(-1px);
 }
 
-.status-badge.accepted {
-  background-color: #dcfce7;
-  color: #16a34a;
-}
-
-.status-badge.rejected {
-  background-color: #fee2e2;
-  color: #dc2626;
-}
-
-.status-badge.cancelled {
-  background-color: #f1f5f9;
-  color: #64748b;
+.rr-btn-detail:active {
+  transform: translateY(0);
 }

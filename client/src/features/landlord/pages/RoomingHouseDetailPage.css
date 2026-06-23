@@ -170,89 +170,176 @@
 
 .rooming-house-detail-page .overview-stats {
   display: flex;
-  flex-wrap: wrap;
-  gap: 12px;
-  justify-content: flex-end;
+  gap: 16px;
+  align-items: center;
 }
 
 .rooming-house-detail-page .stat-item {
   display: flex;
+  flex-direction: row;
   align-items: center;
-  gap: 6px;
-  padding: 6px 10px;
-  border-radius: 6px;
-  border: 1px solid transparent;
-  font-size: 12px;
-  font-weight: 500;
+  padding: 10px 16px;
+  border-radius: 10px;
+  background: #ffffff;
+  border: 1px solid #cbd5e1;
+  min-width: 140px;
+  gap: 12px;
+  text-align: left;
 }
 
 .rooming-house-detail-page .stat-item svg {
-  width: 14px;
-  height: 14px;
+  width: 20px;
+  height: 20px;
+  flex-shrink: 0;
 }
 
-.rooming-house-detail-page .stat-item span {
-  color: inherit;
-  font-size: 12px;
-  font-weight: 600;
+.rooming-house-detail-page .stat-info {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.rooming-house-detail-page .stat-label {
+  font-size: 12.5px;
+  font-weight: 500;
+  color: #64748b;
   white-space: nowrap;
 }
 
-.rooming-house-detail-page .stat-badge {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  min-width: 18px;
-  height: 18px;
-  padding: 0 4px;
-  border-radius: 999px;
-  font-size: 10px;
+.rooming-house-detail-page .stat-number {
+  font-size: 18px;
   font-weight: 700;
-  margin-left: 6px;
+  color: #0f172a;
 }
 
 /* Total Stat Item */
-.rooming-house-detail-page .stat-item--total {
-  background: #f3f4f6;
-  border-color: #e5e7eb;
-  color: #4b5563;
+.rooming-house-detail-page .stat-item--total svg {
+  color: #475569;
 }
-.rooming-house-detail-page .stat-item--total .stat-badge {
-  background: #cbd5e1;
-  color: #1f2937;
+.rooming-house-detail-page .stat-item--total .stat-label {
+  color: #64748b;
+}
+.rooming-house-detail-page .stat-item--total .stat-number {
+  color: #0f172a;
 }
 
 /* Available Rooms */
-.rooming-house-detail-page .stat-item--approved {
-  background: #f0fdf4;
-  border-color: #bbf7d0;
-  color: #166534;
+.rooming-house-detail-page .stat-item--approved svg {
+  color: #16a34a;
 }
-.rooming-house-detail-page .stat-item--approved .stat-badge {
-  background: #86efac;
-  color: #14532d;
+.rooming-house-detail-page .stat-item--approved .stat-label {
+  color: #16a34a;
+}
+.rooming-house-detail-page .stat-item--approved .stat-number {
+  color: #16a34a;
 }
 
 /* Occupied Rooms */
-.rooming-house-detail-page .stat-item--pending {
-  background: #eff6ff;
-  border-color: #bfdbfe;
-  color: #1e40af;
+.rooming-house-detail-page .stat-item--pending svg {
+  color: #2563eb;
 }
-.rooming-house-detail-page .stat-item--pending .stat-badge {
-  background: #3b82f6;
-  color: #ffffff;
+.rooming-house-detail-page .stat-item--pending .stat-label {
+  color: #2563eb;
+}
+.rooming-house-detail-page .stat-item--pending .stat-number {
+  color: #2563eb;
 }
 
 /* Hidden Rooms */
-.rooming-house-detail-page .stat-item--rejected {
-  background: #fee2e2;
-  border-color: #fecaca;
-  color: #991b1b;
+.rooming-house-detail-page .stat-item--rejected svg {
+  color: #dc2626;
 }
-.rooming-house-detail-page .stat-item--rejected .stat-badge {
-  background: #fca5a5;
-  color: #7f1d1d;
+.rooming-house-detail-page .stat-item--rejected .stat-label {
+  color: #dc2626;
+}
+.rooming-house-detail-page .stat-item--rejected .stat-number {
+  color: #dc2626;
+}
+
+/* ─── Navigation and Action Buttons ─── */
+.rooming-house-detail-page .nav-tab-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  min-height: 42px;
+  padding: 8px 16px;
+  border-radius: 8px;
+  background: #ffffff;
+  color: #475569;
+  font-weight: 500;
+  font-size: 14.5px;
+  border: 1px solid #e2e8f0;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  position: relative;
+}
+
+.rooming-house-detail-page .nav-tab-btn:hover {
+  background: #f8fafc;
+  color: #0f172a;
+  border-color: #cbd5e1;
+}
+
+.rooming-house-detail-page .nav-tab-btn.active {
+  color: #2563eb;
+  font-weight: 600;
+  border-color: #3b82f6;
+  background: #ffffff;
+  border-bottom: 3.5px solid #2563eb;
+  padding-bottom: 5.5px;
+}
+
+.rooming-house-detail-page .action-btn-outline {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  min-height: 42px;
+  padding: 8px 18px;
+  border-radius: 8px;
+  background: #ffffff;
+  color: #334155;
+  font-weight: 500;
+  font-size: 14.5px;
+  border: 1px solid #e2e8f0;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.rooming-house-detail-page .action-btn-outline:hover:not(:disabled) {
+  background: #f8fafc;
+  border-color: #cbd5e1;
+  color: #0f172a;
+}
+
+.rooming-house-detail-page .action-btn-outline svg {
+  color: currentColor;
+}
+
+.rooming-house-detail-page .action-btn-primary {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  min-height: 42px;
+  padding: 8px 18px;
+  border-radius: 8px;
+  background: #2563eb;
+  color: #ffffff;
+  font-weight: 600;
+  font-size: 14.5px;
+  border: none;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.rooming-house-detail-page .action-btn-primary:hover:not(:disabled) {
+  background: #1d4ed8;
+  box-shadow: 0 4px 6px rgba(37, 99, 235, 0.15);
+}
+
+.rooming-house-detail-page .action-btn-primary:disabled {
+  background: #93c5fd;
+  cursor: not-allowed;
+  opacity: 0.7;
 }
 
 .rooming-house-detail-page .overview-actions {
@@ -400,7 +487,33 @@
   font-size: 13px;
 }
 
-.empty-panel,
+.empty-panel {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  text-align: center;
+  padding: 48px 24px;
+  background: #ffffff;
+  border: 1px solid #dbe3ef;
+  border-radius: 12px;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05);
+}
+
+.empty-panel h2 {
+  margin: 16px 0 8px;
+  font-size: 20px;
+  font-weight: 700;
+  color: #0f172a;
+}
+
+.empty-panel p {
+  margin: 0 0 24px;
+  font-size: 14px;
+  color: #64748b;
+  max-width: 420px;
+  line-height: 1.5;
+}
+
 .editor-panel {
   padding: 24px;
   border: 1px solid #dbe3ef;
@@ -408,14 +521,32 @@
   background: #ffffff;
 }
 
-.empty-panel h2 {
-  margin: 0 0 8px;
-  font-size: 20px;
+/* Alert banner */
+.rooming-house-rule-editor__alert {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 14px 18px;
+  border-radius: 8px;
+  font-size: 14px;
+  line-height: 1.5;
+  margin-bottom: 8px;
 }
 
-.empty-panel p {
-  margin: 0;
-  color: #64748b;
+.rooming-house-rule-editor__alert svg {
+  flex-shrink: 0;
+  width: 20px;
+  height: 20px;
+}
+
+.rooming-house-rule-editor__alert--warning {
+  background: #fffbeb;
+  color: #b45309;
+  border: 1px solid #fcd34d;
+}
+
+.rooming-house-rule-editor__alert--warning svg {
+  color: #d97706;
 }
 
 .back-link {
@@ -492,6 +623,21 @@
   border: 1px solid #cbd5e1;
   border-radius: 6px;
   font: inherit;
+  transition: border-color 0.2s ease, box-shadow 0.2s ease;
+}
+
+.field input:hover:not(:disabled),
+.field select:hover:not(:disabled),
+.field textarea:hover:not(:disabled) {
+  border-color: #94a3b8;
+}
+
+.field input:focus:not(:disabled),
+.field select:focus:not(:disabled),
+.field textarea:focus:not(:disabled) {
+  outline: none;
+  border-color: #2563eb;
+  box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.1);
 }
 
 .field input[type="checkbox"] {
@@ -601,7 +747,7 @@
 
 .service-price-batch-table {
   display: grid;
-  border: 1px solid #dbe3ef;
+  border: 1px solid #cbd5e1;
   border-radius: 8px;
   overflow: hidden;
   background: #ffffff;
@@ -609,12 +755,12 @@
 
 .service-price-batch-row {
   display: grid;
-  grid-template-columns: 1.2fr 1.6fr 1.7fr 1.2fr 1.2fr;
+  grid-template-columns: 1.5fr 1.2fr 2fr 1.3fr 1.3fr 0.3fr;
   align-items: center;
-  gap: 14px;
-  min-height: 92px;
-  padding: 14px 18px;
-  border-bottom: 1px solid #e2e8f0;
+  gap: 16px;
+  min-height: 84px;
+  padding: 12px 20px;
+  border-bottom: 1px solid #f1f5f9;
 }
 
 .service-price-batch-row:last-child {
@@ -623,51 +769,84 @@
 
 .service-price-batch-row--head {
   min-height: 44px;
-  background: #eef4ff;
-  color: #0f172a;
+  background: #f8fafc;
+  color: #475569;
   font-size: 12px;
-  font-weight: 800;
+  font-weight: 700;
   text-transform: uppercase;
+  border-bottom: 1px solid #cbd5e1;
 }
 
 .service-price-service {
-  display: inline-flex;
+  display: flex;
   align-items: center;
   gap: 12px;
+}
+
+.service-name-container {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.service-name-container strong {
+  font-size: 14.5px;
+  font-weight: 600;
+  color: #0f172a;
+}
+
+.service-name-container span {
+  font-size: 12px;
+  color: #94a3b8;
 }
 
 .service-price-icon {
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  width: 34px;
-  height: 34px;
-  border-radius: 8px;
-  font-size: 13px;
-  font-weight: 800;
+  width: 36px;
+  height: 36px;
+  border-radius: 50%;
 }
 
-.service-price-icon--electric { background: #fff7ed; color: #ea580c; }
-.service-price-icon--water { background: #eff6ff; color: #2563eb; }
-.service-price-icon--wifi { background: #faf5ff; color: #7c3aed; }
-.service-price-icon--trash { background: #f0fdf4; color: #15803d; }
+.service-price-icon--dien { background: #fffbeb; color: #d97706; }
+.service-price-icon--internet { background: #eff6ff; color: #2563eb; }
+.service-price-icon--nuoc { background: #eff6ff; color: #2563eb; }
+.service-price-icon--rac { background: #f0fdf4; color: #16a34a; }
 
 .service-price-current,
 .service-price-methods {
-  display: grid;
-  gap: 5px;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
 }
 
-.service-price-current strong {
+.current-price-display {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.current-price-display strong {
+  font-size: 14.5px;
+  font-weight: 600;
   color: #0f172a;
+}
+
+.current-price-display span {
+  font-size: 12px;
+  color: #64748b;
+}
+
+.current-price-empty {
+  color: #94a3b8;
   font-size: 14px;
 }
 
-.service-price-current span,
 .service-price-methods small {
-  color: #64748b;
+  color: #94a3b8;
   font-size: 12px;
-  font-weight: 600;
+  font-weight: 500;
 }
 
 .service-price-method-static {
@@ -681,59 +860,201 @@
 .service-price-segmented {
   display: inline-flex;
   width: fit-content;
-  padding: 3px;
-  border: 1px solid #cbd5e1;
-  border-radius: 8px;
-  background: #f8fafc;
+  padding: 2px;
+  border-radius: 6px;
+  background: #f1f5f9;
 }
 
 .service-price-segmented button {
-  min-width: 72px;
-  min-height: 32px;
-  padding: 6px 10px;
+  min-width: 64px;
+  min-height: 28px;
+  padding: 4px 10px;
   border: 0;
-  border-radius: 6px;
+  border-radius: 4px;
   background: transparent;
-  color: #475569;
+  color: #64748b;
   font: inherit;
-  font-size: 13px;
-  font-weight: 800;
+  font-size: 12.5px;
+  font-weight: 600;
   cursor: pointer;
+  transition: all 0.2s ease;
 }
 
 .service-price-segmented button.active {
-  background: #162033;
+  background: #0f172a;
   color: #ffffff;
 }
 
-.service-price-inline-field input {
-  width: 100%;
-  min-height: 40px;
-  padding: 8px 10px;
-  border: 1px solid #cbd5e1;
-  border-radius: 6px;
-  font: inherit;
-  font-weight: 800;
-}
-
-.service-price-inline-field input[readonly] {
-  background: #f8fafc;
-  color: #334155;
-}
-
-.service-price-batch-actions {
-  display: grid;
-  grid-template-columns: minmax(0, 1fr) auto;
-  gap: 12px;
+.price-input-wrapper {
+  position: relative;
+  display: inline-flex;
   align-items: center;
+  width: 100%;
 }
 
-.service-price-batch-actions input {
-  min-height: 42px;
-  padding: 9px 12px;
+.price-input-wrapper input {
+  width: 100%;
+  min-height: 38px;
+  padding: 8px 30px 8px 12px;
   border: 1px solid #cbd5e1;
   border-radius: 6px;
   font: inherit;
+  font-size: 14px;
+  font-weight: 500;
+  color: #0f172a;
+  background: #ffffff;
+  transition: border-color 0.2s;
+}
+
+.price-input-wrapper input:focus {
+  border-color: #2563eb;
+  outline: none;
+}
+
+.price-input-wrapper .price-suffix {
+  position: absolute;
+  right: 12px;
+  font-size: 14px;
+  color: #94a3b8;
+  pointer-events: none;
+}
+
+.date-input-wrapper {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  width: 100%;
+}
+
+.date-input-wrapper svg {
+  position: absolute;
+  left: 10px;
+  color: #64748b;
+  width: 16px;
+  height: 16px;
+  pointer-events: none;
+}
+
+.date-input-wrapper input {
+  width: 100%;
+  min-height: 38px;
+  padding: 8px 12px 8px 32px;
+  border: 1px solid #cbd5e1;
+  border-radius: 6px;
+  font: inherit;
+  font-size: 14px;
+  color: #334155;
+  background: #f8fafc;
+  cursor: not-allowed;
+}
+
+.service-price-more-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  height: 32px;
+  border: none;
+  background: transparent;
+  color: #64748b;
+  border-radius: 50%;
+  cursor: pointer;
+  transition: background 0.2s;
+}
+
+.service-price-more-btn:hover {
+  background: #f1f5f9;
+  color: #0f172a;
+}
+
+.service-price-batch-actions-wrapper {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  margin-top: 16px;
+}
+
+.service-price-note-wrapper {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  flex: 1;
+}
+
+.service-price-note-wrapper svg {
+  position: absolute;
+  left: 12px;
+  color: #2563eb;
+  width: 16px;
+  height: 16px;
+  pointer-events: none;
+}
+
+.service-price-note-wrapper input {
+  width: 100%;
+  min-height: 42px;
+  padding: 10px 12px 10px 38px;
+  border: 1px solid #cbd5e1;
+  border-radius: 8px;
+  font: inherit;
+  font-size: 14px;
+  background: #f8fafc;
+  color: #0f172a;
+  transition: border-color 0.2s;
+}
+
+.service-price-note-wrapper input:focus {
+  border-color: #2563eb;
+  background: #ffffff;
+  outline: none;
+}
+
+.primary-action-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 42px;
+  padding: 0 20px;
+  border-radius: 8px;
+  background: #2563eb;
+  color: #ffffff;
+  font-weight: 600;
+  font-size: 14px;
+  border: none;
+  cursor: pointer;
+  transition: background 0.2s;
+}
+
+.primary-action-btn:hover:not(:disabled) {
+  background: #1d4ed8;
+}
+
+.primary-action-btn:disabled {
+  background: #93c5fd;
+  cursor: not-allowed;
+}
+
+.empty-history-card {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 40px 20px;
+  background: #ffffff;
+  border: 1px dashed #cbd5e1;
+  border-radius: 12px;
+  text-align: center;
+}
+
+.empty-history-card svg {
+  margin-bottom: 12px;
+}
+
+.empty-history-card p {
+  margin: 0;
+  font-size: 14px;
+  color: #64748b;
+  font-weight: 500;
 }
 
 .service-price-cards,
@@ -926,4 +1247,591 @@
     flex-wrap: wrap;
     justify-content: flex-start;
   }
+}
+
+/* ==========================================================================
+   Premium UI/UX Styles for Rooming House Detail Sub-tabs
+   ========================================================================== */
+
+/* ─── Info Subtabs (Sub-navigation) ─── */
+.info-subtabs {
+  display: flex;
+  flex-wrap: nowrap;
+  align-items: center;
+  gap: 8px;
+  padding: 16px 20px;
+  background: #f8fafc;
+  border-bottom: 1px solid #e2e8f0;
+  overflow-x: auto;
+  scrollbar-width: none;
+}
+
+.info-subtabs::-webkit-scrollbar {
+  display: none;
+}
+
+.info-subtabs button {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  min-height: 40px;
+  padding: 8px 16px;
+  border-radius: 8px;
+  background: transparent;
+  color: #64748b;
+  font: inherit;
+  font-size: 14px;
+  font-weight: 500;
+  border: 1px solid transparent;
+  cursor: pointer;
+  transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+  white-space: nowrap;
+  flex-shrink: 0;
+}
+
+.info-subtabs button:hover:not(.active) {
+  background: #e2e8f0;
+  color: #334155;
+}
+
+.info-subtabs button.active {
+  background: #ffffff;
+  color: #2563eb;
+  font-weight: 600;
+  border-color: #cbd5e1;
+  box-shadow: 0 2px 4px rgba(15, 23, 42, 0.05);
+  border-bottom: 3px solid #2563eb;
+}
+
+.info-subtabs button svg {
+  flex-shrink: 0;
+  color: currentColor;
+}
+
+.subtab-card {
+  background: #ffffff;
+  border: 1px solid #e2e8f0;
+  border-radius: 16px;
+  padding: 24px;
+  box-shadow: 0 1px 3px rgba(15, 23, 42, 0.04);
+  margin-bottom: 24px;
+}
+
+.subtab-header {
+  display: flex;
+  align-items: flex-start;
+  gap: 16px;
+  margin-bottom: 24px;
+}
+
+.subtab-header-icon {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 44px;
+  height: 44px;
+  border-radius: 10px;
+  background: #eff6ff;
+  color: #2563eb;
+  flex-shrink: 0;
+}
+
+.subtab-header-text h4 {
+  margin: 0 0 4px 0;
+  font-size: 18px;
+  font-weight: 600;
+  color: #0f172a;
+}
+
+.subtab-header-text p {
+  margin: 0;
+  font-size: 14px;
+  color: #64748b;
+}
+
+/* ─── Subtab Alert Banner ─── */
+.subtab-alert {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+  padding: 16px;
+  background: #eff6ff;
+  border: 1px solid #bfdbfe;
+  border-radius: 12px;
+  color: #1e40af;
+  font-size: 14.5px;
+  line-height: 1.5;
+}
+
+.subtab-alert svg {
+  color: #2563eb;
+  flex-shrink: 0;
+  margin-top: 2px;
+}
+
+/* ─── Premium Input Wrapper with unit suffix ─── */
+.input-wrapper {
+  position: relative;
+  display: flex;
+  align-items: center;
+  width: 100%;
+}
+
+.input-wrapper input {
+  padding-right: 64px !important;
+}
+
+.input-suffix {
+  position: absolute;
+  right: 14px;
+  color: #64748b;
+  font-size: 14.5px;
+  font-weight: 500;
+  pointer-events: none;
+}
+
+.label-info-icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  color: #94a3b8;
+  margin-left: 6px;
+  cursor: help;
+  vertical-align: middle;
+}
+
+.label-info-icon:hover {
+  color: #64748b;
+}
+
+.helper-text {
+  font-size: 12px;
+  color: #64748b;
+  margin-top: 4px;
+  font-weight: 400;
+}
+
+/* ─── Checkbox Card Panel ─── */
+.checkbox-card-panel {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 16px 20px;
+  background: #f8fafc;
+  border: 1px solid #e2e8f0;
+  border-radius: 12px;
+  transition: all 0.2s ease;
+  width: 100%;
+}
+
+.checkbox-card-panel:hover {
+  border-color: #bfdbfe;
+  background: #eff6ff;
+}
+
+.checkbox-card-left {
+  display: flex;
+  align-items: flex-start;
+  gap: 14px;
+}
+
+.checkbox-card-input[type="checkbox"] {
+  width: 20px;
+  height: 20px;
+  accent-color: #2563eb;
+  margin-top: 2px;
+  cursor: pointer;
+  flex-shrink: 0;
+}
+
+.checkbox-card-text {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.checkbox-card-title {
+  font-size: 15px;
+  font-weight: 600;
+  color: #1e293b;
+}
+
+.checkbox-card-desc {
+  font-size: 13.5px;
+  color: #64748b;
+}
+
+.checkbox-card-icon {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 40px;
+  height: 40px;
+  border-radius: 8px;
+  background: #eff6ff;
+  color: #2563eb;
+  flex-shrink: 0;
+}
+
+/* ─── Subtab Footer ─── */
+.subtab-footer {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  padding-top: 20px;
+  border-top: 1px solid #e2e8f0;
+  margin-top: 12px;
+  width: 100%;
+}
+
+.shield-info {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  color: #64748b;
+  font-size: 13.5px;
+}
+
+.shield-info svg {
+  color: #2563eb;
+  flex-shrink: 0;
+}
+
+/* ─── Overriding standard form styles inside subtab-card ─── */
+.subtab-card .form-grid {
+  gap: 20px;
+}
+
+.subtab-card .field span {
+  font-size: 14px;
+  font-weight: 600;
+  color: #334155;
+  display: flex;
+  align-items: center;
+  margin-bottom: 2px;
+}
+
+.subtab-card .field input,
+.subtab-card .field select,
+.subtab-card .field textarea {
+  min-height: 44px;
+  border-radius: 8px;
+  border: 1px solid #cbd5e1;
+  padding: 10px 14px;
+  font-size: 15px;
+  transition: all 0.2s ease;
+  background: #ffffff;
+  color: #1e293b;
+}
+
+.subtab-card .field input:focus,
+.subtab-card .field select:focus,
+.subtab-card .field textarea:focus {
+  border-color: #2563eb;
+  outline: none;
+  box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.12);
+}
+
+.subtab-card .field input[disabled],
+.subtab-card .field select[disabled],
+.subtab-card .field textarea[disabled] {
+  background: #f8fafc;
+  color: #64748b;
+  cursor: not-allowed;
+}
+
+.subtab-card .primary-action {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  background: #2563eb !important;
+  color: #ffffff !important;
+  font-weight: 600 !important;
+  min-height: 44px;
+  padding: 10px 24px;
+  border-radius: 8px;
+  font-size: 15px;
+  border: none;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  box-shadow: 0 2px 4px rgba(37, 99, 235, 0.15);
+}
+
+.subtab-card .primary-action:hover:not(:disabled) {
+  background: #1d4ed8 !important;
+  box-shadow: 0 4px 6px rgba(37, 99, 235, 0.2);
+}
+
+/* ─── Amenity List Redesign ─── */
+.amenity-card-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+  gap: 12px;
+}
+
+.amenity-card-item {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 12px 16px;
+  border: 1px solid #e2e8f0;
+  border-radius: 10px;
+  background: #f8fafc;
+  cursor: pointer;
+  user-select: none;
+  transition: all 0.2s ease;
+}
+
+.amenity-card-item:hover {
+  background: #eff6ff;
+  border-color: #bfdbfe;
+}
+
+.amenity-card-item.selected {
+  background: #eff6ff;
+  border-color: #2563eb;
+  box-shadow: 0 2px 4px rgba(37, 99, 235, 0.05);
+}
+
+.amenity-card-checkbox[type="checkbox"] {
+  width: 18px;
+  height: 18px;
+  accent-color: #2563eb;
+  cursor: pointer;
+}
+
+.amenity-card-name {
+  font-size: 14.5px;
+  font-weight: 500;
+  color: #475569;
+}
+
+.amenity-card-item.selected .amenity-card-name {
+  color: #2563eb;
+  font-weight: 600;
+}
+
+/* ─── Legal Document Info List ─── */
+.legal-info-list {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 16px;
+  background: #f8fafc;
+  border: 1px solid #e2e8f0;
+  border-radius: 12px;
+  padding: 20px;
+}
+
+.legal-info-item {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.legal-info-label {
+  font-size: 13px;
+  font-weight: 600;
+  color: #64748b;
+  text-transform: uppercase;
+  letter-spacing: 0.02em;
+}
+
+.legal-info-value {
+  font-size: 15px;
+  font-weight: 600;
+  color: #1e293b;
+}
+
+/* ─── Service Price Table Refinement ─── */
+.subtab-card .service-price-batch-table {
+  border: 1px solid #e2e8f0;
+  border-radius: 12px;
+  overflow: hidden;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.02);
+}
+
+.subtab-card .service-price-batch-row--head {
+  background: #f8fafc;
+  border-bottom: 2px solid #e2e8f0;
+  color: #475569;
+  font-size: 12.5px;
+  font-weight: 700;
+}
+
+.subtab-card .service-price-batch-row {
+  border-bottom: 1px solid #e2e8f0;
+  transition: background 0.15s ease;
+}
+
+.subtab-card .service-price-batch-row:hover:not(.service-price-batch-row--head) {
+  background: #fdfefe;
+}
+
+.subtab-card .service-price-icon {
+  width: 36px;
+  height: 36px;
+  border-radius: 8px;
+  font-weight: 600;
+}
+
+.subtab-card .service-price-current strong {
+  font-size: 14.5px;
+  color: #0f172a;
+}
+
+.subtab-card .service-price-current span {
+  font-size: 11.5px;
+  color: #64748b;
+}
+
+.subtab-card .service-price-segmented {
+  background: #f1f5f9;
+  border: 0;
+  padding: 3px;
+  border-radius: 8px;
+}
+
+.subtab-card .service-price-segmented button {
+  min-width: 64px;
+  min-height: 28px;
+  border-radius: 6px;
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.subtab-card .service-price-segmented button.active {
+  background: #ffffff;
+  color: #2563eb;
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.05);
+}
+
+.subtab-card .service-price-inline-field input {
+  min-height: 38px;
+  border-radius: 8px;
+  border: 1px solid #cbd5e1;
+  padding: 6px 10px;
+  font-weight: 600;
+}
+
+.subtab-card .service-price-batch-actions {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 16px;
+  align-items: center;
+  margin-top: 16px;
+}
+
+.subtab-card .service-price-batch-actions input {
+  min-height: 44px;
+  border: 1px solid #cbd5e1;
+  border-radius: 8px;
+  padding: 10px 14px;
+}
+
+.subtab-card .service-price-history-group {
+  border: 1px solid #e2e8f0;
+  border-radius: 12px;
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.02);
+  margin-bottom: 12px;
+}
+
+.subtab-card .service-price-history-group summary {
+  padding: 12px 18px;
+  background: #f8fafc;
+}
+
+.subtab-card .service-price-table--monthly {
+  border: 0;
+  border-top: 1px solid #e2e8f0;
+}
+
+.subtab-card .service-price-table--monthly .service-price-row--head {
+  background: #ffffff;
+  color: #64748b;
+  border-bottom: 2px solid #e2e8f0;
+}
+
+/* Segmented Tabs for Room Detail main tabs */
+.room-detail-main-tabs {
+  display: inline-flex;
+  padding: 3px;
+  background: #ffffff;
+  border: 1px solid #e2e8f0;
+  border-radius: 8px;
+  width: fit-content;
+}
+
+.room-detail-main-tabs button {
+  min-height: 36px;
+  padding: 6px 16px;
+  border: 0;
+  border-radius: 6px;
+  background: transparent;
+  color: #475569;
+  font: inherit;
+  font-size: 13.5px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.room-detail-main-tabs button:hover:not(:disabled) {
+  color: #0f172a;
+}
+
+.room-detail-main-tabs button.active {
+  background: #0f172a;
+  color: #ffffff;
+}
+
+.room-detail-main-tabs button:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+
+/* Underline Tabs for Room Detail sub tabs */
+.room-detail-sub-tabs {
+  display: flex;
+  gap: 24px;
+  border-bottom: 1px solid #e2e8f0;
+  width: 100%;
+}
+
+.room-detail-sub-tabs button {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 12px 4px;
+  background: transparent;
+  color: #64748b;
+  font: inherit;
+  font-size: 14.5px;
+  font-weight: 600;
+  border: none;
+  border-bottom: 2px solid transparent;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  margin-bottom: -1px;
+}
+
+.room-detail-sub-tabs button svg {
+  color: currentColor;
+  flex-shrink: 0;
+}
+
+.room-detail-sub-tabs button:hover:not(:disabled) {
+  color: #0f172a;
+}
+
+.room-detail-sub-tabs button.active {
+  color: #2563eb;
+  border-bottom-color: #2563eb;
+}
+
+.room-detail-sub-tabs button:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
 }

@@ -20,5 +20,14 @@ public sealed class RoomingHouseRecommendationCandidate
 
     public int AvailableRooms { get; set; }
 
+    /// <summary>Total rooms in the house — used to compute occupancy ratio.</summary>
+    public int TotalRooms { get; set; }
+
+    /// <summary>Whether the house has a cover image (visual quality signal).</summary>
+    public bool HasCoverImage { get; set; }
+
+    /// <summary>House creation date — for freshness scoring.</summary>
+    public DateTimeOffset CreatedAt { get; set; }
+
     public List<string> Amenities { get; set; } = new();
 }

@@ -56,6 +56,36 @@ public class RoomingHouseServicePriceService : IRoomingHouseServicePriceService
 
         var now = DateTimeOffset.UtcNow;
         var nowUtc = now.UtcDateTime;
+        var today = DateOnly.FromDateTime(nowUtc);
+
+        DateOnly effectiveFrom;
+        if (request.EffectiveFrom != default)
+        {
+            // Use the effectiveFrom sent by the client (FE already calculates the correct date)
+            effectiveFrom = request.EffectiveFrom;
+        }
+        else
+        {
+            // Fallback: auto-calculate (for direct API calls without effectiveFrom)
+            var hasAnyPrice = await context.RoomingHouseServicePrices
+                .AnyAsync(x => x.RoomingHouseId == roomingHouseId, cancellationToken);
+
+            if (!hasAnyPrice)
+            {
+                // First time: effective from 1st of current month to cover the entire month
+                effectiveFrom = new DateOnly(nowUtc.Year, nowUtc.Month, 1);
+            }
+            else if (nowUtc.Day == 1)
+            {
+                // If today is the 1st, apply from 1st of this month
+                effectiveFrom = new DateOnly(nowUtc.Year, nowUtc.Month, 1);
+            }
+            else
+            {
+                // From 2nd onwards, apply from 1st of next month
+                effectiveFrom = GetNextBillingPeriodStart(today);
+            }
+        }
 
         var activePrice = await context.RoomingHouseServicePrices
             .Where(x => x.RoomingHouseId == roomingHouseId &&
@@ -64,16 +94,11 @@ public class RoomingHouseServicePriceService : IRoomingHouseServicePriceService
             .OrderByDescending(x => x.EffectiveFrom)
             .FirstOrDefaultAsync(cancellationToken);
 
-        var effectiveFrom = activePrice is null
-            ? new DateOnly(nowUtc.Year, nowUtc.Month, 1)
-            : (nowUtc.Day == 1
-                ? new DateOnly(nowUtc.Year, nowUtc.Month, 1)
-                : GetNextBillingPeriodStart(DateOnly.FromDateTime(nowUtc)));
-
         var scheduledPrice = await context.RoomingHouseServicePrices
             .Where(x => x.RoomingHouseId == roomingHouseId &&
                         x.ServiceTypeId == serviceType.Id &&
-                        x.EffectiveFrom == effectiveFrom)
+                        x.EffectiveFrom == effectiveFrom &&
+                        x.IsActive)
             .FirstOrDefaultAsync(cancellationToken);
 
         if (scheduledPrice is not null)
@@ -107,11 +132,11 @@ public class RoomingHouseServicePriceService : IRoomingHouseServicePriceService
 
         if (activePrice is not null)
         {
-            if (effectiveFrom <= activePrice.EffectiveFrom)
+            if (effectiveFrom == activePrice.EffectiveFrom)
             {
+                // Same effective period: update the existing price record
                 activePrice.PricingUnit = pricingUnit;
                 activePrice.UnitPrice = request.UnitPrice;
-                activePrice.EffectiveFrom = effectiveFrom;
                 activePrice.EffectiveTo = null;
                 activePrice.IsActive = true;
                 activePrice.Note = request.Note;
@@ -123,6 +148,7 @@ public class RoomingHouseServicePriceService : IRoomingHouseServicePriceService
                 return ToServicePriceResponse(activePrice);
             }
 
+            // New effective period: deactivate the old price
             activePrice.IsActive = false;
             activePrice.EffectiveTo = effectiveFrom.AddDays(-1);
             activePrice.UpdatedAt = now;

@@ -10,6 +10,12 @@ public class RoomingHouseAiChatResponse
 
     public bool AiAssisted { get; set; }
 
+    /// <summary>
+    /// Persistent conversation identifier for multi-turn chat.
+    /// Client must send this back in subsequent requests to maintain context.
+    /// </summary>
+    public string ConversationId { get; set; } = string.Empty;
+
     public List<RoomingHouseSearchItemResponse> RoomingHouses { get; set; } = new();
 
     public List<NearbyPlaceResponse> NearbyPlaces { get; set; } = new();

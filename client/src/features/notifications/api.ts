@@ -32,3 +32,10 @@ export async function markAllAsRead(): Promise<void> {
     { method: 'PATCH', auth: true }
   );
 }
+
+export async function deleteNotification(id: string): Promise<void> {
+  await apiClient<ApiResponse<unknown>>(
+    ENDPOINTS.NOTIFICATIONS.DELETE(id),
+    { method: 'DELETE', auth: true }
+  );
+}

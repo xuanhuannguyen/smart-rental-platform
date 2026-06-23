@@ -136,7 +136,7 @@
   border-bottom: 1px solid #f1f5f9;
 }
 
-.tab-btn {
+.notification-dropdown-tabs .tab-btn {
   display: flex;
   align-items: center;
   justify-content: center;
@@ -155,18 +155,18 @@
   flex: 1 1 calc(50% - 3px);
 }
 
-.tab-btn svg {
+.notification-dropdown-tabs .tab-btn svg {
   width: 12px !important;
   height: 12px !important;
 }
 
-.tab-btn:hover:not(.active) {
+.notification-dropdown-tabs .tab-btn:hover:not(.active) {
   background: #f8fafc;
   border-color: #cbd5e1;
   color: #0f172a;
 }
 
-.tab-btn.active {
+.notification-dropdown-tabs .tab-btn.active {
   background: #edf5ff;
   border-color: #246bfe;
   color: #246bfe;
@@ -362,6 +362,38 @@
   height: 6px;
   border-radius: 50%;
   background-color: #246bfe;
+}
+
+.notification-item-delete-btn {
+  position: absolute;
+  top: 8px;
+  right: 8px;
+  width: 26px;
+  height: 26px;
+  border-radius: 6px;
+  border: none;
+  background: transparent;
+  color: #cbd5e1;
+  cursor: pointer;
+  display: grid;
+  place-items: center;
+  transition: all 0.15s ease;
+  opacity: 0;
+  z-index: 2;
+}
+
+.notification-item-card:hover .notification-item-delete-btn {
+  opacity: 1;
+}
+
+.notification-item-delete-btn:hover {
+  background: #fef2f2;
+  color: #ef4444;
+}
+
+.notification-item-delete-btn svg {
+  width: 14px;
+  height: 14px;
 }
 
 .notification-dropdown-empty {

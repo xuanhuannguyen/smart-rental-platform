@@ -21,6 +21,7 @@ export interface ContractOccupantDocumentRequest {
 export interface ContractOccupantRequest {
   clientReferenceId?: string | null;
   guardianClientReferenceId?: string | null;
+  email?: string | null;
   userId?: string | null;
   fullName?: string | null;
   phoneNumber?: string | null;

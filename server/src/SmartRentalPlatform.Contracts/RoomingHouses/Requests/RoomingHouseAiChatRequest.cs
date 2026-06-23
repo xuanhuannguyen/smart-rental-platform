@@ -11,4 +11,13 @@ public class RoomingHouseAiChatRequest
     public string Mode { get; set; } = "detailed";
 
     public string? ConversationId { get; set; }
+
+    public List<RoomingHouseAiChatHistoryMessageRequest> ChatHistory { get; set; } = new();
+}
+
+public class RoomingHouseAiChatHistoryMessageRequest
+{
+    public string Role { get; set; } = string.Empty;
+
+    public string Text { get; set; } = string.Empty;
 }

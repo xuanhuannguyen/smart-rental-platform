@@ -3,7 +3,6 @@ import { useNavigate, useParams } from 'react-router-dom';
 import { ROUTE_PATHS } from '../../../app/router/routePaths';
 import { getApiErrorMessage } from '../../../shared/api/apiError';
 import { Alert } from '../../../shared/components/ui/Alert';
-import { Button } from '../../../shared/components/ui/Button';
 import { Toast } from '../../../shared/components/ui/Toast';
 import type { ContractBriefResponse } from '../../contracts/types';
 import { ContractOccupantsSetupModal } from '../../rental-contracts/components/ContractOccupantsSetupModal';
@@ -11,6 +10,7 @@ import { ContractPreviewModal } from '../../rental-contracts/components/Contract
 import { WalletPaymentConfirmModal } from '../../wallet/components/WalletPaymentConfirmModal';
 import { rentalRequestApi } from '../api';
 import type { RentalRequestResponse, RoomDepositResponse } from '../types';
+import '../../rental-requests/pages/RentalRequestDetail.shared.css';
 import './TenantRentalRequestDetailPage.css';
 
 function toDateInput(date: Date) {
@@ -87,75 +87,168 @@ export const TenantRentalRequestDetailPage = () => {
     }
   };
 
-  if (loading) return <div>Đang tải dữ liệu...</div>;
-  if (error || !request) return <div><Alert type="error">{error || 'Có lỗi xảy ra.'}</Alert></div>;
+  if (loading) return (
+    <div className="rd-page">
+      <div style={{ padding: '60px 0', textAlign: 'center', color: '#94a3b8' }}>Đang tải yêu cầu thuê...</div>
+    </div>
+  );
+
+  if (error || !request) return (
+    <div style={{ padding: '24px' }}><Alert type="error">{error || 'Có lỗi xảy ra.'}</Alert></div>
+  );
+
+  const statusBadgeCls = getRequestStatusBadge(request.status);
 
   return (
-    <div className="tenant-request-detail-page">
-      <section className="overview-band">
-        <div className="overview-header-title-area">
+    <div className="rd-page">
+      {/* ── Hero Header ── */}
+      <div className="rd-hero">
+        <div className="rd-hero__left">
           <button
             type="button"
-            className="back-icon-btn"
+            className="rd-hero__back"
             onClick={() => navigate(ROUTE_PATHS.ACCOUNT.RENTAL_REQUESTS)}
-            title="Quay về danh sách yêu cầu"
+            title="Quay về danh sách"
           >
-            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
-              <line x1="19" y1="12" x2="5" y2="12" />
-              <polyline points="12 19 5 12 12 5" />
+            <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+              <line x1="19" y1="12" x2="5" y2="12"/><polyline points="12 19 5 12 12 5"/>
             </svg>
           </button>
-          <div className="overview-left">
-            <p className="eyebrow">{request.roomingHouseName}</p>
-            <h2>Phòng {request.roomNumber}</h2>
-            <p className="overview-description">
+          <div className="rd-hero__icon">
+            <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+              <rect x="2" y="7" width="20" height="15" rx="2"/>
+              <path d="M16 21V7a2 2 0 0 0-2-2h-4a2 2 0 0 0-2 2v14"/>
+            </svg>
+          </div>
+          <div className="rd-hero__texts">
+            <p className="rd-hero__house">{request.roomingHouseName}</p>
+            <h2 className="rd-hero__room">Phòng {request.roomNumber}</h2>
+            <p className="rd-hero__meta">
+              <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/>
+              </svg>
               Thời gian gửi: {formatDateTime(request.createdAt)}
             </p>
           </div>
         </div>
-
-        <div className="overview-right" style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: '12px' }}>
-          <span className={`status-badge ${getRequestStatusTone(request.status)}`}>
+        <div className="rd-hero__right">
+          <span className={`rd-badge rd-badge--${statusBadgeCls}`}>
             {formatRequestStatus(request.status)}
           </span>
           {request.status === 'Pending' && (
-            <div style={{ display: 'flex', gap: '8px' }}>
-              <Button variant="outline" onClick={() => setShowCancelModal(true)}>Hủy yêu cầu</Button>
+            <div className="rd-hero__actions">
+              <button className="rd-btn rd-btn--danger" onClick={() => setShowCancelModal(true)}>
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                  <line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/>
+                </svg>
+                Hủy yêu cầu
+              </button>
             </div>
           )}
         </div>
-      </section>
-
-      <div className="tenant-request-detail-container">
-        <div className="request-detail-body">
-          {request.rejectedReason && (
-            <div style={{ marginBottom: '20px' }}>
-              <Alert type="error">
-                <strong>Lý do:</strong> {request.rejectedReason}
-              </Alert>
-            </div>
-          )}
-          <RequestInfoBlock request={request} />
-
-          <DepositInfoBlock
-            deposit={request.deposit}
-            onPay={request.deposit?.status === 'PendingPayment' ? () => setShowDepositPaymentConfirm(true) : undefined}
-            isPaying={isPayingDeposit}
-          />
-
-          <ContractProgressBlock
-            contract={request.contract}
-            actor="tenant"
-            onSetupOccupants={(contractId) => setSelectedContractIdForSetup(contractId)}
-            onPreview={(contractId) => setPreviewContractId(contractId)}
-          />
-        </div>
-
       </div>
 
+      {/* ── Rejected Reason ── */}
+      {request.rejectedReason && (
+        <div className="rd-rejected-alert">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+            <circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/>
+          </svg>
+          <span><strong>Lý do từ chối:</strong> {request.rejectedReason}</span>
+        </div>
+      )}
+
+      {/* ── Request Info ── */}
+      <div className="rd-section">
+        <div className="rd-section__heading">
+          <span className="rd-section__heading-icon rd-section__heading-icon--blue">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+              <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/>
+              <polyline points="14 2 14 8 20 8"/>
+              <line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/>
+            </svg>
+          </span>
+          <h3 className="rd-section__title">Thông tin yêu cầu</h3>
+        </div>
+        <div className="rd-section__body">
+          <div className="rd-stats-grid">
+            <StatBox icon="calendar" tone="blue" label="Ngày gửi" value={formatDate(request.createdAt)} />
+            <StatBox icon="users"    tone="green" label="Số người ở dự kiến" value={`${request.expectedOccupantCount} người`} />
+            <StatBox icon="coin"     tone="amber" label="Giá thuê dự kiến" value={`${formatCurrency(request.monthlyRentSnapshot)} đ/tháng`} />
+            <StatBox icon="date-range" tone="violet" label="Thời hạn thuê dự kiến" value={`${formatDate(request.desiredStartDate)} - ${formatDate(request.expectedEndDate)}`} />
+            <StatBox icon="note"     tone="slate" label="Ghi chú" value={request.tenantNote || 'Không có'} />
+          </div>
+        </div>
+      </div>
+
+      {/* ── Deposit Info ── */}
+      <TenantDepositSection
+        deposit={request.deposit}
+        onPay={request.deposit?.status === 'PendingPayment' ? () => setShowDepositPaymentConfirm(true) : undefined}
+        isPaying={isPayingDeposit}
+      />
+
+      {/* ── Contract Progress ── */}
+      <TenantContractSection
+        contract={request.contract}
+        onSetupOccupants={(contractId) => setSelectedContractIdForSetup(contractId)}
+        onPreview={(contractId) => setPreviewContractId(contractId)}
+      />
+
+      {/* ── Supplementary Notes ── */}
+      <div className="rd-section">
+        <div className="rd-section__heading">
+          <span className="rd-section__heading-icon rd-section__heading-icon--slate">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+              <circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/>
+            </svg>
+          </span>
+          <h3 className="rd-section__title">Thông tin bổ sung</h3>
+        </div>
+        <div className="rd-section__body">
+          <div className="rd-notes-grid">
+            <div className="rd-note-box">
+              <p className="rd-note-box__label">Mô tả thêm từ khách thuê</p>
+              <p className={`rd-note-box__text ${!request.tenantNote ? 'rd-note-box__text--empty' : ''}`}>
+                {request.tenantNote || 'Không có ghi chú'}
+              </p>
+            </div>
+            <div className="rd-note-box">
+              <p className="rd-note-box__label">Lý do từ chối (nếu có)</p>
+              <p className={`rd-note-box__text ${!request.rejectedReason ? 'rd-note-box__text--empty' : ''}`}>
+                {request.rejectedReason || 'Không có'}
+              </p>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      {/* ── Cancel Modal ── */}
+      {showCancelModal && (
+        <div className="rd-modal-overlay">
+          <div className="rd-modal">
+            <h3 className="rd-modal__title">Hủy yêu cầu thuê phòng?</h3>
+            <p className="rd-modal__sub">
+              Bạn có chắc chắn muốn hủy yêu cầu thuê phòng này không? Hành động này không thể hoàn tác.
+            </p>
+            <div className="rd-modal__actions">
+              <button className="rd-btn rd-btn--outline" onClick={() => setShowCancelModal(false)}>Quay lại</button>
+              <button className="rd-btn rd-btn--danger" onClick={handleCancelConfirm}>
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                  <line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/>
+                </svg>
+                Xác nhận hủy
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ── Occupants Setup Modal ── */}
       {selectedContractIdForSetup && (
         <ContractOccupantsSetupModal
           contractId={selectedContractIdForSetup}
+          expectedOccupantCount={request.expectedOccupantCount}
           onClose={() => setSelectedContractIdForSetup(null)}
           onSuccess={() => {
             setSelectedContractIdForSetup(null);
@@ -164,6 +257,7 @@ export const TenantRentalRequestDetailPage = () => {
         />
       )}
 
+      {/* ── Contract Preview Modal ── */}
       {previewContractId && (
         <ContractPreviewModal
           contractId={previewContractId}
@@ -176,21 +270,7 @@ export const TenantRentalRequestDetailPage = () => {
         />
       )}
 
-      {showCancelModal && (
-        <div className="approve-modal-overlay" style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, backgroundColor: 'rgba(0,0,0,0.5)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1000 }}>
-          <div className="approve-modal-content" style={{ backgroundColor: 'white', padding: '24px', borderRadius: '8px', width: '500px', maxWidth: '95%', boxShadow: '0 4px 6px rgba(0,0,0,0.1)' }}>
-            <h3 style={{ marginTop: 0, marginBottom: '16px', fontSize: '1.25rem' }}>Xác nhận hủy yêu cầu?</h3>
-            <p style={{ color: '#475569', fontSize: '1rem', marginBottom: '24px', lineHeight: '1.5' }}>
-              Bạn có chắc chắn muốn hủy yêu cầu thuê phòng này không? Hành động này không thể hoàn tác.
-            </p>
-            <div className="form-actions" style={{ display: 'flex', justifyContent: 'flex-end', gap: '12px' }}>
-              <Button variant="outline" onClick={() => setShowCancelModal(false)}>Quay lại</Button>
-              <Button variant="danger" onClick={handleCancelConfirm}>Đồng ý hủy</Button>
-            </div>
-          </div>
-        </div>
-      )}
-
+      {/* ── Wallet Payment Modal ── */}
       <WalletPaymentConfirmModal
         isOpen={showDepositPaymentConfirm}
         title="Xác nhận thanh toán tiền cọc"
@@ -202,126 +282,222 @@ export const TenantRentalRequestDetailPage = () => {
         onClose={() => setShowDepositPaymentConfirm(false)}
       />
 
-      {toast && (
-        <Toast
-          message={toast.message}
-          type={toast.type}
-          onClose={() => setToast(null)}
-        />
-      )}
+      {toast && <Toast message={toast.message} type={toast.type} onClose={() => setToast(null)} />}
     </div>
   );
 };
 
-function RequestInfoBlock({ request }: { request: RentalRequestResponse }) {
+/* ─── Sub-components ─── */
+
+function StatBox({ icon, tone, label, value }: { icon: string; tone: string; label: string; value: string }) {
+  const icons: Record<string, any> = {
+    calendar: (
+      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+        <rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/>
+        <line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/>
+      </svg>
+    ),
+    users: (
+      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+        <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/>
+        <path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/>
+      </svg>
+    ),
+    coin: (
+      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+        <circle cx="12" cy="12" r="10"/>
+        <line x1="12" y1="8" x2="12" y2="16"/><line x1="8" y1="12" x2="16" y2="12"/>
+      </svg>
+    ),
+    'date-range': (
+      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+        <rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/>
+        <line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/>
+      </svg>
+    ),
+    note: (
+      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+        <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/>
+      </svg>
+    ),
+  };
   return (
-    <div className="request-info-card">
-      <h3>Thông tin yêu cầu</h3>
-      <div className="info-box">
-        <div className="request-info-grid">
-          <InfoItem label="Ngày gửi" value={formatDate(request.createdAt)} />
-          <InfoItem label="Số người ở dự kiến" value={`${request.expectedOccupantCount} người`} />
-          <InfoItem label="Giá thuê dự kiến" value={`${formatCurrency(request.monthlyRentSnapshot)} đ/tháng`} />
-          <InfoItem
-            label="Thời hạn thuê dự kiến"
-            value={`${formatDate(request.desiredStartDate)} - ${formatDate(request.expectedEndDate)}`}
-          />
-          <InfoItem label="Ghi chú" value={request.tenantNote || 'Không có'} />
-        </div>
-      </div>
+    <div className="rd-stat">
+      <div className={`rd-stat__icon rd-stat__icon--${tone}`}>{icons[icon]}</div>
+      <span className="rd-stat__label">{label}</span>
+      <span className="rd-stat__value">{value}</span>
     </div>
   );
 }
 
-function DepositInfoBlock({
+function TenantDepositSection({
   deposit,
   onPay,
-  isPaying = false
+  isPaying
 }: {
   deposit?: RoomDepositResponse | null;
   onPay?: () => void;
-  isPaying?: boolean;
+  isPaying: boolean;
 }) {
-  const tone = getDepositTone(deposit?.status);
+  const boxCls = getDepositBoxCls(deposit?.status);
+  const iconCls = deposit?.status === 'PendingPayment' ? 'rd-deposit-icon--amber'
+    : ['Paid', 'Refunded'].includes(deposit?.status ?? '') ? 'rd-deposit-icon--green'
+    : 'rd-deposit-icon--slate';
+
+  const title   = formatDepositStatus(deposit?.status);
+  const subtitle = !deposit ? 'Chưa có yêu cầu cọc.'
+    : deposit.status === 'PendingPayment' ? 'Đang chờ bạn thanh toán cọc để hoàn thành bước giữ phòng.'
+    : deposit.status === 'Paid'          ? 'Bạn đã thanh toán cọc thành công.'
+    : deposit.status === 'Refunded'      ? 'Tiền cọc đã được hoàn trả lại cho bạn.'
+    : deposit.status === 'Forfeited'     ? 'Tiền cọc đã bị mất do hủy hợp đồng hoặc vi phạm.'
+    : '';
 
   return (
-    <div className="request-info-card">
-      <h3>Thông tin đặt cọc</h3>
-      <div className={`deposit-box status-${tone}`}>
-        <div className="request-info-grid">
-          <InfoItem label="Trạng thái cọc" value={formatDepositStatus(deposit?.status)} />
-          <InfoItem label="Số tiền" value={deposit ? `${formatCurrency(deposit.depositAmount)} đ` : 'Chưa xác định'} />
-          {deposit?.status === 'PendingPayment' && deposit.paymentDeadlineAt && (
-            <InfoItem label="Thời hạn cọc" value={formatDateTime(deposit.paymentDeadlineAt)} />
+    <div className="rd-section">
+      <div className="rd-section__heading">
+        <span className="rd-section__heading-icon rd-section__heading-icon--amber">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+            <rect x="2" y="5" width="20" height="14" rx="2"/><line x1="2" y1="10" x2="22" y2="10"/>
+          </svg>
+        </span>
+        <h3 className="rd-section__title">Thông tin đặt cọc</h3>
+      </div>
+      <div className="rd-section__body">
+        <div className={`rd-deposit-box ${boxCls}`}>
+          <div className="rd-deposit-header">
+            <div className={`rd-deposit-icon ${iconCls}`}>
+              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <rect x="2" y="5" width="20" height="14" rx="2"/><line x1="2" y1="10" x2="22" y2="10"/>
+              </svg>
+            </div>
+            <div>
+              <p className="rd-deposit-title">{title}</p>
+              <p className="rd-deposit-subtitle">{subtitle}</p>
+            </div>
+          </div>
+          {deposit && (
+            <div className="rd-deposit-stats">
+              <div className="rd-deposit-stat">
+                <span className="rd-deposit-stat__label">Số tiền cọc</span>
+                <span className="rd-deposit-stat__value">{formatCurrency(deposit.depositAmount)} đ</span>
+              </div>
+              {deposit.paymentDeadlineAt && (
+                <div className="rd-deposit-stat">
+                  <span className="rd-deposit-stat__label">Hạn thanh toán</span>
+                  <span className="rd-deposit-stat__value">{formatDateTime(deposit.paymentDeadlineAt)}</span>
+                </div>
+              )}
+              {deposit.paidAt && (
+                <div className="rd-deposit-stat">
+                  <span className="rd-deposit-stat__label">Đặt cọc lúc</span>
+                  <span className="rd-deposit-stat__value">{formatDateTime(deposit.paidAt)}</span>
+                </div>
+              )}
+            </div>
           )}
-          {deposit?.status === 'Paid' && deposit.paidAt && (
-            <InfoItem label="Đặt cọc lúc" value={formatDateTime(deposit.paidAt)} />
-          )}
-          {deposit?.status === 'Refunded' && deposit.refundedAt && (
-            <InfoItem label="Hoàn cọc lúc" value={formatDateTime(deposit.refundedAt)} />
+          {onPay && (
+            <div style={{ marginTop: 16 }}>
+              <button className="rd-btn rd-btn--primary" onClick={onPay} disabled={isPaying}>
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                  <rect x="2" y="5" width="20" height="14" rx="2"/><line x1="2" y1="10" x2="22" y2="10"/>
+                </svg>
+                Thanh toán cọc ngay
+              </button>
+            </div>
           )}
         </div>
-
-        {onPay && (
-          <div style={{ display: 'flex', justifyContent: 'flex-start' }}>
-            <Button onClick={onPay} disabled={isPaying}>
-              {isPaying ? 'Đang thanh toán...' : 'Thanh toán ngay'}
-            </Button>
-          </div>
-        )}
       </div>
     </div>
   );
 }
 
-function ContractProgressBlock({
-  contract,
-  actor,
-  onSetupOccupants,
-  onPreview
+const CONTRACT_STEPS = [
+  { key: 'created',    label: 'Chờ tạo hợp đồng',  sub: 'Đang chờ chủ trọ tạo hợp đồng' },
+  { key: 'sent',       label: 'Hợp đồng đã gửi',   sub: 'Chủ trọ đã gửi hợp đồng' },
+  { key: 'signing',   label: 'Chờ ký hợp đồng',   sub: 'Chờ bạn ký hợp đồng' },
+  { key: 'completed', label: 'Hoàn tất',            sub: 'Hợp đồng đã được ký' },
+];
+
+function getContractStep(status?: string | null): number {
+  if (!status) return 0;
+  if (['WaitingTenantOccupants', 'LandlordRevisionRequested', 'TenantRevisionRequested', 'PendingLandlordSignature'].includes(status)) return 1;
+  if (status === 'PendingTenantSignature') return 2;
+  if (['Active', 'Expired', 'Cancelled'].includes(status)) return 3;
+  return 0;
+}
+
+function TenantContractSection({
+  contract, onSetupOccupants, onPreview
 }: {
   contract?: ContractBriefResponse | null;
-  actor: 'tenant' | 'landlord';
   onSetupOccupants?: (contractId: string) => void;
   onPreview?: (contractId: string) => void;
 }) {
-  const tone = getContractTone(contract?.status);
+  const step = getContractStep(contract?.status);
   const canSetupOccupants = contract?.status === 'WaitingTenantOccupants';
-  const canEditOccupants = contract?.status === 'LandlordRevisionRequested';
+  const canEditOccupants  = contract?.status === 'LandlordRevisionRequested';
   const isPastContractStartDate = Boolean(contract?.startDate && toDateInput(new Date()) > contract.startDate);
   const canSignContract = contract?.status === 'PendingTenantSignature' && !isPastContractStartDate;
 
   return (
-    <div className="request-info-card">
-      <h3>Tiến độ hợp đồng</h3>
-      <div className={`contract-box status-${tone}`}>
-        <div className="request-info-grid">
-          <InfoItem label="Trạng thái" value={formatContractStatus(contract?.status, actor)} />
-          {contract?.status === 'PendingTenantSignature' && contract.signatureDeadlineAt && (
-            <InfoItem label="Thời hạn ký" value={formatDateTime(contract.signatureDeadlineAt)} />
-          )}
-          {contract?.statusReason && isContractRevisionStatus(contract.status) && (
-            <InfoItem label="Nội dung yêu cầu sửa" value={contract.statusReason} />
-          )}
-          {contract?.statusReason && contract.status === 'Rejected' && (
-            <InfoItem label="Lý do" value={contract.statusReason} />
-          )}
+    <div className="rd-section">
+      <div className="rd-section__heading">
+        <span className="rd-section__heading-icon rd-section__heading-icon--indigo">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+            <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/>
+            <polyline points="14 2 14 8 20 8"/>
+          </svg>
+        </span>
+        <h3 className="rd-section__title">Tiến độ hợp đồng</h3>
+      </div>
+      <div className="rd-section__body">
+        <div className="rd-contract-steps">
+          {CONTRACT_STEPS.map((s, i) => {
+            const isDone   = i < step;
+            const isActive = i === step;
+            return (
+              <div key={s.key} className={`rd-step ${isDone ? 'rd-step--done' : ''} ${isActive ? 'rd-step--active' : ''}`}>
+                <div className="rd-step__circle">
+                  {isDone ? (
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                      <polyline points="20 6 9 17 4 12"/>
+                    </svg>
+                  ) : (
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                      <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/>
+                      <polyline points="14 2 14 8 20 8"/>
+                    </svg>
+                  )}
+                </div>
+                <span className="rd-step__label">{s.label}</span>
+                <span className="rd-step__sub">{s.sub}</span>
+              </div>
+            );
+          })}
         </div>
 
         {contract?.status === 'PendingTenantSignature' && isPastContractStartDate && (
-          <Alert type="error">Hợp đồng đã quá ngày bắt đầu thuê nên không thể ký.</Alert>
+          <div style={{ marginTop: 16 }}>
+            <Alert type="error">Hợp đồng đã quá ngày bắt đầu thuê nên không thể ký.</Alert>
+          </div>
         )}
 
         {contract && (canSetupOccupants || canEditOccupants || canSignContract) && (
-          <div style={{ display: 'flex', gap: 12, flexWrap: 'wrap' }}>
-            {contract.status === 'WaitingTenantOccupants' && onSetupOccupants && (
-              <Button onClick={() => onSetupOccupants(contract.id)}>Nhập thông tin người ở</Button>
+          <div style={{ display: 'flex', gap: 10, marginTop: 20 }}>
+            {canSetupOccupants && onSetupOccupants && (
+              <button className="rd-btn rd-btn--primary" onClick={() => onSetupOccupants(contract.id)}>
+                Nhập thông tin người ở
+              </button>
             )}
-            {contract.status === 'LandlordRevisionRequested' && onSetupOccupants && (
-              <Button onClick={() => onSetupOccupants(contract.id)}>Chỉnh sửa thông tin</Button>
+            {canEditOccupants && onSetupOccupants && (
+              <button className="rd-btn rd-btn--primary" onClick={() => onSetupOccupants(contract.id)}>
+                Chỉnh sửa thông tin
+              </button>
             )}
-            {contract.status === 'PendingTenantSignature' && onPreview && (
-              <Button onClick={() => onPreview(contract.id)}>Xem và ký hợp đồng</Button>
+            {canSignContract && onPreview && (
+              <button className="rd-btn rd-btn--primary" onClick={() => onPreview(contract.id)}>
+                Xem và ký hợp đồng
+              </button>
             )}
           </div>
         )}
@@ -330,110 +506,39 @@ function ContractProgressBlock({
   );
 }
 
-function InfoItem({ label, value }: { label: string; value: string }) {
-  return (
-    <div className="info-item">
-      <span className="label">{label}</span>
-      <span className="value">{value}</span>
-    </div>
-  );
+/* ─── Helper formatters ─── */
+function getRequestStatusBadge(status: string) {
+  if (status === 'Pending')   return 'pending';
+  if (status === 'Accepted')  return 'accepted';
+  if (status === 'Rejected')  return 'rejected';
+  if (status === 'Cancelled') return 'cancelled';
+  return 'expired';
 }
 
 function formatRequestStatus(status: string) {
-  switch (status) {
-    case 'Pending': return 'Chờ duyệt';
-    case 'Accepted': return 'Chấp nhận';
-    case 'Rejected': return 'Từ chối';
-    case 'Cancelled': return 'Đã hủy';
-    case 'Expired': return 'Đã quá hạn';
-    default: return status;
-  }
-}
-
-function getRequestStatusTone(status: string) {
-  if (status === 'Accepted') return 'success';
-  if (status === 'Pending') return 'pending';
-  if (['Rejected', 'Cancelled', 'Expired'].includes(status)) return 'danger';
-  return 'neutral';
+  const map: Record<string, string> = {
+    Pending: 'Chờ duyệt', Accepted: 'Đã duyệt',
+    Rejected: 'Từ chối', Cancelled: 'Đã hủy', Expired: 'Đã quá hạn'
+  };
+  return map[status] ?? status;
 }
 
 function formatDepositStatus(status?: string | null) {
-  switch (status) {
-    case undefined:
-    case null:
-      return 'Chưa tạo';
-    case 'PendingPayment': return 'Chờ thanh toán';
-    case 'Paid': return 'Đã thanh toán';
-    case 'Refunded': return 'Đã hoàn cọc';
-    case 'Forfeited': return 'Mất cọc';
-    case 'Expired': return 'Đã quá hạn';
-    case 'Cancelled': return 'Đã hủy';
-    default: return status;
-  }
+  const map: Record<string, string> = {
+    PendingPayment: 'Đang chờ thanh toán cọc', Paid: 'Đã thanh toán cọc',
+    Refunded: 'Đã hoàn cọc', Forfeited: 'Đã mất cọc',
+    Expired: 'Đã quá hạn', Cancelled: 'Đã hủy'
+  };
+  return status ? (map[status] ?? status) : 'Chưa có thông tin cọc';
 }
 
-function getDepositTone(status?: string | null) {
-  if (!status) return 'neutral';
-  if (['Paid', 'Refunded', 'Forfeited'].includes(status)) return 'success';
-  if (status === 'PendingPayment') return 'warning';
-  if (['Rejected', 'Cancelled', 'Expired'].includes(status)) return 'danger';
-  return 'neutral';
+function getDepositBoxCls(status?: string | null) {
+  if (status === 'PendingPayment') return 'rd-deposit-box--pending';
+  if (['Paid', 'Refunded'].includes(status ?? '')) return 'rd-deposit-box--paid';
+  if (['Forfeited', 'Expired'].includes(status ?? '')) return 'rd-deposit-box--failed';
+  return 'rd-deposit-box--neutral';
 }
 
-function formatContractStatus(status: string | undefined | null, actor: 'tenant' | 'landlord') {
-  switch (status) {
-    case undefined:
-    case null:
-      return 'Chưa tạo';
-    case 'WaitingTenantOccupants':
-      return actor === 'tenant' ? 'Chờ bạn nhập thông tin người ở' : 'Chờ khách nhập thông tin người ở';
-    case 'PendingLandlordSignature':
-      return actor === 'tenant' ? 'Chờ chủ trọ ký' : 'Chờ bạn ký';
-    case 'PendingTenantSignature':
-      return actor === 'tenant' ? 'Chờ bạn ký' : 'Chờ khách ký';
-    case 'LandlordRevisionRequested':
-      return actor === 'tenant' ? 'Chủ trọ yêu cầu sửa đổi' : 'Đang chờ khách sửa';
-    case 'TenantRevisionRequested':
-      return actor === 'tenant' ? 'Đang chờ chủ trọ sửa' : 'Khách yêu cầu sửa đổi';
-    case 'Active':
-      return 'Đang hiệu lực';
-    case 'Expired':
-      return 'Đã hết hạn';
-    case 'Rejected':
-      return 'Từ chối';
-    case 'Cancelled':
-      return 'Đã hủy';
-    default:
-      return status;
-  }
-}
-
-function getContractTone(status?: string | null) {
-  if (!status) return 'neutral';
-  if (['Active', 'Expired'].includes(status)) return 'success';
-  if ([
-    'WaitingTenantOccupants',
-    'PendingLandlordSignature',
-    'PendingTenantSignature',
-    'LandlordRevisionRequested',
-    'TenantRevisionRequested'
-  ].includes(status)) return 'warning';
-  if (['Rejected', 'Cancelled'].includes(status)) return 'danger';
-  return 'neutral';
-}
-
-function isContractRevisionStatus(status: string) {
-  return ['LandlordRevisionRequested', 'TenantRevisionRequested'].includes(status);
-}
-
-function formatDate(value: string) {
-  return new Date(value).toLocaleDateString('vi-VN');
-}
-
-function formatDateTime(value: string) {
-  return new Date(value).toLocaleString('vi-VN');
-}
-
-function formatCurrency(value: number) {
-  return value.toLocaleString('vi-VN');
-}
+function formatDate(v: string)     { return new Date(v).toLocaleDateString('vi-VN'); }
+function formatDateTime(v: string) { return new Date(v).toLocaleString('vi-VN'); }
+function formatCurrency(v: number) { return v.toLocaleString('vi-VN'); }

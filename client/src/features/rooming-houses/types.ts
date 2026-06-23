@@ -239,6 +239,12 @@ export type RoomingHouseAiChatRequest = {
   roomingHouseId?: string | null;
   mode?: 'fast' | 'detailed';
   conversationId?: string | null;
+  chatHistory?: RoomingHouseAiChatHistoryMessage[];
+};
+
+export type RoomingHouseAiChatHistoryMessage = {
+  role: 'assistant' | 'user';
+  text: string;
 };
 
 export type NearbyPlace = {
@@ -256,6 +262,7 @@ export type RoomingHouseAiChatResponse = {
   intent: string;
   confidence: number;
   aiAssisted: boolean;
+  conversationId: string;
   roomingHouses: RoomingHouseSearchItem[];
   nearbyPlaces: NearbyPlace[];
   followUpQuestions: string[];

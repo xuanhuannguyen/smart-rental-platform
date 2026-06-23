@@ -5,6 +5,7 @@ using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Options;
 using SmartRentalPlatform.Application.Common.Interfaces;
 using SmartRentalPlatform.Application.Common.Options;
+using SmartRentalPlatform.Infrastructure.Caching;
 using SmartRentalPlatform.Infrastructure.BackgroundServices;
 using SmartRentalPlatform.Infrastructure.ExternalServices.Ekyc;
 using SmartRentalPlatform.Infrastructure.ExternalServices.Email;
@@ -59,6 +60,7 @@ public static class DependencyInjection
         services.Configure<VnptEkycOptions>(configuration.GetSection(VnptEkycOptions.SectionName));
         services.AddDataProtection();
         services.AddMemoryCache();
+        services.AddScoped<IConversationCacheService, ConversationCacheService>();
         services.AddScoped<IPrivateStorageService, LocalPrivateStorageService>();
         services.AddScoped<IHashService, Sha256HashService>();
         services.AddScoped<ISensitiveDataProtector, DataProtectionSensitiveDataProtector>();

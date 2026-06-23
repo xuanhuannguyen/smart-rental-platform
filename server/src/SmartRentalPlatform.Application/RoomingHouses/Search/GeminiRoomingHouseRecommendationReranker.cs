@@ -47,10 +47,10 @@ public sealed class GeminiRoomingHouseRecommendationReranker : IRoomingHouseReco
             behavior = new
             {
                 request.RecentQueries,
-                request.RecentRoomingHouseIds,
-                request.ClickedRoomingHouseIds,
-                request.PreferredAmenityIds,
-                request.PreferredRoomAmenityIds,
+                recentRoomingHouseIds = request.RecentRoomingHouseIds,
+                clickedRoomingHouseIds = request.ClickedRoomingHouseIds,
+                preferredAmenityIds = request.PreferredAmenityIds,
+                preferredRoomAmenityIds = request.PreferredRoomAmenityIds,
                 request.ProvinceCode,
                 request.WardCode,
                 request.MinPrice,
@@ -58,7 +58,25 @@ public sealed class GeminiRoomingHouseRecommendationReranker : IRoomingHouseReco
                 request.MinAreaM2,
                 request.MaxAreaM2
             },
-            candidates
+            candidates = candidates.Select(c => new
+            {
+                c.Id,
+                c.Name,
+                c.AddressDisplay,
+                c.DistanceKm,
+                c.MinMonthlyRent,
+                c.MaxMonthlyRent,
+                c.MinAreaM2,
+                c.MaxAreaM2,
+                c.AvailableRooms,
+                c.TotalRooms,
+                occupancyRatio = c.TotalRooms > 0
+                    ? Math.Round((double)(c.TotalRooms - c.AvailableRooms) / c.TotalRooms * 100, 0)
+                    : (double?)null,
+                c.HasCoverImage,
+                c.CreatedAt,
+                c.Amenities
+            }).ToList()
         };
 
         try
@@ -100,10 +118,17 @@ public sealed class GeminiRoomingHouseRecommendationReranker : IRoomingHouseReco
 
     private static string BuildRecommendationInstructions()
         => """
-        Bạn là hệ thống gợi ý khu trọ cho người thuê ở Việt Nam.
+        Bạn là hệ thống gợi ý khu trọ thông minh tại Việt Nam.
         Chỉ sắp xếp lại candidate được cung cấp, không tạo id mới.
-        Ưu tiên khu vực, ngân sách, tiện ích và hành vi tìm kiếm/click gần đây.
-        Lý do hiển thị bằng tiếng Việt, ngắn gọn, tự nhiên, tối đa 22 từ mỗi khu trọ.
+        Sử dụng các tiêu chí sau để xếp hạng (theo thứ tự ưu tiên):
+        1. Phù hợp ngân sách (MinPrice/MaxPrice từ behavior) — ưu tiên candidate có giá trong tầm
+        2. Đúng khu vực (ProvinceCode/WardCode) — ưu tiên candidate cùng khu vực
+        3. Đúng tiện ích mong muốn (preferredAmenityIds) — càng match nhiều càng tốt
+        4. Tỷ lệ phòng trống thấp (occupancyRatio cao = được ưa chuộng)
+        5. Độ mới (CreatedAt gần đây) + có hình ảnh (HasCoverImage)
+        6. Lịch sử click (đã click gần đây ưu tiên cao hơn)
+        7. Khoảng cách (DistanceKm gần hơn ưu tiên hơn nếu user có yêu cầu vị trí)
+        Lý do hiển thị bằng tiếng Việt, ngắn gọn tự nhiên, tối đa 22 từ mỗi khu trọ.
         Trả JSON đúng schema.
         """;
 

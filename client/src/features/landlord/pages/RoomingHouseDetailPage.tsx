@@ -44,7 +44,22 @@ import './RoomingHouseDetailPage.css';
 
 type MainTab = 'basic' | 'images' | 'amenities' | 'legal' | 'house-rule' | 'rental-policy' | 'service-prices' | 'rooms' | 'create-room';
 
-const nextPeriodStart = new Date(new Date().getFullYear(), new Date().getMonth() + 1, 1).toISOString().split('T')[0];
+function getLocalDateString(year: number, month: number, day: number): string {
+  return `${year}-${String(month).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
+}
+
+function getNextMonth1st(): string {
+  const now = new Date();
+  const month = now.getMonth() + 1; // 1-based
+  const nextMonth = month === 12 ? 1 : month + 1;
+  const nextYear = month === 12 ? now.getFullYear() + 1 : now.getFullYear();
+  return getLocalDateString(nextYear, nextMonth, 1);
+}
+
+function getCurrentMonth1st(): string {
+  const now = new Date();
+  return getLocalDateString(now.getFullYear(), now.getMonth() + 1, 1);
+}
 
 const defaultServicePriceDrafts: CreateServicePriceRequest[] = [];
 
@@ -113,6 +128,7 @@ export default function RoomingHouseDetailPage() {
   const [servicePricesLoading, setServicePricesLoading] = useState(false);
   const [servicePriceDrafts, setServicePriceDrafts] = useState<CreateServicePriceRequest[]>(defaultServicePriceDrafts);
   const [servicePriceNote, setServicePriceNote] = useState('');
+  const [isFirstTimeServicePrice, setIsFirstTimeServicePrice] = useState(true);
 
   const activeServicePrices = useMemo(() => servicePrices.filter(p => p.isActive), [servicePrices]);
   const servicePriceHistory = useMemo(() => servicePrices, [servicePrices]);
@@ -136,6 +152,11 @@ export default function RoomingHouseDetailPage() {
 
       setBillingServiceTypes(activeServiceTypes);
       setServicePrices(pricesResponse.data);
+
+      const isFirstTime = activePriceByServiceTypeId.size === 0;
+      setIsFirstTimeServicePrice(isFirstTime);
+      const effectiveFromDate = isFirstTime ? getCurrentMonth1st() : getNextMonth1st();
+
       setServicePriceDrafts(activeServiceTypes.map((serviceType) => {
         const activePrice = activePriceByServiceTypeId.get(serviceType.id);
         const pricingUnit = normalizePricingUnit(activePrice?.pricingUnit ?? getDefaultServicePricingUnit(serviceType));
@@ -145,7 +166,7 @@ export default function RoomingHouseDetailPage() {
           pricingUnit,
           unitName: getServicePricingUnitDisplayUnit(pricingUnit, serviceType),
           unitPrice: activePrice?.unitPrice ?? 0,
-          effectiveFrom: nextPeriodStart,
+          effectiveFrom: effectiveFromDate,
         };
       }));
     } catch (err) {
@@ -168,7 +189,7 @@ export default function RoomingHouseDetailPage() {
           ...draft,
           ...patch,
           pricingUnit,
-          effectiveFrom: nextPeriodStart,
+          effectiveFrom: isFirstTimeServicePrice ? getCurrentMonth1st() : getNextMonth1st(),
         };
       })
     );
@@ -185,7 +206,7 @@ export default function RoomingHouseDetailPage() {
         await billingApi.createServicePrice(house.id, {
           ...draft,
           unitPrice: Number(draft.unitPrice) || 0,
-          effectiveFrom: nextPeriodStart,
+          effectiveFrom: isFirstTimeServicePrice ? getCurrentMonth1st() : getNextMonth1st(),
           note: servicePriceNote.trim() || null,
         });
       }
@@ -246,7 +267,6 @@ export default function RoomingHouseDetailPage() {
         });
       } else {
         setRentalPolicyForm(emptyRentalPolicyForm);
-        setMessage('Vui lòng Hoàn Thành Chính Sách Thuê Ở trong thông tin khu trọ để được tạo phòng');
       }
 
       // Tải danh sách phòng
@@ -259,9 +279,6 @@ export default function RoomingHouseDetailPage() {
         }
       } else {
         setRooms([]);
-        if (data.rentalPolicy && !data.houseRule) {
-          setMessage('Vui lòng hoàn thành Luật khu trọ trước khi tạo phòng đầu tiên.');
-        }
       }
     } catch (err) {
       setMessage(getApiErrorMessage(err, 'Không thể tải thông tin chi tiết khu trọ.'));
@@ -420,6 +437,13 @@ export default function RoomingHouseDetailPage() {
       setActiveTab('house-rule');
       return;
     }
+
+    const hasPrices = activeServicePrices.length > 0;
+    if (!hasPrices) {
+      setMessage('Vui lòng cấu hình bảng giá dịch vụ trước khi tạo phòng.');
+      setActiveTab('service-prices');
+      return;
+    }
     setActiveTab('create-room');
     setNewRoomForm(emptyRoomForm);
   }
@@ -472,7 +496,6 @@ export default function RoomingHouseDetailPage() {
     <div className="rooming-house-detail-page" style={{ display: 'contents' }}>
       <main className="dashboard-main">
         {/* Banner Tổng quan */}
-        {/* Banner Tổng quan */}
         <section className="overview-band">
           <div className="overview-header-title-area">
             <button
@@ -486,13 +509,30 @@ export default function RoomingHouseDetailPage() {
                 <polyline points="12 19 5 12 12 5" />
               </svg>
             </button>
+            <div className="overview-house-icon">
+              <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#2563eb" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z" />
+                <polyline points="9 22 9 12 15 12 15 22" />
+                <rect x="10" y="14" width="4" height="4" />
+              </svg>
+            </div>
             <div className="overview-left">
-              <p className="eyebrow">{house.addressDisplay}</p>
-              <h2>
-                {house.name}
-              </h2>
+              <div className="overview-address">
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#2563eb" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" style={{ marginRight: '6px' }}>
+                  <path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z" />
+                  <circle cx="12" cy="10" r="3" />
+                </svg>
+                <span>{house.addressDisplay}</span>
+              </div>
+              <h2>{house.name}</h2>
               <p className="overview-description">
-                Thời gian duyệt: {house.createdAt ? formatDate(house.createdAt) : ''}
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#2563eb" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ marginRight: '6px' }}>
+                  <rect x="3" y="4" width="18" height="18" rx="2" ry="2" />
+                  <line x1="16" y1="2" x2="16" y2="6" />
+                  <line x1="8" y1="2" x2="8" y2="6" />
+                  <line x1="3" y1="10" x2="21" y2="10" />
+                </svg>
+                Thời gian duyệt: <span style={{ color: '#2563eb', fontWeight: 600, marginLeft: '4px' }}>{house.createdAt ? formatDate(house.createdAt) : ''}</span>
               </p>
             </div>
           </div>
@@ -501,68 +541,87 @@ export default function RoomingHouseDetailPage() {
             <div className="overview-stats">
               <div className="stat-item stat-item--total">
                 <HomeIcon />
-                <span>Tổng số phòng</span>
-                <strong className="stat-badge">{roomStats.total}</strong>
+                <div className="stat-info">
+                  <span className="stat-label">Tổng số phòng</span>
+                  <strong className="stat-number">{roomStats.total}</strong>
+                </div>
               </div>
               <div className="stat-item stat-item--approved">
                 <CheckCircleIcon />
-                <span>Số phòng trống</span>
-                <strong className="stat-badge">{roomStats.available}</strong>
+                <div className="stat-info">
+                  <span className="stat-label">Số phòng trống</span>
+                  <strong className="stat-number">{roomStats.available}</strong>
+                </div>
               </div>
               <div className="stat-item stat-item--pending">
                 <UserCheckIcon />
-                <span>Đang thuê</span>
-                <strong className="stat-badge">{roomStats.occupied}</strong>
+                <div className="stat-info">
+                  <span className="stat-label">Đang thuê</span>
+                  <strong className="stat-number">{roomStats.occupied}</strong>
+                </div>
               </div>
               <div className="stat-item stat-item--rejected">
                 <EyeOffIcon />
-                <span>Đang ẩn</span>
-                <strong className="stat-badge">{roomStats.hidden}</strong>
+                <div className="stat-info">
+                  <span className="stat-label">Đang ẩn</span>
+                  <strong className="stat-number">{roomStats.hidden}</strong>
+                </div>
               </div>
             </div>
 
             <div className="overview-actions" style={{ display: 'flex', gap: '12px' }}>
               <button
-                className="secondary-action"
+                className={`nav-tab-btn ${activeTab === 'rooms' ? 'active' : ''}`}
                 onClick={() => setActiveTab('rooms')}
-                style={{
-                  borderColor: activeTab === 'rooms' ? '#2563eb' : undefined,
-                  color: activeTab === 'rooms' ? '#2563eb' : undefined,
-                  backgroundColor: activeTab === 'rooms' ? '#f0f9ff' : undefined
-                }}
               >
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                  <line x1="8" y1="6" x2="21" y2="6" />
+                  <line x1="8" y1="12" x2="21" y2="12" />
+                  <line x1="8" y1="18" x2="21" y2="18" />
+                  <line x1="3" y1="6" x2="3.01" y2="6" />
+                  <line x1="3" y1="12" x2="3.01" y2="12" />
+                  <line x1="3" y1="18" x2="3.01" y2="18" />
+                </svg>
                 Danh sách phòng
               </button>
               <button
-                className="secondary-action"
+                className={`nav-tab-btn ${(activeTab !== 'rooms' && activeTab !== 'create-room') ? 'active' : ''}`}
                 onClick={() => {
                   if (activeTab === 'rooms' || activeTab === 'create-room') setActiveTab('basic');
                 }}
-                style={{
-                  borderColor: (activeTab !== 'rooms' && activeTab !== 'create-room') ? '#2563eb' : undefined,
-                  color: (activeTab !== 'rooms' && activeTab !== 'create-room') ? '#2563eb' : undefined,
-                  backgroundColor: (activeTab !== 'rooms' && activeTab !== 'create-room') ? '#f0f9ff' : undefined
-                }}
               >
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                  <path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z" />
+                  <polyline points="9 22 9 12 15 12 15 22" />
+                  <rect x="10" y="14" width="4" height="4" />
+                </svg>
                 Thông tin khu trọ
               </button>
               {house.approvalStatus === 'Approved' && (
                 <button
-                  className="secondary-action"
+                  className="action-btn-outline"
                   onClick={handleToggleVisibility}
                   disabled={actionLoading}
                 >
+                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                    <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z" />
+                    <circle cx="12" cy="12" r="3" />
+                  </svg>
                   {house.visibilityStatus === 'Visible' ? 'Ẩn khu trọ' : 'Hiển thị khu trọ'}
                 </button>
               )}
               <button
-                className="primary-action"
+                className="action-btn-primary"
                 onClick={handleCreateRoomClick}
                 disabled={!canCreateRoom}
                 title={!canCreateRoom ? "Vui lòng cấu hình chính sách thuê và Luật khu trọ trước khi tạo phòng." : "Tạo phòng mới"}
                 style={!canCreateRoom ? { opacity: 0.5, cursor: 'not-allowed' } : undefined}
               >
-                + Tạo phòng mới
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                  <line x1="12" y1="5" x2="12" y2="19" />
+                  <line x1="5" y1="12" x2="19" y2="12" />
+                </svg>
+                Tạo phòng mới
               </button>
             </div>
           </div>
@@ -573,26 +632,60 @@ export default function RoomingHouseDetailPage() {
 
         {/* Hệ thống Tab Cấp 2 */}
         {(activeTab !== 'rooms' && activeTab !== 'create-room') && (
-          <div className="tabs" style={{ display: 'flex', alignItems: 'center', marginTop: '16px' }}>
+          <div className="info-subtabs">
             <button className={activeTab === 'basic' ? 'active' : ''} onClick={() => setActiveTab('basic')}>
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z" />
+                <polyline points="9 22 9 12 15 12 15 22" />
+              </svg>
               Thông tin cơ bản
             </button>
             <button className={activeTab === 'images' ? 'active' : ''} onClick={() => setActiveTab('images')}>
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <rect x="3" y="3" width="18" height="18" rx="2" ry="2" />
+                <circle cx="8.5" cy="8.5" r="1.5" />
+                <polyline points="21 15 16 10 5 21" />
+              </svg>
               Ảnh khu trọ
             </button>
             <button className={activeTab === 'amenities' ? 'active' : ''} onClick={() => setActiveTab('amenities')}>
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2" />
+              </svg>
               Tiện nghi
             </button>
             <button className={activeTab === 'legal' ? 'active' : ''} onClick={() => setActiveTab('legal')}>
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <rect x="3" y="4" width="18" height="16" rx="2" ry="2" />
+                <line x1="16" y1="2" x2="16" y2="4" />
+                <line x1="8" y1="2" x2="8" y2="4" />
+                <line x1="3" y1="10" x2="21" y2="10" />
+              </svg>
               Giấy tờ pháp lý
             </button>
             <button className={activeTab === 'house-rule' ? 'active' : ''} onClick={() => setActiveTab('house-rule')}>
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" />
+                <polyline points="14 2 14 8 20 8" />
+                <line x1="16" y1="13" x2="8" y2="13" />
+                <line x1="16" y1="17" x2="8" y2="17" />
+              </svg>
               Luật khu trọ
             </button>
             <button className={activeTab === 'rental-policy' ? 'active' : ''} onClick={() => setActiveTab('rental-policy')}>
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <rect x="3" y="4" width="18" height="18" rx="2" ry="2" />
+                <line x1="16" y1="2" x2="16" y2="6" />
+                <line x1="8" y1="2" x2="8" y2="6" />
+                <line x1="3" y1="10" x2="21" y2="10" />
+              </svg>
               Chính sách thuê
             </button>
             <button className={activeTab === 'service-prices' ? 'active' : ''} onClick={() => setActiveTab('service-prices')}>
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <line x1="12" y1="1" x2="12" y2="23" />
+                <path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6" />
+              </svg>
               Bảng giá dịch vụ
             </button>
           </div>
@@ -602,86 +695,150 @@ export default function RoomingHouseDetailPage() {
         <div className="tab-content" style={{ marginTop: '16px' }}>
           {/* TAB 1: THÔNG TIN CƠ BẢN */}
           {activeTab === 'basic' && (
-            <div className="editor-panel form-grid">
+            <div className="subtab-card">
+              <div className="subtab-header">
+                <div className="subtab-header-icon">
+                  <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                    <path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z" />
+                    <polyline points="9 22 9 12 15 12 15 22" />
+                  </svg>
+                </div>
+                <div>
+                  <h4>Thông tin cơ bản</h4>
+                  <p>Quản lý các thông tin hành chính, địa chỉ và mô tả chung của khu trọ.</p>
+                </div>
+              </div>
+
               {addressLocked && (
-                <div className="empty-panel compact" style={{ gridColumn: '1 / -1' }}>
-                  Địa chỉ hành chính của khu trọ đã được duyệt nên không thể chỉnh sửa. Bạn vẫn có thể cập nhật tọa độ và link Google Maps.
+                <div className="subtab-alert" style={{ marginBottom: '20px' }}>
+                  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                    <circle cx="12" cy="12" r="10" />
+                    <line x1="12" y1="16" x2="12" y2="12" />
+                    <line x1="12" y1="8" x2="12.01" y2="8" />
+                  </svg>
+                  <span>Địa chỉ hành chính của khu trọ đã được duyệt nên không thể chỉnh sửa. Bạn vẫn có thể cập nhật tọa độ và link Google Maps.</span>
                 </div>
               )}
-              <label className="field">
-                <span>Tên khu trọ</span>
-                <input value={basicForm.name} onChange={e => setBasicForm({ ...basicForm, name: e.target.value })} />
-              </label>
 
-              <label className="field">
-                <span>Địa chỉ chi tiết</span>
-                <input disabled={addressLocked} value={basicForm.addressLine} onChange={e => setBasicForm({ ...basicForm, addressLine: e.target.value })} />
-              </label>
+              <div className="form-grid">
+                <label className="field">
+                  <span>
+                    Tên khu trọ
+                    <span className="label-info-icon" title="Tên hiển thị công khai của khu trọ">
+                      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="10" /><path d="M12 16v-4" /><path d="M12 8h.01" /></svg>
+                    </span>
+                  </span>
+                  <input value={basicForm.name} onChange={e => setBasicForm({ ...basicForm, name: e.target.value })} placeholder="Nhập tên khu trọ..." />
+                  <span className="helper-text">Tên khu trọ hiển thị với khách thuê</span>
+                </label>
 
-              <label className="field">
-                <span>Tỉnh / Thành phố</span>
-                <select
-                  disabled={addressLocked}
-                  value={basicForm.provinceCode}
-                  onChange={e => setBasicForm({ ...basicForm, provinceCode: e.target.value, wardCode: '' })}
-                >
-                  <option value="">-- Chọn Tỉnh/Thành phố --</option>
-                  {provinces.map(p => (
-                    <option key={p.code} value={p.code}>{p.name}</option>
-                  ))}
-                </select>
-              </label>
+                <label className="field">
+                  <span>
+                    Địa chỉ chi tiết
+                    <span className="label-info-icon" title="Địa chỉ số nhà, tên đường">
+                      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="10" /><path d="M12 16v-4" /><path d="M12 8h.01" /></svg>
+                    </span>
+                  </span>
+                  <input disabled={addressLocked} value={basicForm.addressLine} onChange={e => setBasicForm({ ...basicForm, addressLine: e.target.value })} placeholder="VD: 144 Trần Đại Nghĩa" />
+                  <span className="helper-text">Số nhà, ngõ/hẻm, tên đường</span>
+                </label>
 
-              <label className="field">
-                <span>Phường / Xã</span>
-                <select
-                  value={basicForm.wardCode}
-                  onChange={e => setBasicForm({ ...basicForm, wardCode: e.target.value })}
-                  disabled={addressLocked || !basicForm.provinceCode}
-                >
-                  <option value="">-- Chọn Phường/Xã --</option>
-                  {wards.map(w => (
-                    <option key={w.code} value={w.code}>{w.name}</option>
-                  ))}
-                </select>
-              </label>
+                <label className="field">
+                  <span>Tỉnh / Thành phố</span>
+                  <select
+                    disabled={addressLocked}
+                    value={basicForm.provinceCode}
+                    onChange={e => setBasicForm({ ...basicForm, provinceCode: e.target.value, wardCode: '' })}
+                  >
+                    <option value="">-- Chọn Tỉnh/Thành phố --</option>
+                    {provinces.map(p => (
+                      <option key={p.code} value={p.code}>{p.name}</option>
+                    ))}
+                  </select>
+                  <span className="helper-text">Chọn Tỉnh/Thành phố trực thuộc</span>
+                </label>
 
-              <LeafletLocationPicker
-                addressLine={basicForm.addressLine}
-                provinceName={selectedProvinceName}
-                wardName={selectedWardName}
-                latitude={basicForm.latitude}
-                longitude={basicForm.longitude}
-                googleMapUrl={basicForm.googleMapUrl}
-                onAddressChange={(addressLine) =>
-                  setBasicForm((current) => addressLocked ? current : { ...current, addressLine })
-                }
-                onLocationChange={(latitude, longitude) =>
-                  setBasicForm((current) => ({ ...current, latitude, longitude }))
-                }
-                onGoogleMapUrlChange={(googleMapUrl) =>
-                  setBasicForm((current) => ({ ...current, googleMapUrl }))
-                }
-              />
+                <label className="field">
+                  <span>Phường / Xã</span>
+                  <select
+                    value={basicForm.wardCode}
+                    onChange={e => setBasicForm({ ...basicForm, wardCode: e.target.value })}
+                    disabled={addressLocked || !basicForm.provinceCode}
+                  >
+                    <option value="">-- Chọn Phường/Xã --</option>
+                    {wards.map(w => (
+                      <option key={w.code} value={w.code}>{w.name}</option>
+                    ))}
+                  </select>
+                  <span className="helper-text">Chọn Phường/Xã hành chính</span>
+                </label>
 
-              <label className="field" style={{ gridColumn: '1 / -1' }}>
-                <span>Mô tả khu trọ</span>
-                <textarea
-                  style={{ width: '100%', minHeight: '100px', padding: '10px', border: '1px solid #cbd5e1', borderRadius: '6px', font: 'inherit' }}
-                  value={basicForm.description ?? ''}
-                  onChange={e => setBasicForm({ ...basicForm, description: e.target.value })}
-                />
-              </label>
+                <div style={{ gridColumn: '1 / -1', marginTop: '10px' }}>
+                  <LeafletLocationPicker
+                    addressLine={basicForm.addressLine}
+                    provinceName={selectedProvinceName}
+                    wardName={selectedWardName}
+                    latitude={basicForm.latitude}
+                    longitude={basicForm.longitude}
+                    googleMapUrl={basicForm.googleMapUrl}
+                    onAddressChange={(addressLine) =>
+                      setBasicForm((current) => addressLocked ? current : { ...current, addressLine })
+                    }
+                    onLocationChange={(latitude, longitude) =>
+                      setBasicForm((current) => ({ ...current, latitude, longitude }))
+                    }
+                    onGoogleMapUrlChange={(googleMapUrl) =>
+                      setBasicForm((current) => ({ ...current, googleMapUrl }))
+                    }
+                  />
+                </div>
 
-              <div className="save-row">
-                <button className="primary-action" onClick={handleSaveBasicInfo}>Lưu thông tin</button>
+                <label className="field" style={{ gridColumn: '1 / -1' }}>
+                  <span>Mô tả khu trọ</span>
+                  <textarea
+                    value={basicForm.description ?? ''}
+                    onChange={e => setBasicForm({ ...basicForm, description: e.target.value })}
+                    placeholder="Mô tả các đặc điểm nổi bật của khu trọ..."
+                  />
+                  <span className="helper-text">Thông tin chi tiết giới thiệu về khu trọ tới khách thuê</span>
+                </label>
+              </div>
+
+              <div className="subtab-footer">
+                <div className="shield-info">
+                  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                    <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/>
+                  </svg>
+                  <span>Thông tin này giúp khách thuê tìm kiếm khu trọ trên bản đồ chính xác.</span>
+                </div>
+                <button className="primary-action" onClick={handleSaveBasicInfo} disabled={actionLoading}>
+                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" style={{ marginRight: '6px' }}>
+                    <path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z" />
+                    <polyline points="17 21 17 13 7 13 7 21" />
+                    <polyline points="7 3 7 8 15 8" />
+                  </svg>
+                  {actionLoading ? 'Đang lưu...' : 'Lưu thông tin cơ bản'}
+                </button>
               </div>
             </div>
           )}
 
           {/* TAB 2: ẢNH KHU TRỌ */}
           {activeTab === 'images' && (
-            <div className="editor-panel">
+            <div className="subtab-card">
+              <div className="subtab-header">
+                <div className="subtab-header-icon">
+                  <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                    <rect x="3" y="3" width="18" height="18" rx="2" ry="2" />
+                    <circle cx="8.5" cy="8.5" r="1.5" />
+                    <polyline points="21 15 16 10 5 21" />
+                  </svg>
+                </div>
+                <div>
+                  <h4>Ảnh khu trọ</h4>
+                  <p>Quản lý hình ảnh đại diện, không gian chung và chi tiết của khu trọ.</p>
+                </div>
+              </div>
               <PropertyImageEditor
                 images={houseImages}
                 scope="RoomingHouse"
@@ -693,68 +850,101 @@ export default function RoomingHouseDetailPage() {
 
           {/* TAB 3: TIỆN NGHI KHU TRỌ */}
           {activeTab === 'amenities' && (
-            <div className="editor-panel">
+            <div className="subtab-card">
+              <div className="subtab-header">
+                <div className="subtab-header-icon">
+                  <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                    <polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2" />
+                  </svg>
+                </div>
+                <div>
+                  <h4>Tiện nghi khu trọ</h4>
+                  <p>Lựa chọn các tiện ích, dịch vụ chung được cung cấp tại khu trọ này.</p>
+                </div>
+              </div>
               <AmenityEditor
                 amenities={houseAmenities}
                 selectedIds={selectedAmenityIds}
                 onChange={setSelectedAmenityIds}
                 onSave={handleSaveAmenities}
+                actionLoading={actionLoading}
               />
             </div>
           )}
 
           {/* TAB 4: GIẤY TỜ PHÁP LÝ (READ ONLY) */}
           {activeTab === 'legal' && (
-            <div className="editor-panel">
-              <h3>Thông tin giấy tờ pháp lý</h3>
-              <p style={{ color: '#64748b', marginBottom: '20px' }}>Giấy tờ pháp lý của khu trọ đã được duyệt và không thể chỉnh sửa.</p>
+            <div className="subtab-card">
+              <div className="subtab-header">
+                <div className="subtab-header-icon">
+                  <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                    <rect x="3" y="4" width="18" height="16" rx="2" ry="2" />
+                    <line x1="16" y1="2" x2="16" y2="4" />
+                    <line x1="8" y1="2" x2="8" y2="4" />
+                    <line x1="3" y1="10" x2="21" y2="10" />
+                  </svg>
+                </div>
+                <div>
+                  <h4>Giấy tờ pháp lý</h4>
+                  <p>Các giấy tờ chứng minh quyền sở hữu và vận hành khu trọ hợp pháp.</p>
+                </div>
+              </div>
 
-              <div className="form-grid" style={{ marginBottom: '24px' }}>
-                <label className="field">
-                  <span>Loại giấy tờ</span>
-                  <input value={house.legalDocument?.documentType ?? 'Không xác định'} readOnly style={{ background: '#f8fafc', color: '#64748b' }} />
-                </label>
+              <div className="subtab-alert" style={{ marginBottom: '20px' }}>
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                  <circle cx="12" cy="12" r="10" />
+                  <line x1="12" y1="16" x2="12" y2="12" />
+                  <line x1="12" y1="8" x2="12.01" y2="8" />
+                </svg>
+                <span>Giấy tờ pháp lý của khu trọ đã được ban quản trị duyệt và khóa. Bạn không thể tự ý chỉnh sửa thông tin này.</span>
+              </div>
 
-                <label className="field">
-                  <span>Số giấy tờ (Đã ẩn)</span>
-                  <input value={house.legalDocument?.documentNumberMasked ?? 'Không xác định'} readOnly style={{ background: '#f8fafc', color: '#64748b' }} />
-                </label>
+              <div className="legal-info-list" style={{ marginBottom: '24px' }}>
+                <div className="legal-info-item">
+                  <span className="legal-info-label">Loại giấy tờ pháp lý</span>
+                  <span className="legal-info-value">{house.legalDocument?.documentType ?? 'Không xác định'}</span>
+                </div>
+
+                <div className="legal-info-item">
+                  <span className="legal-info-label">Số giấy tờ (Đã ẩn)</span>
+                  <span className="legal-info-value">{house.legalDocument?.documentNumberMasked ?? 'Không xác định'}</span>
+                </div>
               </div>
 
               <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(240px, 1fr))', gap: '20px' }}>
                 <div>
-                  <h4 style={{ marginBottom: '8px' }}>Mặt trước giấy tờ</h4>
+                  <h4 style={{ fontSize: '14px', fontWeight: 600, color: '#334155', marginBottom: '10px' }}>Mặt trước giấy tờ</h4>
                   {house.legalDocument?.frontImageObjectKey ? (
                     <img
                       src={toAssetUrl(house.legalDocument.frontImageObjectKey)}
                       alt="Front"
-                      style={{ width: '100%', maxHeight: '240px', objectFit: 'contain', border: '1px solid #dbe3ef', borderRadius: '6px' }}
+                      style={{ width: '100%', maxHeight: '240px', objectFit: 'contain', border: '1px solid #e2e8f0', borderRadius: '12px', background: '#f8fafc', padding: '6px' }}
                     />
                   ) : (
-                    <p style={{ color: '#94a3b8', fontStyle: 'italic' }}>Chưa tải lên ảnh</p>
+                    <p style={{ color: '#94a3b8', fontStyle: 'italic', fontSize: '13.5px' }}>Chưa tải lên ảnh</p>
                   )}
                 </div>
 
                 <div>
-                  <h4 style={{ marginBottom: '8px' }}>Mặt sau giấy tờ</h4>
+                  <h4 style={{ fontSize: '14px', fontWeight: 600, color: '#334155', marginBottom: '10px' }}>Mặt sau giấy tờ</h4>
                   {house.legalDocument?.backImageObjectKey ? (
                     <img
                       src={toAssetUrl(house.legalDocument.backImageObjectKey)}
                       alt="Back"
-                      style={{ width: '100%', maxHeight: '240px', objectFit: 'contain', border: '1px solid #dbe3ef', borderRadius: '6px' }}
+                      style={{ width: '100%', maxHeight: '240px', objectFit: 'contain', border: '1px solid #e2e8f0', borderRadius: '12px', background: '#f8fafc', padding: '6px' }}
                     />
                   ) : (
-                    <p style={{ color: '#94a3b8', fontStyle: 'italic' }}>Chưa tải lên ảnh</p>
+                    <p style={{ color: '#94a3b8', fontStyle: 'italic', fontSize: '13.5px' }}>Chưa tải lên ảnh</p>
                   )}
                 </div>
 
                 {house.legalDocument?.extraImageObjectKey && (
                   <div>
-                    <h4 style={{ marginBottom: '8px' }}>Ảnh bổ sung</h4>
+                    <h4 style={{ fontSize: '14px', fontWeight: 600, color: '#334155', marginBottom: '10px' }}>Ảnh bổ sung</h4>
                     <img
                       src={toAssetUrl(house.legalDocument.extraImageObjectKey)}
                       alt="Extra"
-                      style={{ width: '100%', maxHeight: '240px', objectFit: 'contain', border: '1px solid #dbe3ef', borderRadius: '6px' }}
+                      style={{ width: '100%', maxHeight: '240px', objectFit: 'contain', border: '1px solid #e2e8f0', borderRadius: '12px', background: '#f8fafc', padding: '6px' }}
                     />
                   </div>
                 )}
@@ -764,8 +954,21 @@ export default function RoomingHouseDetailPage() {
 
           {/* TAB 4.5: LUẬT KHU TRỌ */}
           {activeTab === 'house-rule' && (
-            <div className="editor-panel">
-              <h3 style={{ margin: '0 0 12px 0' }}>Luật khu trọ</h3>
+            <div className="subtab-card">
+              <div className="subtab-header">
+                <div className="subtab-header-icon">
+                  <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                    <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" />
+                    <polyline points="14 2 14 8 20 8" />
+                    <line x1="16" y1="13" x2="8" y2="13" />
+                    <line x1="16" y1="17" x2="8" y2="17" />
+                  </svg>
+                </div>
+                <div>
+                  <h4>Luật & Quy định khu trọ</h4>
+                  <p>Thiết lập nội quy bắt buộc đối với tất cả khách thuê nhằm bảo đảm an ninh trật tự.</p>
+                </div>
+              </div>
               <RoomingHouseRuleEditor
                 roomingHouseId={house.id}
                 houseRule={house.houseRule}
@@ -776,98 +979,172 @@ export default function RoomingHouseDetailPage() {
 
           {/* TAB 4.5: CHÍNH SÁCH THUÊ */}
           {activeTab === 'rental-policy' && (
-            <div className="editor-panel" style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
-              <h3 style={{ margin: '0 0 10px 0', borderBottom: '1px solid #e2e8f0', paddingBottom: '12px', color: '#1e293b', fontSize: '18px', fontWeight: 600 }}>
-                Cấu hình chính sách cho thuê
-              </h3>
+            <div className="subtab-card">
+              <div className="subtab-header">
+                <div className="subtab-header-icon">
+                  <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                    <rect x="3" y="4" width="18" height="18" rx="2" ry="2" />
+                    <line x1="16" y1="2" x2="16" y2="6" />
+                    <line x1="8" y1="2" x2="8" y2="6" />
+                    <line x1="3" y1="10" x2="21" y2="10" />
+                  </svg>
+                </div>
+                <div>
+                  <h4>Chính sách thuê</h4>
+                  <p>Thiết lập thời hạn hợp đồng, tiền cọc và chu kỳ thanh toán định kỳ của khu trọ.</p>
+                </div>
+              </div>
 
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr', gap: '20px' }}>
-                {/* Section 1: Điều khoản cơ bản */}
-                <div style={{ background: '#f8fafc', padding: '20px', borderRadius: '8px', border: '1px solid #e2e8f0' }}>
-                  <h4 style={{ margin: '0 0 16px 0', color: '#334155', fontSize: '15px', fontWeight: 600 }}>Điều khoản cơ bản</h4>
-                  <div className="form-grid">
-                    <label className="field">
-                      <span>Số tháng thuê tối thiểu</span>
-                      <input
-                        type="number"
-                        min="1"
-                        value={rentalPolicyForm.minRentalMonths}
-                        onChange={(e) =>
-                          setRentalPolicyForm({ ...rentalPolicyForm, minRentalMonths: Number(e.target.value) || 1 })
-                        }
-                      />
-                    </label>
-
-                    <label className="field">
-                      <span>Số tháng thuê tối đa</span>
-                      <input
-                        type="number"
-                        min="1"
-                        value={rentalPolicyForm.maxRentalMonths}
-                        onChange={(e) =>
-                          setRentalPolicyForm({ ...rentalPolicyForm, maxRentalMonths: Number(e.target.value) || 1 })
-                        }
-                      />
-                    </label>
-
-                    <label className="field">
-                      <span>Số ngày báo trước khi gia hạn</span>
-                      <input
-                        type="number"
-                        min="0"
-                        value={rentalPolicyForm.renewalNoticeDays}
-                        onChange={(e) =>
-                          setRentalPolicyForm({ ...rentalPolicyForm, renewalNoticeDays: Number(e.target.value) || 0 })
-                        }
-                      />
-                    </label>
-
-                    <label className="field">
-                      <span>Số tháng tiền cọc</span>
-                      <input
-                        type="number"
-                        min="0"
-                        value={rentalPolicyForm.depositMonths}
-                        onChange={(e) =>
-                          setRentalPolicyForm({ ...rentalPolicyForm, depositMonths: Number(e.target.value) || 0 })
-                        }
-                      />
-                    </label>
-
-                    <label className="field">
-                      <span>Ngày thanh toán mặc định</span>
-                      <input
-                        type="number"
-                        min="1"
-                        max="28"
-                        value={rentalPolicyForm.defaultPaymentDay}
-                        onChange={(e) =>
-                          setRentalPolicyForm({ ...rentalPolicyForm, defaultPaymentDay: Number(e.target.value) || 5 })
-                        }
-                      />
-                    </label>
+              <div className="form-grid" style={{ marginBottom: '20px' }}>
+                <label className="field">
+                  <span>
+                    Số tháng thuê tối thiểu
+                    <span className="label-info-icon" title="Thời gian hợp đồng thuê tối thiểu khách phải ký">
+                      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="10" /><path d="M12 16v-4" /><path d="M12 8h.01" /></svg>
+                    </span>
+                  </span>
+                  <div className="input-wrapper">
+                    <input
+                      type="number"
+                      min="1"
+                      value={rentalPolicyForm.minRentalMonths}
+                      onChange={(e) =>
+                        setRentalPolicyForm({ ...rentalPolicyForm, minRentalMonths: Number(e.target.value) || 1 })
+                      }
+                    />
+                    <span className="input-suffix">tháng</span>
                   </div>
+                  <span className="helper-text">Thời hạn hợp đồng tối thiểu</span>
+                </label>
 
-                  <div style={{ marginTop: '16px' }}>
-                    <label style={{ display: 'flex', alignItems: 'center', gap: '10px', cursor: 'pointer', userSelect: 'none' }}>
+                <label className="field">
+                  <span>
+                    Số tháng thuê tối đa
+                    <span className="label-info-icon" title="Thời gian hợp đồng tối đa cho mỗi lần ký">
+                      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="10" /><path d="M12 16v-4" /><path d="M12 8h.01" /></svg>
+                    </span>
+                  </span>
+                  <div className="input-wrapper">
+                    <input
+                      type="number"
+                      min="1"
+                      value={rentalPolicyForm.maxRentalMonths}
+                      onChange={(e) =>
+                        setRentalPolicyForm({ ...rentalPolicyForm, maxRentalMonths: Number(e.target.value) || 1 })
+                      }
+                    />
+                    <span className="input-suffix">tháng</span>
+                  </div>
+                  <span className="helper-text">Thời hạn hợp đồng tối đa</span>
+                </label>
+
+                <label className="field">
+                  <span>
+                    Số ngày báo trước khi gia hạn
+                    <span className="label-info-icon" title="Khách thuê cần báo trước số ngày này nếu muốn dọn đi hoặc gia hạn">
+                      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="10" /><path d="M12 16v-4" /><path d="M12 8h.01" /></svg>
+                    </span>
+                  </span>
+                  <div className="input-wrapper">
+                    <input
+                      type="number"
+                      min="0"
+                      value={rentalPolicyForm.renewalNoticeDays}
+                      onChange={(e) =>
+                        setRentalPolicyForm({ ...rentalPolicyForm, renewalNoticeDays: Number(e.target.value) || 0 })
+                      }
+                    />
+                    <span className="input-suffix">ngày</span>
+                  </div>
+                  <span className="helper-text">Hạn báo trước khi hết hợp đồng</span>
+                </label>
+
+                <label className="field">
+                  <span>
+                    Số tháng tiền cọc
+                    <span className="label-info-icon" title="Số tháng tiền phòng khách cần đặt cọc trước khi dọn vào">
+                      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="10" /><path d="M12 16v-4" /><path d="M12 8h.01" /></svg>
+                    </span>
+                  </span>
+                  <div className="input-wrapper">
+                    <input
+                      type="number"
+                      min="0"
+                      value={rentalPolicyForm.depositMonths}
+                      onChange={(e) =>
+                        setRentalPolicyForm({ ...rentalPolicyForm, depositMonths: Number(e.target.value) || 0 })
+                      }
+                    />
+                    <span className="input-suffix">tháng</span>
+                  </div>
+                  <span className="helper-text">Khoản tiền cọc đảm bảo hợp đồng</span>
+                </label>
+
+                <label className="field">
+                  <span>
+                    Ngày thanh toán mặc định
+                    <span className="label-info-icon" title="Ngày thanh toán tiền phòng cố định hàng tháng">
+                      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="10" /><path d="M12 16v-4" /><path d="M12 8h.01" /></svg>
+                    </span>
+                  </span>
+                  <div className="input-wrapper">
+                    <input
+                      type="number"
+                      min="1"
+                      max="28"
+                      value={rentalPolicyForm.defaultPaymentDay}
+                      onChange={(e) =>
+                        setRentalPolicyForm({ ...rentalPolicyForm, defaultPaymentDay: Number(e.target.value) || 5 })
+                      }
+                    />
+                    <span className="input-suffix">hàng tháng</span>
+                  </div>
+                  <span className="helper-text">Hạn thanh toán hóa đơn định kỳ (từ ngày 1 đến ngày 28)</span>
+                </label>
+
+                <div style={{ gridColumn: '1 / -1', marginTop: '10px' }}>
+                  <div className="checkbox-card-panel">
+                    <div className="checkbox-card-left">
                       <input
                         type="checkbox"
-                        style={{ width: '18px', height: '18px', margin: 0, cursor: 'pointer' }}
+                        className="checkbox-card-input"
                         checked={rentalPolicyForm.allowShortTermRenewal}
                         onChange={(e) =>
                           setRentalPolicyForm({ ...rentalPolicyForm, allowShortTermRenewal: e.target.checked })
                         }
                       />
-                      <span style={{ fontSize: '14px', fontWeight: 600, color: '#475569' }}>
-                        Cho phép gia hạn ngắn hạn (dưới 6 tháng)
-                      </span>
-                    </label>
+                      <div className="checkbox-card-text">
+                        <span className="checkbox-card-title">Cho phép gia hạn hợp đồng ngắn hạn</span>
+                        <span className="checkbox-card-desc">Hỗ trợ khách thuê ký tiếp hợp đồng ngắn hạn (dưới 6 tháng) khi sắp hết hạn</span>
+                      </div>
+                    </div>
+                    <div className="checkbox-card-icon">
+                      <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                        <rect x="3" y="4" width="18" height="18" rx="2" ry="2" />
+                        <line x1="16" y1="2" x2="16" y2="6" />
+                        <line x1="8" y1="2" x2="8" y2="6" />
+                        <line x1="3" y1="10" x2="21" y2="10" />
+                      </svg>
+                    </div>
                   </div>
                 </div>
               </div>
 
-              <div className="save-row" style={{ marginTop: '8px' }}>
-                <button className="primary-action" onClick={handleSaveRentalPolicy}>Lưu chính sách thuê</button>
+              <div className="subtab-footer">
+                <div className="shield-info">
+                  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                    <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/>
+                  </svg>
+                  <span>Chính sách thuê rõ ràng giúp giảm thiểu các tranh chấp không đáng có.</span>
+                </div>
+                <button className="primary-action" onClick={handleSaveRentalPolicy} disabled={actionLoading}>
+                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" style={{ marginRight: '6px' }}>
+                    <path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z" />
+                    <polyline points="17 21 17 13 7 13 7 21" />
+                    <polyline points="7 3 7 8 15 8" />
+                  </svg>
+                  {actionLoading ? 'Đang lưu...' : 'Lưu chính sách thuê'}
+                </button>
               </div>
             </div>
           )}
@@ -935,6 +1212,7 @@ export default function RoomingHouseDetailPage() {
               drafts={servicePriceDrafts}
               note={servicePriceNote}
               actionLoading={actionLoading}
+              effectiveFromDate={isFirstTimeServicePrice ? getCurrentMonth1st() : getNextMonth1st()}
               onChangeDraft={handleChangeServicePriceDraft}
               onChangeNote={setServicePriceNote}
               onSubmit={handleSaveServicePrices}
@@ -947,20 +1225,94 @@ export default function RoomingHouseDetailPage() {
 
 
               {!house.rentalPolicy ? (
-                <div className="empty-panel">
-                  <h2>Chưa có chính sách cho thuê</h2>
-                  <p>Vui lòng hoàn thành cấu hình chính sách cho thuê trước khi bắt đầu tạo phòng.</p>
-                  <button className="primary-action" onClick={() => setActiveTab('rental-policy')}>
-                    Cấu hình chính sách cho thuê
-                  </button>
+                <div className="empty-panel-container" style={{ display: 'grid', gap: '16px' }}>
+                  <div className="rooming-house-rule-editor__alert rooming-house-rule-editor__alert--warning">
+                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                      <path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z" />
+                      <line x1="12" y1="9" x2="12" y2="13" />
+                      <line x1="12" y1="17" x2="12.01" y2="17" />
+                    </svg>
+                    <span>Vui lòng hoàn thành Chính Sách Thuê ở phần thông tin khu trọ để được tạo phòng.</span>
+                  </div>
+
+                  <div className="empty-panel">
+                    <svg width="240" height="180" viewBox="0 0 240 180" fill="none" xmlns="http://www.w3.org/2000/svg" style={{ marginBottom: '16px' }}>
+                      <path d="M190 120c0-5.5-4.5-10-10-10h-5c-6.6 0-12 5.4-12 12s5.4 12 12 12h15c5.5 0 10-4.5 10-10z" fill="#f1f5f9" opacity="0.6" />
+                      <path d="M50 110c0-6.6 5.4-12 12-12h8c8.8 0 16 7.2 16 16s-7.2 16-16 16h-8c-6.6 0-12-5.4-12-12z" fill="#f1f5f9" opacity="0.6" />
+                      <path d="M120 160h60" stroke="#eff6ff" strokeWidth="6" strokeLinecap="round" />
+                      <path d="M60 160h120" stroke="#3b82f6" strokeWidth="3" strokeLinecap="round" />
+                      <rect x="94" y="24" width="72" height="96" rx="8" fill="#e2e8f0" />
+                      <rect x="90" y="20" width="72" height="96" rx="8" fill="#ffffff" stroke="#cbd5e1" strokeWidth="2" />
+                      <rect x="110" y="52" width="40" height="4" rx="2" fill="#e2e8f0" />
+                      <rect x="110" y="68" width="40" height="4" rx="2" fill="#cbd5e1" />
+                      <rect x="110" y="84" width="30" height="4" rx="2" fill="#e2e8f0" />
+                      <rect x="100" y="50" width="8" height="8" rx="2" fill="#eff6ff" stroke="#3b82f6" strokeWidth="1.5" />
+                      <path d="M102 54l1.5 1.5 3-3" stroke="#3b82f6" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
+                      <rect x="100" y="66" width="8" height="8" rx="2" fill="#eff6ff" stroke="#3b82f6" strokeWidth="1.5" />
+                      <path d="M102 70l1.5 1.5 3-3" stroke="#3b82f6" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
+                      <rect x="100" y="82" width="8" height="8" rx="2" fill="#ffffff" stroke="#cbd5e1" strokeWidth="1.5" />
+                      <rect x="112" y="12" width="28" height="12" rx="4" fill="#64748b" />
+                      <circle cx="126" cy="18" r="3" fill="#cbd5e1" />
+                      <path d="M60 80c0 15 15 25 25 30 10-5 25-15 25-30V60l-25-10-25 10v20z" fill="#3b82f6" />
+                      <path d="M63 80c0 13 13 22 22 26V53l-22 9v18z" fill="#2563eb" />
+                      <path d="M75 80l4 4 8-8" stroke="#ffffff" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round" />
+                      <circle cx="176" cy="74" r="10" stroke="#3b82f6" strokeWidth="3.5" fill="#ffffff" />
+                      <circle cx="176" cy="74" r="3" fill="#3b82f6" />
+                      <path d="M169 81l-14 14" stroke="#3b82f6" strokeWidth="4.5" strokeLinecap="round" />
+                      <path d="M158 92l2 2" stroke="#3b82f6" strokeWidth="3.5" strokeLinecap="round" />
+                      <path d="M161 89l2 2" stroke="#3b82f6" strokeWidth="3.5" strokeLinecap="round" />
+                    </svg>
+
+                    <h2>Chưa có chính sách cho thuê</h2>
+                    <p>Vui lòng hoàn thành cấu hình chính sách cho thuê trước khi bắt đầu tạo phòng.</p>
+                    <button className="action-btn-primary" onClick={() => setActiveTab('rental-policy')} style={{ padding: '8px 20px', minHeight: '40px' }}>
+                      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ marginRight: '8px' }}>
+                        <circle cx="12" cy="12" r="3" />
+                        <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z" />
+                      </svg>
+                      Cấu hình chính sách cho thuê
+                    </button>
+                  </div>
                 </div>
               ) : !house.houseRule ? (
-                <div className="empty-panel">
-                  <h2>Chưa có Luật khu trọ</h2>
-                  <p>Vui lòng hoàn thành Luật khu trọ trước khi bắt đầu tạo phòng.</p>
-                  <button className="primary-action" onClick={() => setActiveTab('house-rule')}>
-                    Cấu hình Luật khu trọ
-                  </button>
+                <div className="empty-panel-container" style={{ display: 'grid', gap: '16px' }}>
+                  <div className="rooming-house-rule-editor__alert rooming-house-rule-editor__alert--warning">
+                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                      <path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z" />
+                      <line x1="12" y1="9" x2="12" y2="13" />
+                      <line x1="12" y1="17" x2="12.01" y2="17" />
+                    </svg>
+                    <span>Vui lòng hoàn thành Luật khu trọ ở phần thông tin khu trọ để được tạo phòng.</span>
+                  </div>
+
+                  <div className="empty-panel">
+                    <svg width="240" height="180" viewBox="0 0 240 180" fill="none" xmlns="http://www.w3.org/2000/svg" style={{ marginBottom: '16px' }}>
+                      <path d="M190 120c0-5.5-4.5-10-10-10h-5c-6.6 0-12 5.4-12 12s5.4 12 12 12h15c5.5 0 10-4.5 10-10z" fill="#f1f5f9" opacity="0.6" />
+                      <path d="M50 110c0-6.6 5.4-12 12-12h8c8.8 0 16 7.2 16 16s-7.2 16-16 16h-8c-6.6 0-12-5.4-12-12z" fill="#f1f5f9" opacity="0.6" />
+                      <path d="M60 160h120" stroke="#3b82f6" strokeWidth="3" strokeLinecap="round" />
+                      <rect x="94" y="24" width="72" height="96" rx="8" fill="#e2e8f0" />
+                      <rect x="90" y="20" width="72" height="96" rx="8" fill="#ffffff" stroke="#cbd5e1" strokeWidth="2" />
+                      <line x1="106" y1="46" x2="146" y2="46" stroke="#94a3b8" strokeWidth="2" strokeLinecap="round" />
+                      <line x1="106" y1="58" x2="146" y2="58" stroke="#cbd5e1" strokeWidth="2" strokeLinecap="round" />
+                      <line x1="106" y1="70" x2="146" y2="70" stroke="#cbd5e1" strokeWidth="2" strokeLinecap="round" />
+                      <line x1="106" y1="82" x2="136" y2="82" stroke="#cbd5e1" strokeWidth="2" strokeLinecap="round" />
+                      <line x1="106" y1="94" x2="146" y2="94" stroke="#cbd5e1" strokeWidth="2" strokeLinecap="round" />
+                      <rect x="112" y="12" width="28" height="12" rx="4" fill="#3b82f6" />
+                      <circle cx="126" cy="18" r="3" fill="#ffffff" />
+                    </svg>
+
+                    <h2>Chưa có Luật khu trọ</h2>
+                    <p>Vui lòng hoàn thành Luật khu trọ trước khi bắt đầu tạo phòng.</p>
+                    <button className="action-btn-primary" onClick={() => setActiveTab('house-rule')} style={{ padding: '8px 20px', minHeight: '40px' }}>
+                      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ marginRight: '8px' }}>
+                        <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" />
+                        <polyline points="14 2 14 8 20 8" />
+                        <line x1="16" y1="13" x2="8" y2="13" />
+                        <line x1="16" y1="17" x2="8" y2="17" />
+                      </svg>
+                      Cấu hình Luật khu trọ
+                    </button>
+                  </div>
                 </div>
               ) : rooms.length === 0 ? (
                 <div className="empty-panel">
@@ -996,6 +1348,96 @@ export default function RoomingHouseDetailPage() {
 
 // ─── Subcomponents ──────────────────────────────────────────────────────────
 
+// ─── Subcomponents ──────────────────────────────────────────────────────────
+
+function formatUnitNameVietnamese(unitName: string, serviceName: string) {
+  const name = unitName || '';
+  if (name === 'MeterReading' || name === 'MeterBased' || name === 'Metered') {
+    const sName = serviceName.toLowerCase();
+    if (sName.includes('nước') || sName.includes('nuoc')) {
+      return 'm³';
+    }
+    return 'số điện';
+  }
+  if (name === 'PerMonth' || name === 'Fixed') {
+    return 'phòng/tháng';
+  }
+  if (name === 'PerPerson' || name === 'PerPersonPerMonth') {
+    return 'người/tháng';
+  }
+  return name;
+}
+
+function formatDateDMY(dateStr: string) {
+  if (!dateStr) return '';
+  const cleanDateStr = dateStr.slice(0, 10);
+  const parts = cleanDateStr.split('-');
+  if (parts.length === 3) {
+    // YYYY-MM-DD to DD/MM/YYYY
+    return `${parts[2]}/${parts[1]}/${parts[0]}`;
+  }
+  return dateStr;
+}
+
+function formatDateDisplay(dateStr: string) {
+  if (!dateStr) return '';
+  const parts = dateStr.split('-');
+  if (parts.length === 3) {
+    // YYYY-MM-DD to MM/DD/YYYY
+    return `${parts[1]}/${parts[2]}/${parts[0]}`;
+  }
+  return dateStr;
+}
+
+function getServiceIconSvg(serviceSlug: string) {
+  switch (serviceSlug) {
+    case 'dien':
+    case 'electric':
+    case 'electricity':
+      return (
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+          <polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/>
+        </svg>
+      );
+    case 'internet':
+    case 'wifi':
+      return (
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+          <path d="M5 12.55a11 11 0 0 1 14.08 0"/>
+          <path d="M1.42 9a16 16 0 0 1 21.16 0"/>
+          <path d="M8.53 16.11a6 6 0 0 1 6.95 0"/>
+          <line x1="12" y1="20" x2="12.01" y2="20" strokeWidth="3"/>
+        </svg>
+      );
+    case 'nuoc':
+    case 'water':
+      return (
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+          <path d="M12 2.69l5.66 5.66a8 8 0 1 1-11.31 0z"/>
+        </svg>
+      );
+    case 'rac':
+    case 'trash':
+    case 'waste':
+      return (
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+          <polyline points="3 6 5 6 21 6"/>
+          <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/>
+          <line x1="10" y1="11" x2="10" y2="17"/>
+          <line x1="14" y1="11" x2="14" y2="17"/>
+        </svg>
+      );
+    default:
+      return (
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+          <circle cx="12" cy="12" r="10"/>
+          <line x1="12" y1="16" x2="12" y2="12"/>
+          <line x1="12" y1="8" x2="12.01" y2="8"/>
+        </svg>
+      );
+  }
+}
+
 function ServicePriceEditorBatch({
   serviceTypes,
   activePrices,
@@ -1004,6 +1446,7 @@ function ServicePriceEditorBatch({
   drafts,
   note,
   actionLoading,
+  effectiveFromDate,
   onChangeDraft,
   onChangeNote,
   onSubmit,
@@ -1017,6 +1460,7 @@ function ServicePriceEditorBatch({
   drafts: CreateServicePriceRequest[];
   note: string;
   actionLoading: boolean;
+  effectiveFromDate: string;
   onChangeDraft: (serviceTypeId: string, patch: Partial<CreateServicePriceRequest>) => void;
   onChangeNote: (note: string) => void;
   onSubmit: (event: FormEvent<HTMLFormElement>) => void;
@@ -1026,13 +1470,19 @@ function ServicePriceEditorBatch({
   const historyGroups = buildServicePriceHistoryGroups(priceHistory, serviceTypes);
 
   return (
-    <div className="editor-panel service-price-editor">
-      <div className="service-price-header">
-        <div>
-          <h3>Giá dịch vụ của khu trọ</h3>
-          <p>Chỉnh sửa tất cả rồi lưu một lần. Giá mới chỉ áp dụng từ đầu kỳ tiếp theo.</p>
+    <div className="subtab-card">
+      <div className="subtab-header" style={{ borderBottom: '1px solid #e2e8f0', paddingBottom: '16px', marginBottom: '20px' }}>
+        <div className="subtab-header-icon">
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+            <line x1="12" y1="1" x2="12" y2="23" />
+            <path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6" />
+          </svg>
         </div>
-        <button type="button" className="secondary-action" onClick={onReload} disabled={loading}>
+        <div style={{ flex: 1 }}>
+          <h4>Bảng giá dịch vụ</h4>
+          <p>Cấu hình đơn giá các loại dịch vụ tiện ích đi kèm (Điện, nước, internet... của khu trọ).</p>
+        </div>
+        <button type="button" className="secondary-action" onClick={onReload} disabled={loading} style={{ minHeight: '38px', padding: '0 16px', borderRadius: '8px', border: '1px solid #cbd5e1', font: 'inherit', fontWeight: 600, cursor: 'pointer', background: '#ffffff', color: '#475569' }}>
           Hoàn tác
         </button>
       </div>
@@ -1043,8 +1493,9 @@ function ServicePriceEditorBatch({
             <span>Dịch vụ</span>
             <span>Giá hiện tại</span>
             <span>Cách tính phí</span>
-            <span>Giá mới</span>
+            <span>Giá mới (VND)</span>
             <span>Từ ngày</span>
+            <span></span>
           </div>
           {serviceTypes.map((serviceType) => {
             const currentPrice = activeByServiceTypeId.get(serviceType.id);
@@ -1054,19 +1505,31 @@ function ServicePriceEditorBatch({
               pricingUnit: defaultPricingUnit,
               unitName: getServicePricingUnitDisplayUnit(defaultPricingUnit, serviceType),
               unitPrice: 0,
-              effectiveFrom: nextPeriodStart,
+              effectiveFrom: effectiveFromDate,
             };
             const methods = getServicePricingUnitOptions(serviceType);
+            const serviceSlug = getServiceTypeSlug(serviceType);
 
             return (
               <div className="service-price-batch-row" key={serviceType.id}>
                 <div className="service-price-service">
-                  <span className={`service-price-icon service-price-icon--${getServiceTypeSlug(serviceType)}`}>{getServiceTypeIcon(serviceType)}</span>
-                  <strong>{serviceType.name}</strong>
+                  <span className={`service-price-icon service-price-icon--${serviceSlug}`}>
+                    {getServiceIconSvg(serviceSlug)}
+                  </span>
+                  <div className="service-name-container">
+                    <strong>{serviceType.name}</strong>
+                    {!currentPrice && <span>Chưa cấu hình</span>}
+                  </div>
                 </div>
                 <div className="service-price-current">
-                  <strong>{currentPrice ? `${formatMoneyString(currentPrice.unitPrice)} VND / ${currentPrice.unitName}` : 'Chưa có giá'}</strong>
-                  <span>{currentPrice ? getPricingUnitLabel(currentPrice.pricingUnit) : 'Chưa cấu hình'}</span>
+                  {currentPrice ? (
+                    <div className="current-price-display">
+                      <strong>{formatMoneyString(currentPrice.unitPrice)} đ</strong>
+                      <span>/ {currentPrice.unitName}</span>
+                    </div>
+                  ) : (
+                    <span className="current-price-empty">&mdash;</span>
+                  )}
                 </div>
                 <div className="service-price-methods">
                   {methods.length === 1 ? (
@@ -1090,52 +1553,97 @@ function ServicePriceEditorBatch({
                   )}
                   <small>{getServicePricingUnitHint(draft.pricingUnit ?? 'PerMonth', serviceType)}</small>
                 </div>
-                <label className="service-price-inline-field">
-                  <input
-                    type="text"
-                    value={formatMoneyString(draft.unitPrice)}
-                    onChange={(event) => onChangeDraft(serviceType.id, { unitPrice: parseMoneyString(event.target.value) })}
-                  />
-                </label>
-                <label className="service-price-inline-field">
-                  <input type="date" value={nextPeriodStart} readOnly />
-                </label>
+                <div className="service-price-new-wrapper">
+                  <div className="price-input-wrapper">
+                    <input
+                      type="text"
+                      placeholder="Nhập giá mới"
+                      value={draft.unitPrice === 0 ? '' : formatMoneyString(draft.unitPrice)}
+                      onChange={(event) => onChangeDraft(serviceType.id, { unitPrice: parseMoneyString(event.target.value) })}
+                    />
+                    <span className="price-suffix">đ</span>
+                  </div>
+                </div>
+                <div className="service-price-date-wrapper">
+                  <div className="date-input-wrapper">
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                      <rect x="3" y="4" width="18" height="18" rx="2" ry="2" />
+                      <line x1="16" y1="2" x2="16" y2="6" />
+                      <line x1="8" y1="2" x2="8" y2="6" />
+                      <line x1="3" y1="10" x2="21" y2="10" />
+                    </svg>
+                    <input type="text" value={formatDateDisplay(effectiveFromDate)} readOnly />
+                  </div>
+                </div>
+                <div className="service-price-action">
+                  <button type="button" className="service-price-more-btn">
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                      <circle cx="12" cy="12" r="1.5" />
+                      <circle cx="12" cy="5" r="1.5" />
+                      <circle cx="12" cy="19" r="1.5" />
+                    </svg>
+                  </button>
+                </div>
               </div>
             );
           })}
         </div>
 
-        <div className="service-price-batch-actions">
-          <input
-            value={note}
-            onChange={(event) => onChangeNote(event.target.value)}
-            placeholder="Ghi chú chung (ví dụ: điều chỉnh theo biểu giá tháng tới)"
-          />
-          <button type="submit" className="primary-action" disabled={actionLoading || serviceTypes.length === 0 || drafts.some((draft) => Number(draft.unitPrice) < 0)}>
+        <div className="service-price-batch-actions-wrapper">
+          <div className="service-price-note-wrapper">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" className="note-info-icon">
+              <circle cx="12" cy="12" r="10" />
+              <line x1="12" y1="16" x2="12" y2="12" />
+              <line x1="12" y1="8" x2="12.01" y2="8" />
+            </svg>
+            <input
+              value={note}
+              onChange={(event) => onChangeNote(event.target.value)}
+              placeholder="Ghi chú chung (ví dụ: điều chỉnh theo biểu giá tháng 10)"
+            />
+          </div>
+          <button type="submit" className="primary-action-btn" disabled={actionLoading || serviceTypes.length === 0 || drafts.some((draft) => Number(draft.unitPrice) < 0)}>
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" style={{ marginRight: '6px' }}>
+              <path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z" />
+              <polyline points="17 21 17 13 7 13 7 21" />
+              <polyline points="7 3 7 8 15 8" />
+            </svg>
             {actionLoading ? 'Đang lưu...' : 'Lưu tất cả'}
           </button>
         </div>
       </form>
 
-      <section className="service-price-panel service-price-history">
-        <div className="section-heading">
-          <h4>Lịch sử thay đổi giá</h4>
-          <span>{priceHistory.length} bản ghi</span>
+      <section className="service-price-panel service-price-history" style={{ marginTop: '30px', borderTop: '1px solid #e2e8f0', paddingTop: '20px' }}>
+        <div className="section-heading" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px' }}>
+          <h4 style={{ margin: 0, fontSize: '15px', fontWeight: 600, color: '#1e293b' }}>Lịch sử thay đổi giá</h4>
+          <button type="button" className="view-history-detail-btn" style={{ background: 'none', border: 'none', color: '#2563eb', fontWeight: 600, fontSize: '14px', cursor: 'pointer' }}>Xem chi tiết &gt;</button>
         </div>
         {historyGroups.length === 0 ? (
-          <div className="empty-panel compact">Chưa có lịch sử thay đổi giá.</div>
+          <div className="empty-history-card">
+            <svg width="120" height="90" viewBox="0 0 120 90" fill="none" xmlns="http://www.w3.org/2000/svg">
+              <circle cx="60" cy="45" r="30" fill="#eff6ff" />
+              <rect x="48" y="22" width="24" height="32" rx="3" fill="#ffffff" stroke="#cbd5e1" strokeWidth="1.5" />
+              <rect x="54" y="18" width="12" height="6" rx="2" fill="#94a3b8" />
+              <line x1="53" y1="28" x2="67" y2="28" stroke="#cbd5e1" strokeWidth="1.5" strokeLinecap="round" />
+              <line x1="53" y1="34" x2="67" y2="34" stroke="#cbd5e1" strokeWidth="1.5" strokeLinecap="round" />
+              <line x1="53" y1="40" x2="61" y2="40" stroke="#cbd5e1" strokeWidth="1.5" strokeLinecap="round" />
+              <circle cx="70" cy="52" r="10" fill="#ffffff" stroke="#3b82f6" strokeWidth="1.5" />
+              <path d="M70 48v4h3" stroke="#3b82f6" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
+            </svg>
+            <p>Chưa có lịch sử thay đổi giá.</p>
+          </div>
         ) : (
           <div className="service-price-history-groups">
             {historyGroups.map((group, index) => (
               <details className="service-price-history-group" key={group.key} open={index === 0}>
-                <summary>
-                  <span className="history-dot-row">
+                <summary style={{ display: 'flex', alignItems: 'center', gap: '12px', padding: '12px 18px', background: '#f8fafc', cursor: 'pointer', fontWeight: 600, color: '#334155', borderBottom: '1px solid #e2e8f0' }}>
+                  <span className="history-dot-row" style={{ display: 'flex', gap: '4px' }}>
                     {group.serviceTypeIds.map((serviceTypeId) => (
-                      <i key={serviceTypeId} className={`history-dot history-dot--${getHistoryServiceTypeSlug(serviceTypeId, serviceTypes)}`} />
+                      <i key={serviceTypeId} className={`history-dot history-dot--${getHistoryServiceTypeSlug(serviceTypeId, serviceTypes)}`} style={{ display: 'inline-block', width: '8px', height: '8px', borderRadius: '50%', background: '#3b82f6' }} />
                     ))}
                   </span>
-                  <strong>{group.label}</strong>
-                  <span>{group.items.length} dịch vụ</span>
+                  <strong style={{ flex: 1 }}>{group.label}</strong>
+                  <span style={{ fontSize: '13px', color: '#64748b', fontWeight: 400 }}>{group.items.length} dịch vụ</span>
                 </summary>
                 <div className="service-price-table service-price-table--monthly">
                   <div className="service-price-row service-price-row--head">
@@ -1146,16 +1654,19 @@ function ServicePriceEditorBatch({
                     <span>Từ ngày</span>
                     <span>Đến ngày</span>
                   </div>
-                  {group.items.map((price) => (
-                    <div className="service-price-row" key={price.id}>
-                      <span>{serviceTypes.find((serviceType) => serviceType.id === price.serviceTypeId)?.name ?? price.serviceName}</span>
-                      <span>{formatMoneyString(price.unitPrice)} VND</span>
-                      <span>{price.unitName}</span>
-                      <span>{getPricingUnitLabel(price.pricingUnit)}</span>
-                      <span>{price.effectiveFrom}</span>
-                      <span>{price.effectiveTo ?? 'Đang thay thế'}</span>
-                    </div>
-                  ))}
+                  {group.items.map((price) => {
+                    const svcName = serviceTypes.find((serviceType) => serviceType.id === price.serviceTypeId)?.name ?? price.serviceName;
+                    return (
+                      <div className="service-price-row" key={price.id}>
+                        <span>{svcName}</span>
+                        <span>{formatMoneyString(price.unitPrice)} VND</span>
+                        <span>{formatUnitNameVietnamese(price.unitName, svcName)}</span>
+                        <span>{getPricingUnitLabel(price.pricingUnit)}</span>
+                        <span>{formatDateDMY(price.effectiveFrom)}</span>
+                        <span>{price.effectiveTo ? formatDateDMY(price.effectiveTo) : 'Đang áp dụng'}</span>
+                      </div>
+                    );
+                  })}
                 </div>
               </details>
             ))}
@@ -1311,9 +1822,9 @@ function getServiceTypeIcon(serviceType: BillingServiceType) {
 function getPricingUnitLabel(method: PricingUnit | string) {
   const normalized = normalizePricingUnitForDisplay(method);
   const labels: Record<PricingUnit, string> = {
-    Metered: 'MeterBased',
-    MeterBased: 'MeterBased',
-    MeterReading: 'MeterBased',
+    Metered: 'Theo chỉ số',
+    MeterBased: 'Theo chỉ số',
+    MeterReading: 'Theo chỉ số',
     Fixed: 'Theo tháng',
     PerMonth: 'Theo tháng',
     PerPerson: 'Theo người/tháng',
@@ -1343,35 +1854,52 @@ function AmenityEditor({
   selectedIds,
   onChange,
   onSave,
+  actionLoading,
 }: {
   amenities: Amenity[];
   selectedIds: number[];
   onChange: (selectedIds: number[]) => void;
   onSave: () => void;
+  actionLoading?: boolean;
 }) {
   return (
-    <div className="stack-panel">
-      <div className="amenity-grid">
-        {amenities.map((amenity) => (
-          <label className="checkbox-field" key={amenity.id}>
-            <input
-              type="checkbox"
-              checked={selectedIds.includes(amenity.id)}
-              onChange={(event) =>
-                onChange(
-                  event.target.checked
-                    ? [...selectedIds, amenity.id]
-                    : selectedIds.filter((id) => id !== amenity.id)
-                )
-              }
-            />
-            {amenity.name}
-          </label>
-        ))}
+    <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
+      <div className="amenity-card-grid">
+        {amenities.map((amenity) => {
+          const isSelected = selectedIds.includes(amenity.id);
+          return (
+            <label className={`amenity-card-item ${isSelected ? 'selected' : ''}`} key={amenity.id}>
+              <input
+                type="checkbox"
+                className="amenity-card-checkbox"
+                checked={isSelected}
+                onChange={(event) =>
+                  onChange(
+                    event.target.checked
+                      ? [...selectedIds, amenity.id]
+                      : selectedIds.filter((id) => id !== amenity.id)
+                  )
+                }
+              />
+              <span className="amenity-card-name">{amenity.name}</span>
+            </label>
+          );
+        })}
       </div>
-      <div className="save-row">
-        <button className="primary-action" onClick={onSave}>
-          Lưu tiện ích
+      <div className="subtab-footer">
+        <div className="shield-info">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+            <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/>
+          </svg>
+          <span>Tiện ích rõ ràng giúp tăng tỷ lệ tiếp cận khách thuê trọ.</span>
+        </div>
+        <button className="primary-action" onClick={onSave} disabled={actionLoading}>
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+            <path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z" />
+            <polyline points="17 21 17 13 7 13 7 21" />
+            <polyline points="7 3 7 8 15 8" />
+          </svg>
+          {actionLoading ? 'Đang lưu...' : 'Lưu tiện ích'}
         </button>
       </div>
     </div>

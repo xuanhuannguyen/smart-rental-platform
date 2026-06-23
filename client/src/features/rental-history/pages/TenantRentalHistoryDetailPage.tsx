@@ -224,7 +224,7 @@ export const TenantRentalHistoryDetailPage: React.FC = () => {
 
   return (
     <div className="history-detail-page">
-      <section className="overview-band">
+      <div className="invoice-overview-band">
         <div className="overview-header-title-area">
           <button
             type="button"
@@ -256,7 +256,7 @@ export const TenantRentalHistoryDetailPage: React.FC = () => {
             {formatStatus(contract.status)}
           </span>
         </div>
-      </section>
+      </div>
 
       <div className="history-detail-tabs">
         <button className={`history-detail-tab ${activeTab === 'contract' ? 'active' : ''}`} onClick={() => setActiveTab('contract')}>
@@ -315,7 +315,7 @@ export const TenantRentalHistoryDetailPage: React.FC = () => {
                   </div>
                   <div className="occupant-dates">
                     <div style={{ marginBottom: '6px' }}>
-                      <span className={`status-badge ${occupant.status === 'Active' ? 'success' : 'danger'}`} style={{ padding: '2px 8px', fontSize: '0.75rem' }}>
+                      <span className={`status-badge ${occupant.status === 'Active' ? 'active' : 'terminated'}`} style={{ padding: '2px 8px', fontSize: '0.75rem' }}>
                         {occupant.status === 'Active' ? 'Đang ở' : 'Đã rời đi'}
                       </span>
                     </div>
@@ -401,8 +401,8 @@ export const TenantRentalHistoryDetailPage: React.FC = () => {
 
         {activeTab === 'appendices' && (
           <div>
-            <div className="appendices-header" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px' }}>
-              <h3 style={{ margin: 0 }}>Danh sách phụ lục hợp đồng</h3>
+            <div className="appendices-header">
+              <h3>Danh sách phụ lục hợp đồng</h3>
               {contract.canCreateAppendix && (
                   <Button 
                     style={{ whiteSpace: 'nowrap' }}
@@ -694,11 +694,11 @@ function getInvoiceStatusLabel(status: string) {
 function getInvoiceStatusClass(status: string) {
   switch (status) {
     case 'Issued':
-      return 'pending';
+      return 'completed';
     case 'Paid':
-      return 'success';
+      return 'active';
     case 'Overdue':
-      return 'danger';
+      return 'terminated';
     case 'Cancelled':
       return 'terminated';
     default:
@@ -711,7 +711,7 @@ function getAppendixStatusClass(status: ContractAppendixStatus) {
     case 'Active': return 'active';
     case 'PendingSignature':
     case 'LandlordRevisionRequested':
-    case 'TenantRevisionRequested': return 'pending';
+    case 'TenantRevisionRequested': return 'completed';
     case 'Rejected':
     case 'Cancelled': return 'terminated';
     default: return '';

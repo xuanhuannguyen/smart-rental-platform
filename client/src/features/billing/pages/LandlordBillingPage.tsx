@@ -518,22 +518,23 @@ function InvoiceListSection({
   onCreate: () => void;
 }) {
   return (
-    <>
-      <section className="overview-band">
+    <div className="landlord-billing-page">
+      {/* ── Overview Band ── */}
+      <section className="invoice-overview-band">
         <div className="overview-left">
           <p className="eyebrow">Quản lý</p>
           <h2>Hóa đơn cho thuê</h2>
           <p className="overview-description">Xem và lọc hóa đơn theo khu trọ, phòng và trạng thái thanh toán.</p>
         </div>
 
-        <div className="overview-right" style={{ flexDirection: 'column', alignItems: 'flex-end', gap: '0.5rem' }}>
-          <div className="filter-group" style={{ display: 'flex', gap: '1rem', background: '#fff', padding: '0.75rem', borderRadius: '0.5rem', boxShadow: '0 1px 3px rgba(0,0,0,0.1)' }}>
-            <div>
-              <label style={{ display: 'block', fontSize: '0.85rem', color: '#6b7280', marginBottom: '0.25rem' }}>Khu trọ</label>
+        <div className="invoice-overview-right">
+          <div className="invoice-filter-group">
+            <div className="invoice-filter-item">
+              <label>Khu trọ</label>
               <select
                 value={selectedHouseId}
                 onChange={(event) => onHouseChange(event.target.value)}
-                style={{ padding: '0.5rem', borderRadius: '0.25rem', border: '1px solid #d1d5db', outline: 'none' }}
+                className="invoice-filter-select"
               >
                 <option value="">Tất cả khu trọ</option>
                 {houses.map((house) => (
@@ -541,13 +542,13 @@ function InvoiceListSection({
                 ))}
               </select>
             </div>
-            <div>
-              <label style={{ display: 'block', fontSize: '0.85rem', color: '#6b7280', marginBottom: '0.25rem' }}>Phòng</label>
+            <div className="invoice-filter-item">
+              <label>Phòng</label>
               <select
                 value={selectedRoomId}
                 onChange={(event) => onRoomChange(event.target.value)}
                 disabled={!selectedHouseId}
-                style={{ padding: '0.5rem', borderRadius: '0.25rem', border: '1px solid #d1d5db', outline: 'none', background: !selectedHouseId ? '#f3f4f6' : '#fff' }}
+                className="invoice-filter-select"
               >
                 <option value="">Tất cả phòng</option>
                 {rooms.map((room) => (
@@ -556,11 +557,20 @@ function InvoiceListSection({
               </select>
             </div>
           </div>
+
+          <button type="button" className="invoice-create-btn" onClick={onCreate}>
+            <svg className="create-plus-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeLinecap="round" strokeLinejoin="round">
+              <line x1="12" y1="5" x2="12" y2="19" />
+              <line x1="5" y1="12" x2="19" y2="12" />
+            </svg>
+            Tạo hóa đơn
+          </button>
         </div>
       </section>
 
-      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '1rem', margin: '0 0 16px 0', borderBottom: '1px solid #e5e7eb' }}>
-        <div className="tabs" style={{ display: 'flex', alignItems: 'center', overflowX: 'auto', gap: '8px', flex: 1 }}>
+      {/* ── Status Tabs ── */}
+      <div className="invoice-tabs-container">
+        <div className="invoice-tabs-wrapper">
           <InvoiceStatusTab status="all" activeStatus={statusFilter} onClick={onStatusChange}>Tất cả</InvoiceStatusTab>
           {invoiceStatuses.map((status) => (
             <InvoiceStatusTab key={status} status={status} activeStatus={statusFilter} onClick={onStatusChange}>
@@ -568,11 +578,9 @@ function InvoiceListSection({
             </InvoiceStatusTab>
           ))}
         </div>
-        <button type="button" className="billing-button" onClick={onCreate} style={{ flexShrink: 0 }}>
-          Tạo hóa đơn
-        </button>
       </div>
 
+      {/* ── Invoice List ── */}
       {loading ? (
         <div className="empty-panel">Đang tải dữ liệu hóa đơn...</div>
       ) : invoices.length === 0 ? (
@@ -581,54 +589,68 @@ function InvoiceListSection({
           <p>Chưa có hóa đơn nào phù hợp với bộ lọc hiện tại.</p>
         </div>
       ) : (
-        <section className="card-grid">
+        <section className="invoice-grid">
           {invoices.map((invoice) => (
             <div
-              className="dashboard-card"
+              className={`invoice-card status-${invoice.status.toLowerCase()}`}
               key={invoice.id}
               onClick={() => onOpen(invoice)}
-              style={{ textAlign: 'left', cursor: 'pointer' }}
             >
-              <div className="card-body-content" style={{ padding: '1rem', width: '100%', boxSizing: 'border-box' }}>
-                <div className="card-title-row" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '0.75rem' }}>
-                  <h3 style={{ margin: 0, fontSize: '1.125rem' }}>{invoice.invoiceNo}</h3>
-                  <span className={`status-chip ${invoice.status.toLowerCase()}`}>{getInvoiceStatusLabel(invoice.status)}</span>
-                </div>
-
-                <div className="card-location" style={{ marginTop: '0.5rem', color: '#6b7280', fontSize: '0.875rem', display: 'flex', alignItems: 'center' }}>
-                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ marginRight: '0.25rem', flexShrink: 0 }}>
-                    <path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"></path>
-                    <polyline points="9 22 9 12 15 12 15 22"></polyline>
+              {/* Card Header */}
+              <div className="invoice-card-header">
+                <div className="invoice-no-box">
+                  <svg className="invoice-file-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                    <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" />
+                    <polyline points="14 2 14 8 20 8" />
+                    <line x1="16" y1="13" x2="8" y2="13" />
+                    <line x1="16" y1="17" x2="8" y2="17" />
                   </svg>
-                  <span>{invoice.roomingHouseName} - Phòng {invoice.roomNumber}</span>
+                  <h3>{invoice.invoiceNo}</h3>
+                </div>
+                <span className={`invoice-status-badge ${invoice.status.toLowerCase()}`}>
+                  {getInvoiceStatusLabel(invoice.status)}
+                </span>
+              </div>
+
+              {/* Card Body */}
+              <div className="invoice-card-body">
+                <div className="house-info">
+                  <svg className="info-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                    <path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z" />
+                    <polyline points="9 22 9 12 15 12 15 22" />
+                  </svg>
+                  <span>{invoice.roomingHouseName}</span>
+                  <span className="room-badge">Phòng {invoice.roomNumber}</span>
                 </div>
 
-                <hr className="card-divider" style={{ margin: '1rem 0', borderColor: '#e5e7eb' }} />
+                <ul className="invoice-details-list">
+                  <li className="invoice-detail-row">
+                    <span className="label">Người thuê</span>
+                    <span className="value tenant-name">{invoice.tenantName || invoice.tenantEmail}</span>
+                  </li>
+                  <li className="invoice-detail-row">
+                    <span className="label">Kỳ hóa đơn</span>
+                    <span className="value">{invoice.billingPeriodStart} – {invoice.billingPeriodEnd}</span>
+                  </li>
+                  <li className="invoice-detail-row">
+                    <span className="label">Hạn thanh toán</span>
+                    <span className="value due-date">{invoice.dueDate}</span>
+                  </li>
+                </ul>
 
-                <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem', fontSize: '0.875rem' }}>
-                  <div style={{ display: 'flex', justifyContent: 'space-between', gap: '1rem' }}>
-                    <span style={{ color: '#6b7280' }}>Người thuê:</span>
-                    <strong>{invoice.tenantName || invoice.tenantEmail}</strong>
-                  </div>
-                  <div style={{ display: 'flex', justifyContent: 'space-between', gap: '1rem' }}>
-                    <span style={{ color: '#6b7280' }}>Kỳ hóa đơn:</span>
-                    <span>{invoice.billingPeriodStart} - {invoice.billingPeriodEnd}</span>
-                  </div>
-                  <div style={{ display: 'flex', justifyContent: 'space-between', gap: '1rem' }}>
-                    <span style={{ color: '#6b7280' }}>Hạn thanh toán:</span>
-                    <span>{invoice.dueDate}</span>
-                  </div>
-                  <div style={{ display: 'flex', justifyContent: 'space-between', gap: '1rem' }}>
-                    <span style={{ color: '#6b7280' }}>Tổng tiền:</span>
-                    <strong style={{ color: '#10b981' }}>{formatMoney(invoice.totalAmount)}</strong>
-                  </div>
+                {/* Card Footer */}
+                <div className="invoice-card-footer">
+                  <span className="amount-label">Tổng tiền</span>
+                  <p className={`amount-value ${invoice.status.toLowerCase()}`}>
+                    {formatMoney(invoice.totalAmount)}
+                  </p>
                 </div>
               </div>
             </div>
           ))}
         </section>
       )}
-    </>
+    </div>
   );
 }
 
@@ -1117,6 +1139,55 @@ function CentralCreateInvoiceModal({
   );
 }
 
+function getTabIcon(status: string, active: boolean) {
+  const color = active ? '#ffffff' : '#64748b';
+  const props = { width: 14, height: 14, viewBox: '0 0 24 24', fill: 'none', stroke: color, strokeWidth: 2, strokeLinecap: 'round' as const, strokeLinejoin: 'round' as const, className: 'invoice-tab-icon' };
+
+  switch (status.toLowerCase()) {
+    case 'all':
+      return (
+        <svg {...props}>
+          <circle cx="12" cy="12" r="10" />
+          <circle cx="12" cy="12" r="3" fill={color} stroke="none" />
+        </svg>
+      );
+    case 'draft':
+      return (
+        <svg {...props}>
+          <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" />
+          <polyline points="14 2 14 8 20 8" />
+        </svg>
+      );
+    case 'issued':
+    case 'sent':
+    case 'paid':
+      return (
+        <svg {...props}>
+          <path d="M22 11.08V12a10 10 0 1 1-5.93-9.14" />
+          <polyline points="22 4 12 14.01 9 11.01" />
+        </svg>
+      );
+    case 'overdue':
+      return (
+        <svg {...props}>
+          <circle cx="12" cy="12" r="10" />
+          <line x1="12" y1="8" x2="12" y2="12" />
+          <line x1="12" y1="16" x2="12.01" y2="16" />
+        </svg>
+      );
+    case 'cancelled':
+      return (
+        <svg {...props}>
+          <circle cx="12" cy="12" r="10" />
+          <line x1="15" y1="9" x2="9" y2="15" />
+          <line x1="9" y1="9" x2="15" y2="15" />
+        </svg>
+      );
+    default:
+      return null;
+  }
+}
+
 function InvoiceStatusTab({
   status,
   activeStatus,
@@ -1134,8 +1205,9 @@ function InvoiceStatusTab({
     <button
       type="button"
       onClick={() => onClick(status)}
-      style={{ padding: '12px 16px', background: 'none', border: 'none', borderBottom: active ? '2px solid #2563eb' : '2px solid transparent', color: active ? '#2563eb' : '#6b7280', fontWeight: active ? 600 : 500, cursor: 'pointer', whiteSpace: 'nowrap', transition: 'all 0.2s' }}
+      className={`invoice-tab-btn${active ? ' active' : ''}`}
     >
+      {getTabIcon(status, active)}
       {children}
     </button>
   );

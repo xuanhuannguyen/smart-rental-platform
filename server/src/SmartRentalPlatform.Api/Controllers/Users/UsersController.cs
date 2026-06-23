@@ -48,6 +48,22 @@ public class UsersController : ControllerBase
     }
 
     [Authorize]
+    [HttpGet("occupants/lookup")]
+    public async Task<ActionResult<ApiResponse<OccupantAccountLookupResponse>>> LookupOccupantAccount(
+        [FromQuery] string email,
+        CancellationToken cancellationToken)
+    {
+        var result = await _userService.LookupOccupantAccountAsync(email, cancellationToken);
+
+        return Ok(new ApiResponse<OccupantAccountLookupResponse>
+        {
+            Success = true,
+            Message = "Kiểm tra tài khoản người ở thành công.",
+            Data = result
+        });
+    }
+
+    [Authorize]
     [HttpPut("me/profile")]
     public async Task<ActionResult<ApiResponse<UserProfileResponse>>> UpdateProfile(
         [FromBody] UpdateUserProfileRequest request,

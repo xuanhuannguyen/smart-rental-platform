@@ -60,8 +60,11 @@ namespace SmartRentalPlatform.Infrastructure.Persistence.Seed
                 "20000000-0000-0000-0000-000000000006"  // RejectedHouseId (Nhà trọ Old Town)
             };
             var defaultHouseIdsCsv = string.Join(",", defaultHouseGuids.Select(id => $"'{id}'"));
+            var dummyLandlordId = Guid.Parse("10000000-0000-0000-0000-000000009999");
+            var seededRoomingHouseSubquery =
+                $"SELECT id FROM rooming_houses WHERE landlord_user_id = '{dummyLandlordId}' AND id NOT IN ({defaultHouseIdsCsv})";
 
-            // Thực hiện xóa nhanh bằng Raw SQL để tránh tràn tham số (Parameter Overflow) và nâng cao hiệu năng
+            // Refresh only generated mock houses. Do not delete user-created rooming houses on development startup.
             // 1. contract_appendix_changes
             await context.Database.ExecuteSqlRawAsync($@"
                 DELETE FROM contract_appendix_changes 
@@ -70,7 +73,7 @@ namespace SmartRentalPlatform.Infrastructure.Persistence.Seed
                     WHERE contract_id IN (
                         SELECT id FROM contracts 
                         WHERE room_id IN (
-                            SELECT id FROM rooms WHERE rooming_house_id NOT IN ({defaultHouseIdsCsv})
+                            SELECT id FROM rooms WHERE rooming_house_id IN ({seededRoomingHouseSubquery})
                         )
                     )
                 )
@@ -82,7 +85,7 @@ namespace SmartRentalPlatform.Infrastructure.Persistence.Seed
                 WHERE contract_id IN (
                     SELECT id FROM contracts 
                     WHERE room_id IN (
-                        SELECT id FROM rooms WHERE rooming_house_id NOT IN ({defaultHouseIdsCsv})
+                        SELECT id FROM rooms WHERE rooming_house_id IN ({seededRoomingHouseSubquery})
                     )
                 )
             ", cancellationToken);
@@ -93,7 +96,7 @@ namespace SmartRentalPlatform.Infrastructure.Persistence.Seed
                 WHERE contract_id IN (
                     SELECT id FROM contracts 
                     WHERE room_id IN (
-                        SELECT id FROM rooms WHERE rooming_house_id NOT IN ({defaultHouseIdsCsv})
+                        SELECT id FROM rooms WHERE rooming_house_id IN ({seededRoomingHouseSubquery})
                     )
                 )
             ", cancellationToken);
@@ -104,7 +107,7 @@ namespace SmartRentalPlatform.Infrastructure.Persistence.Seed
                 WHERE contract_id IN (
                     SELECT id FROM contracts 
                     WHERE room_id IN (
-                        SELECT id FROM rooms WHERE rooming_house_id NOT IN ({defaultHouseIdsCsv})
+                        SELECT id FROM rooms WHERE rooming_house_id IN ({seededRoomingHouseSubquery})
                     )
                 )
             ", cancellationToken);
@@ -117,7 +120,7 @@ namespace SmartRentalPlatform.Infrastructure.Persistence.Seed
                     WHERE contract_id IN (
                         SELECT id FROM contracts 
                         WHERE room_id IN (
-                            SELECT id FROM rooms WHERE rooming_house_id NOT IN ({defaultHouseIdsCsv})
+                            SELECT id FROM rooms WHERE rooming_house_id IN ({seededRoomingHouseSubquery})
                         )
                     )
                 )
@@ -129,7 +132,7 @@ namespace SmartRentalPlatform.Infrastructure.Persistence.Seed
                 WHERE contract_id IN (
                     SELECT id FROM contracts 
                     WHERE room_id IN (
-                        SELECT id FROM rooms WHERE rooming_house_id NOT IN ({defaultHouseIdsCsv})
+                        SELECT id FROM rooms WHERE rooming_house_id IN ({seededRoomingHouseSubquery})
                     )
                 )
             ", cancellationToken);
@@ -140,7 +143,7 @@ namespace SmartRentalPlatform.Infrastructure.Persistence.Seed
                 WHERE invoice_id IN (
                     SELECT id FROM invoices 
                     WHERE room_id IN (
-                        SELECT id FROM rooms WHERE rooming_house_id NOT IN ({defaultHouseIdsCsv})
+                        SELECT id FROM rooms WHERE rooming_house_id IN ({seededRoomingHouseSubquery})
                     )
                 )
             ", cancellationToken);
@@ -149,7 +152,7 @@ namespace SmartRentalPlatform.Infrastructure.Persistence.Seed
             await context.Database.ExecuteSqlRawAsync($@"
                 DELETE FROM invoices 
                 WHERE room_id IN (
-                    SELECT id FROM rooms WHERE rooming_house_id NOT IN ({defaultHouseIdsCsv})
+                    SELECT id FROM rooms WHERE rooming_house_id IN ({seededRoomingHouseSubquery})
                 )
             ", cancellationToken);
 
@@ -157,7 +160,7 @@ namespace SmartRentalPlatform.Infrastructure.Persistence.Seed
             await context.Database.ExecuteSqlRawAsync($@"
                 DELETE FROM contracts 
                 WHERE room_id IN (
-                    SELECT id FROM rooms WHERE rooming_house_id NOT IN ({defaultHouseIdsCsv})
+                    SELECT id FROM rooms WHERE rooming_house_id IN ({seededRoomingHouseSubquery})
                 )
             ", cancellationToken);
 
@@ -165,7 +168,7 @@ namespace SmartRentalPlatform.Infrastructure.Persistence.Seed
             await context.Database.ExecuteSqlRawAsync($@"
                 DELETE FROM room_deposits 
                 WHERE room_id IN (
-                    SELECT id FROM rooms WHERE rooming_house_id NOT IN ({defaultHouseIdsCsv})
+                    SELECT id FROM rooms WHERE rooming_house_id IN ({seededRoomingHouseSubquery})
                 )
             ", cancellationToken);
 
@@ -173,7 +176,7 @@ namespace SmartRentalPlatform.Infrastructure.Persistence.Seed
             await context.Database.ExecuteSqlRawAsync($@"
                 DELETE FROM rental_requests 
                 WHERE room_id IN (
-                    SELECT id FROM rooms WHERE rooming_house_id NOT IN ({defaultHouseIdsCsv})
+                    SELECT id FROM rooms WHERE rooming_house_id IN ({seededRoomingHouseSubquery})
                 )
             ", cancellationToken);
 
@@ -181,7 +184,7 @@ namespace SmartRentalPlatform.Infrastructure.Persistence.Seed
             await context.Database.ExecuteSqlRawAsync($@"
                 DELETE FROM viewing_appointments 
                 WHERE room_id IN (
-                    SELECT id FROM rooms WHERE rooming_house_id NOT IN ({defaultHouseIdsCsv})
+                    SELECT id FROM rooms WHERE rooming_house_id IN ({seededRoomingHouseSubquery})
                 )
             ", cancellationToken);
 
@@ -189,7 +192,7 @@ namespace SmartRentalPlatform.Infrastructure.Persistence.Seed
             await context.Database.ExecuteSqlRawAsync($@"
                 DELETE FROM meter_readings 
                 WHERE room_id IN (
-                    SELECT id FROM rooms WHERE rooming_house_id NOT IN ({defaultHouseIdsCsv})
+                    SELECT id FROM rooms WHERE rooming_house_id IN ({seededRoomingHouseSubquery})
                 )
             ", cancellationToken);
 
@@ -197,21 +200,21 @@ namespace SmartRentalPlatform.Infrastructure.Persistence.Seed
             await context.Database.ExecuteSqlRawAsync($@"
                 DELETE FROM property_images 
                 WHERE room_id IN (
-                    SELECT id FROM rooms WHERE rooming_house_id NOT IN ({defaultHouseIdsCsv})
+                    SELECT id FROM rooms WHERE rooming_house_id IN ({seededRoomingHouseSubquery})
                 )
             ", cancellationToken);
 
             // Xóa property_images liên quan đến khu trọ
             await context.Database.ExecuteSqlRawAsync($@"
                 DELETE FROM property_images 
-                WHERE rooming_house_id NOT IN ({defaultHouseIdsCsv})
+                WHERE rooming_house_id IN ({seededRoomingHouseSubquery})
             ", cancellationToken);
 
             // Xóa room_amenities
             await context.Database.ExecuteSqlRawAsync($@"
                 DELETE FROM room_amenities 
                 WHERE room_id IN (
-                    SELECT id FROM rooms WHERE rooming_house_id NOT IN ({defaultHouseIdsCsv})
+                    SELECT id FROM rooms WHERE rooming_house_id IN ({seededRoomingHouseSubquery})
                 )
             ", cancellationToken);
 
@@ -219,50 +222,50 @@ namespace SmartRentalPlatform.Infrastructure.Persistence.Seed
             await context.Database.ExecuteSqlRawAsync($@"
                 DELETE FROM room_price_tiers 
                 WHERE room_id IN (
-                    SELECT id FROM rooms WHERE rooming_house_id NOT IN ({defaultHouseIdsCsv})
+                    SELECT id FROM rooms WHERE rooming_house_id IN ({seededRoomingHouseSubquery})
                 )
             ", cancellationToken);
 
             // Xóa rooms
             await context.Database.ExecuteSqlRawAsync($@"
                 DELETE FROM rooms 
-                WHERE rooming_house_id NOT IN ({defaultHouseIdsCsv})
+                WHERE rooming_house_id IN ({seededRoomingHouseSubquery})
             ", cancellationToken);
 
             // Xóa rooming_house_amenities
             await context.Database.ExecuteSqlRawAsync($@"
                 DELETE FROM rooming_house_amenities 
-                WHERE rooming_house_id NOT IN ({defaultHouseIdsCsv})
+                WHERE rooming_house_id IN ({seededRoomingHouseSubquery})
             ", cancellationToken);
 
             // Xóa rooming_house_legal_documents
             await context.Database.ExecuteSqlRawAsync($@"
                 DELETE FROM rooming_house_legal_documents 
-                WHERE rooming_house_id NOT IN ({defaultHouseIdsCsv})
+                WHERE rooming_house_id IN ({seededRoomingHouseSubquery})
             ", cancellationToken);
 
             // Xóa rental_policies
             await context.Database.ExecuteSqlRawAsync($@"
                 DELETE FROM rental_policies 
-                WHERE rooming_house_id NOT IN ({defaultHouseIdsCsv})
+                WHERE rooming_house_id IN ({seededRoomingHouseSubquery})
             ", cancellationToken);
 
             // Xóa rooming_house_rules
             await context.Database.ExecuteSqlRawAsync($@"
                 DELETE FROM rooming_house_rules 
-                WHERE rooming_house_id NOT IN ({defaultHouseIdsCsv})
+                WHERE rooming_house_id IN ({seededRoomingHouseSubquery})
             ", cancellationToken);
 
             // Xóa rooming_house_service_prices
             await context.Database.ExecuteSqlRawAsync($@"
                 DELETE FROM rooming_house_service_prices 
-                WHERE rooming_house_id NOT IN ({defaultHouseIdsCsv})
+                WHERE rooming_house_id IN ({seededRoomingHouseSubquery})
             ", cancellationToken);
 
             // Xóa rooming_houses
             await context.Database.ExecuteSqlRawAsync($@"
                 DELETE FROM rooming_houses 
-                WHERE id NOT IN ({defaultHouseIdsCsv})
+                WHERE id IN ({seededRoomingHouseSubquery})
             ", cancellationToken);
 
             // Kiểm tra số lượng khu trọ hiện tại
@@ -291,7 +294,6 @@ namespace SmartRentalPlatform.Infrastructure.Persistence.Seed
             }
 
             // Seeding a dedicated dummy landlord for mock rooming houses to avoid cluttering the demo landlord's dashboard
-            var dummyLandlordId = Guid.Parse("10000000-0000-0000-0000-000000009999");
             var dummyUserExists = await context.Users.AnyAsync(u => u.Id == dummyLandlordId, cancellationToken);
             var landlordRole = await context.Roles.FirstOrDefaultAsync(r => r.Name == RoleName.Landlord, cancellationToken);
             var seededAt = new DateTimeOffset(2026, 6, 22, 0, 0, 0, TimeSpan.Zero);
@@ -341,10 +343,65 @@ namespace SmartRentalPlatform.Infrastructure.Persistence.Seed
 
             var random = new Random(42); // Seed để random nhất quán
 
+            // Tách danh sách phường xã thành Đà Nẵng và các tỉnh khác
+            var danangWards = wards.Where(w => w.ProvinceCode == "48").ToList();
+            var otherWards = wards.Where(w => w.ProvinceCode != "48").ToList();
+
+            if (danangWards.Count == 0) danangWards = wards;
+            if (otherWards.Count == 0) otherWards = wards;
+
+            // Bảng tra cứu tọa độ địa lý thực tế của các tỉnh thành
+            var provinceCoordinates = new Dictionary<string, (decimal Lat, decimal Lng)>
+            {
+                { "01", (21.0278m, 105.8342m) }, // Hà Nội
+                { "04", (22.6710m, 106.2625m) }, // Cao Bằng
+                { "08", (21.8159m, 105.2152m) }, // Tuyên Quang
+                { "11", (21.3853m, 103.0195m) }, // Điện Biên
+                { "12", (22.4045m, 103.4566m) }, // Lai Châu
+                { "14", (21.3283m, 103.9103m) }, // Sơn La
+                { "15", (22.4856m, 103.9607m) }, // Lào Cai
+                { "19", (21.5939m, 105.8481m) }, // Thái Nguyên
+                { "20", (21.8540m, 106.7610m) }, // Lạng Sơn
+                { "22", (20.9599m, 107.0425m) }, // Quảng Ninh
+                { "24", (21.1861m, 106.0763m) }, // Bắc Ninh
+                { "25", (21.3228m, 105.2173m) }, // Phú Thọ
+                { "31", (20.8449m, 106.6881m) }, // Hải Phòng
+                { "33", (20.6465m, 106.0511m) }, // Hưng Yên
+                { "37", (20.2522m, 105.9750m) }, // Ninh Bình
+                { "38", (19.8076m, 105.7764m) }, // Thanh Hóa
+                { "40", (18.6734m, 105.6924m) }, // Nghệ An
+                { "42", (18.3559m, 105.9013m) }, // Hà Tĩnh
+                { "44", (16.8163m, 107.0985m) }, // Quảng Trị
+                { "46", (16.4637m, 107.5909m) }, // Huế
+                { "48", (15.9754m, 108.2638m) }, // Đà Nẵng (Đại học FPT Đà Nẵng)
+                { "51", (15.1205m, 108.8010m) }, // Quảng Ngãi
+                { "52", (13.9829m, 108.0076m) }, // Gia Lai
+                { "56", (12.2388m, 109.1967m) }, // Khánh Hòa
+                { "66", (12.6796m, 108.0447m) }, // Đắk Lắk
+                { "68", (11.9404m, 108.4583m) }, // Lâm Đồng
+                { "75", (10.9574m, 106.8427m) }, // Đồng Nai
+                { "79", (10.7769m, 106.7009m) }, // TP.HCM
+                { "80", (11.3124m, 106.1245m) }, // Tây Ninh
+                { "82", (10.4578m, 105.6372m) }, // Đồng Tháp
+                { "86", (10.2536m, 105.9722m) }, // Vĩnh Long
+                { "91", (10.3739m, 105.4363m) }, // An Giang
+                { "92", (10.0452m, 105.7469m) }, // Cần Thơ
+                { "96", (9.1769m, 105.1500m) }  // Cà Mau
+            };
+
             for (int i = 0; i < targetCount; i++)
             {
-                // 1. Random khu vực trải dài Bắc vào Nam
-                var ward = wards[random.Next(wards.Count)];
+                // Phân bổ: 100 nhà trọ mock đầu tiên ở Đà Nẵng, còn lại ở các tỉnh thành khác
+                AdministrativeWard ward;
+                if (i < 100)
+                {
+                    ward = danangWards[random.Next(danangWards.Count)];
+                }
+                else
+                {
+                    ward = otherWards[random.Next(otherWards.Count)];
+                }
+
                 var province = provinces.First(p => p.Code == ward.ProvinceCode);
 
                 // 2. Random tên khu trọ tiếng Việt tự nhiên
@@ -362,6 +419,26 @@ namespace SmartRentalPlatform.Infrastructure.Persistence.Seed
                 var landlordId = dummyLandlordId;
                 var houseId = Guid.NewGuid();
 
+                // Lấy tọa độ gốc khớp thực tế của tỉnh thành đó
+                decimal baseLat;
+                decimal baseLng;
+                if (provinceCoordinates.TryGetValue(province.Code, out var coords))
+                {
+                    baseLat = coords.Lat;
+                    baseLng = coords.Lng;
+                }
+                else
+                {
+                    // Fallback mặc định về Đà Nẵng nếu không tìm thấy
+                    baseLat = 15.9754m;
+                    baseLng = 108.2638m;
+                }
+
+                var latOffset = Convert.ToDecimal((random.NextDouble() - 0.5) * 0.02);
+                var lngOffset = Convert.ToDecimal((random.NextDouble() - 0.5) * 0.02);
+                var latitude = baseLat + latOffset;
+                var longitude = baseLng + lngOffset;
+
                 // 4. Tạo thực thể RoomingHouse
                 var house = new RoomingHouse
                 {
@@ -373,8 +450,8 @@ namespace SmartRentalPlatform.Infrastructure.Persistence.Seed
                     WardCode = ward.Code,
                     ProvinceCode = province.Code,
                     AddressDisplay = addressDisplay,
-                    Latitude = Convert.ToDecimal(10.0 + random.NextDouble() * 10.0),
-                    Longitude = Convert.ToDecimal(105.0 + random.NextDouble() * 3.0),
+                    Latitude = latitude,
+                    Longitude = longitude,
                     ApprovalStatus = RoomingHouseApprovalStatus.Approved,
                     VisibilityStatus = RoomingHouseVisibilityStatus.Visible,
                     CreatedAt = seededAt,

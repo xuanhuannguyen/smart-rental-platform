@@ -31,4 +31,9 @@ public interface INotificationService
     Task MarkAllAsReadAsync(
         Guid userId,
         CancellationToken cancellationToken = default);
+
+    Task DeleteAsync(
+        Guid userId,
+        Guid notificationId,
+        CancellationToken cancellationToken = default);
 }

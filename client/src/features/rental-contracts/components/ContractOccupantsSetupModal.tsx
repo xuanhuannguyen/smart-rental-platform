@@ -1,7 +1,10 @@
 import { useEffect, useState } from 'react';
 import { useAuth } from '../../../app/providers/AuthProvider';
+import { apiClient } from '../../../shared/api/apiClient';
 import { getApiErrorMessage } from '../../../shared/api/apiError';
+import type { ApiResponse } from '../../../shared/api/apiResponse.types';
 import { toAssetUrl } from '../../../shared/api/assets';
+import { ENDPOINTS } from '../../../shared/api/endpoints';
 import { Alert } from '../../../shared/components/ui/Alert';
 import { Button } from '../../../shared/components/ui/Button';
 import { uploadImage } from '../../files/api';
@@ -13,6 +16,9 @@ interface OccupantForm {
   id: string;
   isMainTenant: boolean;
   hasAccount: boolean;
+  isSaved: boolean;
+  saveMessage: string;
+  saveMessageType: 'success' | 'error' | '';
   email: string;
   fullName: string;
   phoneNumber: string;
@@ -24,6 +30,17 @@ interface OccupantForm {
   frontImageObjectKey: string;
   backImageObjectKey: string;
   extraImageObjectKey: string;
+}
+
+interface OccupantAccountLookupResponse {
+  email: string;
+  Email?: string;
+  exists: boolean;
+  Exists?: boolean;
+  isKycApproved: boolean;
+  IsKycApproved?: boolean;
+  displayName?: string | null;
+  DisplayName?: string | null;
 }
 
 function toDateInput(value?: string | null) {
@@ -39,6 +56,9 @@ function createMainTenantForm(email?: string | null): OccupantForm {
     id: crypto.randomUUID(),
     isMainTenant: true,
     hasAccount: true,
+    isSaved: true,
+    saveMessage: '',
+    saveMessageType: '',
     email: email ?? '',
     fullName: '',
     phoneNumber: '',
@@ -58,6 +78,9 @@ function createEmptyOccupantForm(moveInDate: string): OccupantForm {
     id: crypto.randomUUID(),
     isMainTenant: false,
     hasAccount: false,
+    isSaved: false,
+    saveMessage: '',
+    saveMessageType: '',
     email: '',
     fullName: '',
     phoneNumber: '',
@@ -84,6 +107,9 @@ function mapOccupantToForm(
     id: occupant.id,
     isMainTenant,
     hasAccount,
+    isSaved: true,
+    saveMessage: '',
+    saveMessageType: '',
     email: hasAccount ? occupant.email ?? (isMainTenant ? currentUserEmail : null) ?? '' : '',
     fullName: hasAccount ? '' : occupant.fullName ?? '',
     phoneNumber: hasAccount ? '' : occupant.phoneNumber ?? '',
@@ -98,13 +124,45 @@ function mapOccupantToForm(
   };
 }
 
+function normalizeOccupantSlots(
+  forms: OccupantForm[],
+  expectedOccupantCount?: number,
+  contractStartDate?: string | null,
+  currentUserEmail?: string | null
+) {
+  if (!expectedOccupantCount || expectedOccupantCount <= 0) {
+    return forms;
+  }
+
+  const targetCount = Math.max(expectedOccupantCount, 1);
+  const moveInDate = toDateInput(contractStartDate);
+  const mainTenant = forms.find((item) => item.isMainTenant) ?? createMainTenantForm(currentUserEmail);
+  const coOccupants = forms.filter((item) => !item.isMainTenant).slice(0, targetCount - 1);
+
+  while (coOccupants.length < targetCount - 1) {
+    coOccupants.push(createEmptyOccupantForm(moveInDate));
+  }
+
+  return [{ ...mainTenant, isSaved: true }, ...coOccupants];
+}
+
+function getCoOccupantIndex(occupants: OccupantForm[], currentIndex: number) {
+  return occupants.slice(0, currentIndex + 1).filter((occupant) => !occupant.isMainTenant).length;
+}
+
 interface ContractOccupantsSetupModalProps {
   contractId: string;
+  expectedOccupantCount?: number;
   onClose: () => void;
   onSuccess: () => void;
 }
 
-export function ContractOccupantsSetupModal({ contractId, onClose, onSuccess }: ContractOccupantsSetupModalProps) {
+export function ContractOccupantsSetupModal({
+  contractId,
+  expectedOccupantCount,
+  onClose,
+  onSuccess
+}: ContractOccupantsSetupModalProps) {
   const { currentUser } = useAuth();
 
   const [contract, setContract] = useState<ContractDetailResponse | null>(null);
@@ -112,6 +170,7 @@ export function ContractOccupantsSetupModal({ contractId, onClose, onSuccess }: 
   const [uploadingField, setUploadingField] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [submitting, setSubmitting] = useState(false);
+  const [savingOccupantId, setSavingOccupantId] = useState<string | null>(null);
   const [error, setError] = useState('');
 
   useEffect(() => {
@@ -145,11 +204,11 @@ export function ContractOccupantsSetupModal({ contractId, onClose, onSuccess }: 
               .sort((left, right) => Number(right.isMainTenant) - Number(left.isMainTenant))
           : [createMainTenantForm(currentUser?.email)];
 
-        setOccupants(mappedOccupants);
+        setOccupants(normalizeOccupantSlots(mappedOccupants, expectedOccupantCount, response.data.startDate, currentUser?.email));
       } catch (err) {
         if (isMounted) {
           setError(getApiErrorMessage(err, 'Không thể tải thông tin hợp đồng.'));
-          setOccupants([createMainTenantForm(currentUser?.email)]);
+          setOccupants(normalizeOccupantSlots([createMainTenantForm(currentUser?.email)], expectedOccupantCount, undefined, currentUser?.email));
         }
       } finally {
         if (isMounted) {
@@ -163,7 +222,7 @@ export function ContractOccupantsSetupModal({ contractId, onClose, onSuccess }: 
     return () => {
       isMounted = false;
     };
-  }, [contractId, currentUser?.email, currentUser?.userId]);
+  }, [contractId, currentUser?.email, currentUser?.userId, expectedOccupantCount]);
 
   const addOccupant = () => {
     setOccupants((current) => [
@@ -184,8 +243,130 @@ export function ContractOccupantsSetupModal({ contractId, onClose, onSuccess }: 
 
   const updateOccupant = (id: string, field: keyof OccupantForm, value: string | boolean) => {
     setOccupants((current) =>
-      current.map((occupant) => (occupant.id === id ? { ...occupant, [field]: value } : occupant))
+      current.map((occupant) =>
+        occupant.id === id
+          ? {
+              ...occupant,
+              [field]: value,
+              isSaved: occupant.isMainTenant ? true : false,
+              saveMessage: '',
+              saveMessageType: ''
+            }
+          : occupant
+      )
     );
+  };
+
+  const setOccupantSaveFeedback = (
+    id: string,
+    saveMessage: string,
+    saveMessageType: OccupantForm['saveMessageType'],
+    isSaved = false
+  ) => {
+    setOccupants((current) =>
+      current.map((occupant) =>
+        occupant.id === id
+          ? {
+              ...occupant,
+              isSaved,
+              saveMessage,
+              saveMessageType
+            }
+          : occupant
+      )
+    );
+  };
+
+  const validateOccupant = (occupant: OccupantForm) => {
+    if (!occupant.relationship.trim()) {
+      return 'Cần nhập quan hệ với người thuê chính.';
+    }
+
+    if (!occupant.moveInDate) {
+      return 'Cần chọn ngày dọn vào.';
+    }
+
+    if (occupant.hasAccount) {
+      if (!occupant.email.trim()) {
+        return 'Cần nhập email tài khoản.';
+      }
+
+      if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(occupant.email.trim())) {
+        return 'Email tài khoản chưa đúng định dạng.';
+      }
+
+      return null;
+    }
+
+    if (!occupant.fullName.trim()) {
+      return 'Cần nhập họ tên người ở.';
+    }
+
+    if (!occupant.phoneNumber.trim()) {
+      return 'Cần nhập số điện thoại người ở.';
+    }
+
+    if (!occupant.dateOfBirth) {
+      return 'Cần nhập ngày sinh người ở.';
+    }
+
+    if (!occupant.documentType.trim() || !occupant.documentNumber.trim() || !occupant.frontImageObjectKey.trim()) {
+      return 'Người ở nhập thủ công cần có loại giấy tờ, số giấy tờ và ảnh mặt trước.';
+    }
+
+    return null;
+  };
+
+  const saveOccupant = async (id: string) => {
+    const occupant = occupants.find((item) => item.id === id);
+    if (!occupant) {
+      return;
+    }
+
+    const validationError = validateOccupant(occupant);
+    if (validationError) {
+      setOccupantSaveFeedback(id, validationError, 'error');
+      return;
+    }
+
+    setError('');
+    setSavingOccupantId(id);
+
+    try {
+      if (occupant.hasAccount) {
+        const query = new URLSearchParams({ email: occupant.email.trim() });
+        const lookup = await apiClient<ApiResponse<OccupantAccountLookupResponse>>(
+          `${ENDPOINTS.USERS.OCCUPANT_LOOKUP}?${query.toString()}`,
+          {
+            method: 'GET',
+            auth: true
+          }
+        );
+        const lookupData = lookup.data;
+        const exists = lookupData.exists ?? lookupData.Exists ?? false;
+        const isKycApproved = lookupData.isKycApproved ?? lookupData.IsKycApproved ?? false;
+        const displayName = lookupData.displayName ?? lookupData.DisplayName ?? occupant.email.trim();
+
+        if (!exists) {
+          setOccupantSaveFeedback(id, `Không tìm thấy tài khoản ${occupant.email.trim()}.`, 'error');
+          return;
+        }
+
+        if (!isKycApproved) {
+          setOccupantSaveFeedback(id, `Tài khoản ${occupant.email.trim()} chưa KYC thành công.`, 'error');
+          return;
+        }
+
+        setOccupantSaveFeedback(id, `Đã lưu thành công tài khoản ${displayName}.`, 'success', true);
+        return;
+      }
+
+      setOccupantSaveFeedback(id, 'Đã lưu thành công thông tin người ở này.', 'success', true);
+    } catch (err) {
+      setOccupantSaveFeedback(id, getApiErrorMessage(err, 'Không thể kiểm tra tài khoản người ở.'), 'error');
+    } finally {
+      setSavingOccupantId(null);
+    }
   };
 
   const uploadDocumentImage = async (
@@ -219,12 +400,16 @@ export function ContractOccupantsSetupModal({ contractId, onClose, onSuccess }: 
       return;
     }
 
-    const missingDocumentNumber = occupants.some(
-      (occupant) => !occupant.hasAccount && !occupant.documentNumber.trim()
-    );
+    const invalidOccupant = occupants.find((occupant) => validateOccupant(occupant));
 
-    if (missingDocumentNumber) {
-      setError('Người ở chưa có tài khoản cần nhập lại số giấy tờ trước khi gửi.');
+    if (invalidOccupant) {
+      setError(validateOccupant(invalidOccupant) ?? 'Vui lòng kiểm tra lại thông tin người ở.');
+      return;
+    }
+
+    const unsavedOccupant = occupants.find((occupant) => !occupant.isMainTenant && !occupant.isSaved);
+    if (unsavedOccupant) {
+      setError('Vui lòng bấm lưu từng người ở trước khi gửi danh sách cho chủ trọ.');
       return;
     }
 
@@ -272,7 +457,7 @@ export function ContractOccupantsSetupModal({ contractId, onClose, onSuccess }: 
 
         <div className="occupants-setup-modal-content">
         <p style={{ color: '#475569', fontSize: '0.95rem', margin: 0, paddingBottom: 8 }}>
-          Khai báo danh sách người sẽ sinh sống tại phòng thuê để chủ trọ tạo và ký hợp đồng. Khuyến khích người ở đăng ký tài khoản và xác minh danh tính trên nền tảng.
+          Khai báo danh sách người sẽ sinh sống tại phòng thuê. Nếu yêu cầu thuê dự kiến {expectedOccupantCount ?? 'nhiều'} người, hệ thống sẽ giữ người thuê chính và tạo sẵn các ô người ở cùng cần nhập.
         </p>
 
         {contract && (
@@ -293,13 +478,22 @@ export function ContractOccupantsSetupModal({ contractId, onClose, onSuccess }: 
               {occupants.map((occupant, index) => (
                 <div key={occupant.id} className="occupant-card">
                   <div className="occupant-card-header">
-                    <h3>{occupant.isMainTenant ? 'Người đại diện thuê' : `Người ở cùng #${index + 1}`}</h3>
-                    {!occupant.isMainTenant && (
+                    <h3>{occupant.isMainTenant ? 'Người đại diện thuê' : `Người ở cùng #${getCoOccupantIndex(occupants, index)}`}</h3>
+                    <span className={`occupant-save-status ${occupant.isSaved ? 'saved' : 'draft'}`}>
+                      {occupant.isMainTenant ? 'Người thuê chính' : occupant.isSaved ? 'Đã lưu' : 'Chưa lưu'}
+                    </span>
+                    {!occupant.isMainTenant && !expectedOccupantCount && (
                       <button type="button" className="remove-btn" onClick={() => removeOccupant(occupant.id)}>
                         Xóa
                       </button>
                     )}
                   </div>
+
+                  {occupant.saveMessage && (
+                    <div className={`occupant-save-message ${occupant.saveMessageType}`}>
+                      {occupant.saveMessage}
+                    </div>
+                  )}
 
                   <div className="occupant-grid">
                     {!occupant.isMainTenant && (
@@ -433,15 +627,30 @@ export function ContractOccupantsSetupModal({ contractId, onClose, onSuccess }: 
                         onChange={(event) => updateOccupant(occupant.id, 'moveInDate', event.target.value)}
                       />
                     </div>
+
+                    {!occupant.isMainTenant && (
+                      <div className="form-group full-width occupant-card-actions">
+                        <Button type="button" variant="secondary" onClick={() => saveOccupant(occupant.id)}>
+                          {savingOccupantId === occupant.id ? 'Đang lưu...' : 'Lưu người này'}
+                        </Button>
+                      </div>
+                    )}
                   </div>
                 </div>
               ))}
             </div>
 
             <div className="setup-actions">
-              <Button type="button" variant="secondary" onClick={addOccupant}>
-                + Thêm người ở cùng
-              </Button>
+              {!expectedOccupantCount && (
+                <Button type="button" variant="secondary" onClick={addOccupant}>
+                  + Thêm người ở cùng
+                </Button>
+              )}
+              {expectedOccupantCount && (
+                <span className="occupants-count-hint">
+                  Đã tạo {Math.max(expectedOccupantCount - 1, 0)} ô người ở cùng ngoài người thuê chính.
+                </span>
+              )}
               <div className="submit-wrapper">
                 <Button type="submit" disabled={submitting}>
                   {submitting ? 'Đang gửi...' : 'Hoàn tất & gửi chủ trọ'}

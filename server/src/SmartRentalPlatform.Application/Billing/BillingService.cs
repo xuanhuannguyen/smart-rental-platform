@@ -65,7 +65,7 @@ public class BillingService : IBillingService
                 ErrorCodes.RentalContractNotFound,
                 "Phòng này chưa có hợp đồng Active để tạo hóa đơn.");
 
-        var today = DateOnly.FromDateTime(DateTime.UtcNow);
+        var today = GetBusinessToday();
         var effectiveTerms = await ResolveEffectiveContractTermsAsync(
             contract.Id,
             contract.StartDate,
@@ -1303,8 +1303,13 @@ public class BillingService : IBillingService
 
     private static bool IsFutureBillingPeriod(ResolvedBillingPeriod period)
     {
-        var today = DateOnly.FromDateTime(DateTime.UtcNow);
+        var today = GetBusinessToday();
         return period.Start > today || period.End > today;
+    }
+
+    private static DateOnly GetBusinessToday()
+    {
+        return DateOnly.FromDateTime(DateTime.UtcNow.AddHours(7));
     }
 
     private static string BuildExpectedInvoicePeriodMessage(
@@ -2063,7 +2068,7 @@ public class BillingService : IBillingService
         Guid? contractId,
         CancellationToken cancellationToken)
     {
-        var today = DateOnly.FromDateTime(DateTime.UtcNow);
+        var today = GetBusinessToday();
         var query = context.Invoices
             .Where(x => x.DueDate < today &&
                         x.Status == InvoiceStatus.Issued);

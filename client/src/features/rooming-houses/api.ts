@@ -189,6 +189,14 @@ export async function updateRoomingHouseVisibility(
   return data.data;
 }
 
+export async function submitRoomingHouse(id: string): Promise<RoomingHouseDetail> {
+  const data = await apiClient<ApiResponse<RoomingHouseDetail>>(
+    `/api/rooming-houses/${id}/submit`,
+    { method: 'POST', auth: true }
+  );
+  return data.data;
+}
+
 export async function getRoomingHouseRentalPolicy(id: string): Promise<RentalPolicy | null> {
   const data = await apiClient<ApiResponse<RentalPolicy | null>>(
     `/api/rooming-houses/${id}/rental-policy`,
@@ -227,12 +235,20 @@ export async function upsertRoomingHouseRule(
   return data.data;
 }
 
-export async function submitRoomingHouse(id: string): Promise<RoomingHouseDetail> {
-  const data = await apiClient<ApiResponse<RoomingHouseDetail>>(
-    `/api/rooming-houses/${id}/submit`,
-    { method: 'POST', auth: true }
+export async function previewRoomingHouseRule(
+  id: string,
+  request: UpsertRoomingHouseRuleRequest
+): Promise<Blob> {
+  const blob = await apiClient<Blob>(
+    `/api/rooming-houses/${id}/rule/preview`,
+    {
+      method: 'POST',
+      auth: true,
+      body: request,
+      responseType: 'blob',
+    }
   );
-  return data.data;
+  return blob;
 }
 
 function buildSearchQuery(params: RoomingHouseSearchParams) {

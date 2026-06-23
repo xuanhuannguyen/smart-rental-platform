@@ -10,6 +10,10 @@ public interface IUserService
     Task<UserProfileResponse> GetUserProfileAsync(
         CancellationToken cancellationToken = default);
 
+    Task<OccupantAccountLookupResponse> LookupOccupantAccountAsync(
+        string email,
+        CancellationToken cancellationToken = default);
+
     Task<UserProfileResponse> UpdateUserProfileAsync(
         UpdateUserProfileRequest request,
         CancellationToken cancellationToken = default);

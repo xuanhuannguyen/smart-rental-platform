@@ -41,42 +41,31 @@ public sealed class GeminiStructuredOutputService : IAiStructuredOutputService
             return default;
         }
 
-        using var request = new HttpRequestMessage(
-            HttpMethod.Post,
-            $"models/{Uri.EscapeDataString(options.Model)}:generateContent");
-        request.Headers.Add("x-goog-api-key", options.ApiKey);
-        request.Content = JsonContent.Create(
-            new
+        var payload = new
+        {
+            contents = new[]
             {
-                contents = new[]
+                new
                 {
-                    new
+                    parts = new[]
                     {
-                        parts = new[]
+                        new
                         {
-                            new
-                            {
-                                text = BuildPrompt(schemaName, instructions, input)
-                            }
+                            text = BuildPrompt(schemaName, instructions, input)
                         }
                     }
-                },
-                generationConfig = new
-                {
-                    responseMimeType = "application/json",
-                    responseSchema = jsonSchema
                 }
             },
-            options: JsonOptions);
+            generationConfig = new
+            {
+                responseMimeType = "application/json",
+                responseSchema = jsonSchema
+            }
+        };
 
-        using var response = await httpClient.SendAsync(request, cancellationToken);
-        if (!response.IsSuccessStatusCode)
+        using var response = await SendWithRetryAsync(payload, cancellationToken);
+        if (response is null)
         {
-            var body = await response.Content.ReadAsStringAsync(cancellationToken);
-            logger.LogWarning(
-                "Gemini structured output request failed with {StatusCode}: {Body}",
-                (int)response.StatusCode,
-                body);
             return default;
         }
 
@@ -92,6 +81,49 @@ public sealed class GeminiStructuredOutputService : IAiStructuredOutputService
         }
 
         return JsonSerializer.Deserialize<T>(text, JsonOptions);
+    }
+
+    private async Task<HttpResponseMessage?> SendWithRetryAsync(
+        object payload,
+        CancellationToken cancellationToken)
+    {
+        const int maxAttempts = 3;
+
+        for (var attempt = 1; attempt <= maxAttempts; attempt++)
+        {
+            using var request = new HttpRequestMessage(
+                HttpMethod.Post,
+                $"models/{Uri.EscapeDataString(options.Model)}:generateContent");
+            request.Headers.Add("x-goog-api-key", options.ApiKey);
+            request.Content = JsonContent.Create(payload, options: JsonOptions);
+
+            var response = await httpClient.SendAsync(request, cancellationToken);
+            if (response.IsSuccessStatusCode)
+            {
+                return response;
+            }
+
+            var statusCode = (int)response.StatusCode;
+            var body = await response.Content.ReadAsStringAsync(cancellationToken);
+            var shouldRetry = statusCode is 429 or 500 or 502 or 503 or 504;
+            logger.LogWarning(
+                "Gemini structured output request failed with {StatusCode} on attempt {Attempt}/{MaxAttempts}. Retry={Retry}. Body: {Body}",
+                statusCode,
+                attempt,
+                maxAttempts,
+                shouldRetry && attempt < maxAttempts,
+                body);
+            response.Dispose();
+
+            if (!shouldRetry || attempt == maxAttempts)
+            {
+                return null;
+            }
+
+            await Task.Delay(TimeSpan.FromMilliseconds(350 * attempt), cancellationToken);
+        }
+
+        return null;
     }
 
     private static string BuildPrompt(string schemaName, string instructions, object input)

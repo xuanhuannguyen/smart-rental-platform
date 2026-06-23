@@ -35,6 +35,16 @@ public class RoomCommandService : IRoomCommandService
             roomingHouseId,
             cancellationToken);
 
+        var hasServicePrices = await context.RoomingHouseServicePrices
+            .AnyAsync(x => x.RoomingHouseId == roomingHouseId && x.IsActive, cancellationToken);
+
+        if (!hasServicePrices)
+        {
+            throw new BadRequestException(
+                ErrorCodes.ValidationError,
+                "Vui lòng cấu hình bảng giá dịch vụ trước khi tạo phòng.");
+        }
+
         RoomValidationRules.ValidateRoomFields(
             request.RoomNumber,
             request.Floor,

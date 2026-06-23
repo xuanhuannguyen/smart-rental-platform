@@ -319,6 +319,18 @@ public class RoomingHousesController : ControllerBase
     }
 
     [Authorize]
+    [HttpPost("{id:guid}/rule/preview")]
+    public async Task<IActionResult> PreviewRule(
+        Guid id,
+        UpsertRoomingHouseRuleRequest request,
+        CancellationToken cancellationToken)
+    {
+        var userId = GetCurrentUserId();
+        var pdfStream = await roomingHouseRuleService.PreviewRuleAsync(id, userId, request, cancellationToken);
+        return File(pdfStream, "application/pdf", $"house-rule-preview-{id:N}.pdf");
+    }
+
+    [Authorize]
     [HttpGet("{id:guid}/service-prices")]
     public async Task<ActionResult<ApiResponse<List<ServicePriceResponse>>>> GetServicePrices(
         Guid id,

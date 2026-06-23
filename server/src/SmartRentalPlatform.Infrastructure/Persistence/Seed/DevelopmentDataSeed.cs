@@ -24,6 +24,7 @@ public static class DevelopmentDataSeed
     private static readonly Guid TenantUserId = Guid.Parse("10000000-0000-0000-0000-000000000001");
     private static readonly Guid LandlordUserId = Guid.Parse("10000000-0000-0000-0000-000000000002");
     private static readonly Guid CoTenantUserId = Guid.Parse("10000000-0000-0000-0000-000000000003");
+    private static readonly Guid DummyLandlordUserId = Guid.Parse("10000000-0000-0000-0000-000000009999");
     private static readonly Guid TenantApprovedKycId = Guid.Parse("50000000-0000-0000-0000-000000000001");
     private static readonly Guid ApprovedHouseId = Guid.Parse("20000000-0000-0000-0000-000000000001");
     private static readonly Guid DraftHouseId = Guid.Parse("20000000-0000-0000-0000-000000000002");
@@ -248,6 +249,18 @@ public static class DevelopmentDataSeed
             });
         }
 
+        if (!await context.Users.AnyAsync(x => x.Id == DummyLandlordUserId, cancellationToken))
+        {
+            context.Users.Add(CreateUser(DummyLandlordUserId, "landlord.mock@example.com", "Chủ trọ Mock", passwordService));
+            context.UserProfiles.Add(CreateProfile(DummyLandlordUserId, "Chủ trọ Mock"));
+            context.UserRoles.Add(new UserRole
+            {
+                UserId = DummyLandlordUserId,
+                RoleId = RoleSeed.LandlordRoleId,
+                CreatedAt = SeededAt
+            });
+        }
+
         // await SeedDemoUserAsync(
         //     context,
         //     passwordService,
@@ -441,8 +454,8 @@ public static class DevelopmentDataSeed
                 ProvinceCode = location.ProvinceCode,
                 WardCode = location.WardCode,
                 AddressDisplay = $"123 Nguyễn Văn Cừ, {location.WardName}, {location.ProvinceName}",
-                Latitude = 10.762622m,
-                Longitude = 106.660172m,
+                Latitude = 15.975400m,
+                Longitude = 108.263800m,
                 ApprovalStatus = RoomingHouseApprovalStatus.Approved,
                 VisibilityStatus = RoomingHouseVisibilityStatus.Visible,
                 ReviewedAt = SeededAt,
@@ -505,7 +518,7 @@ public static class DevelopmentDataSeed
             context.RoomingHouses.Add(new RoomingHouse
             {
                 Id = DraftHouseId,
-                LandlordUserId = LandlordUserId,
+                LandlordUserId = DummyLandlordUserId,
                 Name = "Nhà trọ Minh Anh",
                 Description = "Bản nháp dùng để test chỉnh sửa khu trọ.",
                 AddressLine = "45 Lê Lợi",
@@ -527,8 +540,8 @@ public static class DevelopmentDataSeed
             "Nhà trọ Sunrise",
             "Nhà trọ mini mới, gần khu công nghệ và siêu thị, phù hợp sinh viên và nhân viên văn phòng.",
             "88 Duong So 7",
-            10.841021m,
-            106.809847m,
+            15.980000m,
+            108.265000m,
             RoomingHouseApprovalStatus.Approved,
             RoomingHouseVisibilityStatus.Visible,
             "demo/houses/sunrise/cover.jpg",
@@ -547,8 +560,8 @@ public static class DevelopmentDataSeed
             "Nhà trọ Green View",
             "Khu trọ yên tĩnh, có ban công, máy giặt chung và khu để xe riêng.",
             "12 Pham Van Dong",
-            10.821903m,
-            106.682179m,
+            15.972000m,
+            108.260000m,
             RoomingHouseApprovalStatus.Approved,
             RoomingHouseVisibilityStatus.Visible,
             "demo/houses/green-view/cover.jpg",
@@ -563,12 +576,12 @@ public static class DevelopmentDataSeed
             context,
             location,
             PendingHouseId,
-            LandlordUserId,
+            DummyLandlordUserId,
             "Nhà trọ Garden Pending",
             "Hồ sơ nhà trọ đang chờ admin duyệt, dùng để test luồng kiểm duyệt.",
             "36 Nguyen Huu Tho",
-            10.732681m,
-            106.702184m,
+            15.982000m,
+            108.268000m,
             RoomingHouseApprovalStatus.Pending,
             RoomingHouseVisibilityStatus.Hidden,
             "demo/houses/garden-pending/cover.jpg",
@@ -581,12 +594,12 @@ public static class DevelopmentDataSeed
             context,
             location,
             RejectedHouseId,
-            LandlordUserId,
+            DummyLandlordUserId,
             "Nhà trọ Old Town",
             "Hồ sơ bị từ chối để test màn hình lý do và gửi lại hồ sơ.",
             "7 Tran Hung Dao",
-            10.776901m,
-            106.700914m,
+            15.970000m,
+            108.258000m,
             RoomingHouseApprovalStatus.Rejected,
             RoomingHouseVisibilityStatus.Hidden,
             "demo/houses/old-town/cover.jpg",
@@ -901,8 +914,7 @@ public static class DevelopmentDataSeed
     {
         var ward = await context.AdministrativeWards
             .AsNoTracking()
-            .Where(x => x.IsActive)
-            .OrderBy(x => x.Code)
+            .Where(x => x.IsActive && x.Code == "20285")
             .Select(x => new
             {
                 x.Code,

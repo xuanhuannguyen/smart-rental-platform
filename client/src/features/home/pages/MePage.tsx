@@ -8,12 +8,17 @@ import { Toast } from '../../../shared/components/ui/Toast';
 import { toAssetUrl } from '../../../shared/api/assets';
 import { getProvinces, getWardsByProvince } from '../../administrative/api';
 import type { Province, Ward } from '../../administrative/types';
-import { getMyRoomingHouseOnboarding, getPublicRoomingHouseListing, searchLocationAddress } from '../../rooming-houses/api';
-import type { RoomingHouseListingItem } from '../../rooming-houses/types';
+import {
+  getGuestRoomingHouseRecommendations,
+  getMyRoomingHouseOnboarding,
+  getPublicRoomingHouseListing,
+  searchLocationAddress,
+} from '../../rooming-houses/api';
+import type { GuestRoomingHouseRecommendationRequest, RoomingHouseListingItem, RoomingHouseSearchItem } from '../../rooming-houses/types';
 import SearchSuggestionBox from '../../rooming-houses/components/SearchSuggestionBox';
 import { LocationFilterPanel } from '../../rooming-houses/components/LocationFilterPanel';
 import RentalAiChatbot from '../../rooming-houses/components/RentalAiChatbot';
-import { saveRoomingHouseView, saveSearchBehavior } from '../../rooming-houses/rentalBehaviorStorage';
+import { saveRoomingHouseView, saveSearchBehavior, toGuestRecommendationRequest } from '../../rooming-houses/rentalBehaviorStorage';
 import { saveRecentSearch } from '../../rooming-houses/searchRecentStorage';
 import { NotificationBell } from '../../notifications/components/NotificationBell';
 import './MePage.css';
@@ -46,6 +51,7 @@ type HomeListingCategory = {
 
 /** sessionStorage cache key for home page listing. */
 const LISTING_CACHE_KEY = 'srp_home_listing_cache';
+const RECOMMENDATION_CACHE_KEY = 'srp_home_ai_recommendation_cache';
 /** Cache TTL: 5 minutes. */
 const LISTING_CACHE_TTL = 5 * 60 * 1000;
 
@@ -77,6 +83,7 @@ export function MePage() {
 
   const [error, setError] = useState('');
   const [homeListings, setHomeListings] = useState<HomeListingItem[]>([]);
+  const [recommendedListings, setRecommendedListings] = useState<HomeListingItem[]>([]);
   const [searchQuery, setSearchQuery] = useState('');
   const [loadingHouses, setLoadingHouses] = useState(false);
   const [isCheckingLandlord, setIsCheckingLandlord] = useState(false);
@@ -139,6 +146,43 @@ export function MePage() {
     }
 
     void loadHomeListings();
+  }, []);
+
+  useEffect(() => {
+    async function loadAiRecommendations() {
+      try {
+        const cached = sessionStorage.getItem(RECOMMENDATION_CACHE_KEY);
+        if (cached) {
+          const entry: ListingCacheEntry = JSON.parse(cached);
+          if (Date.now() - entry.timestamp < LISTING_CACHE_TTL) {
+            setRecommendedListings(entry.items);
+            return;
+          }
+        }
+      } catch {
+        // Corrupted cache — ignore and re-fetch
+      }
+
+      try {
+        const request = toGuestRecommendationRequest(8) ?? createDefaultRecommendationRequest();
+        const recommendation = await getGuestRoomingHouseRecommendations(request);
+        const mapped = recommendation.items.map((item) =>
+          mapSearchItemToHomeItem(item, recommendation.reasons[item.id])
+        );
+        setRecommendedListings(mapped);
+
+        try {
+          const entry: ListingCacheEntry = { items: mapped, timestamp: Date.now() };
+          sessionStorage.setItem(RECOMMENDATION_CACHE_KEY, JSON.stringify(entry));
+        } catch {
+          // sessionStorage full — silently skip cache
+        }
+      } catch {
+        setRecommendedListings([]);
+      }
+    }
+
+    void loadAiRecommendations();
   }, []);
 
   useEffect(() => {
@@ -205,8 +249,11 @@ export function MePage() {
     (selectedWardName && selectedProvinceName ? `${selectedWardName}, ${selectedProvinceName}` : selectedProvinceName) ||
     'Khu vực / Xung quanh';
   const listingCategories = useMemo(
-    () => buildListingCategories(homeListings, false),
-    [homeListings]
+    () => [
+      ...buildListingCategories(recommendedListings, true),
+      ...buildListingCategories(homeListings, false),
+    ],
+    [homeListings, recommendedListings]
   );
 
   async function handleLandlordRegister() {
@@ -621,6 +668,8 @@ function HomeListingCard({ house, onOpen }: { house: HomeListingItem; onOpen: ()
             </div>
           </>
         )}
+
+
       </div>
     </button>
   );
@@ -695,6 +744,34 @@ function mapListingItemToHomeItem(item: RoomingHouseListingItem): HomeListingIte
     maxAreaM2: item.maxAreaM2,
     amenities: item.amenities.map((a) => a.name),
     createdAt: item.createdAt,
+  };
+}
+
+function mapSearchItemToHomeItem(item: RoomingHouseSearchItem, reason?: string): HomeListingItem {
+  return {
+    id: item.id,
+    name: item.name,
+    addressDisplay: item.addressDisplay,
+    coverImageUrl: item.coverImageUrl,
+    availableRooms: item.availableRooms,
+    minMonthlyRent: item.minMonthlyRent,
+    maxMonthlyRent: item.maxMonthlyRent,
+    minAreaM2: item.minAreaM2,
+    maxAreaM2: item.maxAreaM2,
+    amenities: item.amenities.map((a) => a.name),
+    createdAt: item.createdAt,
+    reason,
+  };
+}
+
+function createDefaultRecommendationRequest(): GuestRoomingHouseRecommendationRequest {
+  return {
+    recentQueries: [],
+    recentRoomingHouseIds: [],
+    clickedRoomingHouseIds: [],
+    preferredAmenityIds: [],
+    preferredRoomAmenityIds: [],
+    pageSize: 8,
   };
 }
 

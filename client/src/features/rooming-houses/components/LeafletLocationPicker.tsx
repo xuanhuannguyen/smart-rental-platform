@@ -148,7 +148,8 @@ export default function LeafletLocationPicker({
     setError('');
     try {
       const result = await searchLocationAddress(fullAddress);
-      onAddressChange(result.displayAddress || addressLine);
+      // Không ghi đè addressLine bằng displayAddress từ VietMap vì nó đã chứa ward+province
+      // -> backend BuildAddressDisplayAsync sẽ append ward+province vào addressLine, gây trùng
       onLocationChange(result.latitude, result.longitude);
       setIsEditingMarker(false);
     } catch (searchError) {
@@ -163,56 +164,108 @@ export default function LeafletLocationPicker({
       <label className="leaflet-location-picker__field">
         <span>Tìm địa chỉ</span>
         <div className="leaflet-location-picker__search-row">
-          <input
-            className="leaflet-location-picker__input"
-            value={addressLine}
-            onChange={(event) => onAddressChange(event.target.value)}
-            placeholder="Nhập địa chỉ, sau đó bấm Tìm vị trí"
-          />
+          <div className="field-input-wrapper search-input-wrapper">
+            <span className="field-icon">
+              <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
+                <circle cx="11" cy="11" r="8" />
+                <line x1="21" y1="21" x2="16.65" y2="16.65" />
+              </svg>
+            </span>
+            <input
+              className="leaflet-location-picker__input has-icon"
+              value={fullAddress}
+              readOnly
+              placeholder="Nhập đầy đủ Tỉnh/thành phố, Phường/xã, Địa chỉ phía trên..."
+            />
+          </div>
           <button
-            className="leaflet-location-picker__search-button"
+            className="leaflet-location-picker__search-button primary-btn-with-icon"
             disabled={searching}
             type="button"
             onClick={searchAddressOnMap}
           >
-            {searching ? 'Đang tìm' : 'Tìm vị trí'}
+            <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" className="btn-icon">
+              <circle cx="12" cy="12" r="10" />
+              <circle cx="12" cy="12" r="3" />
+              <line x1="12" y1="1" x2="12" y2="3" />
+              <line x1="12" y1="21" x2="12" y2="23" />
+              <line x1="1" y1="12" x2="3" y2="12" />
+              <line x1="21" y1="12" x2="23" y2="12" />
+            </svg>
+            <span>{searching ? 'Đang tìm' : 'Tìm vị trí'}</span>
           </button>
         </div>
       </label>
 
       <label className="leaflet-location-picker__field">
         <span>Link Google Maps cho người thuê</span>
-        <input
-          className="leaflet-location-picker__input"
-          value={googleMapUrl ?? ''}
-          onChange={(event) => onGoogleMapUrlChange(event.target.value)}
-          placeholder="Dán link Google Maps để người thuê mở chỉ đường"
-        />
+        <div className="field-input-wrapper">
+          <span className="field-icon">
+            <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
+              <path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71" />
+              <path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71" />
+            </svg>
+          </span>
+          <input
+            className="leaflet-location-picker__input has-icon"
+            value={googleMapUrl ?? ''}
+            onChange={(event) => onGoogleMapUrlChange(event.target.value)}
+            placeholder="Dán link Google Maps để người thuê mở chỉ đường"
+          />
+        </div>
       </label>
 
-      <div ref={mapContainerRef} className="leaflet-location-picker__map" />
+      <div className="leaflet-map-card">
+        <div className="leaflet-map-card-header">
+          <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="#246bfe" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" className="map-pin-header-icon">
+            <path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z" />
+            <circle cx="12" cy="10" r="3" />
+          </svg>
+          <h3>Vị trí trên bản đồ</h3>
+        </div>
 
-      <div className="leaflet-location-picker__actions">
-        <button
-          className="leaflet-location-picker__secondary-button"
-          disabled={!hasCoordinates}
-          type="button"
-          onClick={() => setIsEditingMarker((current) => !current)}
-        >
-          {isEditingMarker ? 'Khóa vị trí' : 'Chỉnh vị trí'}
-        </button>
+        <div ref={mapContainerRef} className="leaflet-location-picker__map" />
+
+        <div className="leaflet-location-picker__actions">
+          <button
+            className="leaflet-location-picker__secondary-button outline-btn-with-icon"
+            disabled={!hasCoordinates}
+            type="button"
+            onClick={() => setIsEditingMarker((current) => !current)}
+          >
+            <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" className="btn-icon">
+              <circle cx="12" cy="12" r="10" />
+              <circle cx="12" cy="12" r="3" />
+              <line x1="12" y1="1" x2="12" y2="3" />
+              <line x1="12" y1="21" x2="12" y2="23" />
+              <line x1="1" y1="12" x2="3" y2="12" />
+              <line x1="21" y1="12" x2="23" y2="12" />
+            </svg>
+            <span>{isEditingMarker ? 'Khóa vị trí' : 'Chỉnh vị trí'}</span>
+          </button>
+        </div>
+
+        {hasCoordinates ? (
+          <p className="leaflet-location-picker__coords">
+            <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" strokeWidth="2.5" style={{ marginRight: '6px', color: '#64748b' }}>
+              <circle cx="12" cy="12" r="10" />
+              <path d="M12 16v-4" />
+              <path d="M12 8h.01" />
+            </svg>
+            Vĩ độ: {latitude.toFixed(7)} - Kinh độ: {longitude.toFixed(7)}
+          </p>
+        ) : (
+          <p className="leaflet-location-picker__hint">
+            <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" strokeWidth="2.5" style={{ marginRight: '6px', color: '#64748b' }}>
+              <circle cx="12" cy="12" r="10" />
+              <path d="M12 16v-4" />
+              <path d="M12 8h.01" />
+            </svg>
+            Bấm Tìm vị trí để lấy tọa độ. Nếu marker lệch, bấm Chỉnh vị trí rồi kéo marker hoặc click lên bản đồ.
+          </p>
+        )}
+        {error && <p className="leaflet-location-picker__error">{error}</p>}
       </div>
-
-      {hasCoordinates ? (
-        <p className="leaflet-location-picker__coords">
-          Vĩ độ: {latitude.toFixed(7)} - Kinh độ: {longitude.toFixed(7)}
-        </p>
-      ) : (
-        <p className="leaflet-location-picker__hint">
-          Bấm Tìm vị trí để lấy tọa độ. Nếu marker lệch, bấm Chỉnh vị trí rồi kéo marker hoặc click lên bản đồ.
-        </p>
-      )}
-      {error && <p className="leaflet-location-picker__error">{error}</p>}
     </section>
   );
 }

@@ -19,7 +19,7 @@ import { saveRecentSearch } from './searchRecentStorage';
 import './SearchRoomingHousesPage.css';
 
 const DEFAULT_PAGE_SIZE = 12;
-const PRICE_RANGE_MAX = 10_000_000;
+const PRICE_RANGE_MAX = 30_000_000;
 const PRICE_RANGE_STEP = 100_000;
 const SORT_OPTIONS = new Set(['relevance', 'newest', 'priceAsc', 'priceDesc', 'areaAsc', 'areaDesc', 'distanceAsc']);
 type LocationPanel = 'area' | 'nearby' | null;
@@ -907,7 +907,7 @@ export default function SearchRoomingHousesPage() {
                         aria-label="Kéo giá tối đa"
                       />
                     </div>
-                    <span>10 triệu</span>
+                    <span>30 triệu</span>
                   </div>
 
                   <div className="price-input-row">

@@ -94,4 +94,19 @@ public class NotificationService : INotificationService
 
         await _context.SaveChangesAsync(cancellationToken);
     }
+
+    public async Task DeleteAsync(
+        Guid userId,
+        Guid notificationId,
+        CancellationToken cancellationToken = default)
+    {
+        var notification = await _context.Notifications
+            .FirstOrDefaultAsync(x => x.Id == notificationId && x.UserId == userId, cancellationToken);
+
+        if (notification == null)
+            throw new NotFoundException("NOTIFICATION_NOT_FOUND", "Không tìm thấy thông báo.");
+
+        _context.Notifications.Remove(notification);
+        await _context.SaveChangesAsync(cancellationToken);
+    }
 }

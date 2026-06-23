@@ -71,6 +71,22 @@ public class NotificationsController : ControllerBase
     }
 
     [Authorize]
+    [HttpDelete("{id:guid}")]
+    public async Task<ActionResult<ApiResponse<object>>> Delete(
+        Guid id,
+        CancellationToken cancellationToken = default)
+    {
+        var userId = GetCurrentUserId();
+        await _notificationService.DeleteAsync(userId, id, cancellationToken);
+
+        return Ok(new ApiResponse<object>
+        {
+            Success = true,
+            Message = "Đã xóa thông báo.",
+        });
+    }
+
+    [Authorize]
     [HttpPatch("read-all")]
     public async Task<ActionResult<ApiResponse<object>>> MarkAllAsRead(
         CancellationToken cancellationToken = default)

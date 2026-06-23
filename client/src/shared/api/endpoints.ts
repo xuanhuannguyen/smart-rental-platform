@@ -16,6 +16,7 @@ export const ENDPOINTS = {
   USERS: {
     ME: '/api/users/me',
     PROFILE: '/api/users/me/profile',
+    OCCUPANT_LOOKUP: '/api/users/occupants/lookup',
     LANDLORD_ELIGIBILITY: '/api/users/me/landlord-eligibility',
     SESSIONS: '/api/users/me/sessions',
     REVOKE_SESSION: (id: string) => `/api/users/me/sessions/${id}`
@@ -148,5 +149,6 @@ export const ENDPOINTS = {
     UNREAD_COUNT: '/api/notifications/unread-count',
     MARK_READ: (id: string) => `/api/notifications/${id}/read`,
     MARK_ALL_READ: '/api/notifications/read-all',
+    DELETE: (id: string) => `/api/notifications/${id}`,
   }
 } as const;

@@ -537,6 +537,7 @@ public class RoomingHouseQueryService : IRoomingHouseQueryService
         CancellationToken cancellationToken = default)
     {
         var pageSize = Math.Min(24, Math.Max(1, request.PageSize));
+        var candidatePageSize = pageSize;
         var candidateCriteria = new ParsedRoomingHouseSearchCriteria
         {
             ProvinceCode = NormalizeEmpty(request.ProvinceCode),
@@ -555,7 +556,7 @@ public class RoomingHouseQueryService : IRoomingHouseQueryService
                 .ToList(),
             Sort = "relevance",
             Page = 1,
-            PageSize = 48
+            PageSize = candidatePageSize
         };
 
         ValidateSearchRequest(candidateCriteria);
@@ -614,6 +615,9 @@ public class RoomingHouseQueryService : IRoomingHouseQueryService
             MinAreaM2 = item.MinAreaM2,
             MaxAreaM2 = item.MaxAreaM2,
             AvailableRooms = item.AvailableRooms,
+            TotalRooms = item.TotalRooms,
+            HasCoverImage = !string.IsNullOrWhiteSpace(item.CoverImageUrl),
+            CreatedAt = item.CreatedAt,
             Amenities = item.Amenities.Select(x => x.Name).ToList()
         };
 
@@ -621,9 +625,41 @@ public class RoomingHouseQueryService : IRoomingHouseQueryService
         IEnumerable<RoomingHouseSearchItemResponse> items)
         => items.ToDictionary(
             x => x.Id,
-            x => x.MinMonthlyRent is null
-                ? "Khu trọ còn phòng và phù hợp để bạn tham khảo thêm."
-                : "Phù hợp với khu vực, giá thuê hoặc tiện ích bạn quan tâm gần đây.");
+            x =>
+            {
+                var parts = new List<string>();
+
+                if (x.AvailableRooms > 0)
+                {
+                    var ratio = x.TotalRooms > 0 ? (double)x.AvailableRooms / x.TotalRooms : 0;
+                    parts.Add(ratio > 0.5
+                        ? $"Còn {x.AvailableRooms}/{x.TotalRooms} phòng trống, nhiều lựa chọn."
+                        : $"Còn {x.AvailableRooms} phòng trống.");
+                }
+
+                if (x.MinMonthlyRent is not null)
+                {
+                    var rentDisplay = x.MaxMonthlyRent is not null && x.MinMonthlyRent != x.MaxMonthlyRent
+                        ? $"{x.MinMonthlyRent:N0} - {x.MaxMonthlyRent:N0} đ"
+                        : $"{x.MinMonthlyRent:N0} đ";
+                    parts.Add($"Giá thuê từ {rentDisplay}/tháng.");
+                }
+
+                if (x.MinAreaM2 is not null)
+                {
+                    parts.Add($"Diện tích từ {x.MinAreaM2:F0}m².");
+                }
+
+                if (x.Amenities.Count > 0)
+                {
+                    var topAmenities = x.Amenities.Take(3).Select(a => a.Name);
+                    parts.Add($"Tiện ích: {string.Join(", ", topAmenities)}.");
+                }
+
+                return parts.Count > 0
+                    ? string.Join(" ", parts)
+                    : "Khu trọ còn phòng và phù hợp để bạn tham khảo thêm.";
+            });
 
     private void LogSearchParse(
         RoomingHouseSearchRequest request,
@@ -723,7 +759,72 @@ public class RoomingHouseQueryService : IRoomingHouseQueryService
         criteria.RadiusKm = GeoSearchHelper.NormalizeRadius(
             criteria.RadiusKm,
             hasPlaceText: !string.IsNullOrWhiteSpace(criteria.PlaceText));
+
+        ValidatePriceBounds(criteria.MinPrice, criteria.MaxPrice);
+        ValidateAreaBounds(criteria.MinArea, criteria.MaxArea);
         NormalizeSearchRanges(criteria);
+    }
+
+    private static void ValidatePriceBounds(decimal? minPrice, decimal? maxPrice)
+    {
+        if (minPrice is < 0m)
+        {
+            throw new BadRequestException(
+                ErrorCodes.ValidationError,
+                "Giá thuê tối thiểu không được âm.",
+                new { field = nameof(minPrice) });
+        }
+
+        if (maxPrice is < 0m)
+        {
+            throw new BadRequestException(
+                ErrorCodes.ValidationError,
+                "Giá thuê tối đa không được âm.",
+                new { field = nameof(maxPrice) });
+        }
+
+        if (minPrice is not null && minPrice < 500_000m)
+        {
+            throw new BadRequestException(
+                ErrorCodes.ValidationError,
+                "Giá thuê tối thiểu phải từ 500.000₫ trở lên.",
+                new { field = nameof(minPrice), value = minPrice });
+        }
+
+        if (maxPrice is not null && maxPrice > 30_000_000m)
+        {
+            throw new BadRequestException(
+                ErrorCodes.ValidationError,
+                "Giá thuê tối đa không được vượt quá 30.000.000₫.",
+                new { field = nameof(maxPrice), value = maxPrice });
+        }
+    }
+
+    private static void ValidateAreaBounds(decimal? minArea, decimal? maxArea)
+    {
+        if (minArea is < 0m)
+        {
+            throw new BadRequestException(
+                ErrorCodes.ValidationError,
+                "Diện tích tối thiểu không được âm.",
+                new { field = nameof(minArea) });
+        }
+
+        if (maxArea is < 0m)
+        {
+            throw new BadRequestException(
+                ErrorCodes.ValidationError,
+                "Diện tích tối đa không được âm.",
+                new { field = nameof(maxArea) });
+        }
+
+        if (minArea is not null && maxArea is not null && minArea > maxArea)
+        {
+            throw new BadRequestException(
+                ErrorCodes.ValidationError,
+                "Diện tích tối thiểu không được lớn hơn diện tích tối đa.",
+                new { field = nameof(minArea), minArea, maxArea });
+        }
     }
 
     private async Task ApplyAdministrativeLocationCriteriaAsync(

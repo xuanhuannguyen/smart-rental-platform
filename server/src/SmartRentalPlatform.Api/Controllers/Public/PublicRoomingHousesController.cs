@@ -1,4 +1,5 @@
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.AspNetCore.RateLimiting;
 using SmartRentalPlatform.Application.RoomingHouses;
 using SmartRentalPlatform.Contracts.Common;
 using SmartRentalPlatform.Contracts.RoomingHouses;
@@ -81,6 +82,7 @@ public class PublicRoomingHousesController : ControllerBase
     }
 
     [HttpPost("ai-chat")]
+    [EnableRateLimiting("AiChat")]
     public async Task<ActionResult<ApiResponse<RoomingHouseAiChatResponse>>> Chat(
         [FromBody] RoomingHouseAiChatRequest request,
         CancellationToken cancellationToken)
