@@ -1,0 +1,244 @@
+/* Landlord Dashboard Layout Styles - Aligned with Account Sidebar styling */
+
+.landlord-dashboard {
+  display: grid;
+  grid-template-columns: 280px minmax(0, 1fr);
+  min-height: 100vh;
+  background: #f4f7fb;
+}
+
+.dashboard-sidebar {
+  background: #ffffff;
+  color: #1e293b;
+  padding: 28px 24px;
+  border-right: 1px solid #eef2f6;
+  display: flex;
+  flex-direction: column;
+  position: sticky;
+  top: 0;
+  height: 100vh;
+  box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.01), 0 2px 4px -1px rgba(0, 0, 0, 0.01);
+}
+
+/* Header Branding Section */
+.landlord-sidebar-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 24px;
+}
+
+.sidebar-brand-wrapper {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.sidebar-brand-icon {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 36px;
+  height: 36px;
+  border-radius: 50%;
+  background: #eff6ff;
+  color: #246bfe;
+  flex-shrink: 0;
+}
+
+.sidebar-brand-text {
+  display: flex;
+  flex-direction: column;
+}
+
+.sidebar-brand-text h1 {
+  margin: 0;
+  font-size: 18px;
+  font-weight: 700;
+  color: #0f172a;
+  letter-spacing: -0.01em;
+  line-height: 1.2;
+}
+
+.sidebar-brand-text p {
+  margin: 2px 0 0;
+  font-size: 11px;
+  color: #64748b;
+  font-weight: 400;
+  white-space: nowrap;
+}
+
+/* Navigation Items List */
+.sidebar-items-list {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  flex-grow: 1;
+}
+
+.sidebar-item {
+  width: 100%;
+  min-height: 42px;
+  margin: 0 0 4px;
+  padding: 12px 14px;
+  border-radius: 10px;
+  background: transparent;
+  color: #475569;
+  text-align: left;
+  font: inherit;
+  font-size: 14px;
+  font-weight: 500;
+  cursor: pointer;
+  border: none;
+  transition: all 0.2s ease-in-out;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  text-decoration: none;
+}
+
+.sidebar-item-icon {
+  width: 18px;
+  height: 18px;
+  color: #64748b;
+  flex-shrink: 0;
+  transition: color 0.2s ease;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.sidebar-item-text {
+  flex-grow: 1;
+  line-height: 1.4;
+}
+
+.sidebar-chevron {
+  width: 14px;
+  height: 14px;
+  color: #94a3b8;
+  flex-shrink: 0;
+  transition: transform 0.2s ease, opacity 0.2s ease;
+}
+
+/* Interactive States */
+.sidebar-item:hover:not(:disabled):not(.active) {
+  background: #f8fafc;
+  color: #0f172a;
+}
+
+.sidebar-item:hover:not(:disabled):not(.active) .sidebar-item-icon {
+  color: #475569;
+}
+
+.sidebar-item:hover:not(:disabled):not(.active) .sidebar-chevron {
+  color: #475569;
+  transform: translateX(2px);
+}
+
+/* Active Menu Item */
+.sidebar-item.active {
+  background: #eff6ff;
+  color: #246bfe;
+  font-weight: 600;
+  border-left: 3px solid #246bfe;
+  padding-left: 11px;
+}
+
+.sidebar-item.active .sidebar-item-icon {
+  color: #246bfe;
+}
+
+/* Bottom Promo Card (Aligned with profile card style) */
+.sidebar-promo-card {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 14px 16px;
+  background: #f4f6fb;
+  border-radius: 12px;
+  margin-top: auto;
+  margin-bottom: 20px;
+  transition: all 0.2s ease-in-out;
+  border: 1px solid transparent;
+}
+
+.sidebar-promo-card:hover {
+  background: #ebf0f7;
+  border-color: #dbeafe;
+}
+
+.promo-icon-wrapper {
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.promo-content-wrapper {
+  display: flex;
+  flex-direction: column;
+}
+
+.promo-content-wrapper h4 {
+  margin: 0;
+  font-size: 13px;
+  font-weight: 600;
+  color: #0f172a;
+}
+
+.promo-content-wrapper p {
+  margin: 4px 0 0;
+  font-size: 11px;
+  color: #64748b;
+  line-height: 1.4;
+}
+
+/* Exit/Back Button - Blue Background Styling */
+.sidebar-back-btn {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  padding: 12px 16px;
+  background: #eff3fa;
+  color: #246bfe;
+  border-radius: 12px;
+  font-size: 14px;
+  font-weight: 600;
+  border: none;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  text-decoration: none;
+}
+
+.sidebar-back-btn svg {
+  color: #246bfe;
+  transition: transform 0.2s ease;
+}
+
+.sidebar-back-btn:hover {
+  background: #e0ebf7;
+  color: #1d4ed8;
+}
+
+.sidebar-back-btn:hover svg {
+  color: #1d4ed8;
+  transform: translateX(-3px);
+}
+
+/* Override notification badge red dot */
+.landlord-sidebar-header .notification-bell-wrapper .notification-badge {
+  width: 8px !important;
+  height: 8px !important;
+  min-width: 0 !important;
+  border-radius: 50% !important;
+  background: #ef4444 !important; /* red dot matching the mockup image */
+  color: transparent !important;
+  font-size: 0 !important;
+  padding: 0 !important;
+  top: 4px !important;
+  right: 4px !important;
+  box-shadow: 0 0 0 2px #ffffff !important;
+}

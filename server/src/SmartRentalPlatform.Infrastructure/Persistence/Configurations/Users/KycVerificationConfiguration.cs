@@ -24,6 +24,7 @@ public class KycVerificationConfiguration : IEntityTypeConfiguration<KycVerifica
         builder.Property(x => x.OcrFullName).HasColumnName("ocr_full_name").HasMaxLength(150);
         builder.Property(x => x.OcrCitizenIdMasked).HasColumnName("ocr_citizen_id_masked").HasMaxLength(50);
         builder.Property(x => x.CitizenIdHash).HasColumnName("citizen_id_hash").HasColumnType("text").IsRequired();
+        builder.Property(x => x.DocumentNumberEncrypted).HasColumnName("document_number_encrypted").HasColumnType("text");
         builder.Property(x => x.OcrDateOfBirth).HasColumnName("ocr_date_of_birth");
         builder.Property(x => x.OcrGender).HasColumnName("ocr_gender").HasMaxLength(30);
         builder.Property(x => x.OcrAddress).HasColumnName("ocr_address").HasColumnType("text");

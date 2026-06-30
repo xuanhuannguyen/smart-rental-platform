@@ -14,8 +14,15 @@ public interface IRoomingHouseQueryService
     Task<List<RoomingHouseDetailResponse>> GetPublicAvailableAsync(
         CancellationToken cancellationToken = default);
 
+    Task<List<RoomingHouseListingResponse>> GetPublicListingAsync(
+        CancellationToken cancellationToken = default);
+
     Task<PagedResult<RoomingHouseSearchItemResponse>> SearchPublicAsync(
         RoomingHouseSearchRequest request,
+        CancellationToken cancellationToken = default);
+
+    Task<RoomingHouseRecommendationResponse> GetGuestRecommendationsAsync(
+        GuestRoomingHouseRecommendationRequest request,
         CancellationToken cancellationToken = default);
 
     Task<RoomingHouseDetailResponse?> GetPublicByIdAsync(

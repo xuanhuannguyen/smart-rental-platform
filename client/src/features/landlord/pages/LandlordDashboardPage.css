@@ -1,86 +1,4 @@
-.landlord-dashboard {
-  display: grid;
-  grid-template-columns: 248px minmax(0, 1fr);
-  min-height: 100vh;
-}
-
-.dashboard-sidebar {
-  background: #ffffff;
-  color: #1e293b;
-  padding: 24px 16px;
-  border-right: 1px solid #e2e8f0;
-  display: flex;
-  flex-direction: column;
-  position: sticky;
-  top: 0;
-  height: 100vh;
-}
-
-.dashboard-sidebar h1 {
-  margin: 0 0 24px 4px;
-  font-size: 22px;
-  font-weight: 700;
-  color: #0f172a;
-  letter-spacing: -0.02em;
-}
-
-.sidebar-item {
-  width: 100%;
-  min-height: 42px;
-  margin: 0 0 8px;
-  padding: 10px 14px;
-  border-radius: 6px;
-  background: transparent;
-  color: #475569;
-  text-align: left;
-  font: inherit;
-  font-size: 14px;
-  font-weight: 500;
-  cursor: pointer;
-  border: none;
-  transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
-  display: flex;
-  align-items: center;
-}
-
-.sidebar-item:hover:not(:disabled) {
-  background: #f1f5f9;
-  color: #0f172a;
-  transform: translateX(4px);
-}
-
-.sidebar-item.active {
-  background: #eff6ff;
-  color: #246bfe;
-  font-weight: 600;
-  border-left: 3px solid #246bfe;
-  padding-left: 11px;
-}
-
-.sidebar-item.active:hover {
-  background: #e0f2fe;
-  transform: none;
-}
-
-.sidebar-item:disabled {
-  color: #94a3b8;
-  cursor: not-allowed;
-  opacity: 0.5;
-}
-
-.sidebar-back-btn {
-  margin-top: auto !important;
-  border-top: 1px solid #f1f5f9;
-  padding-top: 16px;
-  border-radius: 0;
-  color: #64748b;
-}
-
-.sidebar-back-btn:hover {
-  color: #0f172a;
-  background: transparent !important;
-  transform: translateX(-4px) !important;
-}
+/* LandlordDashboardPage.css - Page specific styles (sidebar styles moved to LandlordLayout.css) */
 
 .dashboard-main {
   padding: 24px;
@@ -279,7 +197,7 @@
   width: 100%;
   padding: 0;
   border: 1px solid #dbe3ef;
-  border-radius: 12px;
+  border-radius: 16px;
   background: #ffffff;
   color: inherit;
   text-align: left;
@@ -298,7 +216,7 @@
 .landlord-dashboard-page .card-media-wrapper {
   position: relative;
   width: 100%;
-  height: 120px;
+  height: 180px;
   background: #f1f5f9;
   overflow: hidden;
 }
@@ -316,27 +234,68 @@
 
 .landlord-dashboard-page .card-status-overlay {
   position: absolute;
-  top: 8px;
-  left: 8px;
+  top: 10px;
+  left: 10px;
   display: flex;
   flex-direction: column;
-  gap: 4px;
+  gap: 6px;
 }
 
 .landlord-dashboard-page .card-status-overlay .status-pill {
   font-size: 10px;
-  padding: 2px 8px;
-  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.08);
+  font-weight: 700;
+  padding: 4px 10px;
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.06);
   border-radius: 999px;
   border: none;
   min-height: auto;
 }
 
+.status-pill--icon {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.dot-indicator {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background-color: currentColor;
+  display: inline-block;
+}
+
+.landlord-dashboard-page .card-menu-trigger-overlay {
+  position: absolute;
+  top: 10px;
+  right: 10px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  color: #64748b;
+  background-color: #ffffff;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
+  border: none;
+  padding: 0;
+  cursor: pointer;
+  transition: background-color 0.2s, color 0.2s, transform 0.2s;
+  z-index: 10;
+}
+
+.landlord-dashboard-page .card-menu-trigger-overlay:hover {
+  background-color: #f1f5f9;
+  color: #0f172a;
+  transform: scale(1.05);
+}
+
 .landlord-dashboard-page .card-body-content {
-  padding: 12px;
+  padding: 24px;
   display: flex;
   flex-direction: column;
-  gap: 8px;
+  gap: 14px;
   flex: 1;
 }
 
@@ -344,15 +303,14 @@
   display: flex;
   justify-content: space-between;
   align-items: center;
-  gap: 8px;
 }
 
 .landlord-dashboard-page .card-title-row h3 {
   margin: 0;
-  font-size: 14.5px;
+  font-size: 22px;
   font-weight: 700;
-  color: #0f172a;
-  line-height: 1.4;
+  color: #0c1831;
+  line-height: 1.2;
   display: -webkit-box;
   -webkit-line-clamp: 1;
   -webkit-box-orient: vertical;
@@ -360,33 +318,14 @@
   flex: 1;
 }
 
-.landlord-dashboard-page .card-menu-trigger {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  width: 28px;
-  height: 28px;
-  border-radius: 999px;
-  color: #64748b;
-  transition: background-color 0.2s, color 0.2s;
-  background: transparent;
-  border: none;
-  padding: 0;
-  cursor: pointer;
-}
-
-.landlord-dashboard-page .card-menu-trigger:hover {
-  background-color: #f1f5f9;
-  color: #0f172a;
-}
-
 .landlord-dashboard-page .card-location {
   display: flex;
   align-items: center;
-  gap: 4px;
+  gap: 6px;
   color: #64748b;
-  font-size: 12px;
+  font-size: 14px;
   line-height: 1.4;
+  margin-top: 2px;
 }
 
 .landlord-dashboard-page .card-location span {
@@ -395,73 +334,131 @@
   text-overflow: ellipsis;
 }
 
-.landlord-dashboard-page .card-divider {
-  border: 0;
-  border-top: 1px solid #e2e8f0;
-  margin: 0;
+.landlord-dashboard-page .card-location svg {
+  color: #94a3b8;
+  flex-shrink: 0;
 }
 
-.landlord-dashboard-page .card-stats-row {
-  display: flex;
-  justify-content: space-between;
+.landlord-dashboard-page .card-divider {
+  border: 0;
+  border-top: 1px solid #f1f5f9;
+  margin: 6px 0;
+}
+
+/* Metrics grid */
+.card-metrics-grid {
+  display: grid;
+  grid-template-columns: 1fr 1.1fr;
+  gap: 0;
+  margin: 6px 0;
   align-items: center;
 }
 
-.landlord-dashboard-page .card-rooms-count {
+.metric-item {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.metric-item:first-child {
+  border-right: 1px solid #f1f5f9;
+  padding-right: 16px;
+}
+
+.metric-item:last-child {
+  padding-left: 16px;
+}
+
+.metric-icon {
+  width: 36px;
+  height: 36px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+
+.metric-icon--blue {
+  background-color: #eff6ff;
+  color: #246bfe;
+}
+
+.metric-icon--green {
+  background-color: #f0fdf4;
+  color: #10b981;
+}
+
+.metric-text-group {
   display: flex;
   flex-direction: column;
-  gap: 1px;
+  gap: 2px;
 }
 
-.landlord-dashboard-page .stats-label {
+.metric-label {
   font-size: 9px;
   font-weight: 700;
-  letter-spacing: 0.05em;
   color: #94a3b8;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
 }
 
-.landlord-dashboard-page .stats-value {
+.metric-value {
   font-size: 14px;
   font-weight: 700;
   color: #0f172a;
 }
 
-.landlord-dashboard-page .card-update-time {
-  font-size: 11px;
-  color: #94a3b8;
+/* Banner Alert styles in footer */
+.card-footer-alert-banner {
+  margin-top: 8px;
+  width: 100%;
 }
 
-.landlord-dashboard-page .card-error-row {
-  margin-top: 4px;
-}
-
-.landlord-dashboard-page .card-footer-action {
+.alert-banner-content {
   display: flex;
-  justify-content: flex-end;
-  margin-top: 4px;
-}
-
-.landlord-dashboard-page .action-link {
+  align-items: center;
+  padding: 10px 16px;
+  border-radius: 8px;
   font-size: 13px;
   font-weight: 600;
-  display: inline-flex;
-  align-items: center;
-  gap: 4px;
+  width: 100%;
+  box-sizing: border-box;
+  gap: 8px;
+  border: 1px solid transparent;
+  transition: transform 0.2s, box-shadow 0.2s;
+}
+
+.alert-banner-content--info {
+  background-color: #eff6ff;
+  color: #246bfe;
+  border-color: rgba(36, 107, 254, 0.06);
+}
+
+.alert-banner-content--success {
+  background-color: #f0fdf4;
+  color: #10b981;
+  border-color: rgba(16, 185, 129, 0.06);
+}
+
+.alert-banner-content--warning {
+  background-color: #fffbeb;
+  color: #d97706;
+  border-color: rgba(217, 119, 6, 0.06);
+}
+
+.banner-icon {
+  flex-shrink: 0;
+}
+
+.chevron-icon {
+  margin-left: auto;
+  flex-shrink: 0;
   transition: transform 0.2s;
 }
 
-.landlord-dashboard-page .dashboard-card:hover .action-link {
+.dashboard-card:hover .chevron-icon {
   transform: translateX(4px);
-}
-
-.landlord-dashboard-page .action-link.text-success {
-  color: #246bfe;
-}
-.landlord-dashboard-page .action-link.text-warning {
-  color: #eab308;
-}
-.landlord-dashboard-page .action-link.text-info {
-  color: #64748b;
 }
 
 .status-row {
@@ -486,6 +483,16 @@
 .status-pill--success {
   background: #dcfce7;
   color: #166534;
+}
+
+.status-pill--visibility-hidden {
+  background: #e6f4ea !important;
+  color: #137333 !important;
+}
+
+.status-pill--visibility-visible {
+  background: #e6f4ea !important;
+  color: #137333 !important;
 }
 
 .status-pill--info {

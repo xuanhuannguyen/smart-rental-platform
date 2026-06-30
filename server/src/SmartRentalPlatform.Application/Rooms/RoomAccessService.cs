@@ -37,7 +37,7 @@ public class RoomAccessService
         }
 
         EnsureRoomingHouseApproved(roomingHouse);
-        await EnsureLeasePolicyExistsAsync(roomingHouseId, cancellationToken);
+        await EnsureRentalPolicyExistsAsync(roomingHouseId, cancellationToken);
         await EnsureHouseRuleExistsAsync(roomingHouseId, cancellationToken);
     }
 
@@ -113,17 +113,17 @@ public class RoomAccessService
         return amenityIds;
     }
 
-    private async Task EnsureLeasePolicyExistsAsync(
+    private async Task EnsureRentalPolicyExistsAsync(
         Guid roomingHouseId,
         CancellationToken cancellationToken)
     {
-        var hasLeasePolicy = await context.LeasePolicies
+        var hasRentalPolicy = await context.RentalPolicies
             .AnyAsync(x => x.RoomingHouseId == roomingHouseId && x.IsActive, cancellationToken);
 
-        if (!hasLeasePolicy)
+        if (!hasRentalPolicy)
         {
             throw new ConflictException(
-                ErrorCodes.LeasePolicyRequired,
+                ErrorCodes.RentalPolicyRequired,
                 "Vui lòng hoàn thành chính sách thuê trước khi tạo hoặc quản lý phòng.",
                 new { roomingHouseId });
         }

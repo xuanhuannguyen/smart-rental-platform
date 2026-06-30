@@ -1,260 +1,441 @@
-.landlord-appointments-page {
+/* =====================================================
+   LANDLORD APPOINTMENTS PAGE — Premium UI
+   ===================================================== */
+
+/* ---------- Page Header ---------- */
+.appt-page-header {
   display: flex;
-}
-
-.landlord-tabs {
-  display: flex;
-  gap: 12px;
-  border-bottom: 2px solid #e2e8f0;
-  padding-bottom: 12px;
-  margin-bottom: 28px;
-}
-
-.landlord-tabs button {
-  background: none;
-  border: none;
-  font-size: 0.95rem;
-  font-weight: 600;
-  color: #64748b;
-  padding: 8px 16px;
-  border-radius: 8px;
-  cursor: pointer;
-  transition: all 0.2s ease;
-}
-
-.landlord-tabs button:hover {
-  color: #0f172a;
-  background-color: #f1f5f9;
-}
-
-.landlord-tabs button.active {
-  color: #2563eb;
-  background-color: #eff6ff;
-}
-
-.landlord-appointments-list {
-  display: flex;
-  flex-direction: column;
-  gap: 16px;
-  max-width: 800px;
-}
-
-.landlord-card {
-  background: #ffffff;
-  border: 1px solid #e2e8f0;
-  border-radius: 12px;
-  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05);
-  padding: 20px;
-  display: flex;
-  flex-direction: column;
-  gap: 14px;
-  transition: transform 0.2s ease, box-shadow 0.2s ease;
-}
-
-.landlord-card:hover {
-  transform: translateY(-1px);
-  box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.05);
-}
-
-/* Landlord card status accent borders */
-.landlord-card.status-pending {
-  border-left: 4px solid #f59e0b;
-}
-.landlord-card.status-confirmed {
-  border-left: 4px solid #22c55e;
-}
-.landlord-card.status-rejected {
-  border-left: 4px solid #ef4444;
-}
-.landlord-card.status-cancelledbytenant,
-.landlord-card.status-cancelledbylandlord {
-  border-left: 4px solid #64748b;
-}
-.landlord-card.status-completed {
-  border-left: 4px solid #a855f7;
-}
-.landlord-card.status-expired {
-  border-left: 4px solid #cbd5e1;
-}
-
-.landlord-card__header {
-  display: flex;
+  align-items: center;
   justify-content: space-between;
-  align-items: flex-start;
-  gap: 16px;
+  background: #ffffff;
+  border: 1px solid #e8edf5;
+  border-radius: 16px;
+  padding: 28px 32px;
+  margin-bottom: 24px;
+  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.04);
 }
 
-.landlord-card__header h3 {
-  font-size: 1.1rem;
-  font-weight: 700;
-  color: #1e293b;
-  margin: 0 0 4px 0;
-}
-
-.tenant-info {
-  font-size: 0.85rem;
-  color: #64748b;
-  margin: 0;
-}
-
-.landlord-card__body {
-  font-size: 0.92rem;
-  color: #475569;
-  display: flex;
-  flex-direction: column;
-  gap: 8px;
-}
-
-.landlord-card__body p {
-  margin: 0;
-}
-
-.landlord-card__body strong {
-  color: #1e293b;
-}
-
-.note-text {
-  background-color: #f8fafc;
-  border-left: 2px solid #cbd5e1;
-  padding: 6px 12px;
-  font-style: italic;
-  font-size: 0.88rem;
-  border-radius: 0 6px 6px 0;
-}
-
-.conflict-warning-card {
-  background-color: #fffbeb;
-  border: 1px dashed #fcd34d;
-  border-radius: 8px;
-  padding: 12px 16px;
-  color: #92400e;
-  margin-top: 6px;
-}
-
-.conflict-warning-title {
-  font-weight: 700;
-  font-size: 0.9rem;
-  margin-bottom: 6px !important;
-}
-
-.conflict-warning-card ul {
-  margin: 0;
-  padding-left: 20px;
-  font-size: 0.88rem;
+.appt-page-header__left {
   display: flex;
   flex-direction: column;
   gap: 4px;
 }
 
-.landlord-card__footer {
+.appt-eyebrow {
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.1em;
+  color: #246bfe;
+  text-transform: uppercase;
+  margin: 0;
+}
+
+.appt-page-title {
+  font-size: 28px;
+  font-weight: 800;
+  color: #0f172a;
+  margin: 0;
+  line-height: 1.2;
+}
+
+.appt-page-subtitle {
+  font-size: 14px;
+  color: #64748b;
+  margin: 0;
+}
+
+.appt-page-header__icon {
+  width: 60px;
+  height: 60px;
+  background: #eff6ff;
+  border-radius: 14px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+
+/* ---------- Tabs ---------- */
+.appt-tabs {
+  display: flex;
+  gap: 8px;
+  border-bottom: 2px solid #e8edf5;
+  padding-bottom: 0;
+  margin-bottom: 24px;
+  overflow-x: auto;
+}
+
+.appt-tab {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  background: none;
+  border: none;
+  border-bottom: 2px solid transparent;
+  margin-bottom: -2px;
+  font-size: 14px;
+  font-weight: 600;
+  color: #64748b;
+  padding: 10px 16px;
+  border-radius: 0;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  white-space: nowrap;
+}
+
+.appt-tab:hover {
+  color: #246bfe;
+  background: #f0f6ff;
+  border-radius: 8px 8px 0 0;
+}
+
+.appt-tab--active {
+  color: #246bfe;
+  border-bottom-color: #246bfe;
+}
+
+.appt-tab--active svg {
+  color: #246bfe;
+}
+
+/* ---------- State boxes (loading / empty) ---------- */
+.appt-state-box {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 16px;
+  padding: 64px 24px;
+  color: #94a3b8;
+  font-size: 15px;
+  text-align: center;
+}
+
+.appt-state-box p { margin: 0; }
+.appt-state-box--empty { color: #94a3b8; }
+
+@keyframes spin {
+  from { transform: rotate(0deg); }
+  to { transform: rotate(360deg); }
+}
+
+/* ---------- Cards List ---------- */
+.appt-list {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  max-width: 640px;
+}
+
+/* ---------- Appointment Card ---------- */
+.appt-card {
+  background: #ffffff;
+  border: 1px solid #e8edf5;
+  border-radius: 16px;
+  overflow: hidden;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.04);
+  transition: box-shadow 0.2s ease, transform 0.2s ease;
+  border-left: 4px solid #e8edf5;
+}
+
+.appt-card:hover {
+  box-shadow: 0 6px 20px rgba(0, 0, 0, 0.07);
+  transform: translateY(-1px);
+}
+
+/* Status accent colours */
+.appt-card--pending       { border-left-color: #f59e0b; }
+.appt-card--confirmed     { border-left-color: #22c55e; }
+.appt-card--rejected      { border-left-color: #ef4444; }
+.appt-card--proposal      { border-left-color: #0ea5e9; }
+.appt-card--completed     { border-left-color: #6366f1; }
+.appt-card--expired       { border-left-color: #cbd5e1; }
+.appt-card--cancelledbylandlord,
+.appt-card--cancelledbytenant { border-left-color: #94a3b8; }
+
+/* Card Header */
+.appt-card__header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 18px 20px 12px;
+  border-bottom: 1px solid #f1f5f9;
+}
+
+.appt-card__title-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.appt-card__house-icon {
+  width: 36px;
+  height: 36px;
+  background: #f0f6ff;
+  border-radius: 8px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: #246bfe;
+  flex-shrink: 0;
+}
+
+.appt-card__room-name {
+  font-size: 16px;
+  font-weight: 700;
+  color: #0f172a;
+  margin: 0;
+}
+
+/* Status Badge */
+.appt-status-badge {
+  display: inline-flex;
+  align-items: center;
+  padding: 5px 12px;
+  border-radius: 20px;
+  font-size: 11.5px;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  white-space: nowrap;
+  flex-shrink: 0;
+}
+
+.appt-status-badge--pending {
+  background: #fff7ed;
+  color: #c2410c;
+  border: 1px solid #fed7aa;
+}
+.appt-status-badge--confirmed {
+  background: #f0fdf4;
+  color: #15803d;
+  border: 1px solid #bbf7d0;
+}
+.appt-status-badge--rejected {
+  background: #fef2f2;
+  color: #b91c1c;
+  border: 1px solid #fecaca;
+}
+.appt-status-badge--proposal {
+  background: #f0f9ff;
+  color: #0369a1;
+  border: 1px solid #bae6fd;
+}
+.appt-status-badge--completed {
+  background: #f5f3ff;
+  color: #5b21b6;
+  border: 1px solid #ddd6fe;
+}
+.appt-status-badge--expired {
+  background: #f8fafc;
+  color: #94a3b8;
+  border: 1px solid #e2e8f0;
+}
+.appt-status-badge--cancelledbylandlord,
+.appt-status-badge--cancelledbytenant {
+  background: #f8fafc;
+  color: #64748b;
+  border: 1px solid #e2e8f0;
+}
+
+/* Card Meta Section */
+.appt-card__meta {
+  padding: 14px 20px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.appt-meta-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 14px;
+  color: #475569;
+}
+
+.appt-meta-icon {
+  color: #94a3b8;
+  display: flex;
+  align-items: center;
+  flex-shrink: 0;
+}
+
+.appt-meta-label {
+  font-weight: 600;
+  color: #374151;
+  white-space: nowrap;
+}
+
+.appt-meta-value {
+  color: #475569;
+}
+
+/* Note Boxes */
+.appt-note-box {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  padding: 10px 14px;
+  border-radius: 8px;
+  font-size: 13.5px;
+  line-height: 1.5;
+}
+
+.appt-note-box svg {
+  flex-shrink: 0;
+  margin-top: 2px;
+}
+
+.appt-note-box--tenant {
+  background: #f8fafc;
+  border: 1px solid #e2e8f0;
+  color: #475569;
+}
+.appt-note-box--tenant svg { color: #94a3b8; }
+
+.appt-note-box--landlord {
+  background: #f0f9ff;
+  border: 1px solid #bae6fd;
+  color: #0369a1;
+}
+.appt-note-box--landlord svg { color: #0ea5e9; }
+
+.appt-note-box--cancel {
+  background: #fef2f2;
+  border: 1px solid #fecaca;
+  color: #b91c1c;
+}
+.appt-note-box--cancel svg { color: #ef4444; }
+
+/* Proposal Banner */
+.appt-proposal-banner {
+  background: #f0f9ff;
+  border: 1px solid #bae6fd;
+  border-radius: 10px;
+  padding: 12px 16px;
+  font-size: 13.5px;
+  color: #0369a1;
+}
+
+.appt-proposal-banner__title {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-weight: 700;
+  margin-bottom: 6px;
+}
+
+.appt-proposal-banner p {
+  margin: 0;
+}
+
+/* Conflict Banner */
+.appt-conflict-banner {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  background: #fffbeb;
+  border: 1px dashed #fcd34d;
+  border-radius: 10px;
+  padding: 12px 14px;
+  color: #92400e;
+  font-size: 13.5px;
+}
+
+.appt-conflict-banner svg {
+  flex-shrink: 0;
+  margin-top: 2px;
+  color: #d97706;
+}
+
+.appt-conflict-banner ul {
+  margin: 4px 0 0 0;
+  padding-left: 18px;
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+}
+
+/* Card Footer */
+.appt-card__footer {
   display: flex;
   justify-content: flex-end;
   align-items: center;
-  padding-top: 10px;
+  padding: 12px 20px 16px;
   border-top: 1px solid #f1f5f9;
 }
 
-.action-buttons-group {
+.appt-action-group {
   display: flex;
-  gap: 12px;
+  gap: 10px;
   align-items: center;
 }
 
-.btn-confirm {
-  background-color: #2563eb;
-  color: #ffffff;
-  border: none;
-  border-radius: 6px;
-  padding: 8px 16px;
-  font-size: 0.9rem;
-  font-weight: 600;
+/* Action Buttons */
+.appt-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  padding: 9px 20px;
+  font-size: 14px;
+  font-weight: 700;
+  border-radius: 10px;
   cursor: pointer;
   transition: all 0.2s ease;
+  border: none;
+  height: 40px;
+  box-sizing: border-box;
 }
 
-.btn-confirm:hover {
-  background-color: #1d4ed8;
+.appt-btn--confirm {
+  background: #246bfe;
+  color: #ffffff;
+  box-shadow: 0 4px 12px rgba(36, 107, 254, 0.25);
 }
+.appt-btn--confirm:hover {
+  background: #1a5ce0;
+  box-shadow: 0 6px 16px rgba(36, 107, 254, 0.35);
+  transform: translateY(-1px);
+}
+.appt-btn--confirm:active { transform: translateY(0); }
 
-.btn-reject {
-  background-color: #ffffff;
+.appt-btn--reject {
+  background: #ffffff;
   color: #dc2626;
-  border: 1px solid #fca5a5;
-  border-radius: 6px;
-  padding: 8px 16px;
-  font-size: 0.9rem;
-  font-weight: 600;
-  cursor: pointer;
-  transition: all 0.2s ease;
+  border: 1.5px solid #fca5a5;
+}
+.appt-btn--reject:hover {
+  background: #fef2f2;
+  border-color: #ef4444;
 }
 
-.btn-reject:hover {
-  background-color: #fee2e2;
-}
-
-.btn-complete {
-  background-color: #7c3aed;
+.appt-btn--complete {
+  background: #246bfe;
   color: #ffffff;
-  border: none;
-  border-radius: 6px;
-  padding: 8px 16px;
-  font-size: 0.9rem;
-  font-weight: 600;
-  cursor: pointer;
-  transition: all 0.2s ease;
+  box-shadow: 0 4px 12px rgba(36, 107, 254, 0.2);
+}
+.appt-btn--complete:hover {
+  background: #1a5ce0;
+  transform: translateY(-1px);
 }
 
-.btn-complete:hover {
-  background-color: #6d28d9;
+.appt-btn--cancel {
+  background: #ffffff;
+  color: #64748b;
+  border: 1.5px solid #e2e8f0;
 }
-
-.btn-cancel-landlord {
-  background-color: #ffffff;
-  color: #475569;
-  border: 1px solid #cbd5e1;
-  border-radius: 6px;
-  padding: 8px 16px;
-  font-size: 0.9rem;
-  font-weight: 600;
-  cursor: pointer;
-  transition: all 0.2s ease;
-}
-
-.btn-cancel-landlord:hover {
-  background-color: #f1f5f9;
+.appt-btn--cancel:hover {
+  background: #f8fafc;
   color: #0f172a;
+  border-color: #cbd5e1;
 }
 
-.info-time-waiting {
-  font-size: 0.85rem;
+/* Waiting info */
+.appt-waiting-info {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 13px;
   color: #64748b;
   font-style: italic;
-}
-
-/* Modal specific warning style */
-.modal-conflict-alert {
-  background-color: #fff5f5;
-  border: 1px solid #fee2e2;
-  border-radius: 8px;
-  padding: 12px 16px;
-  color: #c53030;
-  font-size: 0.9rem;
-  margin-bottom: 16px;
-  display: flex;
-  flex-direction: column;
-  gap: 8px;
-}
-
-.checkbox-field {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  font-weight: 600;
-  cursor: pointer;
-  color: #9b2c2c;
-}
-
-.checkbox-field input[type="checkbox"] {
-  width: auto;
-  cursor: pointer;
 }

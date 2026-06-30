@@ -12,64 +12,57 @@ import {
   updateRoomingHouseAmenities,
   updateRoomingHouseBasicInfo,
   updateRoomingHouseImages,
-  updateRoomingHouseLeasePolicy,
+  updateRoomingHouseRentalPolicy,
+  updateRoomingHouseVisibility,
 } from '../../rooming-houses/api';
 import {
-  createRoom,
-  getRoomDetail,
   getRoomsByRoomingHouse,
-  submitRoom,
-  updateRoom,
-  updateRoomAmenities,
-  updateRoomImages,
-  updateRoomPriceTiers,
+  createRoom,
 } from '../../rooms/api';
 import { billingApi } from '../../billing/api';
+import type {
+  BillingServiceType,
+  ServicePrice,
+  CreateServicePriceRequest,
+  PricingUnit,
+} from '../../billing/types';
 import type {
   RoomingHouseDetail,
   Amenity,
   PropertyImageRequest,
   RoomingHouseBasicInfoRequest,
-  UpdateLeasePolicyRequest,
+  UpdateRentalPolicyRequest,
 } from '../../rooming-houses/types';
-import type { Room, CreateRoomRequest, RoomPriceTierRequest } from '../../rooms/types';
-import type { BillingMethod, BillingServiceCode, CreateServicePriceRequest, ServicePrice } from '../../billing/types';
+import type { Room, CreateRoomRequest } from '../../rooms/types';
 import { getProvinces, getWardsByProvince } from '../../administrative/api';
 import type { Province, Ward } from '../../administrative/types';
 import PropertyImageEditor from '../../rooming-houses/components/PropertyImageEditor';
 import LeafletLocationPicker from '../../rooming-houses/components/LeafletLocationPicker';
+import { ServicePriceEditorBatch, normalizePricingUnit, getDefaultServicePricingUnit, getServicePricingUnitDisplayUnit } from '../components/ServicePriceEditorBatch';
 import RoomingHouseRuleEditor from '../../rooming-houses/components/RoomingHouseRuleEditor';
 import { cleanImages, toImageRequests } from '../../rooming-houses/utils/imageRequests';
 import './RoomingHouseDetailPage.css';
 
-type MainTab = 'basic' | 'images' | 'amenities' | 'legal' | 'house-rule' | 'lease-policy' | 'rooms';
-type RoomTab = 'basic' | 'images' | 'amenities' | 'price';
+type MainTab = 'basic' | 'images' | 'amenities' | 'legal' | 'house-rule' | 'rental-policy' | 'service-prices' | 'rooms' | 'create-room';
 
-const today = new Date().toISOString().slice(0, 10);
-const nextPeriodStart = getNextPeriodStart();
+function getLocalDateString(year: number, month: number, day: number): string {
+  return `${year}-${String(month).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
+}
 
-const serviceOptions: Array<{ code: BillingServiceCode; label: string; method: 'Metered' | 'Fixed'; unit: string; defaultPrice: number }> = [
-  { code: 'Electric', label: 'Điện', method: 'Metered', unit: 'kWh', defaultPrice: 4000 },
-  { code: 'Water', label: 'Nước', method: 'Metered', unit: 'm3', defaultPrice: 18000 },
-  { code: 'Wifi', label: 'Wifi', method: 'Fixed', unit: 'month', defaultPrice: 100000 },
-  { code: 'Trash', label: 'Rác', method: 'Fixed', unit: 'month', defaultPrice: 50000 },
-];
+function getNextMonth1st(): string {
+  const now = new Date();
+  const month = now.getMonth() + 1; // 1-based
+  const nextMonth = month === 12 ? 1 : month + 1;
+  const nextYear = month === 12 ? now.getFullYear() + 1 : now.getFullYear();
+  return getLocalDateString(nextYear, nextMonth, 1);
+}
 
-const emptyServicePriceForm: CreateServicePriceRequest = {
-  serviceCode: 'Electric',
-  billingMethod: 'Metered',
-  unitName: 'kWh',
-  unitPrice: 4000,
-  effectiveFrom: today,
-  note: '',
-};
+function getCurrentMonth1st(): string {
+  const now = new Date();
+  return getLocalDateString(now.getFullYear(), now.getMonth() + 1, 1);
+}
 
-const defaultServicePriceDrafts: CreateServicePriceRequest[] = [
-  { serviceCode: 'Electric', billingMethod: 'MeterBased', unitName: 'kWh', unitPrice: 4000, effectiveFrom: nextPeriodStart, note: null },
-  { serviceCode: 'Water', billingMethod: 'PerPerson', unitName: 'person', unitPrice: 50000, effectiveFrom: nextPeriodStart, note: null },
-  { serviceCode: 'Wifi', billingMethod: 'PerMonth', unitName: 'month', unitPrice: 100000, effectiveFrom: nextPeriodStart, note: null },
-  { serviceCode: 'Trash', billingMethod: 'PerPerson', unitName: 'person', unitPrice: 30000, effectiveFrom: nextPeriodStart, note: null },
-];
+const defaultServicePriceDrafts: CreateServicePriceRequest[] = [];
 
 const emptyRoomForm: CreateRoomRequest = {
   roomNumber: '',
@@ -80,14 +73,13 @@ const emptyRoomForm: CreateRoomRequest = {
   description: '',
 };
 
-const emptyLeasePolicyForm: UpdateLeasePolicyRequest = {
+const emptyRentalPolicyForm: UpdateRentalPolicyRequest = {
+  minRentalMonths: 1,
+  maxRentalMonths: 12,
   allowShortTermRenewal: false,
   renewalNoticeDays: 30,
   depositMonths: 1,
-  discount6MonthsPercent: 0,
-  discount9MonthsPercent: 0,
-  discount12MonthsPercent: 0,
-  discount24MonthsPercent: 0,
+  defaultPaymentDay: 5,
 };
 
 export default function RoomingHouseDetailPage() {
@@ -101,16 +93,11 @@ export default function RoomingHouseDetailPage() {
   const [actionLoading, setActionLoading] = useState(false);
   const [message, setMessage] = useState('');
   const [activeTab, setActiveTab] = useState<MainTab>('rooms');
+  const [newRoomForm, setNewRoomForm] = useState<CreateRoomRequest>(emptyRoomForm);
+
 
   // Lease Policy
-  const [leasePolicyForm, setLeasePolicyForm] = useState<UpdateLeasePolicyRequest>(emptyLeasePolicyForm);
-
-  // Giá dịch vụ theo từng khu trọ
-  const [servicePrices, setServicePrices] = useState<ServicePrice[]>([]);
-  const [servicePricesLoading, setServicePricesLoading] = useState(false);
-  const [servicePriceForm, setServicePriceForm] = useState<CreateServicePriceRequest>(emptyServicePriceForm);
-  const [servicePriceDrafts, setServicePriceDrafts] = useState<CreateServicePriceRequest[]>(defaultServicePriceDrafts);
-  const [servicePriceNote, setServicePriceNote] = useState('');
+  const [rentalPolicyForm, setRentalPolicyForm] = useState<UpdateRentalPolicyRequest>(emptyRentalPolicyForm);
 
   // Địa giới hành chính cho Tab 1
   const [provinces, setProvinces] = useState<Province[]>([]);
@@ -135,16 +122,104 @@ export default function RoomingHouseDetailPage() {
 
   // States của Quản lý Phòng (Tab 5)
   const [rooms, setRooms] = useState<Room[]>([]);
-  const [selectedRoom, setSelectedRoom] = useState<Room | null>(null);
-  const [roomAmenities, setRoomAmenities] = useState<Amenity[]>([]);
-  const [roomEditorMode, setRoomEditorMode] = useState<'list' | 'edit' | 'create'>('list');
-  const [roomActiveTab, setRoomActiveTab] = useState<RoomTab>('basic');
 
-  // Form phòng
-  const [roomForm, setRoomForm] = useState<CreateRoomRequest>(emptyRoomForm);
-  const [roomImages, setRoomImages] = useState<PropertyImageRequest[]>([]);
-  const [roomAmenityIds, setRoomAmenityIds] = useState<number[]>([]);
-  const [priceTiers, setPriceTiers] = useState<RoomPriceTierRequest[]>([]);
+  // States của Bảng giá dịch vụ (Tab Service Prices)
+  const [billingServiceTypes, setBillingServiceTypes] = useState<BillingServiceType[]>([]);
+  const [servicePrices, setServicePrices] = useState<ServicePrice[]>([]);
+  const [servicePricesLoading, setServicePricesLoading] = useState(false);
+  const [servicePriceDrafts, setServicePriceDrafts] = useState<CreateServicePriceRequest[]>(defaultServicePriceDrafts);
+  const [servicePriceNote, setServicePriceNote] = useState('');
+  const [isFirstTimeServicePrice, setIsFirstTimeServicePrice] = useState(true);
+
+  const activeServicePrices = useMemo(() => servicePrices.filter(p => p.isActive), [servicePrices]);
+  const servicePriceHistory = useMemo(() => servicePrices, [servicePrices]);
+
+  async function loadServicePrices() {
+    if (!id) return;
+    setServicePricesLoading(true);
+    try {
+      const [pricesResponse, serviceTypesResponse] = await Promise.all([
+        billingApi.getServicePrices(id),
+        billingApi.getServiceTypes(),
+      ]);
+      const activeServiceTypes = serviceTypesResponse.data
+        .filter((serviceType) => serviceType.isActive)
+        .sort((a, b) => a.name.localeCompare(b.name, 'vi'));
+      const activePriceByServiceTypeId = new Map(
+        pricesResponse.data
+          .filter((price: ServicePrice) => price.isActive)
+          .map((price: ServicePrice) => [price.serviceTypeId, price])
+      );
+
+      setBillingServiceTypes(activeServiceTypes);
+      setServicePrices(pricesResponse.data);
+
+      const isFirstTime = activePriceByServiceTypeId.size === 0;
+      setIsFirstTimeServicePrice(isFirstTime);
+      const effectiveFromDate = isFirstTime ? getCurrentMonth1st() : getNextMonth1st();
+
+      setServicePriceDrafts(activeServiceTypes.map((serviceType) => {
+        const activePrice = activePriceByServiceTypeId.get(serviceType.id);
+        const pricingUnit = normalizePricingUnit(activePrice?.pricingUnit ?? getDefaultServicePricingUnit(serviceType));
+
+        return {
+          serviceTypeId: serviceType.id,
+          pricingUnit,
+          unitName: getServicePricingUnitDisplayUnit(pricingUnit, serviceType),
+          unitPrice: activePrice?.unitPrice ?? 0,
+          effectiveFrom: effectiveFromDate,
+        };
+      }));
+    } catch (err) {
+      console.warn('Cannot load service prices:', err);
+    } finally {
+      setServicePricesLoading(false);
+    }
+  }
+
+  function handleChangeServicePriceDraft(serviceTypeId: string, patch: Partial<CreateServicePriceRequest>) {
+    setServicePriceDrafts((drafts) =>
+      drafts.map((draft) => {
+        if (draft.serviceTypeId !== serviceTypeId) {
+          return draft;
+        }
+
+        const pricingUnit = normalizePricingUnit(patch.pricingUnit ?? draft.pricingUnit ?? 'PerMonth');
+
+        return {
+          ...draft,
+          ...patch,
+          pricingUnit,
+          effectiveFrom: isFirstTimeServicePrice ? getCurrentMonth1st() : getNextMonth1st(),
+        };
+      })
+    );
+  }
+
+  async function handleSaveServicePrices(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    if (!house) return;
+
+    setActionLoading(true);
+    setMessage('');
+    try {
+      for (const draft of servicePriceDrafts) {
+        await billingApi.createServicePrice(house.id, {
+          ...draft,
+          unitPrice: Number(draft.unitPrice) || 0,
+          effectiveFrom: isFirstTimeServicePrice ? getCurrentMonth1st() : getNextMonth1st(),
+          note: servicePriceNote.trim() || null,
+        });
+      }
+
+      await loadServicePrices();
+      setMessage('Đã lưu tất cả giá dịch vụ thành công.');
+    } catch (err) {
+      setMessage(getApiErrorMessage(err, 'Không thể lưu giá dịch vụ.'));
+    } finally {
+      setActionLoading(false);
+    }
+  }
 
   // Tải thông tin khu trọ
   useEffect(() => {
@@ -157,7 +232,7 @@ export default function RoomingHouseDetailPage() {
     setMessage('');
     try {
       const data = await getRoomingHouseDetail(id!);
-      
+
       // Chỉ cho phép khu trọ đã duyệt vào trang này
       if (data.approvalStatus !== 'Approved') {
         setMessage('Khu trọ này chưa được quản trị viên phê duyệt. Không thể truy cập quản lý phòng.');
@@ -166,7 +241,7 @@ export default function RoomingHouseDetailPage() {
       }
 
       setHouse(data);
-      
+
       // Khởi tạo các form
       setBasicForm({
         name: data.name,
@@ -182,23 +257,21 @@ export default function RoomingHouseDetailPage() {
       setHouseImages(toImageRequests(data.images));
       setSelectedAmenityIds(data.amenities.map(a => a.id));
 
-      if (data.leasePolicy) {
-        setLeasePolicyForm({
-          allowShortTermRenewal: data.leasePolicy.allowShortTermRenewal,
-          renewalNoticeDays: data.leasePolicy.renewalNoticeDays,
-          depositMonths: data.leasePolicy.depositMonths,
-          discount6MonthsPercent: data.leasePolicy.discount6MonthsPercent,
-          discount9MonthsPercent: data.leasePolicy.discount9MonthsPercent,
-          discount12MonthsPercent: data.leasePolicy.discount12MonthsPercent,
-          discount24MonthsPercent: data.leasePolicy.discount24MonthsPercent,
+      if (data.rentalPolicy) {
+        setRentalPolicyForm({
+          minRentalMonths: data.rentalPolicy.minRentalMonths,
+          maxRentalMonths: data.rentalPolicy.maxRentalMonths,
+          allowShortTermRenewal: data.rentalPolicy.allowShortTermRenewal,
+          renewalNoticeDays: data.rentalPolicy.renewalNoticeDays,
+          depositMonths: data.rentalPolicy.depositMonths,
+          defaultPaymentDay: data.rentalPolicy.defaultPaymentDay,
         });
       } else {
-        setLeasePolicyForm(emptyLeasePolicyForm);
-        setMessage('Vui lòng Hoàn Thành Chính Sách Thuê Ở trong thông tin khu trọ để được tạo phòng');
+        setRentalPolicyForm(emptyRentalPolicyForm);
       }
 
       // Tải danh sách phòng
-      if (data.leasePolicy && data.houseRule) {
+      if (data.rentalPolicy && data.houseRule) {
         try {
           const roomsData = await getRoomsByRoomingHouse(id!);
           setRooms(roomsData);
@@ -207,9 +280,6 @@ export default function RoomingHouseDetailPage() {
         }
       } else {
         setRooms([]);
-        if (data.leasePolicy && !data.houseRule) {
-          setMessage('Vui lòng hoàn thành Luật khu trọ trước khi tạo phòng đầu tiên.');
-        }
       }
     } catch (err) {
       setMessage(getApiErrorMessage(err, 'Không thể tải thông tin chi tiết khu trọ.'));
@@ -221,10 +291,10 @@ export default function RoomingHouseDetailPage() {
   // Tải Tỉnh/Thành & Tiện ích
   useEffect(() => {
     if (activeTab === 'basic' && provinces.length === 0) {
-      getProvinces().then(setProvinces).catch(() => {});
+      getProvinces().then(setProvinces).catch(() => { });
     }
     if (activeTab === 'amenities' && houseAmenities.length === 0) {
-      getAmenities('House').then(setHouseAmenities).catch(() => {});
+      getAmenities('House').then(setHouseAmenities).catch(() => { });
     }
     if (activeTab === 'service-prices' && house) {
       loadServicePrices();
@@ -237,7 +307,7 @@ export default function RoomingHouseDetailPage() {
       setWards([]);
       return;
     }
-    getWardsByProvince(basicForm.provinceCode).then(setWards).catch(() => {});
+    getWardsByProvince(basicForm.provinceCode).then(setWards).catch(() => { });
   }, [basicForm.provinceCode]);
 
   // Thống kê phòng
@@ -245,42 +315,13 @@ export default function RoomingHouseDetailPage() {
     total: rooms.length,
     available: rooms.filter((r) => r.status === 'Available').length,
     occupied: rooms.filter((r) => r.status === 'Occupied').length,
-    hidden: rooms.filter((r) => r.status === 'Hidden').length,
+    hidden: rooms.filter((r) => r.status === 'Hidden' || r.status === 'Maintenance').length,
   }), [rooms]);
   const selectedProvinceName =
     provinces.find((province) => province.code === basicForm.provinceCode)?.name ?? '';
   const selectedWardName = wards.find((ward) => ward.code === basicForm.wardCode)?.name ?? '';
-  const canCreateRoom = Boolean(house?.leasePolicy && house?.houseRule);
-
-  const activeServicePrices = useMemo(
-    () => servicePrices.filter((price) => price.isActive),
-    [servicePrices]
-  );
-
-  const servicePriceHistory = useMemo(
-    () => [...servicePrices].sort((a, b) =>
-      b.effectiveFrom.localeCompare(a.effectiveFrom) ||
-      a.serviceCode.localeCompare(b.serviceCode)
-    ),
-    [servicePrices]
-  );
-
-  useEffect(() => {
-    if (servicePricesLoading || servicePrices.length === 0) {
-      return;
-    }
-
-    setServicePriceDrafts(defaultServicePriceDrafts.map((draft) => {
-      const activePrice = activeServicePrices.find((price) => price.serviceCode === draft.serviceCode);
-      return {
-        ...draft,
-        billingMethod: normalizeBillingMethod(activePrice?.billingMethod ?? draft.billingMethod),
-        unitName: activePrice?.unitName ?? draft.unitName,
-        unitPrice: activePrice?.unitPrice ?? draft.unitPrice,
-        effectiveFrom: nextPeriodStart,
-      };
-    }));
-  }, [activeServicePrices, servicePrices.length, servicePricesLoading]);
+  const canCreateRoom = Boolean(house?.rentalPolicy && house?.houseRule);
+  const addressLocked = house?.approvalStatus === 'Approved';
 
   // ─── Tab 1: Lưu thông tin cơ bản khu trọ ──────────────────────────────────
   async function handleSaveBasicInfo() {
@@ -299,6 +340,25 @@ export default function RoomingHouseDetailPage() {
   }
 
   // ─── Tab 2: Lưu ảnh khu trọ ──────────────────────────────────────────────
+  async function handleToggleVisibility() {
+    if (!house) return;
+
+    const nextVisibility = house.visibilityStatus === 'Visible' ? 'Hidden' : 'Visible';
+    setActionLoading(true);
+    setMessage('');
+    try {
+      const updated = await updateRoomingHouseVisibility(house.id, nextVisibility);
+      setHouse(updated);
+      setMessage(nextVisibility === 'Hidden'
+        ? 'Khu trọ đã được ẩn khỏi trang công khai.'
+        : 'Khu trọ đã được hiển thị công khai.');
+    } catch (err) {
+      setMessage(getApiErrorMessage(err, 'Không thể cập nhật trạng thái hiển thị khu trọ.'));
+    } finally {
+      setActionLoading(false);
+    }
+  }
+
   async function handleSaveImages() {
     if (!house) return;
     setActionLoading(true);
@@ -333,23 +393,22 @@ export default function RoomingHouseDetailPage() {
   }
 
   // ─── Tab 4: Lưu chính sách thuê khu trọ ────────────────────────────────────
-  async function handleSaveLeasePolicy() {
+  async function handleSaveRentalPolicy() {
     if (!house) return;
     setActionLoading(true);
     setMessage('');
     try {
-      await updateRoomingHouseLeasePolicy(house.id, leasePolicyForm);
+      await updateRoomingHouseRentalPolicy(house.id, rentalPolicyForm);
       const updated = await getRoomingHouseDetail(house.id);
       setHouse(updated);
-      if (updated.leasePolicy) {
-        setLeasePolicyForm({
-          allowShortTermRenewal: updated.leasePolicy.allowShortTermRenewal,
-          renewalNoticeDays: updated.leasePolicy.renewalNoticeDays,
-          depositMonths: updated.leasePolicy.depositMonths,
-          discount6MonthsPercent: updated.leasePolicy.discount6MonthsPercent,
-          discount9MonthsPercent: updated.leasePolicy.discount9MonthsPercent,
-          discount12MonthsPercent: updated.leasePolicy.discount12MonthsPercent,
-          discount24MonthsPercent: updated.leasePolicy.discount24MonthsPercent,
+      if (updated.rentalPolicy) {
+        setRentalPolicyForm({
+          minRentalMonths: updated.rentalPolicy.minRentalMonths,
+          maxRentalMonths: updated.rentalPolicy.maxRentalMonths,
+          allowShortTermRenewal: updated.rentalPolicy.allowShortTermRenewal,
+          renewalNoticeDays: updated.rentalPolicy.renewalNoticeDays,
+          depositMonths: updated.rentalPolicy.depositMonths,
+          defaultPaymentDay: updated.rentalPolicy.defaultPaymentDay,
         });
       }
       setMessage('Đã cập nhật chính sách thuê thành công.');
@@ -365,134 +424,12 @@ export default function RoomingHouseDetailPage() {
     setMessage('Đã cập nhật luật khu trọ thành công.');
   }
 
-  // ─── Tab 5: Logic Quản lý phòng ──────────────────────────────────────────
-  async function loadServicePrices() {
-    if (!house) return;
-    setServicePricesLoading(true);
-    try {
-      const response = await billingApi.getServicePrices(house.id);
-      setServicePrices(response.data);
-    } catch (err) {
-      setMessage(getApiErrorMessage(err, 'Không thể tải bảng giá dịch vụ của khu trọ.'));
-    } finally {
-      setServicePricesLoading(false);
-    }
-  }
 
-  function handleChangeServicePriceDraft(serviceCode: BillingServiceCode, patch: Partial<CreateServicePriceRequest>) {
-    setServicePriceDrafts((current) =>
-      current.map((draft) => draft.serviceCode === serviceCode
-        ? { ...draft, ...patch, effectiveFrom: nextPeriodStart }
-        : draft)
-    );
-  }
 
-  async function handleSaveServicePrices(event: FormEvent<HTMLFormElement>) {
-    event.preventDefault();
-    if (!house) return;
-
-    setActionLoading(true);
-    setMessage('');
-    try {
-      for (const draft of servicePriceDrafts) {
-        await billingApi.createServicePrice(house.id, {
-          ...draft,
-          billingMethod: toApiBillingMethod(draft.billingMethod),
-          unitPrice: Number(draft.unitPrice) || 0,
-          effectiveFrom: nextPeriodStart,
-          note: servicePriceNote.trim() || null,
-        });
-      }
-
-      const response = await billingApi.getServicePrices(house.id);
-      setServicePrices(response.data);
-      setMessage('Đã lưu tất cả giá dịch vụ thành công.');
-    } catch (err) {
-      setMessage(getApiErrorMessage(err, 'Không thể lưu giá dịch vụ.'));
-    } finally {
-      setActionLoading(false);
-    }
-  }
-
-  function handleSelectServicePrice(code: BillingServiceCode) {
-    const option = serviceOptions.find((item) => item.code === code);
-    if (!option) return;
-
-    setServicePriceForm((current) => ({
-      ...current,
-      serviceCode: option.code,
-      billingMethod: option.method,
-      unitName: option.unit,
-      unitPrice: option.defaultPrice,
-    }));
-  }
-
-  async function handleSaveServicePrice(event: FormEvent<HTMLFormElement>) {
-    event.preventDefault();
-    if (!house) return;
-
-    setActionLoading(true);
-    setMessage('');
-    try {
-      await billingApi.createServicePrice(house.id, {
-        ...servicePriceForm,
-        unitPrice: Number(servicePriceForm.unitPrice) || 0,
-        note: servicePriceForm.note?.trim() || null,
-      });
-      const response = await billingApi.getServicePrices(house.id);
-      setServicePrices(response.data);
-      setMessage('Đã cập nhật giá dịch vụ cho khu trọ thành công.');
-    } catch (err) {
-      setMessage(getApiErrorMessage(err, 'Không thể cập nhật giá dịch vụ.'));
-    } finally {
-      setActionLoading(false);
-    }
-  }
-
-  async function openRoom(roomId: string) {
-    setActionLoading(true);
-    setMessage('');
-    try {
-      const roomDetail = await getRoomDetail(roomId);
-      setSelectedRoom(roomDetail);
-      setRoomEditorMode('edit');
-      setRoomActiveTab('basic');
-
-      // Fill form phòng
-      setRoomForm({
-        roomNumber: roomDetail.roomNumber,
-        floor: roomDetail.floor,
-        areaM2: roomDetail.areaM2 ?? null,
-        maxOccupants: roomDetail.maxOccupants,
-        isTieredPricing: roomDetail.isTieredPricing,
-        description: roomDetail.description ?? '',
-      });
-      setRoomImages(toImageRequests(roomDetail.images));
-      setRoomAmenityIds(roomDetail.amenities.map((amenity) => amenity.id));
-      setPriceTiers(
-        roomDetail.priceTiers.map((tier) => ({
-          occupantCount: tier.occupantCount,
-          monthlyRent: tier.monthlyRent,
-          isActive: tier.isActive,
-        }))
-      );
-
-      // Load tiện ích phòng
-      if (roomAmenities.length === 0) {
-        const amenitiesList = await getAmenities('Room');
-        setRoomAmenities(amenitiesList);
-      }
-    } catch (err) {
-      setMessage(getApiErrorMessage(err, 'Không thể tải thông tin phòng.'));
-    } finally {
-      setActionLoading(false);
-    }
-  }
-
-  async function openCreateRoom() {
-    if (!house?.leasePolicy) {
+  function handleCreateRoomClick() {
+    if (!house?.rentalPolicy) {
       setMessage('Vui lòng hoàn thành chính sách cho thuê trước khi tạo phòng.');
-      setActiveTab('lease-policy');
+      setActiveTab('rental-policy');
       return;
     }
 
@@ -502,127 +439,40 @@ export default function RoomingHouseDetailPage() {
       return;
     }
 
-    setSelectedRoom(null);
-    setRoomEditorMode('create');
-    setRoomActiveTab('basic');
-    setRoomForm(emptyRoomForm);
-    setRoomImages([]);
-    setRoomAmenityIds([]);
-    setPriceTiers([{ occupantCount: 1, monthlyRent: 0, isActive: true }]);
-    setMessage('');
-
-    try {
-      if (roomAmenities.length === 0) {
-        const amenitiesList = await getAmenities('Room');
-        setRoomAmenities(amenitiesList);
-      }
-    } catch (err) {
-      setMessage(getApiErrorMessage(err, 'Không thể tải tiện ích phòng.'));
+    const hasPrices = activeServicePrices.length > 0;
+    if (!hasPrices) {
+      setMessage('Vui lòng cấu hình bảng giá dịch vụ trước khi tạo phòng.');
+      setActiveTab('service-prices');
+      return;
     }
+    setActiveTab('create-room');
+    setNewRoomForm(emptyRoomForm);
   }
 
-  async function handleSaveRoomBasic() {
+  async function handleCreateRoomSubmit() {
     if (!house) return;
     setActionLoading(true);
     setMessage('');
     try {
-      if (selectedRoom) {
-        const updated = await updateRoom(selectedRoom.id, roomForm);
-        setSelectedRoom(updated);
-        setRooms(current => current.map(r => r.id === updated.id ? updated : r));
-        setMessage('Đã lưu thông tin cơ bản phòng.');
-      } else {
-        const created = await createRoom(house.id, roomForm);
-        setSelectedRoom(created);
-        setRooms(current => [...current, created]);
-        setRoomEditorMode('edit');
-        setRoomActiveTab('images'); // chuyển sang tab ảnh
-        setMessage('Tạo phòng thành công. Hãy tải lên ảnh minh họa cho phòng.');
-      }
+      const createdRoom = await createRoom(house.id, newRoomForm);
+      setMessage('Tạo phòng mới thành công. Hãy tiếp tục cập nhật các thông tin khác.');
+      setNewRoomForm(emptyRoomForm);
+      // Chuyển hướng sang trang chi tiết phòng vừa tạo để có thể edit Ảnh, Tiện ích, Bảng giá
+      navigate(ROUTE_PATHS.LANDLORD.ROOM_DETAIL(house.id, createdRoom.id), { state: { initialTab: 'images' } });
     } catch (err) {
-      setMessage(getApiErrorMessage(err, 'Không thể lưu thông tin phòng.'));
+      setMessage(getApiErrorMessage(err, 'Không thể tạo phòng.'));
     } finally {
       setActionLoading(false);
     }
   }
 
-  async function handleSaveRoomImages() {
-    if (!selectedRoom) return;
-    setActionLoading(true);
-    setMessage('');
-    try {
-      const updated = await updateRoomImages(selectedRoom.id, cleanImages(roomImages));
-      setSelectedRoom(updated);
-      setRoomImages(toImageRequests(updated.images));
-      setRooms(current => current.map(r => r.id === updated.id ? updated : r));
-      setMessage('Đã lưu ảnh phòng thành công.');
-    } catch (err) {
-      setMessage(getApiErrorMessage(err, 'Không thể lưu ảnh phòng.'));
-    } finally {
-      setActionLoading(false);
-    }
-  }
-
-  async function handleSaveRoomAmenities() {
-    if (!selectedRoom) return;
-    setActionLoading(true);
-    setMessage('');
-    try {
-      const updated = await updateRoomAmenities(selectedRoom.id, roomAmenityIds);
-      setSelectedRoom(updated);
-      setRoomAmenityIds(updated.amenities.map(a => a.id));
-      setRooms(current => current.map(r => r.id === updated.id ? updated : r));
-      setMessage('Đã cập nhật tiện ích phòng thành công.');
-    } catch (err) {
-      setMessage(getApiErrorMessage(err, 'Không thể lưu tiện ích phòng.'));
-    } finally {
-      setActionLoading(false);
-    }
-  }
-
-  async function handleSaveRoomPrice() {
-    if (!selectedRoom) return;
-    setActionLoading(true);
-    setMessage('');
-    try {
-      const updated = await updateRoomPriceTiers(selectedRoom.id, priceTiers);
-      setSelectedRoom(updated);
-      setPriceTiers(updated.priceTiers.map(t => ({ occupantCount: t.occupantCount, monthlyRent: t.monthlyRent, isActive: t.isActive })));
-      setRooms(current => current.map(r => r.id === updated.id ? updated : r));
-      setMessage('Đã cập nhật bảng giá phòng thành công.');
-    } catch (err) {
-      setMessage(getApiErrorMessage(err, 'Không thể lưu bảng giá phòng.'));
-    } finally {
-      setActionLoading(false);
-    }
-  }
-
-  async function handlePublishRoom() {
-    if (!selectedRoom) return;
-    setActionLoading(true);
-    setMessage('');
-    try {
-      const updated = await submitRoom(selectedRoom.id);
-      setSelectedRoom(updated);
-      setRooms(current => current.map(r => r.id === updated.id ? updated : r));
-      setMessage('Phòng đã được hiển thị hoạt động và sẵn sàng cho thuê.');
-    } catch (err) {
-      setMessage(getApiErrorMessage(err, 'Không thể hiển thị hoạt động phòng.'));
-    } finally {
-      setActionLoading(false);
-    }
-  }
 
   // ─── Renders ─────────────────────────────────────────────────────────────
   const formatDate = formatDateVi;
 
   if (loading) {
     return (
-      <div className="landlord-dashboard">
-        <aside className="dashboard-sidebar">
-          <h1>Chủ trọ</h1>
-          <button className="sidebar-item active">Quản lý khu trọ</button>
-        </aside>
+      <div className="rooming-house-detail-page" style={{ display: 'contents' }}>
         <main className="dashboard-main">
           <div className="empty-panel">Đang tải thông tin khu trọ...</div>
         </main>
@@ -632,13 +482,7 @@ export default function RoomingHouseDetailPage() {
 
   if (!house) {
     return (
-      <div className="landlord-dashboard">
-        <aside className="dashboard-sidebar">
-          <h1>Chủ trọ</h1>
-          <button className="sidebar-item" onClick={() => navigate(ROUTE_PATHS.LANDLORD.DASHBOARD)}>
-            Quay lại Dashboard
-          </button>
-        </aside>
+      <div className="rooming-house-detail-page" style={{ display: 'contents' }}>
         <main className="dashboard-main">
           <div className="empty-panel">
             <h2>Lỗi truy cập</h2>
@@ -650,143 +494,200 @@ export default function RoomingHouseDetailPage() {
   }
 
   return (
-    <div className="landlord-dashboard rooming-house-detail-page">
-      <aside className="dashboard-sidebar">
-        <h1>Chủ trọ</h1>
-        <button
-          className="sidebar-item active"
-          onClick={() => navigate(ROUTE_PATHS.LANDLORD.DASHBOARD)}
-        >
-          Quản lý khu trọ
-        </button>
-        <button
-          className="sidebar-item"
-          onClick={() => navigate(ROUTE_PATHS.LANDLORD.VIEWING_APPOINTMENTS)}
-        >
-          Lịch hẹn xem phòng
-        </button>
-        <button className="sidebar-item" disabled style={{ opacity: 0.6, cursor: 'not-allowed' }}>
-          Quản lý doanh thu (Sau này)
-        </button>
-        <button className="sidebar-item sidebar-back-btn" onClick={() => navigate(ROUTE_PATHS.ME.ROOT)}>
-          ← Quay lại trang chủ
-        </button>
-      </aside>
-
+    <div className="rooming-house-detail-page" style={{ display: 'contents' }}>
       <main className="dashboard-main">
         {/* Banner Tổng quan */}
-        {activeTab === 'rooms' && (
-          <section className="overview-band">
-            <div className="overview-header-title-area">
-              <button
-                type="button"
-                className="back-icon-btn"
-                onClick={() => navigate(ROUTE_PATHS.LANDLORD.DASHBOARD)}
-                title="Quay về quản lý khu trọ"
-              >
-                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
-                  <line x1="19" y1="12" x2="5" y2="12" />
-                  <polyline points="12 19 5 12 12 5" />
+        <section className="overview-band">
+          <div className="overview-header-title-area">
+            <button
+              type="button"
+              className="back-icon-btn"
+              onClick={() => navigate(ROUTE_PATHS.LANDLORD.ROOMING_HOUSES)}
+              title="Quay về quản lý khu trọ"
+            >
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                <line x1="19" y1="12" x2="5" y2="12" />
+                <polyline points="12 19 5 12 12 5" />
+              </svg>
+            </button>
+            <div className="overview-house-icon">
+              <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#2563eb" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z" />
+                <polyline points="9 22 9 12 15 12 15 22" />
+                <rect x="10" y="14" width="4" height="4" />
+              </svg>
+            </div>
+            <div className="overview-left">
+              <div className="overview-address">
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#2563eb" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" style={{ marginRight: '6px' }}>
+                  <path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z" />
+                  <circle cx="12" cy="10" r="3" />
                 </svg>
+                <span>{house.addressDisplay}</span>
+              </div>
+              <h2>{house.name}</h2>
+              <p className="overview-description">
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#2563eb" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ marginRight: '6px' }}>
+                  <rect x="3" y="4" width="18" height="18" rx="2" ry="2" />
+                  <line x1="16" y1="2" x2="16" y2="6" />
+                  <line x1="8" y1="2" x2="8" y2="6" />
+                  <line x1="3" y1="10" x2="21" y2="10" />
+                </svg>
+                Thời gian duyệt: <span style={{ color: '#2563eb', fontWeight: 600, marginLeft: '4px' }}>{house.createdAt ? formatDate(house.createdAt) : ''}</span>
+              </p>
+            </div>
+          </div>
+
+          <div className="overview-right" style={{ display: 'flex', flexDirection: 'column', gap: '16px', alignItems: 'flex-end' }}>
+            <div className="overview-stats">
+              <div className="stat-item stat-item--total">
+                <HomeIcon />
+                <div className="stat-info">
+                  <span className="stat-label">Tổng số phòng</span>
+                  <strong className="stat-number">{roomStats.total}</strong>
+                </div>
+              </div>
+              <div className="stat-item stat-item--approved">
+                <CheckCircleIcon />
+                <div className="stat-info">
+                  <span className="stat-label">Số phòng trống</span>
+                  <strong className="stat-number">{roomStats.available}</strong>
+                </div>
+              </div>
+              <div className="stat-item stat-item--pending">
+                <UserCheckIcon />
+                <div className="stat-info">
+                  <span className="stat-label">Đang thuê</span>
+                  <strong className="stat-number">{roomStats.occupied}</strong>
+                </div>
+              </div>
+              <div className="stat-item stat-item--rejected">
+                <EyeOffIcon />
+                <div className="stat-info">
+                  <span className="stat-label">Đang ẩn</span>
+                  <strong className="stat-number">{roomStats.hidden}</strong>
+                </div>
+              </div>
+            </div>
+
+            <div className="overview-actions" style={{ display: 'flex', gap: '12px' }}>
+              <button
+                className={`nav-tab-btn ${activeTab === 'rooms' ? 'active' : ''}`}
+                onClick={() => setActiveTab('rooms')}
+              >
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                  <line x1="8" y1="6" x2="21" y2="6" />
+                  <line x1="8" y1="12" x2="21" y2="12" />
+                  <line x1="8" y1="18" x2="21" y2="18" />
+                  <line x1="3" y1="6" x2="3.01" y2="6" />
+                  <line x1="3" y1="12" x2="3.01" y2="12" />
+                  <line x1="3" y1="18" x2="3.01" y2="18" />
+                </svg>
+                Danh sách phòng
               </button>
-              <div className="overview-left">
-                <p className="eyebrow">{house.addressDisplay}</p>
-                <h2>{house.name}</h2>
-                <p className="overview-description">
-                  Thời gian duyệt: {house.createdAt ? formatDate(house.createdAt) : ''}
-                </p>
-              </div>
+              <button
+                className={`nav-tab-btn ${(activeTab !== 'rooms' && activeTab !== 'create-room') ? 'active' : ''}`}
+                onClick={() => {
+                  if (activeTab === 'rooms' || activeTab === 'create-room') setActiveTab('basic');
+                }}
+              >
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                  <path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z" />
+                  <polyline points="9 22 9 12 15 12 15 22" />
+                  <rect x="10" y="14" width="4" height="4" />
+                </svg>
+                Thông tin khu trọ
+              </button>
+              {house.approvalStatus === 'Approved' && (
+                <button
+                  className="action-btn-outline"
+                  onClick={handleToggleVisibility}
+                  disabled={actionLoading}
+                >
+                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                    <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z" />
+                    <circle cx="12" cy="12" r="3" />
+                  </svg>
+                  {house.visibilityStatus === 'Visible' ? 'Ẩn khu trọ' : 'Hiển thị khu trọ'}
+                </button>
+              )}
+              <button
+                className="action-btn-primary"
+                onClick={handleCreateRoomClick}
+                disabled={!canCreateRoom}
+                title={!canCreateRoom ? "Vui lòng cấu hình chính sách thuê và Luật khu trọ trước khi tạo phòng." : "Tạo phòng mới"}
+                style={!canCreateRoom ? { opacity: 0.5, cursor: 'not-allowed' } : undefined}
+              >
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                  <line x1="12" y1="5" x2="12" y2="19" />
+                  <line x1="5" y1="12" x2="19" y2="12" />
+                </svg>
+                Tạo phòng mới
+              </button>
             </div>
-            
-            <div className="overview-right">
-              <div className="overview-actions">
-                {roomEditorMode === 'list' && (
-                  <>
-                    <button
-                      type="button"
-                      className="secondary-action"
-                      onClick={() => setActiveTab('basic')}
-                    >
-                      Xem thông tin khu trọ
-                    </button>
-                    <button
-                      className="primary-action"
-                      onClick={openCreateRoom}
-                      disabled={!canCreateRoom}
-                      title={!canCreateRoom ? "Vui lòng cấu hình chính sách thuê và Luật khu trọ trước khi tạo phòng." : undefined}
-                      style={!canCreateRoom ? { opacity: 0.5, cursor: 'not-allowed' } : undefined}
-                    >
-                      Tạo phòng mới
-                    </button>
-                  </>
-                )}
-              </div>
-              
-              <div className="overview-stats">
-                <div className="stat-item stat-item--total">
-                  <HomeIcon />
-                  <span>Tổng số phòng</span>
-                  <strong className="stat-badge">{roomStats.total}</strong>
-                </div>
-                <div className="stat-item stat-item--approved">
-                  <CheckCircleIcon />
-                  <span>Số phòng trống</span>
-                  <strong className="stat-badge">{roomStats.available}</strong>
-                </div>
-                <div className="stat-item stat-item--pending">
-                  <UserCheckIcon />
-                  <span>Đang thuê</span>
-                  <strong className="stat-badge">{roomStats.occupied}</strong>
-                </div>
-                <div className="stat-item stat-item--rejected">
-                  <EyeOffIcon />
-                  <span>Đang ẩn</span>
-                  <strong className="stat-badge">{roomStats.hidden}</strong>
-                </div>
-              </div>
-            </div>
-          </section>
-        )}
+          </div>
+        </section>
 
         {message && <p className="dashboard-message">{message}</p>}
         {actionLoading && <p className="dashboard-message" style={{ background: '#dbeafe', color: '#1e40af' }}>Đang lưu thay đổi...</p>}
 
-
-
         {/* Hệ thống Tab Cấp 2 */}
-        {activeTab !== 'rooms' && (
-          <div className="tabs" style={{ display: 'flex', alignItems: 'center' }}>
+        {(activeTab !== 'rooms' && activeTab !== 'create-room') && (
+          <div className="info-subtabs">
             <button className={activeTab === 'basic' ? 'active' : ''} onClick={() => setActiveTab('basic')}>
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z" />
+                <polyline points="9 22 9 12 15 12 15 22" />
+              </svg>
               Thông tin cơ bản
             </button>
             <button className={activeTab === 'images' ? 'active' : ''} onClick={() => setActiveTab('images')}>
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <rect x="3" y="3" width="18" height="18" rx="2" ry="2" />
+                <circle cx="8.5" cy="8.5" r="1.5" />
+                <polyline points="21 15 16 10 5 21" />
+              </svg>
               Ảnh khu trọ
             </button>
             <button className={activeTab === 'amenities' ? 'active' : ''} onClick={() => setActiveTab('amenities')}>
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2" />
+              </svg>
               Tiện nghi
             </button>
             <button className={activeTab === 'legal' ? 'active' : ''} onClick={() => setActiveTab('legal')}>
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <rect x="3" y="4" width="18" height="16" rx="2" ry="2" />
+                <line x1="16" y1="2" x2="16" y2="4" />
+                <line x1="8" y1="2" x2="8" y2="4" />
+                <line x1="3" y1="10" x2="21" y2="10" />
+              </svg>
               Giấy tờ pháp lý
             </button>
             <button className={activeTab === 'house-rule' ? 'active' : ''} onClick={() => setActiveTab('house-rule')}>
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" />
+                <polyline points="14 2 14 8 20 8" />
+                <line x1="16" y1="13" x2="8" y2="13" />
+                <line x1="16" y1="17" x2="8" y2="17" />
+              </svg>
               Luật khu trọ
             </button>
-            <button className={activeTab === 'lease-policy' ? 'active' : ''} onClick={() => setActiveTab('lease-policy')}>
+            <button className={activeTab === 'rental-policy' ? 'active' : ''} onClick={() => setActiveTab('rental-policy')}>
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <rect x="3" y="4" width="18" height="18" rx="2" ry="2" />
+                <line x1="16" y1="2" x2="16" y2="6" />
+                <line x1="8" y1="2" x2="8" y2="6" />
+                <line x1="3" y1="10" x2="21" y2="10" />
+              </svg>
               Chính sách thuê
             </button>
             <button className={activeTab === 'service-prices' ? 'active' : ''} onClick={() => setActiveTab('service-prices')}>
-              Giá dịch vụ
-            </button>
-            <button
-              type="button"
-              className="primary-action"
-              style={{ marginLeft: 'auto', minHeight: '38px', padding: '8px 14px' }}
-              onClick={() => {
-                setActiveTab('rooms');
-                setRoomEditorMode('list');
-              }}
-            >
-              Quay lại danh sách phòng
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <line x1="12" y1="1" x2="12" y2="23" />
+                <path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6" />
+              </svg>
+              Bảng giá dịch vụ
             </button>
           </div>
         )}
@@ -795,80 +696,150 @@ export default function RoomingHouseDetailPage() {
         <div className="tab-content" style={{ marginTop: '16px' }}>
           {/* TAB 1: THÔNG TIN CƠ BẢN */}
           {activeTab === 'basic' && (
-            <div className="editor-panel form-grid">
-              <label className="field">
-                <span>Tên khu trọ</span>
-                <input value={basicForm.name} onChange={e => setBasicForm({ ...basicForm, name: e.target.value })} />
-              </label>
+            <div className="subtab-card">
+              <div className="subtab-header">
+                <div className="subtab-header-icon">
+                  <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                    <path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z" />
+                    <polyline points="9 22 9 12 15 12 15 22" />
+                  </svg>
+                </div>
+                <div>
+                  <h4>Thông tin cơ bản</h4>
+                  <p>Quản lý các thông tin hành chính, địa chỉ và mô tả chung của khu trọ.</p>
+                </div>
+              </div>
 
-              <label className="field">
-                <span>Địa chỉ chi tiết</span>
-                <input value={basicForm.addressLine} onChange={e => setBasicForm({ ...basicForm, addressLine: e.target.value })} />
-              </label>
+              {addressLocked && (
+                <div className="subtab-alert" style={{ marginBottom: '20px' }}>
+                  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                    <circle cx="12" cy="12" r="10" />
+                    <line x1="12" y1="16" x2="12" y2="12" />
+                    <line x1="12" y1="8" x2="12.01" y2="8" />
+                  </svg>
+                  <span>Địa chỉ hành chính của khu trọ đã được duyệt nên không thể chỉnh sửa. Bạn vẫn có thể cập nhật tọa độ và link Google Maps.</span>
+                </div>
+              )}
 
-              <label className="field">
-                <span>Tỉnh / Thành phố</span>
-                <select
-                  value={basicForm.provinceCode}
-                  onChange={e => setBasicForm({ ...basicForm, provinceCode: e.target.value, wardCode: '' })}
-                >
-                  <option value="">-- Chọn Tỉnh/Thành phố --</option>
-                  {provinces.map(p => (
-                    <option key={p.code} value={p.code}>{p.name}</option>
-                  ))}
-                </select>
-              </label>
+              <div className="form-grid">
+                <label className="field">
+                  <span>
+                    Tên khu trọ
+                    <span className="label-info-icon" title="Tên hiển thị công khai của khu trọ">
+                      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="10" /><path d="M12 16v-4" /><path d="M12 8h.01" /></svg>
+                    </span>
+                  </span>
+                  <input value={basicForm.name} onChange={e => setBasicForm({ ...basicForm, name: e.target.value })} placeholder="Nhập tên khu trọ..." />
+                  <span className="helper-text">Tên khu trọ hiển thị với khách thuê</span>
+                </label>
 
-              <label className="field">
-                <span>Phường / Xã</span>
-                <select
-                  value={basicForm.wardCode}
-                  onChange={e => setBasicForm({ ...basicForm, wardCode: e.target.value })}
-                  disabled={!basicForm.provinceCode}
-                >
-                  <option value="">-- Chọn Phường/Xã --</option>
-                  {wards.map(w => (
-                    <option key={w.code} value={w.code}>{w.name}</option>
-                  ))}
-                </select>
-              </label>
+                <label className="field">
+                  <span>
+                    Địa chỉ chi tiết
+                    <span className="label-info-icon" title="Địa chỉ số nhà, tên đường">
+                      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="10" /><path d="M12 16v-4" /><path d="M12 8h.01" /></svg>
+                    </span>
+                  </span>
+                  <input disabled={addressLocked} value={basicForm.addressLine} onChange={e => setBasicForm({ ...basicForm, addressLine: e.target.value })} placeholder="VD: 144 Trần Đại Nghĩa" />
+                  <span className="helper-text">Số nhà, ngõ/hẻm, tên đường</span>
+                </label>
 
-              <LeafletLocationPicker
-                addressLine={basicForm.addressLine}
-                provinceName={selectedProvinceName}
-                wardName={selectedWardName}
-                latitude={basicForm.latitude}
-                longitude={basicForm.longitude}
-                googleMapUrl={basicForm.googleMapUrl}
-                onAddressChange={(addressLine) =>
-                  setBasicForm((current) => ({ ...current, addressLine }))
-                }
-                onLocationChange={(latitude, longitude) =>
-                  setBasicForm((current) => ({ ...current, latitude, longitude }))
-                }
-                onGoogleMapUrlChange={(googleMapUrl) =>
-                  setBasicForm((current) => ({ ...current, googleMapUrl }))
-                }
-              />
+                <label className="field">
+                  <span>Tỉnh / Thành phố</span>
+                  <select
+                    disabled={addressLocked}
+                    value={basicForm.provinceCode}
+                    onChange={e => setBasicForm({ ...basicForm, provinceCode: e.target.value, wardCode: '' })}
+                  >
+                    <option value="">-- Chọn Tỉnh/Thành phố --</option>
+                    {provinces.map(p => (
+                      <option key={p.code} value={p.code}>{p.name}</option>
+                    ))}
+                  </select>
+                  <span className="helper-text">Chọn Tỉnh/Thành phố trực thuộc</span>
+                </label>
 
-              <label className="field" style={{ gridColumn: '1 / -1' }}>
-                <span>Mô tả khu trọ</span>
-                <textarea
-                  style={{ width: '100%', minHeight: '100px', padding: '10px', border: '1px solid #cbd5e1', borderRadius: '6px', font: 'inherit' }}
-                  value={basicForm.description ?? ''}
-                  onChange={e => setBasicForm({ ...basicForm, description: e.target.value })}
-                />
-              </label>
+                <label className="field">
+                  <span>Phường / Xã</span>
+                  <select
+                    value={basicForm.wardCode}
+                    onChange={e => setBasicForm({ ...basicForm, wardCode: e.target.value })}
+                    disabled={addressLocked || !basicForm.provinceCode}
+                  >
+                    <option value="">-- Chọn Phường/Xã --</option>
+                    {wards.map(w => (
+                      <option key={w.code} value={w.code}>{w.name}</option>
+                    ))}
+                  </select>
+                  <span className="helper-text">Chọn Phường/Xã hành chính</span>
+                </label>
 
-              <div className="save-row">
-                <button className="primary-action" onClick={handleSaveBasicInfo}>Lưu thông tin</button>
+                <div style={{ gridColumn: '1 / -1', marginTop: '10px' }}>
+                  <LeafletLocationPicker
+                    addressLine={basicForm.addressLine}
+                    provinceName={selectedProvinceName}
+                    wardName={selectedWardName}
+                    latitude={basicForm.latitude}
+                    longitude={basicForm.longitude}
+                    googleMapUrl={basicForm.googleMapUrl}
+                    onAddressChange={(addressLine) =>
+                      setBasicForm((current) => addressLocked ? current : { ...current, addressLine })
+                    }
+                    onLocationChange={(latitude, longitude) =>
+                      setBasicForm((current) => ({ ...current, latitude, longitude }))
+                    }
+                    onGoogleMapUrlChange={(googleMapUrl) =>
+                      setBasicForm((current) => ({ ...current, googleMapUrl }))
+                    }
+                  />
+                </div>
+
+                <label className="field" style={{ gridColumn: '1 / -1' }}>
+                  <span>Mô tả khu trọ</span>
+                  <textarea
+                    value={basicForm.description ?? ''}
+                    onChange={e => setBasicForm({ ...basicForm, description: e.target.value })}
+                    placeholder="Mô tả các đặc điểm nổi bật của khu trọ..."
+                  />
+                  <span className="helper-text">Thông tin chi tiết giới thiệu về khu trọ tới khách thuê</span>
+                </label>
+              </div>
+
+              <div className="subtab-footer">
+                <div className="shield-info">
+                  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                    <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/>
+                  </svg>
+                  <span>Thông tin này giúp khách thuê tìm kiếm khu trọ trên bản đồ chính xác.</span>
+                </div>
+                <button className="primary-action" onClick={handleSaveBasicInfo} disabled={actionLoading}>
+                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" style={{ marginRight: '6px' }}>
+                    <path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z" />
+                    <polyline points="17 21 17 13 7 13 7 21" />
+                    <polyline points="7 3 7 8 15 8" />
+                  </svg>
+                  {actionLoading ? 'Đang lưu...' : 'Lưu thông tin cơ bản'}
+                </button>
               </div>
             </div>
           )}
 
           {/* TAB 2: ẢNH KHU TRỌ */}
           {activeTab === 'images' && (
-            <div className="editor-panel">
+            <div className="subtab-card">
+              <div className="subtab-header">
+                <div className="subtab-header-icon">
+                  <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                    <rect x="3" y="3" width="18" height="18" rx="2" ry="2" />
+                    <circle cx="8.5" cy="8.5" r="1.5" />
+                    <polyline points="21 15 16 10 5 21" />
+                  </svg>
+                </div>
+                <div>
+                  <h4>Ảnh khu trọ</h4>
+                  <p>Quản lý hình ảnh đại diện, không gian chung và chi tiết của khu trọ.</p>
+                </div>
+              </div>
               <PropertyImageEditor
                 images={houseImages}
                 scope="RoomingHouse"
@@ -880,68 +851,101 @@ export default function RoomingHouseDetailPage() {
 
           {/* TAB 3: TIỆN NGHI KHU TRỌ */}
           {activeTab === 'amenities' && (
-            <div className="editor-panel">
+            <div className="subtab-card">
+              <div className="subtab-header">
+                <div className="subtab-header-icon">
+                  <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                    <polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2" />
+                  </svg>
+                </div>
+                <div>
+                  <h4>Tiện nghi khu trọ</h4>
+                  <p>Lựa chọn các tiện ích, dịch vụ chung được cung cấp tại khu trọ này.</p>
+                </div>
+              </div>
               <AmenityEditor
                 amenities={houseAmenities}
                 selectedIds={selectedAmenityIds}
                 onChange={setSelectedAmenityIds}
                 onSave={handleSaveAmenities}
+                actionLoading={actionLoading}
               />
             </div>
           )}
 
           {/* TAB 4: GIẤY TỜ PHÁP LÝ (READ ONLY) */}
           {activeTab === 'legal' && (
-            <div className="editor-panel">
-              <h3>Thông tin giấy tờ pháp lý</h3>
-              <p style={{ color: '#64748b', marginBottom: '20px' }}>Giấy tờ pháp lý của khu trọ đã được duyệt và không thể chỉnh sửa.</p>
+            <div className="subtab-card">
+              <div className="subtab-header">
+                <div className="subtab-header-icon">
+                  <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                    <rect x="3" y="4" width="18" height="16" rx="2" ry="2" />
+                    <line x1="16" y1="2" x2="16" y2="4" />
+                    <line x1="8" y1="2" x2="8" y2="4" />
+                    <line x1="3" y1="10" x2="21" y2="10" />
+                  </svg>
+                </div>
+                <div>
+                  <h4>Giấy tờ pháp lý</h4>
+                  <p>Các giấy tờ chứng minh quyền sở hữu và vận hành khu trọ hợp pháp.</p>
+                </div>
+              </div>
 
-              <div className="form-grid" style={{ marginBottom: '24px' }}>
-                <label className="field">
-                  <span>Loại giấy tờ</span>
-                  <input value={house.legalDocument?.documentType ?? 'Không xác định'} readOnly style={{ background: '#f8fafc', color: '#64748b' }} />
-                </label>
+              <div className="subtab-alert" style={{ marginBottom: '20px' }}>
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                  <circle cx="12" cy="12" r="10" />
+                  <line x1="12" y1="16" x2="12" y2="12" />
+                  <line x1="12" y1="8" x2="12.01" y2="8" />
+                </svg>
+                <span>Giấy tờ pháp lý của khu trọ đã được ban quản trị duyệt và khóa. Bạn không thể tự ý chỉnh sửa thông tin này.</span>
+              </div>
 
-                <label className="field">
-                  <span>Số giấy tờ (Đã ẩn)</span>
-                  <input value={house.legalDocument?.documentNumberMasked ?? 'Không xác định'} readOnly style={{ background: '#f8fafc', color: '#64748b' }} />
-                </label>
+              <div className="legal-info-list" style={{ marginBottom: '24px' }}>
+                <div className="legal-info-item">
+                  <span className="legal-info-label">Loại giấy tờ pháp lý</span>
+                  <span className="legal-info-value">{house.legalDocument?.documentType ?? 'Không xác định'}</span>
+                </div>
+
+                <div className="legal-info-item">
+                  <span className="legal-info-label">Số giấy tờ (Đã ẩn)</span>
+                  <span className="legal-info-value">{house.legalDocument?.documentNumberMasked ?? 'Không xác định'}</span>
+                </div>
               </div>
 
               <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(240px, 1fr))', gap: '20px' }}>
                 <div>
-                  <h4 style={{ marginBottom: '8px' }}>Mặt trước giấy tờ</h4>
+                  <h4 style={{ fontSize: '14px', fontWeight: 600, color: '#334155', marginBottom: '10px' }}>Mặt trước giấy tờ</h4>
                   {house.legalDocument?.frontImageObjectKey ? (
                     <img
                       src={toAssetUrl(house.legalDocument.frontImageObjectKey)}
                       alt="Front"
-                      style={{ width: '100%', maxHeight: '240px', objectFit: 'contain', border: '1px solid #dbe3ef', borderRadius: '6px' }}
+                      style={{ width: '100%', maxHeight: '240px', objectFit: 'contain', border: '1px solid #e2e8f0', borderRadius: '12px', background: '#f8fafc', padding: '6px' }}
                     />
                   ) : (
-                    <p style={{ color: '#94a3b8', fontStyle: 'italic' }}>Chưa tải lên ảnh</p>
+                    <p style={{ color: '#94a3b8', fontStyle: 'italic', fontSize: '13.5px' }}>Chưa tải lên ảnh</p>
                   )}
                 </div>
 
                 <div>
-                  <h4 style={{ marginBottom: '8px' }}>Mặt sau giấy tờ</h4>
+                  <h4 style={{ fontSize: '14px', fontWeight: 600, color: '#334155', marginBottom: '10px' }}>Mặt sau giấy tờ</h4>
                   {house.legalDocument?.backImageObjectKey ? (
                     <img
                       src={toAssetUrl(house.legalDocument.backImageObjectKey)}
                       alt="Back"
-                      style={{ width: '100%', maxHeight: '240px', objectFit: 'contain', border: '1px solid #dbe3ef', borderRadius: '6px' }}
+                      style={{ width: '100%', maxHeight: '240px', objectFit: 'contain', border: '1px solid #e2e8f0', borderRadius: '12px', background: '#f8fafc', padding: '6px' }}
                     />
                   ) : (
-                    <p style={{ color: '#94a3b8', fontStyle: 'italic' }}>Chưa tải lên ảnh</p>
+                    <p style={{ color: '#94a3b8', fontStyle: 'italic', fontSize: '13.5px' }}>Chưa tải lên ảnh</p>
                   )}
                 </div>
 
                 {house.legalDocument?.extraImageObjectKey && (
                   <div>
-                    <h4 style={{ marginBottom: '8px' }}>Ảnh bổ sung</h4>
+                    <h4 style={{ fontSize: '14px', fontWeight: 600, color: '#334155', marginBottom: '10px' }}>Ảnh bổ sung</h4>
                     <img
                       src={toAssetUrl(house.legalDocument.extraImageObjectKey)}
                       alt="Extra"
-                      style={{ width: '100%', maxHeight: '240px', objectFit: 'contain', border: '1px solid #dbe3ef', borderRadius: '6px' }}
+                      style={{ width: '100%', maxHeight: '240px', objectFit: 'contain', border: '1px solid #e2e8f0', borderRadius: '12px', background: '#f8fafc', padding: '6px' }}
                     />
                   </div>
                 )}
@@ -951,8 +955,21 @@ export default function RoomingHouseDetailPage() {
 
           {/* TAB 4.5: LUẬT KHU TRỌ */}
           {activeTab === 'house-rule' && (
-            <div className="editor-panel">
-              <h3 style={{ margin: '0 0 12px 0' }}>Luật khu trọ</h3>
+            <div className="subtab-card">
+              <div className="subtab-header">
+                <div className="subtab-header-icon">
+                  <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                    <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" />
+                    <polyline points="14 2 14 8 20 8" />
+                    <line x1="16" y1="13" x2="8" y2="13" />
+                    <line x1="16" y1="17" x2="8" y2="17" />
+                  </svg>
+                </div>
+                <div>
+                  <h4>Luật & Quy định khu trọ</h4>
+                  <p>Thiết lập nội quy bắt buộc đối với tất cả khách thuê nhằm bảo đảm an ninh trật tự.</p>
+                </div>
+              </div>
               <RoomingHouseRuleEditor
                 roomingHouseId={house.id}
                 houseRule={house.houseRule}
@@ -962,122 +979,225 @@ export default function RoomingHouseDetailPage() {
           )}
 
           {/* TAB 4.5: CHÍNH SÁCH THUÊ */}
-          {activeTab === 'lease-policy' && (
-            <div className="editor-panel" style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
-              <h3 style={{ margin: '0 0 10px 0', borderBottom: '1px solid #e2e8f0', paddingBottom: '12px', color: '#1e293b', fontSize: '18px', fontWeight: 600 }}>
-                Cấu hình chính sách cho thuê
-              </h3>
+          {activeTab === 'rental-policy' && (
+            <div className="subtab-card">
+              <div className="subtab-header">
+                <div className="subtab-header-icon">
+                  <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                    <rect x="3" y="4" width="18" height="18" rx="2" ry="2" />
+                    <line x1="16" y1="2" x2="16" y2="6" />
+                    <line x1="8" y1="2" x2="8" y2="6" />
+                    <line x1="3" y1="10" x2="21" y2="10" />
+                  </svg>
+                </div>
+                <div>
+                  <h4>Chính sách thuê</h4>
+                  <p>Thiết lập thời hạn hợp đồng, tiền cọc và chu kỳ thanh toán định kỳ của khu trọ.</p>
+                </div>
+              </div>
 
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr', gap: '20px' }}>
-                {/* Section 1: Điều khoản cơ bản */}
-                <div style={{ background: '#f8fafc', padding: '20px', borderRadius: '8px', border: '1px solid #e2e8f0' }}>
-                  <h4 style={{ margin: '0 0 16px 0', color: '#334155', fontSize: '15px', fontWeight: 600 }}>Điều khoản cơ bản</h4>
-                  <div className="form-grid">
-                    <label className="field">
-                      <span>Số ngày báo trước khi gia hạn</span>
-                      <input
-                        type="number"
-                        min="0"
-                        value={leasePolicyForm.renewalNoticeDays}
-                        onChange={(e) =>
-                          setLeasePolicyForm({ ...leasePolicyForm, renewalNoticeDays: Number(e.target.value) || 0 })
-                        }
-                      />
-                    </label>
-
-                    <label className="field">
-                      <span>Số tháng tiền cọc</span>
-                      <input
-                        type="number"
-                        min="0"
-                        value={leasePolicyForm.depositMonths}
-                        onChange={(e) =>
-                          setLeasePolicyForm({ ...leasePolicyForm, depositMonths: Number(e.target.value) || 0 })
-                        }
-                      />
-                    </label>
+              <div className="form-grid" style={{ marginBottom: '20px' }}>
+                <label className="field">
+                  <span>
+                    Số tháng thuê tối thiểu
+                    <span className="label-info-icon" title="Thời gian hợp đồng thuê tối thiểu khách phải ký">
+                      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="10" /><path d="M12 16v-4" /><path d="M12 8h.01" /></svg>
+                    </span>
+                  </span>
+                  <div className="input-wrapper">
+                    <input
+                      type="number"
+                      min="1"
+                      value={rentalPolicyForm.minRentalMonths}
+                      onChange={(e) =>
+                        setRentalPolicyForm({ ...rentalPolicyForm, minRentalMonths: Number(e.target.value) || 1 })
+                      }
+                    />
+                    <span className="input-suffix">tháng</span>
                   </div>
+                  <span className="helper-text">Thời hạn hợp đồng tối thiểu</span>
+                </label>
 
-                  <div style={{ marginTop: '16px' }}>
-                    <label style={{ display: 'flex', alignItems: 'center', gap: '10px', cursor: 'pointer', userSelect: 'none' }}>
+                <label className="field">
+                  <span>
+                    Số tháng thuê tối đa
+                    <span className="label-info-icon" title="Thời gian hợp đồng tối đa cho mỗi lần ký">
+                      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="10" /><path d="M12 16v-4" /><path d="M12 8h.01" /></svg>
+                    </span>
+                  </span>
+                  <div className="input-wrapper">
+                    <input
+                      type="number"
+                      min="1"
+                      value={rentalPolicyForm.maxRentalMonths}
+                      onChange={(e) =>
+                        setRentalPolicyForm({ ...rentalPolicyForm, maxRentalMonths: Number(e.target.value) || 1 })
+                      }
+                    />
+                    <span className="input-suffix">tháng</span>
+                  </div>
+                  <span className="helper-text">Thời hạn hợp đồng tối đa</span>
+                </label>
+
+                <label className="field">
+                  <span>
+                    Số ngày báo trước khi gia hạn
+                    <span className="label-info-icon" title="Khách thuê cần báo trước số ngày này nếu muốn dọn đi hoặc gia hạn">
+                      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="10" /><path d="M12 16v-4" /><path d="M12 8h.01" /></svg>
+                    </span>
+                  </span>
+                  <div className="input-wrapper">
+                    <input
+                      type="number"
+                      min="0"
+                      value={rentalPolicyForm.renewalNoticeDays}
+                      onChange={(e) =>
+                        setRentalPolicyForm({ ...rentalPolicyForm, renewalNoticeDays: Number(e.target.value) || 0 })
+                      }
+                    />
+                    <span className="input-suffix">ngày</span>
+                  </div>
+                  <span className="helper-text">Hạn báo trước khi hết hợp đồng</span>
+                </label>
+
+                <label className="field">
+                  <span>
+                    Số tháng tiền cọc
+                    <span className="label-info-icon" title="Số tháng tiền phòng khách cần đặt cọc trước khi dọn vào">
+                      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="10" /><path d="M12 16v-4" /><path d="M12 8h.01" /></svg>
+                    </span>
+                  </span>
+                  <div className="input-wrapper">
+                    <input
+                      type="number"
+                      min="0"
+                      value={rentalPolicyForm.depositMonths}
+                      onChange={(e) =>
+                        setRentalPolicyForm({ ...rentalPolicyForm, depositMonths: Number(e.target.value) || 0 })
+                      }
+                    />
+                    <span className="input-suffix">tháng</span>
+                  </div>
+                  <span className="helper-text">Khoản tiền cọc đảm bảo hợp đồng</span>
+                </label>
+
+                <label className="field">
+                  <span>
+                    Ngày thanh toán mặc định
+                    <span className="label-info-icon" title="Ngày thanh toán tiền phòng cố định hàng tháng">
+                      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="10" /><path d="M12 16v-4" /><path d="M12 8h.01" /></svg>
+                    </span>
+                  </span>
+                  <div className="input-wrapper">
+                    <input
+                      type="number"
+                      min="1"
+                      max="28"
+                      value={rentalPolicyForm.defaultPaymentDay}
+                      onChange={(e) =>
+                        setRentalPolicyForm({ ...rentalPolicyForm, defaultPaymentDay: Number(e.target.value) || 5 })
+                      }
+                    />
+                    <span className="input-suffix">hàng tháng</span>
+                  </div>
+                  <span className="helper-text">Hạn thanh toán hóa đơn định kỳ (từ ngày 1 đến ngày 28)</span>
+                </label>
+
+                <div style={{ gridColumn: '1 / -1', marginTop: '10px' }}>
+                  <div className="checkbox-card-panel">
+                    <div className="checkbox-card-left">
                       <input
                         type="checkbox"
-                        style={{ width: '18px', height: '18px', margin: 0, cursor: 'pointer' }}
-                        checked={leasePolicyForm.allowShortTermRenewal}
+                        className="checkbox-card-input"
+                        checked={rentalPolicyForm.allowShortTermRenewal}
                         onChange={(e) =>
-                          setLeasePolicyForm({ ...leasePolicyForm, allowShortTermRenewal: e.target.checked })
+                          setRentalPolicyForm({ ...rentalPolicyForm, allowShortTermRenewal: e.target.checked })
                         }
                       />
-                      <span style={{ fontSize: '14px', fontWeight: 600, color: '#475569' }}>
-                        Cho phép gia hạn ngắn hạn (dưới 6 tháng)
-                      </span>
-                    </label>
-                  </div>
-                </div>
-
-                {/* Section 2: Chương trình giảm giá */}
-                <div style={{ background: '#f8fafc', padding: '20px', borderRadius: '8px', border: '1px solid #e2e8f0' }}>
-                  <h4 style={{ margin: '0 0 16px 0', color: '#334155', fontSize: '15px', fontWeight: 600 }}>
-                    Ưu đãi giảm giá theo thời hạn thuê (%)
-                  </h4>
-                  <div className="form-grid">
-                    <label className="field">
-                      <span>Giảm giá thuê 6 tháng (%)</span>
-                      <input
-                        type="number"
-                        min="0"
-                        max="100"
-                        value={leasePolicyForm.discount6MonthsPercent}
-                        onChange={(e) =>
-                          setLeasePolicyForm({ ...leasePolicyForm, discount6MonthsPercent: Number(e.target.value) || 0 })
-                        }
-                      />
-                    </label>
-
-                    <label className="field">
-                      <span>Giảm giá thuê 9 tháng (%)</span>
-                      <input
-                        type="number"
-                        min="0"
-                        max="100"
-                        value={leasePolicyForm.discount9MonthsPercent}
-                        onChange={(e) =>
-                          setLeasePolicyForm({ ...leasePolicyForm, discount9MonthsPercent: Number(e.target.value) || 0 })
-                        }
-                      />
-                    </label>
-
-                    <label className="field">
-                      <span>Giảm giá thuê 12 tháng (%)</span>
-                      <input
-                        type="number"
-                        min="0"
-                        max="100"
-                        value={leasePolicyForm.discount12MonthsPercent}
-                        onChange={(e) =>
-                          setLeasePolicyForm({ ...leasePolicyForm, discount12MonthsPercent: Number(e.target.value) || 0 })
-                        }
-                      />
-                    </label>
-
-                    <label className="field">
-                      <span>Giảm giá thuê 24 tháng (%)</span>
-                      <input
-                        type="number"
-                        min="0"
-                        max="100"
-                        value={leasePolicyForm.discount24MonthsPercent}
-                        onChange={(e) =>
-                          setLeasePolicyForm({ ...leasePolicyForm, discount24MonthsPercent: Number(e.target.value) || 0 })
-                        }
-                      />
-                    </label>
+                      <div className="checkbox-card-text">
+                        <span className="checkbox-card-title">Cho phép gia hạn hợp đồng ngắn hạn</span>
+                        <span className="checkbox-card-desc">Hỗ trợ khách thuê ký tiếp hợp đồng ngắn hạn (dưới 6 tháng) khi sắp hết hạn</span>
+                      </div>
+                    </div>
+                    <div className="checkbox-card-icon">
+                      <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                        <rect x="3" y="4" width="18" height="18" rx="2" ry="2" />
+                        <line x1="16" y1="2" x2="16" y2="6" />
+                        <line x1="8" y1="2" x2="8" y2="6" />
+                        <line x1="3" y1="10" x2="21" y2="10" />
+                      </svg>
+                    </div>
                   </div>
                 </div>
               </div>
 
-              <div className="save-row" style={{ marginTop: '8px' }}>
-                <button className="primary-action" onClick={handleSaveLeasePolicy}>Lưu chính sách thuê</button>
+              <div className="subtab-footer">
+                <div className="shield-info">
+                  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                    <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/>
+                  </svg>
+                  <span>Chính sách thuê rõ ràng giúp giảm thiểu các tranh chấp không đáng có.</span>
+                </div>
+                <button className="primary-action" onClick={handleSaveRentalPolicy} disabled={actionLoading}>
+                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" style={{ marginRight: '6px' }}>
+                    <path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z" />
+                    <polyline points="17 21 17 13 7 13 7 21" />
+                    <polyline points="7 3 7 8 15 8" />
+                  </svg>
+                  {actionLoading ? 'Đang lưu...' : 'Lưu chính sách thuê'}
+                </button>
+              </div>
+            </div>
+          )}
+
+          {/* TAB: TẠO PHÒNG MỚI */}
+          {activeTab === 'create-room' && (
+            <div className="editor-panel" style={{ marginTop: '20px', background: '#f8fafc', border: '1px solid #cbd5e1' }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px' }}>
+                <h3 style={{ margin: 0, fontSize: '18px', color: '#1e293b' }}>Tạo phòng mới</h3>
+              </div>
+
+              <div className="tabs" style={{ marginBottom: '16px', display: 'flex', alignItems: 'center' }}>
+                <button className="active" style={{ fontWeight: 600 }}>Thông tin cơ bản</button>
+                <button disabled style={{ opacity: 0.5, cursor: 'not-allowed' }}>Ảnh phòng</button>
+                <button disabled style={{ opacity: 0.5, cursor: 'not-allowed' }}>Tiện ích phòng</button>
+                <button disabled style={{ opacity: 0.5, cursor: 'not-allowed' }}>Bảng giá</button>
+              </div>
+
+              <div className="form-grid">
+                <label className="field">
+                  <span>Số phòng / Tên phòng</span>
+                  <input value={newRoomForm.roomNumber} onChange={e => setNewRoomForm({ ...newRoomForm, roomNumber: e.target.value })} placeholder="VD: 101" />
+                </label>
+
+                <label className="field">
+                  <span>Tầng</span>
+                  <input type="number" value={newRoomForm.floor} onChange={e => setNewRoomForm({ ...newRoomForm, floor: Number(e.target.value) || 1 })} />
+                </label>
+
+                <label className="field">
+                  <span>Diện tích (m²)</span>
+                  <input type="number" value={newRoomForm.areaM2 ?? ''} onChange={e => setNewRoomForm({ ...newRoomForm, areaM2: e.target.value === '' ? null : Number(e.target.value) })} placeholder="VD: 25" />
+                </label>
+
+                <label className="field">
+                  <span>Số khách tối đa</span>
+                  <input type="number" value={newRoomForm.maxOccupants} onChange={e => setNewRoomForm({ ...newRoomForm, maxOccupants: Number(e.target.value) || 1 })} />
+                </label>
+
+                <label className="field checkbox-field" style={{ gridColumn: '1 / -1', display: 'flex', alignItems: 'center', gap: '8px', marginTop: '8px' }}>
+                  <input type="checkbox" checked={newRoomForm.isTieredPricing} onChange={e => setNewRoomForm({ ...newRoomForm, isTieredPricing: e.target.checked })} style={{ width: '18px', height: '18px', margin: 0, cursor: 'pointer' }} />
+                  <span style={{ fontSize: '14px', fontWeight: 600, color: '#475569' }}>Áp dụng giá thuê theo số lượng người ở (bảng giá thay đổi)</span>
+                </label>
+
+                <label className="field" style={{ gridColumn: '1 / -1' }}>
+                  <span>Mô tả phòng</span>
+                  <textarea style={{ width: '100%', minHeight: '80px', padding: '10px', border: '1px solid #cbd5e1', borderRadius: '6px', font: 'inherit' }} value={newRoomForm.description ?? ''} onChange={e => setNewRoomForm({ ...newRoomForm, description: e.target.value })} placeholder="Mô tả thêm về phòng..." />
+                </label>
+
+                <div className="save-row">
+                  <button className="primary-action" onClick={handleCreateRoomSubmit}>Lưu thông tin</button>
+                </div>
               </div>
             </div>
           )}
@@ -1085,6 +1205,7 @@ export default function RoomingHouseDetailPage() {
           {/* TAB 5: QUẢN LÝ PHÒNG */}
           {activeTab === 'service-prices' && (
             <ServicePriceEditorBatch
+              serviceTypes={billingServiceTypes}
               prices={servicePrices}
               activePrices={activeServicePrices}
               priceHistory={servicePriceHistory}
@@ -1092,6 +1213,7 @@ export default function RoomingHouseDetailPage() {
               drafts={servicePriceDrafts}
               note={servicePriceNote}
               actionLoading={actionLoading}
+              effectiveFromDate={isFirstTimeServicePrice ? getCurrentMonth1st() : getNextMonth1st()}
               onChangeDraft={handleChangeServicePriceDraft}
               onChangeNote={setServicePriceNote}
               onSubmit={handleSaveServicePrices}
@@ -1101,207 +1223,120 @@ export default function RoomingHouseDetailPage() {
 
           {activeTab === 'rooms' && (
             <div>
-              {roomEditorMode === 'list' && (
-                <>
-                  {!house.leasePolicy ? (
-                    <div className="empty-panel">
-                      <h2>Chưa có chính sách cho thuê</h2>
-                      <p>Vui lòng hoàn thành cấu hình chính sách cho thuê trước khi bắt đầu tạo phòng.</p>
-                      <button className="primary-action" onClick={() => setActiveTab('lease-policy')}>
-                        Cấu hình chính sách cho thuê
-                      </button>
-                    </div>
-                  ) : !house.houseRule ? (
-                    <div className="empty-panel">
-                      <h2>Chưa có Luật khu trọ</h2>
-                      <p>Vui lòng hoàn thành Luật khu trọ trước khi bắt đầu tạo phòng.</p>
-                      <button className="primary-action" onClick={() => setActiveTab('house-rule')}>
-                        Cấu hình Luật khu trọ
-                      </button>
-                    </div>
-                  ) : rooms.length === 0 ? (
-                    <div className="empty-panel">
-                      <h2>Chưa có phòng nào</h2>
-                      <p>Khu trọ của bạn chưa có phòng nào. Hãy tạo phòng mới bằng nút "Tạo phòng mới" ở góc phải phía trên.</p>
-                    </div>
-                  ) : (
-                    <div className="card-grid">
-                      {rooms.map(room => (
-                        <button key={room.id} className="dashboard-card" onClick={() => openRoom(room.id)}>
-                          <div className="card-header">
-                            <h3>Phòng {room.roomNumber}</h3>
-                            <span>Cập nhật: {formatDate(room.updatedAt)}</span>
-                          </div>
-                          <p style={{ margin: '8px 0 4px' }}>Tầng: {room.floor}</p>
-                          <p style={{ margin: '0 0 8px' }}>
-                            {room.areaM2 ? `${room.areaM2} m²` : 'Chưa nhập diện tích'} - Tối đa: {room.maxOccupants} người
-                          </p>
-                          <span className={`status-pill ${getStatusToneClass(room.status)}`}>
-                            {formatStatus(room.status)}
-                          </span>
-                        </button>
-                      ))}
-                    </div>
-                  )}
-                </>
-              )}
 
-              {(roomEditorMode === 'edit' || roomEditorMode === 'create') && (
-                <div className="editor-panel">
-                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px' }}>
-                    <button className="back-link" style={{ margin: 0 }} onClick={() => setRoomEditorMode('list')}>
-                      ← Quay lại danh sách phòng
-                    </button>
-                    {roomEditorMode === 'edit' && selectedRoom && (
-                      <div style={{ display: 'flex', gap: '8px' }}>
-                        <button
-                          className="secondary-action"
-                          onClick={() => navigate(`${ROUTE_PATHS.LANDLORD.METER_READINGS}?roomId=${selectedRoom.id}`)}
-                        >
-                          Nhập chỉ số
-                        </button>
-                        <button
-                          className="secondary-action"
-                          onClick={() => navigate(`${ROUTE_PATHS.LANDLORD.INVOICE_CREATE}?roomId=${selectedRoom.id}`)}
-                        >
-                          Tạo hóa đơn
-                        </button>
-                        {selectedRoom.status === 'Hidden' && (
-                          <button className="primary-action" onClick={handlePublishRoom}>
-                            Hiển thị phòng (Hoạt động)
-                          </button>
-                        )}
-                        <span className={`status-pill ${getStatusToneClass(selectedRoom.status)}`} style={{ padding: '8px 16px', fontSize: '13px' }}>
-                          Trạng thái: {formatStatus(selectedRoom.status)}
-                        </span>
-                      </div>
-                    )}
+
+              {!house.rentalPolicy ? (
+                <div className="empty-panel-container" style={{ display: 'grid', gap: '16px' }}>
+                  <div className="rooming-house-rule-editor__alert rooming-house-rule-editor__alert--warning">
+                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                      <path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z" />
+                      <line x1="12" y1="9" x2="12" y2="13" />
+                      <line x1="12" y1="17" x2="12.01" y2="17" />
+                    </svg>
+                    <span>Vui lòng hoàn thành Chính Sách Thuê ở phần thông tin khu trọ để được tạo phòng.</span>
                   </div>
 
-                  <h3 style={{ marginBottom: '16px' }}>
-                    {roomEditorMode === 'create' ? 'Tạo phòng mới' : `Chỉnh sửa Phòng ${selectedRoom?.roomNumber}`}
-                  </h3>
+                  <div className="empty-panel">
+                    <svg width="240" height="180" viewBox="0 0 240 180" fill="none" xmlns="http://www.w3.org/2000/svg" style={{ marginBottom: '16px' }}>
+                      <path d="M190 120c0-5.5-4.5-10-10-10h-5c-6.6 0-12 5.4-12 12s5.4 12 12 12h15c5.5 0 10-4.5 10-10z" fill="#f1f5f9" opacity="0.6" />
+                      <path d="M50 110c0-6.6 5.4-12 12-12h8c8.8 0 16 7.2 16 16s-7.2 16-16 16h-8c-6.6 0-12-5.4-12-12z" fill="#f1f5f9" opacity="0.6" />
+                      <path d="M120 160h60" stroke="#eff6ff" strokeWidth="6" strokeLinecap="round" />
+                      <path d="M60 160h120" stroke="#3b82f6" strokeWidth="3" strokeLinecap="round" />
+                      <rect x="94" y="24" width="72" height="96" rx="8" fill="#e2e8f0" />
+                      <rect x="90" y="20" width="72" height="96" rx="8" fill="#ffffff" stroke="#cbd5e1" strokeWidth="2" />
+                      <rect x="110" y="52" width="40" height="4" rx="2" fill="#e2e8f0" />
+                      <rect x="110" y="68" width="40" height="4" rx="2" fill="#cbd5e1" />
+                      <rect x="110" y="84" width="30" height="4" rx="2" fill="#e2e8f0" />
+                      <rect x="100" y="50" width="8" height="8" rx="2" fill="#eff6ff" stroke="#3b82f6" strokeWidth="1.5" />
+                      <path d="M102 54l1.5 1.5 3-3" stroke="#3b82f6" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
+                      <rect x="100" y="66" width="8" height="8" rx="2" fill="#eff6ff" stroke="#3b82f6" strokeWidth="1.5" />
+                      <path d="M102 70l1.5 1.5 3-3" stroke="#3b82f6" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
+                      <rect x="100" y="82" width="8" height="8" rx="2" fill="#ffffff" stroke="#cbd5e1" strokeWidth="1.5" />
+                      <rect x="112" y="12" width="28" height="12" rx="4" fill="#64748b" />
+                      <circle cx="126" cy="18" r="3" fill="#cbd5e1" />
+                      <path d="M60 80c0 15 15 25 25 30 10-5 25-15 25-30V60l-25-10-25 10v20z" fill="#3b82f6" />
+                      <path d="M63 80c0 13 13 22 22 26V53l-22 9v18z" fill="#2563eb" />
+                      <path d="M75 80l4 4 8-8" stroke="#ffffff" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round" />
+                      <circle cx="176" cy="74" r="10" stroke="#3b82f6" strokeWidth="3.5" fill="#ffffff" />
+                      <circle cx="176" cy="74" r="3" fill="#3b82f6" />
+                      <path d="M169 81l-14 14" stroke="#3b82f6" strokeWidth="4.5" strokeLinecap="round" />
+                      <path d="M158 92l2 2" stroke="#3b82f6" strokeWidth="3.5" strokeLinecap="round" />
+                      <path d="M161 89l2 2" stroke="#3b82f6" strokeWidth="3.5" strokeLinecap="round" />
+                    </svg>
 
-                  <div className="tabs" style={{ marginBottom: '16px' }}>
-                    <button className={roomActiveTab === 'basic' ? 'active' : ''} onClick={() => setRoomActiveTab('basic')}>
-                      Thông tin cơ bản
-                    </button>
-                    <button
-                      className={roomActiveTab === 'images' ? 'active' : ''}
-                      onClick={() => setRoomActiveTab('images')}
-                      disabled={roomEditorMode === 'create' && !selectedRoom}
-                    >
-                      Ảnh phòng
-                    </button>
-                    <button
-                      className={roomActiveTab === 'amenities' ? 'active' : ''}
-                      onClick={() => setRoomActiveTab('amenities')}
-                      disabled={roomEditorMode === 'create' && !selectedRoom}
-                    >
-                      Tiện ích phòng
-                    </button>
-                    <button
-                      className={roomActiveTab === 'price' ? 'active' : ''}
-                      onClick={() => setRoomActiveTab('price')}
-                      disabled={roomEditorMode === 'create' && !selectedRoom}
-                    >
-                      Bảng giá
+                    <h2>Chưa có chính sách cho thuê</h2>
+                    <p>Vui lòng hoàn thành cấu hình chính sách cho thuê trước khi bắt đầu tạo phòng.</p>
+                    <button className="action-btn-primary" onClick={() => setActiveTab('rental-policy')} style={{ padding: '8px 20px', minHeight: '40px' }}>
+                      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ marginRight: '8px' }}>
+                        <circle cx="12" cy="12" r="3" />
+                        <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z" />
+                      </svg>
+                      Cấu hình chính sách cho thuê
                     </button>
                   </div>
+                </div>
+              ) : !house.houseRule ? (
+                <div className="empty-panel-container" style={{ display: 'grid', gap: '16px' }}>
+                  <div className="rooming-house-rule-editor__alert rooming-house-rule-editor__alert--warning">
+                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                      <path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z" />
+                      <line x1="12" y1="9" x2="12" y2="13" />
+                      <line x1="12" y1="17" x2="12.01" y2="17" />
+                    </svg>
+                    <span>Vui lòng hoàn thành Luật khu trọ ở phần thông tin khu trọ để được tạo phòng.</span>
+                  </div>
 
-                  {/* ROOM TAB 1: THÔNG TIN CƠ BẢN PHÒNG */}
-                  {roomActiveTab === 'basic' && (
-                    <div className="form-grid">
-                      <label className="field">
-                        <span>Số phòng / Tên phòng</span>
-                        <input value={roomForm.roomNumber} onChange={e => setRoomForm({ ...roomForm, roomNumber: e.target.value })} />
-                      </label>
+                  <div className="empty-panel">
+                    <svg width="240" height="180" viewBox="0 0 240 180" fill="none" xmlns="http://www.w3.org/2000/svg" style={{ marginBottom: '16px' }}>
+                      <path d="M190 120c0-5.5-4.5-10-10-10h-5c-6.6 0-12 5.4-12 12s5.4 12 12 12h15c5.5 0 10-4.5 10-10z" fill="#f1f5f9" opacity="0.6" />
+                      <path d="M50 110c0-6.6 5.4-12 12-12h8c8.8 0 16 7.2 16 16s-7.2 16-16 16h-8c-6.6 0-12-5.4-12-12z" fill="#f1f5f9" opacity="0.6" />
+                      <path d="M60 160h120" stroke="#3b82f6" strokeWidth="3" strokeLinecap="round" />
+                      <rect x="94" y="24" width="72" height="96" rx="8" fill="#e2e8f0" />
+                      <rect x="90" y="20" width="72" height="96" rx="8" fill="#ffffff" stroke="#cbd5e1" strokeWidth="2" />
+                      <line x1="106" y1="46" x2="146" y2="46" stroke="#94a3b8" strokeWidth="2" strokeLinecap="round" />
+                      <line x1="106" y1="58" x2="146" y2="58" stroke="#cbd5e1" strokeWidth="2" strokeLinecap="round" />
+                      <line x1="106" y1="70" x2="146" y2="70" stroke="#cbd5e1" strokeWidth="2" strokeLinecap="round" />
+                      <line x1="106" y1="82" x2="136" y2="82" stroke="#cbd5e1" strokeWidth="2" strokeLinecap="round" />
+                      <line x1="106" y1="94" x2="146" y2="94" stroke="#cbd5e1" strokeWidth="2" strokeLinecap="round" />
+                      <rect x="112" y="12" width="28" height="12" rx="4" fill="#3b82f6" />
+                      <circle cx="126" cy="18" r="3" fill="#ffffff" />
+                    </svg>
 
-                      <label className="field">
-                        <span>Tầng</span>
-                        <input
-                          type="number"
-                          value={roomForm.floor}
-                          onChange={e => setRoomForm({ ...roomForm, floor: Number(e.target.value) || 1 })}
-                        />
-                      </label>
-
-                      <label className="field">
-                        <span>Diện tích (m²)</span>
-                        <input
-                          type="number"
-                          value={roomForm.areaM2 ?? ''}
-                          onChange={e => setRoomForm({ ...roomForm, areaM2: e.target.value === '' ? null : Number(e.target.value) })}
-                        />
-                      </label>
-
-                      <label className="field">
-                        <span>Số khách tối đa</span>
-                        <input
-                          type="number"
-                          value={roomForm.maxOccupants}
-                          onChange={e => setRoomForm({ ...roomForm, maxOccupants: Number(e.target.value) || 1 })}
-                        />
-                      </label>
-
-                      <label className="field checkbox-field" style={{ gridColumn: '1 / -1', display: 'flex', alignItems: 'center', gap: '8px', marginTop: '8px' }}>
-                        <input
-                          type="checkbox"
-                          checked={roomForm.isTieredPricing}
-                          onChange={e => setRoomForm({ ...roomForm, isTieredPricing: e.target.checked })}
-                          style={{ width: '18px', height: '18px', margin: 0, cursor: 'pointer' }}
-                        />
-                        <span style={{ fontSize: '14px', fontWeight: 600, color: '#475569' }}>
-                          Áp dụng giá thuê theo số lượng người ở (bảng giá thay đổi)
-                        </span>
-                      </label>
-
-                      <label className="field" style={{ gridColumn: '1 / -1' }}>
-                        <span>Mô tả phòng</span>
-                        <textarea
-                          style={{ width: '100%', minHeight: '80px', padding: '10px', border: '1px solid #cbd5e1', borderRadius: '6px', font: 'inherit' }}
-                          value={roomForm.description ?? ''}
-                          onChange={e => setRoomForm({ ...roomForm, description: e.target.value })}
-                        />
-                      </label>
-
-                      <div className="save-row">
-                        <button className="primary-action" onClick={handleSaveRoomBasic}>Lưu thông tin</button>
+                    <h2>Chưa có Luật khu trọ</h2>
+                    <p>Vui lòng hoàn thành Luật khu trọ trước khi bắt đầu tạo phòng.</p>
+                    <button className="action-btn-primary" onClick={() => setActiveTab('house-rule')} style={{ padding: '8px 20px', minHeight: '40px' }}>
+                      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ marginRight: '8px' }}>
+                        <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" />
+                        <polyline points="14 2 14 8 20 8" />
+                        <line x1="16" y1="13" x2="8" y2="13" />
+                        <line x1="16" y1="17" x2="8" y2="17" />
+                      </svg>
+                      Cấu hình Luật khu trọ
+                    </button>
+                  </div>
+                </div>
+              ) : rooms.length === 0 ? (
+                <div className="empty-panel">
+                  <h2>Chưa có phòng nào</h2>
+                  <p>Khu trọ của bạn chưa có phòng nào. Hãy tạo phòng mới bằng nút "Tạo phòng mới" ở góc phải phía trên.</p>
+                </div>
+              ) : (
+                <div className="card-grid">
+                  {rooms.map(room => (
+                    <button key={room.id} className="dashboard-card" onClick={() => navigate(ROUTE_PATHS.LANDLORD.ROOM_DETAIL(id!, room.id))}>
+                      <div className="card-header">
+                        <h3>Phòng {room.roomNumber}</h3>
+                        <span>Cập nhật: {formatDate(room.updatedAt)}</span>
                       </div>
-                    </div>
-                  )}
-
-                  {/* ROOM TAB 2: ẢNH PHÒNG */}
-                  {roomActiveTab === 'images' && selectedRoom && (
-                    <PropertyImageEditor
-                      images={roomImages}
-                      scope="Room"
-                      onChange={setRoomImages}
-                      onSave={handleSaveRoomImages}
-                    />
-                  )}
-
-                  {/* ROOM TAB 3: TIỆN NGHI PHÒNG */}
-                  {roomActiveTab === 'amenities' && selectedRoom && (
-                    <AmenityEditor
-                      amenities={roomAmenities}
-                      selectedIds={roomAmenityIds}
-                      onChange={setRoomAmenityIds}
-                      onSave={handleSaveRoomAmenities}
-                    />
-                  )}
-
-                  {/* ROOM TAB 4: BẢNG GIÁ PHÒNG */}
-                  {roomActiveTab === 'price' && selectedRoom && (
-                    <PriceTierEditor
-                      priceTiers={priceTiers}
-                      isTieredPricing={selectedRoom.isTieredPricing}
-                      maxOccupants={selectedRoom.maxOccupants}
-                      onChange={setPriceTiers}
-                      onSave={handleSaveRoomPrice}
-                      depositMonths={house?.leasePolicy?.depositMonths}
-                    />
-                  )}
+                      <p style={{ margin: '8px 0 4px' }}>Tầng: {room.floor}</p>
+                      <p style={{ margin: '0 0 8px' }}>
+                        {room.areaM2 ? `${room.areaM2} m²` : 'Chưa nhập diện tích'} - Tối đa: {room.maxOccupants} người
+                      </p>
+                      <span className={`status-pill ${getStatusToneClass(room.status)}`}>
+                        {formatStatus(room.status)}
+                      </span>
+                    </button>
+                  ))}
                 </div>
               )}
             </div>
@@ -1314,564 +1349,59 @@ export default function RoomingHouseDetailPage() {
 
 // ─── Subcomponents ──────────────────────────────────────────────────────────
 
-function ServicePriceEditorBatch({
-  activePrices,
-  priceHistory,
-  loading,
-  drafts,
-  note,
-  actionLoading,
-  onChangeDraft,
-  onChangeNote,
-  onSubmit,
-  onReload,
-}: {
-  prices: ServicePrice[];
-  activePrices: ServicePrice[];
-  priceHistory: ServicePrice[];
-  loading: boolean;
-  drafts: CreateServicePriceRequest[];
-  note: string;
-  actionLoading: boolean;
-  onChangeDraft: (serviceCode: BillingServiceCode, patch: Partial<CreateServicePriceRequest>) => void;
-  onChangeNote: (note: string) => void;
-  onSubmit: (event: FormEvent<HTMLFormElement>) => void;
-  onReload: () => void;
-}) {
-  const activeByCode = new Map(activePrices.map((price) => [price.serviceCode, price]));
-  const historyGroups = buildServicePriceHistoryGroups(priceHistory);
-
-  return (
-    <div className="editor-panel service-price-editor">
-      <div className="service-price-header">
-        <div>
-          <h3>Giá dịch vụ của khu trọ</h3>
-          <p>Chỉnh sửa tất cả rồi lưu một lần. Giá mới chỉ áp dụng từ đầu kỳ tiếp theo.</p>
-        </div>
-        <button type="button" className="secondary-action" onClick={onReload} disabled={loading}>
-          Hoàn tác
-        </button>
-      </div>
-
-      <form className="service-price-batch" onSubmit={onSubmit}>
-        <div className="service-price-batch-table">
-          <div className="service-price-batch-row service-price-batch-row--head">
-            <span>Dịch vụ</span>
-            <span>Giá hiện tại</span>
-            <span>Cách tính phí</span>
-            <span>Giá mới</span>
-            <span>Từ ngày</span>
-          </div>
-          {serviceOptions.map((service) => {
-            const currentPrice = activeByCode.get(service.code);
-            const draft = drafts.find((item) => item.serviceCode === service.code) ?? defaultServicePriceDrafts.find((item) => item.serviceCode === service.code)!;
-            const methods = getServiceBillingMethods(service.code);
-
-            return (
-              <div className="service-price-batch-row" key={service.code}>
-                <div className="service-price-service">
-                  <span className={`service-price-icon service-price-icon--${service.code.toLowerCase()}`}>{getServiceIcon(service.code)}</span>
-                  <strong>{service.label}</strong>
-                </div>
-                <div className="service-price-current">
-                  <strong>{currentPrice ? `${formatMoneyString(currentPrice.unitPrice)} VND / ${currentPrice.unitName}` : 'Chưa có giá'}</strong>
-                  <span>{currentPrice ? getBillingMethodLabel(currentPrice.billingMethod) : 'Chưa cấu hình'}</span>
-                </div>
-                <div className="service-price-methods">
-                  {methods.length === 1 ? (
-                    <span className="service-price-method-static">{getBillingMethodLabel(methods[0])}</span>
-                  ) : (
-                    <div className="service-price-segmented">
-                      {methods.map((method) => (
-                        <button
-                          type="button"
-                          key={method}
-                          className={normalizeBillingMethod(draft.billingMethod) === method ? 'active' : ''}
-                          onClick={() => onChangeDraft(service.code, {
-                            billingMethod: method,
-                            unitName: method === 'PerPerson' ? 'person' : method === 'PerMonth' ? 'month' : service.unit,
-                          })}
-                        >
-                          {getBillingMethodShortLabel(method)}
-                        </button>
-                      ))}
-                    </div>
-                  )}
-                  <small>{getUnitHint(draft.billingMethod)}</small>
-                </div>
-                <label className="service-price-inline-field">
-                  <input
-                    type="text"
-                    value={formatMoneyString(draft.unitPrice)}
-                    onChange={(event) => onChangeDraft(service.code, { unitPrice: parseMoneyString(event.target.value) })}
-                  />
-                </label>
-                <label className="service-price-inline-field">
-                  <input type="date" value={nextPeriodStart} readOnly />
-                </label>
-              </div>
-            );
-          })}
-        </div>
-
-        <div className="service-price-batch-actions">
-          <input
-            value={note}
-            onChange={(event) => onChangeNote(event.target.value)}
-            placeholder="Ghi chú chung (ví dụ: điều chỉnh theo biểu giá tháng tới)"
-          />
-          <button type="submit" className="primary-action" disabled={actionLoading || drafts.some((draft) => Number(draft.unitPrice) <= 0)}>
-            {actionLoading ? 'Đang lưu...' : 'Lưu tất cả'}
-          </button>
-        </div>
-      </form>
-
-      <section className="service-price-panel service-price-history">
-        <div className="section-heading">
-          <h4>Lịch sử thay đổi giá</h4>
-          <span>{priceHistory.length} bản ghi</span>
-        </div>
-        {historyGroups.length === 0 ? (
-          <div className="empty-panel compact">Chưa có lịch sử thay đổi giá.</div>
-        ) : (
-          <div className="service-price-history-groups">
-            {historyGroups.map((group, index) => (
-              <details className="service-price-history-group" key={group.key} open={index === 0}>
-                <summary>
-                  <span className="history-dot-row">
-                    {group.serviceCodes.map((code) => (
-                      <i key={code} className={`history-dot history-dot--${code.toLowerCase()}`} />
-                    ))}
-                  </span>
-                  <strong>{group.label}</strong>
-                  <span>{group.items.length} dịch vụ</span>
-                </summary>
-                <div className="service-price-table service-price-table--monthly">
-            <div className="service-price-row service-price-row--head">
-              <span>Dịch vụ</span>
-              <span>Đơn giá</span>
-              <span>Đơn vị</span>
-              <span>Cách tính</span>
-              <span>Từ ngày</span>
-              <span>Đến ngày</span>
-            </div>
-            {group.items.map((price) => (
-              <div className="service-price-row" key={price.id}>
-                <span>{serviceOptions.find((service) => service.code === price.serviceCode)?.label ?? price.serviceName}</span>
-                <span>{formatMoneyString(price.unitPrice)} VND</span>
-                <span>{price.unitName}</span>
-                <span>{getBillingMethodLabel(price.billingMethod)}</span>
-                <span>{price.effectiveFrom}</span>
-                <span>{price.effectiveTo ?? 'Đang thay thế'}</span>
-              </div>
-            ))}
-                </div>
-              </details>
-            ))}
-          </div>
-        )}
-      </section>
-    </div>
-  );
-}
-
-function ServicePriceEditor({
-  activePrices,
-  priceHistory,
-  loading,
-  form,
-  actionLoading,
-  onSelectService,
-  onChangeForm,
-  onSubmit,
-  onReload,
-}: {
-  prices: ServicePrice[];
-  activePrices: ServicePrice[];
-  priceHistory: ServicePrice[];
-  loading: boolean;
-  form: CreateServicePriceRequest;
-  actionLoading: boolean;
-  onSelectService: (code: BillingServiceCode) => void;
-  onChangeForm: (form: CreateServicePriceRequest) => void;
-  onSubmit: (event: FormEvent<HTMLFormElement>) => void;
-  onReload: () => void;
-}) {
-  const activeByCode = new Map(activePrices.map((price) => [price.serviceCode, price]));
-
-  return (
-    <div className="editor-panel service-price-editor">
-      <div className="service-price-header">
-        <div>
-          <h3>Giá dịch vụ của khu trọ</h3>
-          <p>Mỗi khu trọ có thể cấu hình giá điện, nước và các khoản cố định riêng.</p>
-        </div>
-        <button type="button" className="secondary-action" onClick={onReload} disabled={loading}>
-          Làm mới
-        </button>
-      </div>
-
-      <div className="service-price-grid">
-        <section className="service-price-panel">
-          <div className="section-heading">
-            <h4>Giá đang áp dụng</h4>
-            <span>{activePrices.length}/4 dịch vụ</span>
-          </div>
-
-          {loading ? (
-            <div className="empty-panel compact">Đang tải bảng giá dịch vụ...</div>
-          ) : (
-            <div className="service-price-cards">
-              {serviceOptions.map((service) => {
-                const price = activeByCode.get(service.code);
-                return (
-                  <div className="service-price-card" key={service.code}>
-                    <div>
-                      <strong>{service.label}</strong>
-                      <span>{price ? `${formatMoneyString(price.unitPrice)} VND / ${price.unitName}` : 'Chưa cấu hình'}</span>
-                    </div>
-                    <small>{price ? `Từ ${price.effectiveFrom}` : service.method === 'Metered' ? 'Theo chỉ số' : 'Cố định'}</small>
-                  </div>
-                );
-              })}
-            </div>
-          )}
-        </section>
-
-        <section className="service-price-panel">
-          <div className="section-heading">
-            <h4>Cập nhật giá mới</h4>
-          </div>
-
-          <form className="service-price-form" onSubmit={onSubmit}>
-            <label className="field">
-              <span>Dịch vụ</span>
-              <select value={form.serviceCode} onChange={(event) => onSelectService(event.target.value as BillingServiceCode)}>
-                {serviceOptions.map((service) => (
-                  <option key={service.code} value={service.code}>{service.label}</option>
-                ))}
-              </select>
-            </label>
-
-            <div className="form-grid">
-              <label className="field">
-                <span>Cách tính</span>
-                <input value={form.billingMethod === 'Metered' ? 'Theo chỉ số' : 'Cố định'} readOnly />
-              </label>
-              <label className="field">
-                <span>Đơn vị</span>
-                <input value={form.unitName} onChange={(event) => onChangeForm({ ...form, unitName: event.target.value })} />
-              </label>
-            </div>
-
-            <div className="form-grid">
-              <label className="field">
-                <span>Đơn giá (VND)</span>
-                <input
-                  type="text"
-                  value={formatMoneyString(form.unitPrice)}
-                  onChange={(event) => onChangeForm({ ...form, unitPrice: parseMoneyString(event.target.value) })}
-                  placeholder="0"
-                />
-              </label>
-              <label className="field">
-                <span>Hiệu lực từ</span>
-                <input type="date" value={form.effectiveFrom} onChange={(event) => onChangeForm({ ...form, effectiveFrom: event.target.value })} />
-              </label>
-            </div>
-
-            <label className="field">
-              <span>Ghi chú</span>
-              <input value={form.note ?? ''} onChange={(event) => onChangeForm({ ...form, note: event.target.value })} placeholder="Ví dụ: điều chỉnh theo biểu giá tháng này" />
-            </label>
-
-            <div className="save-row">
-              <button type="submit" className="primary-action" disabled={actionLoading || form.unitPrice <= 0}>
-                {actionLoading ? 'Đang lưu...' : 'Lưu giá dịch vụ'}
-              </button>
-            </div>
-          </form>
-        </section>
-      </div>
-
-      <section className="service-price-panel service-price-history">
-        <div className="section-heading">
-          <h4>Lịch sử thay đổi giá</h4>
-          <span>{priceHistory.length} bản ghi</span>
-        </div>
-        {priceHistory.length === 0 ? (
-          <div className="empty-panel compact">Chưa có lịch sử thay đổi giá.</div>
-        ) : (
-          <div className="service-price-table">
-            <div className="service-price-row service-price-row--head">
-              <span>Dịch vụ</span>
-              <span>Đơn giá</span>
-              <span>Đơn vị</span>
-              <span>Từ ngày</span>
-              <span>Đến ngày</span>
-            </div>
-            {priceHistory.map((price) => (
-              <div className="service-price-row" key={price.id}>
-                <span>{serviceOptions.find((service) => service.code === price.serviceCode)?.label ?? price.serviceName}</span>
-                <span>{formatMoneyString(price.unitPrice)} VND</span>
-                <span>{price.unitName}</span>
-                <span>{price.effectiveFrom}</span>
-                <span>{price.effectiveTo ?? 'Đang thay thế'}</span>
-              </div>
-            ))}
-          </div>
-        )}
-      </section>
-    </div>
-  );
-}
-
-function buildServicePriceHistoryGroups(prices: ServicePrice[]) {
-  const formatter = new Intl.DateTimeFormat('vi-VN', { month: 'long', year: 'numeric' });
-  const groups = new Map<string, ServicePrice[]>();
-
-  for (const price of prices) {
-    const key = price.effectiveFrom.slice(0, 7);
-    const items = groups.get(key) ?? [];
-    groups.set(key, [...items, price]);
-  }
-
-  return Array.from(groups.entries())
-    .sort(([a], [b]) => b.localeCompare(a))
-    .map(([key, items]) => {
-      const latestByService = new Map<BillingServiceCode, ServicePrice>();
-      for (const item of [...items].sort((a, b) =>
-        b.effectiveFrom.localeCompare(a.effectiveFrom) ||
-        b.updatedAt.localeCompare(a.updatedAt)
-      )) {
-        if (!latestByService.has(item.serviceCode)) {
-          latestByService.set(item.serviceCode, item);
-        }
-      }
-
-      const sortedItems = serviceOptions
-        .map((service) => latestByService.get(service.code))
-        .filter((item): item is ServicePrice => Boolean(item));
-      const date = new Date(`${key}-01T00:00:00`);
-
-      return {
-        key,
-        label: formatter.format(date),
-        items: sortedItems,
-        serviceCodes: sortedItems.map((item) => item.serviceCode),
-      };
-    });
-}
-
-function getNextPeriodStart() {
-  const date = new Date();
-  const nextPeriod = new Date(date.getFullYear(), date.getMonth() + 1, 1);
-  const year = nextPeriod.getFullYear();
-  const month = String(nextPeriod.getMonth() + 1).padStart(2, '0');
-  return `${year}-${month}-01`;
-}
-
-function normalizeBillingMethod(method: BillingMethod): BillingMethod {
-  if (method === 'Metered') {
-    return 'MeterBased';
-  }
-
-  if (method === 'Fixed') {
-    return 'PerMonth';
-  }
-
-  return method;
-}
-
-function toApiBillingMethod(method: BillingMethod): BillingMethod {
-  if (method === 'MeterBased') {
-    return 'Metered';
-  }
-
-  if (method === 'PerMonth' || method === 'PerPerson') {
-    return 'Fixed';
-  }
-
-  return method;
-}
-
-function getServiceBillingMethods(serviceCode: BillingServiceCode): BillingMethod[] {
-  if (serviceCode === 'Electric') {
-    return ['MeterBased'];
-  }
-
-  if (serviceCode === 'Water') {
-    return ['MeterBased', 'PerPerson', 'PerMonth'];
-  }
-
-  return ['PerMonth', 'PerPerson'];
-}
-
-function getBillingMethodLabel(method: BillingMethod) {
-  const normalized = normalizeBillingMethod(method);
-  const labels: Record<BillingMethod, string> = {
-    Metered: 'MeterBased',
-    MeterBased: 'MeterBased',
-    Fixed: 'Theo tháng',
-    PerMonth: 'Theo tháng',
-    PerPerson: 'Theo người',
-  };
-
-  return labels[normalized];
-}
-
-function getBillingMethodShortLabel(method: BillingMethod) {
-  const labels: Record<BillingMethod, string> = {
-    Metered: 'Chỉ số',
-    MeterBased: 'Chỉ số',
-    Fixed: 'Tháng',
-    PerMonth: 'Tháng',
-    PerPerson: 'Người',
-  };
-
-  return labels[method];
-}
-
-function getUnitHint(method: BillingMethod) {
-  const normalized = normalizeBillingMethod(method);
-  if (normalized === 'PerPerson') {
-    return 'VND / người / tháng';
-  }
-
-  if (normalized === 'PerMonth') {
-    return 'VND / phòng / tháng';
-  }
-
-  return 'Theo số kWh/m3 tiêu thụ';
-}
-
-function getServiceIcon(serviceCode: BillingServiceCode) {
-  const icons: Record<BillingServiceCode, string> = {
-    Electric: 'E',
-    Water: 'W',
-    Wifi: 'Wi',
-    Trash: 'R',
-  };
-
-  return icons[serviceCode];
-}
+// ─── Subcomponents ──────────────────────────────────────────────────────────
 
 function AmenityEditor({
   amenities,
   selectedIds,
   onChange,
   onSave,
+  actionLoading,
 }: {
   amenities: Amenity[];
   selectedIds: number[];
   onChange: (selectedIds: number[]) => void;
   onSave: () => void;
+  actionLoading?: boolean;
 }) {
   return (
-    <div className="stack-panel">
-      <div className="amenity-grid">
-        {amenities.map((amenity) => (
-          <label className="checkbox-field" key={amenity.id}>
-            <input
-              type="checkbox"
-              checked={selectedIds.includes(amenity.id)}
-              onChange={(event) =>
-                onChange(
-                  event.target.checked
-                    ? [...selectedIds, amenity.id]
-                    : selectedIds.filter((id) => id !== amenity.id)
-                )
-              }
-            />
-            {amenity.name}
-          </label>
-        ))}
+    <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
+      <div className="amenity-card-grid">
+        {amenities.map((amenity) => {
+          const isSelected = selectedIds.includes(amenity.id);
+          return (
+            <label className={`amenity-card-item ${isSelected ? 'selected' : ''}`} key={amenity.id}>
+              <input
+                type="checkbox"
+                className="amenity-card-checkbox"
+                checked={isSelected}
+                onChange={(event) =>
+                  onChange(
+                    event.target.checked
+                      ? [...selectedIds, amenity.id]
+                      : selectedIds.filter((id) => id !== amenity.id)
+                  )
+                }
+              />
+              <span className="amenity-card-name">{amenity.name}</span>
+            </label>
+          );
+        })}
       </div>
-      <div className="save-row">
-        <button className="primary-action" onClick={onSave}>
-          Lưu tiện ích
-        </button>
-      </div>
-    </div>
-  );
-}
-
-function PriceTierEditor({
-  priceTiers,
-  isTieredPricing,
-  maxOccupants,
-  onChange,
-  onSave,
-  depositMonths = 0,
-}: {
-  priceTiers: RoomPriceTierRequest[];
-  isTieredPricing: boolean;
-  maxOccupants: number;
-  onChange: (tiers: RoomPriceTierRequest[]) => void;
-  onSave: () => void;
-  depositMonths?: number;
-}) {
-  const structureKey = priceTiers.map(t => t.occupantCount).join(',');
-
-  useEffect(() => {
-    const targetCount = isTieredPricing ? (maxOccupants || 1) : 1;
-    const expectedStructure = Array.from({ length: targetCount }, (_, i) => i + 1).join(',');
-
-    if (structureKey !== expectedStructure) {
-      const finalTiers: RoomPriceTierRequest[] = [];
-      const firstTier = priceTiers.find(t => t.occupantCount === 1) || priceTiers[0];
-      const basePrice = firstTier?.monthlyRent || 0;
-
-      for (let i = 1; i <= targetCount; i++) {
-        const existing = priceTiers.find(t => t.occupantCount === i);
-        finalTiers.push({
-          occupantCount: i,
-          monthlyRent: existing ? existing.monthlyRent : basePrice,
-          isActive: true
-        });
-      }
-      onChange(finalTiers);
-    }
-  }, [isTieredPricing, maxOccupants, structureKey, onChange]);
-
-  function updateTier(index: number, tier: RoomPriceTierRequest) {
-    onChange(priceTiers.map((t, i) => (i === index ? tier : t)));
-  }
-
-  return (
-    <div className="stack-panel">
-      {priceTiers.map((tier, index) => (
-        <div className="inline-editor" key={index} style={{ gridTemplateColumns: '1fr 1fr', alignItems: 'center' }}>
-          <label className="field">
-            <span>
-              {isTieredPricing
-                ? `Giá thuê cho ${tier.occupantCount} người (VND/tháng)`
-                : 'Giá thuê cố định (VND/tháng)'}
-            </span>
-            <input
-              type="text"
-              value={formatMoneyString(tier.monthlyRent)}
-              onChange={(e) =>
-                updateTier(index, { ...tier, monthlyRent: parseMoneyString(e.target.value) })
-              }
-              placeholder="0"
-            />
-          </label>
-          <label className="field">
-            <span>Đặt cọc (tháng)</span>
-            <input
-              type="number"
-              min={0}
-              value={depositMonths}
-              readOnly
-              style={{ background: '#f1f5f9' }}
-            />
-          </label>
+      <div className="subtab-footer">
+        <div className="shield-info">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+            <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/>
+          </svg>
+          <span>Tiện ích rõ ràng giúp tăng tỷ lệ tiếp cận khách thuê trọ.</span>
         </div>
-      ))}
-      <div className="save-row" style={{ marginTop: '8px' }}>
-        <button className="primary-action" onClick={onSave}>
-          Lưu bảng giá
+        <button className="primary-action" onClick={onSave} disabled={actionLoading}>
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+            <path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z" />
+            <polyline points="17 21 17 13 7 13 7 21" />
+            <polyline points="7 3 7 8 15 8" />
+          </svg>
+          {actionLoading ? 'Đang lưu...' : 'Lưu tiện ích'}
         </button>
       </div>
     </div>
@@ -1915,4 +1445,6 @@ function EyeOffIcon() {
     </svg>
   );
 }
+
+
 

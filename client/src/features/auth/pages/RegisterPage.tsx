@@ -3,6 +3,7 @@ import { Link, useNavigate } from 'react-router-dom';
 import { ROUTE_PATHS } from '../../../app/router/routePaths';
 import { getApiErrorMessage } from '../../../shared/api/apiError';
 import { Alert } from '../../../shared/components/ui/Alert';
+import { AuthLayout } from '../components/AuthLayout';
 import { RegisterForm } from '../components/RegisterForm';
 import { authApi } from '../services/authApi';
 import type { RegisterRequest } from '../types/auth.types';
@@ -28,20 +29,18 @@ export function RegisterPage() {
   }
 
   return (
-    <main className="auth-page">
-      <section className="auth-panel">
-        <p className="eyebrow">Smart Rental Platform</p>
-        <h1>Đăng ký</h1>
+    <AuthLayout
+      title="Tạo tài khoản"
+      subtitle="Bắt đầu quản lý phòng trọ, lịch hẹn và hợp đồng trong một không gian gọn gàng."
+      compact
+    >
+      {error && <Alert type="error">{error}</Alert>}
 
+      <RegisterForm isSubmitting={isSubmitting} onSubmit={handleRegister} />
 
-        {error && <Alert type="error">{error}</Alert>}
-
-        <RegisterForm isSubmitting={isSubmitting} onSubmit={handleRegister} />
-
-        <div className="auth-links">
-          <Link to={ROUTE_PATHS.AUTH.LOGIN}>Đã có tài khoản?</Link>
-        </div>
-      </section>
-    </main>
+      <div className="auth-links">
+        <Link to={ROUTE_PATHS.AUTH.LOGIN}>Đã có tài khoản? Đăng nhập</Link>
+      </div>
+    </AuthLayout>
   );
 }

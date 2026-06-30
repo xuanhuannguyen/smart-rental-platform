@@ -24,6 +24,8 @@ namespace SmartRentalPlatform.Infrastructure.Persistence.Configurations.Properti
             builder.Property(x => x.LandlordNote).HasColumnName("landlord_note").HasColumnType("text");
             builder.Property(x => x.CancelReason).HasColumnName("cancel_reason").HasColumnType("text");
             builder.Property(x => x.RespondedAt).HasColumnName("responded_at");
+            builder.Property(x => x.ProposedScheduledAt).HasColumnName("proposed_scheduled_at");
+            builder.Property(x => x.ProposedDurationMinutes).HasColumnName("proposed_duration_minutes");
             builder.Property(x => x.CreatedAt).HasColumnName("created_at").HasDefaultValueSql("now()").IsRequired();
             builder.Property(x => x.UpdatedAt).HasColumnName("updated_at").HasDefaultValueSql("now()").IsRequired();
 

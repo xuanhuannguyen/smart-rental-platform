@@ -1,0 +1,84 @@
+.wallet-payment-modal-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 1000;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 20px;
+  background: rgba(15, 23, 42, 0.48);
+}
+
+.wallet-payment-modal {
+  width: min(460px, 100%);
+  border-radius: 12px;
+  border: 1px solid #dbe3ef;
+  background: #ffffff;
+  padding: 24px;
+  box-shadow: 0 20px 55px rgba(15, 23, 42, 0.18);
+}
+
+.wallet-payment-modal h3 {
+  margin: 0 0 8px;
+  color: #0f172a;
+}
+
+.wallet-payment-description {
+  margin: 0 0 18px;
+  color: #64748b;
+  line-height: 1.5;
+}
+
+.wallet-payment-summary {
+  display: grid;
+  gap: 10px;
+  margin-bottom: 18px;
+}
+
+.wallet-payment-summary-row {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 10px 12px;
+  border: 1px solid #e2e8f0;
+  border-radius: 8px;
+  background: #f8fafc;
+}
+
+.wallet-payment-summary-row span {
+  color: #64748b;
+}
+
+.wallet-payment-summary-row strong {
+  color: #0f172a;
+  text-align: right;
+}
+
+.wallet-payment-danger-text {
+  color: #b91c1c !important;
+}
+
+.wallet-payment-alert {
+  border-radius: 8px;
+  padding: 10px 12px;
+  line-height: 1.45;
+}
+
+.wallet-payment-alert-info {
+  border: 1px solid #bfdbfe;
+  background: #eff6ff;
+  color: #1d4ed8;
+}
+
+.wallet-payment-alert-error {
+  border: 1px solid #fecaca;
+  background: #fef2f2;
+  color: #b91c1c;
+}
+
+.wallet-payment-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 10px;
+  flex-wrap: wrap;
+}

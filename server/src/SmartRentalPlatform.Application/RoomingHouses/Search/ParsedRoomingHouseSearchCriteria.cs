@@ -26,6 +26,12 @@ public class ParsedRoomingHouseSearchCriteria
 
     public List<int> RoomAmenityIds { get; set; } = new();
 
+    public List<Guid> RecentRoomingHouseIds { get; set; } = new();
+
+    public List<int> PreferredAmenityIds { get; set; } = new();
+
+    public List<int> PreferredRoomAmenityIds { get; set; } = new();
+
     public decimal? CenterLat { get; set; }
 
     public decimal? CenterLng { get; set; }
@@ -37,6 +43,12 @@ public class ParsedRoomingHouseSearchCriteria
     public int Page { get; set; } = 1;
 
     public int PageSize { get; set; } = 12;
+
+    public bool AiAssisted { get; set; }
+
+    public string? InterpretedQuery { get; set; }
+
+    public List<string> RelaxedFields { get; set; } = new();
 
     public static ParsedRoomingHouseSearchCriteria FromRequest(RoomingHouseSearchRequest request)
     {
@@ -52,6 +64,9 @@ public class ParsedRoomingHouseSearchCriteria
             MinOccupants = request.MinOccupants,
             AmenityIds = request.AmenityIds.Distinct().ToList(),
             RoomAmenityIds = request.RoomAmenityIds.Distinct().ToList(),
+            RecentRoomingHouseIds = request.RecentRoomingHouseIds.Distinct().ToList(),
+            PreferredAmenityIds = request.PreferredAmenityIds.Distinct().ToList(),
+            PreferredRoomAmenityIds = request.PreferredRoomAmenityIds.Distinct().ToList(),
             CenterLat = request.CenterLat,
             CenterLng = request.CenterLng,
             RadiusKm = request.RadiusKm,

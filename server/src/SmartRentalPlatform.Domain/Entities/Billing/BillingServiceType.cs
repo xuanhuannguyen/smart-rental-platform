@@ -1,11 +1,13 @@
+using SmartRentalPlatform.Domain.Entities.Properties;
+
 namespace SmartRentalPlatform.Domain.Entities.Billing;
 
 public class BillingServiceType
 {
     public Guid Id { get; set; }
-    public BillingServiceCode Code { get; set; }
     public string Name { get; set; } = string.Empty;
-    public bool IsMetered { get; set; }
+    public bool SupportsMeterReading { get; set; }
+    public string? MeterUnitName { get; set; }
     public bool IsActive { get; set; } = true;
     public DateTimeOffset CreatedAt { get; set; }
 

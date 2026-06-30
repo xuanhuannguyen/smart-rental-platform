@@ -1,0 +1,306 @@
+.landlord-request-detail-page {
+  /* padding and bg are handled by dashboard-main */
+}
+
+.landlord-request-detail-container {
+  padding: 24px;
+  background: #fff;
+  border-radius: 8px;
+  box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+  margin-bottom: 24px;
+}
+
+.landlord-request-detail-page .overview-band {
+  display: flex;
+  flex-direction: row;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 24px;
+  margin-bottom: 24px;
+  padding: 24px;
+  border: 1px solid #dbe3ef;
+  border-radius: 12px;
+  background: #ffffff;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.03);
+}
+
+.landlord-request-detail-page .overview-header-title-area {
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+  gap: 16px;
+  flex: 1;
+}
+
+.landlord-request-detail-page .back-icon-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 40px;
+  height: 40px;
+  border-radius: 8px;
+  background: #f1f5f9;
+  color: #475569;
+  border: 1px solid #cbd5e1;
+  cursor: pointer;
+  transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+  flex-shrink: 0;
+}
+
+.landlord-request-detail-page .back-icon-btn:hover {
+  background: #e2e8f0;
+  color: #0f172a;
+  border-color: #94a3b8;
+  transform: translateX(-2px);
+}
+
+.landlord-request-detail-page .overview-left {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  flex: 1;
+}
+
+.landlord-request-detail-page .overview-left h2 {
+  margin: 4px 0 0;
+  font-size: 30px;
+  font-weight: 700;
+  color: #0f172a;
+}
+
+.landlord-request-detail-page .overview-right {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 12px;
+  justify-content: center;
+}
+
+.landlord-request-detail-page .eyebrow {
+  font-size: 12px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: #64748b;
+  margin: 0;
+}
+
+.landlord-request-detail-page .overview-description {
+  margin: 0;
+  font-size: 14.5px;
+  color: #64748b;
+}
+
+.request-detail-body {
+  display: flex;
+  flex-direction: column;
+  gap: 24px;
+}
+
+.request-info-card {
+  background: #f8fafc;
+  padding: 20px;
+  border-radius: 8px;
+  border: 1px solid #e2e8f0;
+}
+
+.request-info-card h3 {
+  margin-top: 0;
+  margin-bottom: 16px;
+  font-size: 1.1rem;
+  color: #334155;
+  border-bottom: 1px solid #e2e8f0;
+  padding-bottom: 8px;
+}
+
+.info-box, .deposit-box, .contract-box {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 16px;
+  background: #fff;
+  border: 1px solid #e2e8f0;
+  padding: 16px;
+  border-radius: 8px;
+}
+
+.request-info-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+  gap: 16px;
+  width: 100%;
+}
+
+.info-item {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.info-item .label {
+  font-size: 0.9rem;
+  color: #64748b;
+}
+
+.info-item .value {
+  font-weight: 500;
+  color: #0f172a;
+}
+
+.reject-reason-box {
+  background-color: #fef2f2;
+  border: 1px solid #fca5a5;
+  color: #991b1b;
+  padding: 16px;
+  border-radius: 8px;
+  margin-bottom: 24px;
+}
+
+.status-badge {
+  padding: 6px 12px;
+  border-radius: 9999px;
+  font-size: 0.85rem;
+  font-weight: 600;
+  white-space: nowrap;
+}
+
+.status-badge.pending {
+  background: #fef3c7;
+  color: #92400e;
+}
+
+.status-badge.accepted,
+.status-badge.success {
+  background: #dcfce7;
+  color: #166534;
+}
+
+.status-badge.rejected,
+.status-badge.cancelled,
+.status-badge.expired,
+.status-badge.danger {
+  background: #fee2e2;
+  color: #991b1b;
+}
+
+.status-badge.warning {
+  background: #fef3c7;
+  color: #92400e;
+}
+
+.status-badge.neutral {
+  background: #ffffff;
+  color: #475569;
+  border: 1px solid #e2e8f0;
+}
+
+
+/* Boxes */
+
+.deposit-box.status-neutral,
+.contract-box.status-neutral {
+  border-color: #e2e8f0;
+  background: #ffffff;
+}
+
+.deposit-box.status-warning,
+.contract-box.status-warning {
+  border-color: #facc15;
+  background: #fefce8;
+}
+
+.deposit-box.status-success,
+.contract-box.status-success {
+  border-color: #86efac;
+  background: #f0fdf4;
+}
+
+.deposit-box.status-danger,
+.contract-box.status-danger {
+  border-color: #fca5a5;
+  background: #fef2f2;
+}
+
+/* --- IN PROGRESS (BLUE) --- */
+.deposit-box.PendingPayment,
+.contract-box.WaitingTenantOccupants,
+.contract-box.PendingLandlordSignature,
+.contract-box.PendingTenantSignature,
+.contract-box.LandlordRevisionRequested,
+.contract-box.TenantRevisionRequested {
+  border-color: #bfdbfe;
+  background: #eff6ff;
+}
+
+/* --- DONE (GREEN) --- */
+.deposit-box.Paid,
+.deposit-box.Refunded,
+.contract-box.Active {
+  border-color: #86efac;
+  background: #f0fdf4;
+}
+
+/* --- FAILED/REJECTED (RED) --- */
+.deposit-box.Forfeited,
+.contract-box.Rejected {
+  border-color: #fca5a5;
+  background: #fef2f2;
+}
+
+/* --- NO CONTRACT --- */
+.contract-box.NoContract {
+  border-color: #e2e8f0;
+  background: #f8fafc;
+}
+
+.action-bar {
+  display: flex;
+  gap: 12px;
+  margin-top: 24px;
+  padding-top: 20px;
+  border-top: 1px solid #f1f5f9;
+  flex-wrap: wrap;
+}
+
+.approve-form {
+  margin-top: 16px;
+  padding: 16px;
+  background-color: #f8fafc;
+  border-radius: 8px;
+  border: 1px solid #e2e8f0;
+}
+
+.reject-form {
+  margin-top: 16px;
+  padding: 16px;
+  background-color: #fef2f2;
+  border-radius: 8px;
+  border: 1px solid #fca5a5;
+}
+
+.form-group {
+  margin-bottom: 12px;
+}
+
+.form-group label {
+  display: block;
+  margin-bottom: 8px;
+  font-weight: 500;
+  color: #1e293b;
+}
+
+.form-group textarea {
+  width: 100%;
+  padding: 10px;
+  border: 1px solid #cbd5e1;
+  border-radius: 6px;
+  resize: vertical;
+  font-family: inherit;
+}
+
+.form-actions {
+  display: flex;
+  gap: 8px;
+  margin-top: 16px;
+}

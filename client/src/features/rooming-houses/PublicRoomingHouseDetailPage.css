@@ -1,218 +1,522 @@
+@import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap');
+
 .public-house-detail {
-  width: min(100% - 40px, 1120px);
+  font-family: 'Plus Jakarta Sans', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+  width: min(100% - 40px, 980px); /* Reduced container width from 1120px to 980px for a more compact feel */
   margin: 0 auto;
-  padding: 32px 0 56px;
+  padding: 24px 0 56px;
   display: grid;
-  gap: 24px;
+  gap: 24px; /* Reduced gap from 32px to 24px */
 }
 
 .public-house-detail--state {
   min-height: 60vh;
+  display: grid;
   place-content: center;
   text-align: center;
+  gap: 12px;
+}
+
+.public-house-detail--state p {
+  color: #64748b;
+  font-size: 15px;
+  margin: 0;
 }
 
 .public-house-detail__back {
   width: fit-content;
+  display: flex;
+  align-items: center;
+  gap: 6px;
   color: #246bfe;
-  font-weight: 800;
+  font-weight: 700;
+  font-size: 14px;
   text-decoration: none;
+  transition: opacity 0.2s ease, transform 0.2s ease;
 }
 
+.public-house-detail__back:hover {
+  opacity: 0.8;
+  transform: translateX(-2px);
+}
+
+/* ── Hero & Header Card ────────────────────────────── */
 .public-house-detail__hero {
   display: grid;
-  grid-template-columns: minmax(280px, 460px) minmax(0, 1fr);
-  gap: 28px;
+  grid-template-columns: minmax(0, 1.2fr) minmax(0, 1fr);
+  gap: 28px; /* Reduced gap from 36px to 28px */
+  align-items: start;
+}
+
+.hero-details-card {
+  display: flex;
+  flex-direction: column;
+  gap: 16px; /* Reduced gap from 20px to 16px */
+  background: #ffffff;
+}
+
+.house-status-badge {
+  display: inline-flex;
   align-items: center;
-}
-
-.public-house-detail__hero img,
-.public-house-detail__placeholder {
-  width: 100%;
-  aspect-ratio: 4 / 3;
-  border-radius: 8px;
-  object-fit: cover;
-  background: #e2e8f0;
-}
-
-.public-house-detail__placeholder {
-  display: grid;
-  place-items: center;
-  color: #64748b;
+  gap: 6px;
+  background: #f0f7ff;
+  border: 1px solid #c2e0ff;
+  color: #0066cc;
+  font-size: 11px; /* Reduced font size from 12px to 11px */
   font-weight: 700;
+  padding: 5px 12px; /* Reduced padding from 6px 14px */
+  border-radius: 30px;
+  width: fit-content;
+  text-transform: uppercase;
+  letter-spacing: 0.02em;
+}
+
+.house-status-badge svg {
+  color: #246bfe;
 }
 
 .public-house-detail__hero h1 {
-  margin: 8px 0 12px;
-  color: #0f172a;
-  font-size: 36px;
-}
-
-.public-house-detail__hero p {
   margin: 0;
-  color: #475569;
-  line-height: 1.6;
+  color: #0f172a;
+  font-size: 28px; /* Reduced title size from 32px to 28px */
+  font-weight: 800;
+  line-height: 1.25;
 }
 
 .public-house-detail__description {
-  margin-top: 14px !important;
-}
-
-.public-house-detail__section {
-  display: grid;
-  gap: 12px;
-  padding: 18px;
-  border: 1px solid #dbe3ef;
-  border-radius: 8px;
-  background: #ffffff;
-}
-
-.public-house-detail__section h2 {
+  color: #475569;
+  font-size: 14px; /* Reduced description size from 15px to 14px */
+  line-height: 1.55;
   margin: 0;
-  font-size: 22px;
 }
 
-.public-house-detail__section-heading {
+/* Mini-Map Preview Customizations */
+.hero-details-card .tenant-map-preview-container {
+  border-radius: 12px; /* Reduced from 16px to match smaller geometry */
+  overflow: hidden;
+  border: 1px solid #f1f5f9;
+}
+
+/* Amenities Mini Section */
+.house-amenities-mini-section {
   display: flex;
-  gap: 12px;
-  align-items: center;
-  justify-content: space-between;
-}
-
-.public-house-detail__section-heading span {
-  color: #246bfe;
-  font-weight: 800;
-}
-
-.public-house-detail__rooms {
-  display: grid;
-  gap: 14px;
-}
-
-.public-room-card {
-  display: grid;
-  grid-template-columns: 180px minmax(0, 1fr);
-  gap: 14px;
-  padding: 12px;
-  border: 1px solid #e2e8f0;
-  border-radius: 8px;
-  background: #ffffff;
-  text-decoration: none;
-  color: inherit;
-  cursor: pointer;
-  transition: transform 0.2s ease, box-shadow 0.2s ease, border-color 0.2s ease;
-}
-
-.public-room-card:hover {
-  transform: translateY(-2px);
-  box-shadow: 0 4px 12px rgba(15, 23, 42, 0.08);
-  border-color: #246bfe;
-}
-
-.public-room-card img,
-.public-room-card__placeholder {
-  width: 100%;
-  aspect-ratio: 4 / 3;
-  border-radius: 6px;
-  object-fit: cover;
-  background: #e2e8f0;
-}
-
-.public-room-card__placeholder {
-  display: grid;
-  place-items: center;
-  color: #64748b;
-  font-weight: 700;
-  text-align: center;
-}
-
-.public-room-card__body {
-  min-width: 0;
-  display: grid;
+  flex-direction: column;
   gap: 10px;
-  align-content: start;
+  border-top: 1px solid #f1f5f9;
+  padding-top: 16px;
 }
 
-.public-room-card h3 {
-  margin: 0 0 4px;
-  color: #0f172a;
-  font-size: 18px;
-}
-
-.public-room-card p {
+.house-amenities-mini-section h3 {
   margin: 0;
-  color: #64748b;
-  line-height: 1.5;
-}
-
-.public-room-card strong {
-  color: #b45309;
-  font-size: 17px;
-}
-
-.public-room-card__amenities {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 8px;
-}
-
-.public-room-card__amenities span {
-  padding: 6px 8px;
-  border-radius: 6px;
-  background: #eff6ff;
-  color: #1d4ed8;
-  font-size: 13px;
+  font-size: 14px; /* Reduced from 16px */
   font-weight: 700;
+  color: #0f172a;
 }
 
 .public-house-detail__amenities {
   display: flex;
   flex-wrap: wrap;
-  gap: 10px;
+  gap: 8px; /* Reduced from 10px */
 }
 
-.public-house-detail__amenities span {
-  padding: 8px 10px;
-  border: 1px solid #dbe3ef;
-  border-radius: 6px;
-  background: #f8fafc;
+.house-amenity-card {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 8px 12px; /* Reduced from 10px 16px */
+  border: 1px solid #f1f5f9;
+  border-radius: 10px; /* Reduced from 12px */
+  background: #ffffff;
   color: #334155;
+  font-weight: 600;
+  font-size: 13px; /* Reduced from 14px */
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.02);
+  transition: all 0.2s ease;
+}
+
+.house-amenity-card:hover {
+  border-color: #c2e0ff;
+  background: #f8fafc;
+}
+
+.amenity-icon {
+  width: 16px; /* Reduced from 18px */
+  height: 16px;
+  color: #246bfe;
+  flex-shrink: 0;
+}
+
+/* ── Section Standard Layouts ──────────────────────── */
+.public-house-detail__section {
+  background: #ffffff;
+  border: 1px solid #f1f5f9;
+  border-radius: 18px; /* Reduced from 24px */
+  padding: 24px; /* Reduced padding from 32px to 24px */
+  box-shadow: 0 8px 24px -12px rgba(15, 23, 42, 0.04);
+  display: flex;
+  flex-direction: column;
+  gap: 20px; /* Reduced gap from 24px to 20px */
+}
+
+.section-title-with-icon {
+  display: flex;
+  align-items: center;
+  gap: 12px; /* Reduced from 16px */
+}
+
+.section-title-icon-wrapper {
+  width: 36px; /* Reduced from 44px */
+  height: 36px;
+  border-radius: 50%;
+  display: grid;
+  place-items: center;
+  flex-shrink: 0;
+}
+
+.section-title-icon-wrapper.circle-blue {
+  background: #f0f7ff;
+  color: #246bfe;
+}
+
+.section-title-icon-wrapper svg {
+  width: 18px; /* Reduced from 22px */
+  height: 18px;
+  stroke-width: 2.2;
+}
+
+.section-title-with-icon h2 {
+  margin: 0;
+  font-size: 18px; /* Reduced section header size from 22px to 18px */
   font-weight: 700;
+  color: #0f172a;
+}
+
+/* ── Rules Section ─────────────────────────────────── */
+.rules-card-body {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 24px;
+}
+
+.rules-card-info {
+  flex-grow: 1;
 }
 
 .public-house-detail__rule-link {
   width: fit-content;
-  min-height: 40px;
   display: inline-flex;
   align-items: center;
-  justify-content: center;
-  padding: 9px 16px;
-  border-radius: 6px;
+  gap: 6px;
+  padding: 10px 18px; /* Reduced padding from 12px 24px */
+  border-radius: 10px; /* Reduced from 12px */
   background: #246bfe;
   color: #ffffff;
-  font-weight: 800;
+  font-weight: 700;
+  font-size: 13px; /* Reduced from 15px */
   text-decoration: none;
+  box-shadow: 0 3px 10px rgba(36, 107, 254, 0.2);
+  transition: all 0.2s ease, transform 0.1s ease;
 }
 
 .public-house-detail__rule-link:hover {
   background: #1a5ce0;
+  box-shadow: 0 4px 14px rgba(36, 107, 254, 0.28);
+  transform: translateY(-1px);
+}
+
+.public-house-detail__rule-link:active {
+  transform: translateY(1px);
+}
+
+.public-house-detail__rule-link svg {
+  width: 15px;
+  height: 15px;
+  flex-shrink: 0;
+}
+
+.rules-card-illustration {
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.rules-card-illustration svg {
+  width: 90px; /* Scaled down checklist illustration from 120px to 90px */
+  height: 90px;
 }
 
 .public-house-detail__muted {
   margin: 0;
   color: #64748b;
+  font-size: 14px;
 }
 
+/* ── Rental Policy Section ─────────────────────────── */
+.rental-policy-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(240px, 1fr)); /* Reduced min-width from 280px to 240px */
+  gap: 12px;
+}
+
+.rental-policy-item {
+  display: flex;
+  align-items: center;
+  gap: 12px; /* Reduced from 16px */
+  padding: 12px 16px; /* Reduced padding from 18px 20px */
+  background: #f8fafc;
+  border: 1px solid #f1f5f9;
+  border-radius: 12px; /* Reduced from 16px */
+  transition: all 0.2s ease;
+}
+
+.rental-policy-item:hover {
+  background: #ffffff;
+  border-color: #c2e0ff;
+  box-shadow: 0 6px 16px -6px rgba(15, 23, 42, 0.04);
+}
+
+.policy-item-icon-wrapper {
+  width: 34px; /* Reduced from 40px */
+  height: 34px;
+  border-radius: 8px; /* Reduced from 12px */
+  display: grid;
+  place-items: center;
+  background: #ffffff;
+  border: 1px solid #f1f5f9;
+  color: #246bfe;
+  flex-shrink: 0;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.01);
+}
+
+.policy-item-icon-wrapper svg {
+  width: 16px; /* Reduced from 20px */
+  height: 16px;
+  stroke-width: 2.2;
+}
+
+.policy-item-text {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+
+.rental-policy-label {
+  font-size: 10px; /* Reduced label size from 11px to 10px */
+  font-weight: 700;
+  color: #94a3b8;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.rental-policy-value {
+  font-size: 14px; /* Reduced value size from 16px to 14px */
+  font-weight: 700;
+  color: #0f172a;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+/* ── Vacant Rooms Section ──────────────────────────── */
+.public-house-detail__section-heading {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  border-bottom: 1px solid #f1f5f9;
+  padding-bottom: 12px; /* Reduced padding from 18px to 12px */
+}
+
+.available-rooms-count {
+  font-size: 13px; /* Reduced from 15px */
+  font-weight: 700;
+  color: #246bfe;
+  background: #f0f7ff;
+  padding: 4px 10px;
+  border-radius: 20px;
+}
+
+.public-house-detail__rooms {
+  display: grid;
+  gap: 12px; /* Reduced gap from 16px to 12px */
+}
+
+.public-room-card {
+  display: grid;
+  grid-template-columns: 140px minmax(0, 1fr) 30px; /* Changed column size from 180px grid to 140px for a smaller look */
+  gap: 16px; /* Reduced gap from 24px to 16px */
+  padding: 12px; /* Reduced padding from 16px to 12px */
+  border: 1px solid #f1f5f9;
+  border-radius: 14px; /* Reduced from 18px */
+  background: #ffffff;
+  text-decoration: none;
+  color: inherit;
+  cursor: pointer;
+  transition: all 0.25s ease;
+}
+
+.public-room-card:hover {
+  border-color: #c2e0ff;
+  box-shadow: 0 8px 24px -10px rgba(15, 23, 42, 0.08);
+  transform: translateY(-2px);
+}
+
+.public-room-card__img-wrapper {
+  width: 140px; /* Reduced width from 180px to 140px */
+  height: 94px; /* Reduced height from 120px to 94px */
+  border-radius: 10px; /* Reduced from 12px */
+  overflow: hidden;
+  flex-shrink: 0;
+  border: 1px solid #f1f5f9;
+}
+
+.public-room-card__img-wrapper img,
+.public-room-card__placeholder {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  background: #f8fafc;
+}
+
+.public-room-card__placeholder {
+  display: grid;
+  place-items: center;
+  color: #94a3b8;
+  font-weight: 700;
+  font-size: 13px;
+}
+
+.public-room-card__body {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  min-width: 0;
+}
+
+.room-card-main-info {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.room-card-main-info h3 {
+  margin: 0;
+  color: #0f172a;
+  font-size: 16px; /* Reduced title size from 18px to 16px */
+  font-weight: 700;
+}
+
+.room-card-spec {
+  margin: 0;
+  color: #64748b;
+  font-size: 13px; /* Reduced from 14px */
+  font-weight: 500;
+}
+
+.room-card-price {
+  color: #ea580c;
+  font-size: 16px; /* Reduced from 18px */
+  font-weight: 800;
+}
+
+.public-room-card__amenities {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 5px;
+}
+
+.room-amenity-badge {
+  padding: 3px 8px;
+  border-radius: 6px;
+  background: #f0f7ff;
+  color: #246bfe;
+  font-size: 11px; /* Reduced from 12px */
+  font-weight: 700;
+}
+
+.public-room-card__chevron {
+  display: grid;
+  place-items: center;
+  color: #94a3b8;
+  transition: all 0.2s ease;
+}
+
+.public-room-card:hover .public-room-card__chevron {
+  color: #246bfe;
+  transform: translateX(3px);
+}
+
+/* ── Responsive Styling ────────────────────────────── */
 @media (max-width: 860px) {
   .public-house-detail__hero {
     grid-template-columns: 1fr;
+    gap: 24px;
+  }
+
+  .public-house-detail__hero img,
+  .public-house-detail__placeholder {
+    aspect-ratio: 16 / 9;
+  }
+}
+
+@media (max-width: 600px) {
+  .public-room-card {
+    grid-template-columns: 120px minmax(0, 1fr) 24px;
+    gap: 12px;
+  }
+
+  .public-room-card__img-wrapper {
+    width: 120px;
+    height: 80px;
+  }
+}
+
+@media (max-width: 500px) {
+  .public-house-detail {
+    padding: 16px 0 40px;
+    gap: 20px;
+  }
+
+  .public-house-detail__section {
+    padding: 16px;
+    border-radius: 14px;
+    gap: 16px;
+  }
+
+  .rules-card-body {
+    flex-direction: column-reverse;
+    align-items: flex-start;
+    gap: 16px;
+  }
+
+  .rules-card-illustration {
+    align-self: center;
   }
 
   .public-room-card {
     grid-template-columns: 1fr;
+    gap: 12px;
+    position: relative;
   }
 
-  .public-house-detail__hero h1 {
-    font-size: 30px;
+  .public-room-card__img-wrapper {
+    width: 100%;
+    height: 160px;
+  }
+
+  .public-room-card__chevron {
+    position: absolute;
+    right: 12px;
+    top: 12px;
+    background: rgba(255, 255, 255, 0.9);
+    border-radius: 50%;
+    width: 28px;
+    height: 28px;
+    box-shadow: 0 2px 6px rgba(0, 0, 0, 0.08);
   }
 }

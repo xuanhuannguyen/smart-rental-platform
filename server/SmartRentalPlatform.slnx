@@ -6,4 +6,8 @@
     <Project Path="src/SmartRentalPlatform.Domain/SmartRentalPlatform.Domain.csproj" />
     <Project Path="src/SmartRentalPlatform.Infrastructure/SmartRentalPlatform.Infrastructure.csproj" />
   </Folder>
+  <Folder Name="/tests/">
+    <Project Path="tests/SmartRentalPlatform.UnitTests/SmartRentalPlatform.UnitTests.csproj" />
+    <Project Path="tests/SmartRentalPlatform.IntegrationTests/SmartRentalPlatform.IntegrationTests.csproj" />
+  </Folder>
 </Solution>

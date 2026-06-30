@@ -7,10 +7,11 @@ import { toAssetUrl } from '../../../shared/api/assets';
 import { Button } from '../../../shared/components/ui/Button';
 import { billingApi } from '../api';
 import type { Invoice } from '../types';
+import { WalletPaymentConfirmModal } from '../../wallet/components/WalletPaymentConfirmModal';
 import '../../home/pages/MePage.css';
 import './BillingPages.css';
 
-const tenantStatuses = ['Issued', 'PartiallyPaid', 'Paid', 'Overdue'];
+const tenantStatuses = ['Issued', 'Paid', 'Overdue', 'Cancelled'];
 
 type TenantInvoicesPanelProps = {
   invoiceId?: string;
@@ -103,28 +104,32 @@ export function TenantInvoicesPanel({ invoiceId: controlledInvoiceId, onOpenInvo
 
   return (
     <>
-      <section className="billing-header tenant-invoices-header">
-        <div>
+      <div className="invoice-overview-band">
+        <div className="overview-left">
           <span className="billing-kicker">Hóa đơn hằng tháng</span>
-          <h2>Theo dõi và thanh toán</h2>
-          <p>Bạn chỉ nhìn thấy hóa đơn đã phát hành và có thể thanh toán các khoản còn nợ qua ví nội bộ.</p>
+          <h2>Theo dõi &amp; Thanh toán</h2>
+          <p className="overview-description">Xem các hóa đơn đã phát hành và có thể thanh toán các khoản còn nợ qua ví nội bộ.</p>
         </div>
-        <button type="button" className="billing-button secondary" onClick={() => void loadInvoices()}>
-          Tải lại
-        </button>
-      </section>
+        <div className="invoice-overview-right">
+          <div className="invoice-filter-group">
+            <div className="invoice-filter-item">
+              <label>Trạng thái</label>
+              <select className="invoice-filter-select" value={statusFilter} onChange={(event) => setStatusFilter(event.target.value)}>
+                <option value="">Tất cả trạng thái</option>
+                {tenantStatuses.map((status) => <option key={status} value={status}>{getInvoiceStatusLabel(status)}</option>)}
+              </select>
+            </div>
+            <div className="invoice-filter-item">
+              <label>Kỳ hóa đơn</label>
+              <input type="month" className="invoice-filter-select" value={periodFilter} onChange={(event) => setPeriodFilter(event.target.value)} />
+            </div>
+          </div>
+        </div>
+      </div>
 
       <TenantNotification invoices={invoices} />
       {message && <div className="billing-alert success">{message}</div>}
       {error && <div className="billing-alert error">{error}</div>}
-
-      <div className="filter-bar">
-        <select value={statusFilter} onChange={(event) => setStatusFilter(event.target.value)}>
-          <option value="">Tất cả trạng thái</option>
-          {tenantStatuses.map((status) => <option key={status} value={status}>{getInvoiceStatusLabel(status)}</option>)}
-        </select>
-        <input type="month" value={periodFilter} onChange={(event) => setPeriodFilter(event.target.value)} />
-      </div>
 
       {loading && invoices.length === 0 ? (
         <div className="billing-panel"><div className="state-block loading-state">Đang tải hóa đơn...</div></div>
@@ -135,87 +140,159 @@ export function TenantInvoicesPanel({ invoiceId: controlledInvoiceId, onOpenInvo
         </div>
       ) : (
         <section className="tenant-layout">
-          <div className="billing-panel invoice-list">
-            {filteredInvoices.map((invoice) => (
-              <button
-                type="button"
-                key={invoice.id}
-                className={`invoice-list-item ${selectedInvoice?.id === invoice.id ? 'active' : ''}`}
-                onClick={() => {
-                  setSelectedId(invoice.id);
-                  if (onOpenInvoice) {
-                    onOpenInvoice(invoice.id);
-                  } else {
-                    navigate(`/me/invoices/${invoice.id}`);
-                  }
-                }}
-              >
-                <span>{invoice.invoiceNo}</span>
-                <strong>{formatMoney(invoice.remainingAmount)}</strong>
-                <small>{invoice.billingPeriodStart} - {invoice.billingPeriodEnd}</small>
-                <em className={`status-chip ${invoice.status.toLowerCase()}`}>{getInvoiceStatusLabel(invoice.status)}</em>
-              </button>
-            ))}
+          <div className="billing-panel tenant-invoice-list">
+            {filteredInvoices.map((invoice) => {
+              const isSelected = selectedInvoice?.id === invoice.id;
+              const statusClass = invoice.status.toLowerCase();
+              return (
+                <button
+                  type="button"
+                  key={invoice.id}
+                  className={`tenant-invoice-card ${isSelected ? 'active' : ''} status-${statusClass}`}
+                  onClick={() => {
+                    setSelectedId(invoice.id);
+                    if (onOpenInvoice) {
+                      onOpenInvoice(invoice.id);
+                    } else {
+                      navigate(ROUTE_PATHS.ACCOUNT.INVOICE_DETAIL(invoice.id));
+                    }
+                  }}
+                >
+                  <div className="tenant-invoice-card-header">
+                    <span className="invoice-no">{invoice.invoiceNo}</span>
+                    <span className={`invoice-status-badge ${statusClass}`}>{getInvoiceStatusLabel(invoice.status)}</span>
+                  </div>
+                  <div className="tenant-invoice-card-body">
+                    <div className="invoice-period">
+                      <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" className="period-icon">
+                        <rect x="3" y="4" width="18" height="18" rx="2" ry="2"></rect>
+                        <line x1="16" y1="2" x2="16" y2="6"></line>
+                        <line x1="8" y1="2" x2="8" y2="6"></line>
+                        <line x1="3" y1="10" x2="21" y2="10"></line>
+                      </svg>
+                      <span>{invoice.billingPeriodStart} - {invoice.billingPeriodEnd}</span>
+                    </div>
+                    <div className="invoice-amount-box">
+                      <span className="amount-label">{invoice.status === 'Paid' ? 'Đã thanh toán' : 'Cần thanh toán'}</span>
+                      <strong className="amount-value">{formatMoney(getPayableAmount(invoice))}</strong>
+                    </div>
+                  </div>
+                </button>
+              );
+            })}
           </div>
 
           {selectedInvoice && (
-            <div className="billing-panel invoice-detail">
-              <div className="invoice-topline">
-                <div>
-                  <span className="billing-kicker">Chi tiết hóa đơn</span>
-                  <h3>{selectedInvoice.invoiceNo}</h3>
-                </div>
-                <span className={`status-chip ${selectedInvoice.status.toLowerCase()}`}>{getInvoiceStatusLabel(selectedInvoice.status)}</span>
-              </div>
-
-              <div className="invoice-summary">
-                <span>Hạn thanh toán <strong>{selectedInvoice.dueDate}</strong></span>
-                <span>Tổng tiền <strong>{formatMoney(selectedInvoice.totalAmount)}</strong></span>
-                <span>Đã thanh toán <strong>{formatMoney(selectedInvoice.paidAmount)}</strong></span>
-                <span>Còn lại <strong>{formatMoney(selectedInvoice.remainingAmount)}</strong></span>
-              </div>
-
-              <div className="data-table">
-                <div className="table-row table-head item-table-row">
-                  <span>Hạng mục</span><span>Mô tả</span><span>Số lượng</span><span>Đơn giá</span><span>Thành tiền</span>
-                </div>
-                {selectedInvoice.items.map((item) => (
-                  <div key={item.id} className="table-row item-table-row">
-                    <span>{getInvoiceItemTypeLabel(item.itemType)}</span>
-                    <span>{item.description}</span>
-                    <span>{item.quantity}</span>
-                    <span>{formatMoney(item.unitPrice)}</span>
-                    <strong>{formatMoney(item.amount)}</strong>
+            <div className="billing-panel tenant-invoice-detail">
+              <div className="tenant-invoice-detail-header">
+                <div className="header-title">
+                  <div className="invoice-icon-box">
+                    <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                      <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path>
+                      <polyline points="14 2 14 8 20 8"></polyline>
+                      <line x1="16" y1="13" x2="8" y2="13"></line>
+                      <line x1="16" y1="17" x2="8" y2="17"></line>
+                      <polyline points="10 9 9 9 8 9"></polyline>
+                    </svg>
                   </div>
-                ))}
+                  <div>
+                    <h3>{selectedInvoice.invoiceNo}</h3>
+                    <span className="billing-kicker">Chi tiết hóa đơn thanh toán</span>
+                  </div>
+                </div>
+                <span className={`invoice-status-badge xl ${selectedInvoice.status.toLowerCase()}`}>
+                  {getInvoiceStatusLabel(selectedInvoice.status)}
+                </span>
               </div>
 
-              <button
-                type="button"
-                className="billing-button"
-                disabled={!canPay(selectedInvoice) || busy === selectedInvoice.id}
-                onClick={() => setConfirmPay(selectedInvoice)}
-              >
-                {busy === selectedInvoice.id ? 'Đang thanh toán...' : 'Thanh toán bằng ví'}
-              </button>
+              <div className="tenant-invoice-stats-grid">
+                <div className="stat-card">
+                  <span className="stat-label">Hạn thanh toán</span>
+                  <strong className="stat-value due-date">{selectedInvoice.dueDate}</strong>
+                </div>
+                <div className="stat-card">
+                  <span className="stat-label">Tổng tiền</span>
+                  <strong className="stat-value">{formatMoney(selectedInvoice.totalAmount)}</strong>
+                </div>
+                <div className="stat-card">
+                  <span className="stat-label">Đã thanh toán</span>
+                  <strong className="stat-value paid">{formatMoney(getPaidAmount(selectedInvoice))}</strong>
+                </div>
+                <div className="stat-card highlighted">
+                  <span className="stat-label">Còn lại</span>
+                  <strong className="stat-value payable">{formatMoney(getPayableAmount(selectedInvoice))}</strong>
+                </div>
+              </div>
+
+              <div className="tenant-invoice-items-table">
+                <div className="table-header">
+                  <span className="col-type">Khoản mục</span>
+                  <span className="col-desc">Mô tả</span>
+                  <span className="col-qty">Số lượng</span>
+                  <span className="col-price">Đơn giá</span>
+                  <span className="col-amount">Thành tiền</span>
+                </div>
+                <div className="table-body">
+                  {selectedInvoice.items.map((item) => (
+                    <div key={item.id} className="table-row">
+                      <span className="col-type" data-label="Khoản mục">
+                        <span className={`item-type-tag ${item.itemType.toLowerCase()}`}>
+                          {getInvoiceItemTypeLabel(item.itemType)}
+                        </span>
+                      </span>
+                      <span className="col-desc" data-label="Mô tả">{item.description}</span>
+                      <span className="col-qty" data-label="Số lượng">{item.quantity}</span>
+                      <span className="col-price" data-label="Đơn giá">{formatMoney(item.unitPrice)}</span>
+                      <strong className="col-amount" data-label="Thành tiền">{formatMoney(item.amount)}</strong>
+                    </div>
+                  ))}
+                </div>
+              </div>
+
+              <div className="tenant-invoice-actions">
+                <button
+                  type="button"
+                  className="tenant-pay-button"
+                  disabled={!canPay(selectedInvoice) || busy === selectedInvoice.id}
+                  onClick={() => setConfirmPay(selectedInvoice)}
+                >
+                  <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" className="pay-icon">
+                    <rect x="2" y="5" width="20" height="14" rx="2" ry="2"></rect>
+                    <line x1="2" y1="10" x2="22" y2="10"></line>
+                  </svg>
+                  {busy === selectedInvoice.id ? 'Đang thực hiện giao dịch...' : 'Thanh toán ngay bằng Ví nội bộ'}
+                </button>
+              </div>
             </div>
           )}
         </section>
       )}
 
-      {confirmPay && (
-        <div className="modal-backdrop">
-          <div className="confirm-dialog">
-            <h3>Xác nhận thanh toán</h3>
-            <p>Thanh toán {formatMoney(confirmPay.remainingAmount)} từ ví nội bộ?</p>
-            <div className="action-row">
-              <button type="button" className="billing-button secondary" onClick={() => setConfirmPay(null)} disabled={Boolean(busy)}>Đóng</button>
-              <button type="button" className="billing-button" onClick={() => void handlePay(confirmPay)} disabled={Boolean(busy)}>Thanh toán</button>
-            </div>
-          </div>
-        </div>
-      )}
+      <WalletPaymentConfirmModal
+        isOpen={Boolean(confirmPay)}
+        title="Xác nhận thanh toán"
+        description={confirmPay ? `Thanh toán ${formatMoney(getPayableAmount(confirmPay))} từ ví nội bộ?` : undefined}
+        amount={confirmPay ? getPayableAmount(confirmPay) : 0}
+        confirmLabel="Thanh toán"
+        isSubmitting={Boolean(busy)}
+        onConfirm={() => {
+          if (confirmPay) {
+            void handlePay(confirmPay);
+          }
+        }}
+        onClose={() => setConfirmPay(null)}
+      />
     </>
+  );
+}
+
+export function AccountTenantInvoicesPage() {
+  const navigate = useNavigate();
+
+  return (
+    <div className="profile-invoices-section">
+      <TenantInvoicesPanel onOpenInvoice={(invoiceId) => navigate(ROUTE_PATHS.ACCOUNT.INVOICE_DETAIL(invoiceId))} />
+    </div>
   );
 }
 
@@ -258,7 +335,7 @@ export default function TenantInvoicesPage() {
               Duyệt hồ sơ
             </Button>
           ) : isLandlord ? (
-            <Button type="button" variant="secondary" onClick={() => navigate(ROUTE_PATHS.LANDLORD.DASHBOARD)}>
+            <Button type="button" variant="secondary" onClick={() => navigate(ROUTE_PATHS.LANDLORD.ROOMING_HOUSES)}>
               Kênh chủ trọ
             </Button>
           ) : (
@@ -282,8 +359,11 @@ export default function TenantInvoicesPage() {
                   <strong>{currentUser.displayName}</strong>
                   <span>{currentUser.email}</span>
                 </div>
-                <button className="dropdown-item" onClick={() => { setShowDropdown(false); navigate(ROUTE_PATHS.ME.PROFILE); }}>
+                <button className="dropdown-item" onClick={() => { setShowDropdown(false); navigate(ROUTE_PATHS.ACCOUNT.PROFILE); }}>
                   Chỉnh sửa thông tin
+                </button>
+                <button className="dropdown-item" onClick={() => { setShowDropdown(false); navigate(ROUTE_PATHS.ACCOUNT.INVOICES); }}>
+                  Hóa đơn của tôi
                 </button>
                 {isAdmin && (
                   <button className="dropdown-item" onClick={() => { setShowDropdown(false); navigate(ROUTE_PATHS.ADMIN.APPROVALS); }}>
@@ -291,7 +371,7 @@ export default function TenantInvoicesPage() {
                   </button>
                 )}
                 {isLandlord && (
-                  <button className="dropdown-item" onClick={() => { setShowDropdown(false); navigate(ROUTE_PATHS.LANDLORD.DASHBOARD); }}>
+                  <button className="dropdown-item" onClick={() => { setShowDropdown(false); navigate(ROUTE_PATHS.LANDLORD.ROOMING_HOUSES); }}>
                     Kênh chủ trọ
                   </button>
                 )}
@@ -318,7 +398,7 @@ export default function TenantInvoicesPage() {
 function TenantNotification({ invoices }: { invoices: Invoice[] }) {
   const dueSoon = invoices.filter((invoice) => {
     const diffDays = Math.ceil((new Date(invoice.dueDate).getTime() - Date.now()) / 86400000);
-    return (invoice.status === 'Issued' || invoice.status === 'PartiallyPaid') && diffDays >= 0 && diffDays <= 3;
+    return invoice.status === 'Issued' && diffDays >= 0 && diffDays <= 3;
   }).length;
   const payable = invoices.filter((invoice) => canPay(invoice)).length;
 
@@ -327,22 +407,41 @@ function TenantNotification({ invoices }: { invoices: Invoice[] }) {
   }
 
   return (
-    <div className="billing-alert info">
-      {payable > 0 && <span>Bạn có {payable} hóa đơn cần thanh toán.</span>}
-      {dueSoon > 0 && <span>{dueSoon} hóa đơn sắp đến hạn trong 3 ngày.</span>}
+    <div className="tenant-billing-notification">
+      <div className="notification-icon">
+        <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+          <path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z" />
+          <line x1="12" y1="9" x2="12" y2="13" />
+          <line x1="12" y1="17" x2="12.01" y2="17" />
+        </svg>
+      </div>
+      <div className="notification-content">
+        <h4>Chú ý thanh toán</h4>
+        <p>
+          {payable > 0 && <span>Bạn có <strong>{payable}</strong> hóa đơn cần thanh toán. </span>}
+          {dueSoon > 0 && <span>Có <strong>{dueSoon}</strong> hóa đơn sẽ hết hạn trong vòng 3 ngày tới. Vui lòng thanh toán sớm.</span>}
+        </p>
+      </div>
     </div>
   );
 }
 
 function canPay(invoice: Invoice) {
-  return invoice.remainingAmount > 0 && (invoice.status === 'Issued' || invoice.status === 'PartiallyPaid' || invoice.status === 'Overdue');
+  return invoice.totalAmount > 0 && (invoice.status === 'Issued' || invoice.status === 'Overdue');
+}
+
+function getPaidAmount(invoice: Invoice) {
+  return invoice.status === 'Paid' ? invoice.totalAmount : 0;
+}
+
+function getPayableAmount(invoice: Invoice) {
+  return invoice.status === 'Paid' ? 0 : invoice.totalAmount;
 }
 
 function getInvoiceStatusLabel(status: string) {
   const labels: Record<string, string> = {
     Draft: 'Nháp',
     Issued: 'Đã phát hành',
-    PartiallyPaid: 'Thanh toán một phần',
     Paid: 'Đã thanh toán',
     Overdue: 'Quá hạn',
     Cancelled: 'Đã hủy'
@@ -354,8 +453,6 @@ function getInvoiceStatusLabel(status: string) {
 function getInvoiceItemTypeLabel(itemType: string) {
   const labels: Record<string, string> = {
     Rent: 'Tiền phòng',
-    Electricity: 'Tiền điện',
-    Water: 'Tiền nước',
     Service: 'Dịch vụ',
     Discount: 'Giảm trừ',
     Other: 'Khác'

@@ -1,15 +1,19 @@
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
+using SmartRentalPlatform.Api.Extensions;
 using SmartRentalPlatform.Application.Common.Interfaces;
 using SmartRentalPlatform.Application.RoomingHouses;
 using SmartRentalPlatform.Contracts.Amenities;
 using SmartRentalPlatform.Contracts.Common;
-using SmartRentalPlatform.Contracts.LeasePolicies;
 using SmartRentalPlatform.Contracts.LegalDocuments;
 using SmartRentalPlatform.Contracts.PropertyImages;
+using SmartRentalPlatform.Contracts.RentalPolicies.Requests;
+using SmartRentalPlatform.Contracts.RentalPolicies.Responses;
 using SmartRentalPlatform.Contracts.RoomingHouses;
 using SmartRentalPlatform.Contracts.RoomingHouseRules.Requests;
 using SmartRentalPlatform.Contracts.RoomingHouseRules.Responses;
+using SmartRentalPlatform.Contracts.RoomingHouses.Requests;
+using SmartRentalPlatform.Contracts.RoomingHouses.Responses;
 
 namespace SmartRentalPlatform.Api.Controllers;
 
@@ -21,8 +25,9 @@ public class RoomingHousesController : ControllerBase
     private readonly IRoomingHouseDraftService roomingHouseDraftService;
     private readonly IRoomingHouseMediaService roomingHouseMediaService;
     private readonly IRoomingHouseSubmissionService roomingHouseSubmissionService;
-    private readonly IRoomingHouseLeasePolicyService roomingHouseLeasePolicyService;
+    private readonly IRoomingHouseRentalPolicyService roomingHouseRentalPolicyService;
     private readonly IRoomingHouseRuleService roomingHouseRuleService;
+    private readonly IRoomingHouseServicePriceService roomingHouseServicePriceService;
     private readonly ICurrentUserService currentUserService;
 
     public RoomingHousesController(
@@ -30,16 +35,18 @@ public class RoomingHousesController : ControllerBase
         IRoomingHouseDraftService roomingHouseDraftService,
         IRoomingHouseMediaService roomingHouseMediaService,
         IRoomingHouseSubmissionService roomingHouseSubmissionService,
-        IRoomingHouseLeasePolicyService roomingHouseLeasePolicyService,
+        IRoomingHouseRentalPolicyService roomingHouseRentalPolicyService,
         IRoomingHouseRuleService roomingHouseRuleService,
+        IRoomingHouseServicePriceService roomingHouseServicePriceService,
         ICurrentUserService currentUserService)
     {
         this.roomingHouseQueryService = roomingHouseQueryService;
         this.roomingHouseDraftService = roomingHouseDraftService;
         this.roomingHouseMediaService = roomingHouseMediaService;
         this.roomingHouseSubmissionService = roomingHouseSubmissionService;
-        this.roomingHouseLeasePolicyService = roomingHouseLeasePolicyService;
+        this.roomingHouseRentalPolicyService = roomingHouseRentalPolicyService;
         this.roomingHouseRuleService = roomingHouseRuleService;
+        this.roomingHouseServicePriceService = roomingHouseServicePriceService;
         this.currentUserService = currentUserService;
     }
 
@@ -186,6 +193,23 @@ public class RoomingHousesController : ControllerBase
     }
 
     [Authorize]
+    [HttpPut("{id:guid}/visibility")]
+    public async Task<ActionResult<ApiResponse<RoomingHouseDetailResponse>>> UpdateVisibility(
+        Guid id,
+        UpdateRoomingHouseVisibilityRequest request,
+        CancellationToken cancellationToken)
+    {
+        var ownership = await EnsureOwnerAsync(id, cancellationToken);
+        if (ownership is not null)
+        {
+            return ownership;
+        }
+
+        var result = await roomingHouseDraftService.UpdateVisibilityAsync(id, request, cancellationToken);
+        return RoomingHouseDetailResult(result, "Cập nhật trạng thái hiển thị khu trọ thành công.");
+    }
+
+    [Authorize]
     [HttpPost("{id:guid}/submit")]
     public async Task<ActionResult<ApiResponse<RoomingHouseDetailResponse>>> Submit(
         Guid id,
@@ -202,8 +226,8 @@ public class RoomingHousesController : ControllerBase
     }
 
     [Authorize]
-    [HttpGet("{id:guid}/lease-policy")]
-    public async Task<ActionResult<ApiResponse<LeasePolicyResponse>>> GetLeasePolicy(
+    [HttpGet("{id:guid}/rental-policy")]
+    public async Task<ActionResult<ApiResponse<RentalPolicyResponse>>> GetRentalPolicy(
         Guid id,
         CancellationToken cancellationToken)
     {
@@ -228,9 +252,9 @@ public class RoomingHousesController : ControllerBase
             });
         }
 
-        var result = await roomingHouseLeasePolicyService.GetLeasePolicyAsync(id, cancellationToken);
+        var result = await roomingHouseRentalPolicyService.GetRentalPolicyAsync(id, cancellationToken);
 
-        return Ok(new ApiResponse<LeasePolicyResponse>
+        return Ok(new ApiResponse<RentalPolicyResponse>
         {
             Success = true,
             Message = result is null
@@ -241,16 +265,16 @@ public class RoomingHousesController : ControllerBase
     }
 
     [Authorize]
-    [HttpPut("{id:guid}/lease-policy")]
-    public async Task<ActionResult<ApiResponse<LeasePolicyResponse>>> UpdateLeasePolicy(
+    [HttpPut("{id:guid}/rental-policy")]
+    public async Task<ActionResult<ApiResponse<RentalPolicyResponse>>> UpdateRentalPolicy(
         Guid id,
-        UpdateLeasePolicyRequest request,
+        UpdateRentalPolicyRequest request,
         CancellationToken cancellationToken)
     {
         var userId = GetCurrentUserId();
-        var result = await roomingHouseLeasePolicyService.UpdateLeasePolicyAsync(id, userId, request, cancellationToken);
+        var result = await roomingHouseRentalPolicyService.UpdateRentalPolicyAsync(id, userId, request, cancellationToken);
 
-        return Ok(new ApiResponse<LeasePolicyResponse>
+        return Ok(new ApiResponse<RentalPolicyResponse>
         {
             Success = true,
             Message = "Lưu chính sách thuê thành công.",
@@ -295,14 +319,54 @@ public class RoomingHousesController : ControllerBase
         });
     }
 
+    [Authorize]
+    [HttpPost("{id:guid}/rule/preview")]
+    public async Task<IActionResult> PreviewRule(
+        Guid id,
+        UpsertRoomingHouseRuleRequest request,
+        CancellationToken cancellationToken)
+    {
+        var userId = GetCurrentUserId();
+        var pdfStream = await roomingHouseRuleService.PreviewRuleAsync(id, userId, request, cancellationToken);
+        return File(pdfStream, "application/pdf", $"house-rule-preview-{id:N}.pdf");
+    }
+
+    [Authorize]
+    [HttpGet("{id:guid}/service-prices")]
+    public async Task<ActionResult<ApiResponse<List<ServicePriceResponse>>>> GetServicePrices(
+        Guid id,
+        CancellationToken cancellationToken)
+    {
+        var result = await roomingHouseServicePriceService.GetServicePricesAsync(GetCurrentUserId(), id, cancellationToken);
+
+        return Ok(new ApiResponse<List<ServicePriceResponse>>
+        {
+            Success = true,
+            Message = "Tải bảng giá dịch vụ thành công.",
+            Data = result
+        });
+    }
+
+    [Authorize]
+    [HttpPost("{id:guid}/service-prices")]
+    public async Task<ActionResult<ApiResponse<ServicePriceResponse>>> CreateServicePrice(
+        Guid id,
+        CreateServicePriceRequest request,
+        CancellationToken cancellationToken)
+    {
+        var result = await roomingHouseServicePriceService.CreateServicePriceAsync(GetCurrentUserId(), id, request, cancellationToken);
+
+        return Ok(new ApiResponse<ServicePriceResponse>
+        {
+            Success = true,
+            Message = "Tạo bảng giá dịch vụ mới thành công.",
+            Data = result
+        });
+    }
+
     private Guid GetCurrentUserId()
     {
-        if (!currentUserService.IsAuthenticated || currentUserService.UserId is null)
-        {
-            throw new UnauthorizedAccessException("Không tìm thấy mã người dùng đã đăng nhập.");
-        }
-
-        return currentUserService.UserId.Value;
+        return currentUserService.GetRequiredUserId("Không tìm thấy mã người dùng đã đăng nhập.");
     }
 
     private async Task<ActionResult<ApiResponse<RoomingHouseDetailResponse>>?> EnsureOwnerAsync(

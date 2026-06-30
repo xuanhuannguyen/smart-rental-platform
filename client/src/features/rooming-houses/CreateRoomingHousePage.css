@@ -1,10 +1,268 @@
 .create-rooming-house-page {
   min-height: 100vh;
-  padding: 32px 24px;
-  max-width: 920px;
-  margin: 0 auto;
+  padding: 40px 24px;
+  background-color: #f8fafc; /* Light gray page background to pop the white card */
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  align-items: center;
 }
 
+.create-rooming-house-page > * {
+  width: 100%;
+  max-width: 960px;
+}
+
+/* ==========================================
+   VIEW SUBMITTED HEADER
+   ========================================== */
+.create-rooming-house-page__view-submitted-header {
+  display: flex;
+  justify-content: flex-start;
+  width: 100%;
+  max-width: 960px;
+  margin: 0 auto 16px auto;
+}
+
+.create-rooming-house-page__back-btn {
+  background: #ffffff;
+  border: 1px solid #cbd5e1;
+  color: #475569;
+  padding: 8px 16px;
+  border-radius: 8px;
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05);
+  transition: background-color 0.2s, color 0.2s, border-color 0.2s;
+}
+
+.create-rooming-house-page__back-btn:hover {
+  background-color: #f8fafc;
+  color: #1e293b;
+  border-color: #94a3b8;
+}
+
+/* ==========================================
+   PENDING APPROVAL STATE CARD (MOCKUP)
+   ========================================== */
+.create-rooming-house-page__pending-card {
+  background: #ffffff;
+  border: 1px solid rgba(226, 232, 240, 0.8);
+  border-radius: 24px;
+  box-shadow: 0 20px 48px rgba(0, 0, 0, 0.03), 0 8px 24px rgba(36, 107, 254, 0.03);
+  display: flex;
+  flex-direction: column;
+  max-width: 580px;
+  margin: 0 auto;
+  padding: 48px 40px;
+  text-align: center;
+  align-items: center;
+}
+
+.create-rooming-house-page__pending-title {
+  color: #1e293b;
+  font-size: 26px;
+  font-weight: 800;
+  margin: 24px 0 10px 0;
+  line-height: 1.2;
+}
+
+.create-rooming-house-page__pending-subtitle {
+  color: #64748b;
+  font-size: 14.5px;
+  line-height: 1.6;
+  margin: 0 0 32px 0;
+}
+
+/* Rooming house brief info box */
+.create-rooming-house-page__pending-house {
+  align-self: stretch;
+  align-items: center;
+  background: #f5f9ff;
+  border: 1px solid #dbeafe;
+  border-radius: 16px;
+  display: flex;
+  gap: 16px;
+  padding: 16px 20px;
+  text-align: left;
+  margin-bottom: 32px;
+}
+
+.create-rooming-house-page__pending-house-info {
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+}
+
+.create-rooming-house-page__pending-house-info h3 {
+  color: #1e293b;
+  font-size: 16px;
+  font-weight: 700;
+  margin: 0 0 4px 0;
+  line-height: 1.3;
+}
+
+.create-rooming-house-page__pending-house-info p {
+  color: #64748b;
+  font-size: 13px;
+  line-height: 1.4;
+  margin: 0;
+}
+
+/* Horizontal Timeline flow */
+.create-rooming-house-page__timeline {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  align-self: stretch;
+  margin-bottom: 40px;
+  padding: 0 10px;
+}
+
+.create-rooming-house-page__timeline-step {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  width: 120px;
+  flex-shrink: 0;
+}
+
+.create-rooming-house-page__timeline-icon {
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 2;
+  transition: all 0.2s ease;
+}
+
+.create-rooming-house-page__timeline-icon--completed {
+  background-color: #246bfe;
+  color: #ffffff;
+}
+
+.create-rooming-house-page__timeline-icon--active {
+  background-color: #f59e0b;
+  color: #ffffff;
+  box-shadow: 0 0 0 5px rgba(245, 158, 11, 0.15);
+}
+
+.create-rooming-house-page__timeline-icon--pending {
+  background-color: #cbd5e1;
+  color: #ffffff;
+}
+
+.create-rooming-house-page__timeline-line {
+  flex: 1;
+  height: 2px;
+  border-top: 2px dashed #cbd5e1;
+  margin-top: 15px; /* Centers with the 32px icon */
+  z-index: 1;
+}
+
+.create-rooming-house-page__timeline-line--completed {
+  border-top-style: dashed;
+  border-top-color: #246bfe;
+}
+
+.create-rooming-house-page__timeline-line--pending {
+  border-top-style: dashed;
+  border-top-color: #e2e8f0;
+}
+
+.create-rooming-house-page__timeline-content {
+  margin-top: 12px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  text-align: center;
+}
+
+.create-rooming-house-page__timeline-content strong {
+  font-size: 13px;
+  font-weight: 700;
+  color: #1e293b;
+  margin-bottom: 4px;
+  white-space: nowrap;
+}
+
+.create-rooming-house-page__timeline-content span {
+  font-size: 11px;
+  color: #64748b;
+  line-height: 1.35;
+}
+
+/* Pending card action buttons */
+.create-rooming-house-page__pending-actions {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 16px;
+  align-self: stretch;
+}
+
+.create-rooming-house-page__primary-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  min-height: 44px;
+  padding: 10px 28px;
+  border-radius: 12px;
+  background: #246bfe;
+  color: #ffffff;
+  font-weight: 700;
+  font-size: 14.5px;
+  text-decoration: none;
+  box-shadow: 0 6px 16px rgba(36, 107, 254, 0.2);
+  transition: all 0.2s ease;
+  width: 240px;
+}
+
+.create-rooming-house-page__primary-btn:hover {
+  background: #1d4ed8;
+  box-shadow: 0 8px 20px rgba(36, 107, 254, 0.28);
+  transform: translateY(-1px);
+}
+
+.create-rooming-house-page__primary-btn:active {
+  transform: translateY(0);
+}
+
+.create-rooming-house-page__link-btn {
+  background: none;
+  border: 0;
+  color: #246bfe;
+  font-family: inherit;
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 12px;
+  transition: color 0.2s ease;
+}
+
+.create-rooming-house-page__link-btn:hover {
+  color: #1d4ed8;
+  text-decoration: underline;
+}
+
+.create-rooming-house-page__link-btn .arrow-right {
+  font-size: 16px;
+  line-height: 1;
+}
+
+/* ==========================================
+   LEGACY COMPATIBILITY
+   ========================================== */
 .create-rooming-house-page__state {
   display: grid;
   gap: 14px;
@@ -12,73 +270,52 @@
   margin: 0 auto;
   padding: 32px;
   border: 1px solid #dbe3ef;
-  border-radius: 8px;
+  border-radius: 16px;
   background: #ffffff;
   text-align: center;
 }
 
 .create-rooming-house-page__state h1 {
   margin: 0;
-  font-size: 24px;
+  font-size: 22px;
+  font-weight: 800;
+  color: #1e293b;
 }
 
 .create-rooming-house-page__state p {
   margin: 0;
   color: #64748b;
+  line-height: 1.5;
 }
 
-.create-rooming-house-page__summary {
-  display: grid;
-  gap: 4px;
-  padding: 14px;
-  border-radius: 6px;
-  background: #f8fafc;
-  font-size: 14px;
-  color: #475569;
-  text-align: left;
-}
-
-.create-rooming-house-page__summary strong {
-  font-size: 16px;
-  color: #162033;
-}
-
-.create-rooming-house-page__primary {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  min-height: 42px;
-  padding: 10px 24px;
-  border-radius: 6px;
-  background: #246bfe;
-  color: #ffffff;
-  font-weight: 700;
-  text-decoration: none;
-}
-
-.create-rooming-house-page__secondary {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  min-height: 42px;
-  padding: 10px 24px;
-  border-radius: 6px;
-  background: #f1f5f9;
-  color: #334155;
-  font-weight: 700;
-  text-decoration: none;
-  border: 1px solid #cbd5e1;
-  transition: background 0.2s;
-}
-
-.create-rooming-house-page__secondary:hover {
-  background: #e2e8f0;
-}
-
-.create-rooming-house-page__actions {
-  display: flex;
-  flex-direction: column;
-  gap: 12px;
-  margin-top: 20px;
-  align-items: center;
+@media (max-width: 640px) {
+  .create-rooming-house-page__pending-card {
+    padding: 32px 20px;
+  }
+  
+  .create-rooming-house-page__timeline {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 16px;
+    padding-left: 20px;
+    position: relative;
+    margin-bottom: 32px;
+  }
+  
+  .create-rooming-house-page__timeline-step {
+    flex-direction: row;
+    width: auto;
+    text-align: left;
+    gap: 16px;
+  }
+  
+  .create-rooming-house-page__timeline-content {
+    margin-top: 0;
+    align-items: flex-start;
+    text-align: left;
+  }
+  
+  .create-rooming-house-page__timeline-line {
+    display: none; /* Hide the dashed connectors on mobile since vertical space varies */
+  }
 }

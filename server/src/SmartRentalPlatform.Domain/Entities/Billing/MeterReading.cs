@@ -1,5 +1,5 @@
-using SmartRentalPlatform.Domain.Entities.Leasing;
 using SmartRentalPlatform.Domain.Entities.Properties;
+using SmartRentalPlatform.Domain.Entities.RentalContracts;
 using SmartRentalPlatform.Domain.Entities.Users;
 
 namespace SmartRentalPlatform.Domain.Entities.Billing;
@@ -16,14 +16,13 @@ public class MeterReading
     public decimal CurrentReading { get; set; }
     public decimal Consumption { get; set; }
     public string? ProofImageObjectKey { get; set; }
-    public MeterReadingStatus Status { get; set; } = MeterReadingStatus.Draft;
     public Guid RecordedByLandlordUserId { get; set; }
     public DateTimeOffset ReadingAt { get; set; }
     public DateTimeOffset CreatedAt { get; set; }
     public DateTimeOffset UpdatedAt { get; set; }
 
     public Room Room { get; set; } = null!;
-    public Contract Contract { get; set; } = null!;
+    public RentalContract RentalContract { get; set; } = null!;
     public BillingServiceType ServiceType { get; set; } = null!;
     public User RecordedByLandlord { get; set; } = null!;
     public ICollection<InvoiceItem> InvoiceItems { get; set; } = new List<InvoiceItem>();

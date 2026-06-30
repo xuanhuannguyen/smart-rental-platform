@@ -10,6 +10,9 @@ const STATUS_LABELS: Record<string, string> = {
   Visible: 'Hiển thị',
   Maintenance: 'Bảo trì',
   Reserved: 'Đã đặt chỗ',
+  Active: 'Đang hiệu lực',
+  Expired: 'Đã hết hạn',
+  Cancelled: 'Đã hủy',
 };
 
 export function formatStatus(status: string): string {
@@ -21,15 +24,18 @@ export function getStatusToneClass(status: string): string {
     case 'Approved':
     case 'Available':
     case 'Visible':
+    case 'Active':
       return 'status-pill--success';
     case 'Pending':
       return 'status-pill--info';
     case 'Rejected':
+    case 'Cancelled':
       return 'status-pill--danger';
     case 'Draft':
       return 'status-pill--warning';
     case 'Hidden':
     case 'Maintenance':
+    case 'Expired':
       return 'status-pill--neutral';
     case 'Occupied':
     case 'Reserved':

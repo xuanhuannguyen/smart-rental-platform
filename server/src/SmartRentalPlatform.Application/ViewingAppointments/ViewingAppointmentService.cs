@@ -6,6 +6,7 @@ using SmartRentalPlatform.Contracts.ViewingAppointments.Requests;
 using SmartRentalPlatform.Contracts.ViewingAppointments.Responses;
 using SmartRentalPlatform.Domain.Entities.Properties;
 using SmartRentalPlatform.Domain.Enums;
+using SmartRentalPlatform.Domain.Enums.Notifications;
 using SmartRentalPlatform.Domain.Enums.Properties;
 using System;
 using System.Collections.Generic;
@@ -18,10 +19,12 @@ namespace SmartRentalPlatform.Application.ViewingAppointments
     public class ViewingAppointmentService : IViewingAppointmentService
     {
         private readonly IAppDbContext _context;
+        private readonly INotificationService _notificationService;
 
-        public ViewingAppointmentService(IAppDbContext context)
+        public ViewingAppointmentService(IAppDbContext context, INotificationService notificationService)
         {
             _context = context;
+            _notificationService = notificationService;
         }
 
         public async Task<ViewingAppointmentResponse> CreateAsync(
@@ -85,19 +88,21 @@ namespace SmartRentalPlatform.Application.ViewingAppointments
                     "Bạn không thể đặt lịch xem phòng trọ của chính mình.");
             }
 
-            // Chặn duplicate: tenant đã có appointment Pending/Confirmed cho cùng room
+            // Chặn duplicate: tenant đã có appointment Pending/Confirmed cho cùng room,
+            // hoặc Rejected nhưng vẫn còn đề xuất đang chờ phản hồi (ProposedScheduledAt != null)
             var existingActive = await _context.ViewingAppointments
                 .AnyAsync(x => x.RoomId == request.RoomId
                     && x.TenantUserId == tenantUserId
                     && (x.Status == ViewingAppointmentStatus.Pending
-                        || x.Status == ViewingAppointmentStatus.Confirmed),
+                        || x.Status == ViewingAppointmentStatus.Confirmed
+                        || (x.Status == ViewingAppointmentStatus.Rejected && x.ProposedScheduledAt != null)),
                     cancellationToken);
 
             if (existingActive)
             {
                 throw new ConflictException(
                     ErrorCodes.ViewingAppointmentDuplicate,
-                    "Bạn đã có lịch hẹn đang chờ duyệt hoặc đã xác nhận cho phòng này.");
+                    "Bạn đã có lịch hẹn cho phòng này và chu trình chưa kết thúc. Vui lòng chờ hoặc liên hệ chủ trọ.");
             }
 
             int duration = request.DurationMinutes ?? 30;
@@ -133,8 +138,15 @@ namespace SmartRentalPlatform.Application.ViewingAppointments
                 .Include(x => x.TenantUser)
                 .FirstAsync(x => x.Id == appointment.Id, cancellationToken);
 
-            // Stub for sending notification to Landlord (BR-VIEW-CREATE-11)
-            Console.WriteLine($"[Notification Stub] Notify landlord {house.LandlordUserId} about new viewing appointment {appointment.Id}");
+            // Send notification to Landlord (BR-VIEW-CREATE-11)
+            await _notificationService.CreateAsync(
+                userId: house.LandlordUserId,
+                type: NotificationType.NewViewingAppointment,
+                title: "📅 Lịch xem phòng mới",
+                body: $"{savedAppointment.TenantUser?.DisplayName ?? "Khách hàng"} muốn xem phòng {room.RoomNumber} tại {house.Name} lúc {appointment.ScheduledAt:HH:mm 'ngày' dd/MM/yyyy}.",
+                referenceId: appointment.Id.ToString(),
+                referenceType: "ViewingAppointment",
+                cancellationToken: cancellationToken);
 
             return ViewingAppointmentMapper.ToResponse(savedAppointment);
         }
@@ -306,8 +318,15 @@ namespace SmartRentalPlatform.Application.ViewingAppointments
 
             await _context.SaveChangesAsync(cancellationToken);
 
-            // Stub for sending notification to Tenant (BR-CONFIRM-05/Landlord note)
-            Console.WriteLine($"[Notification Stub] Notify tenant {appointment.TenantUserId} about confirmed viewing appointment {appointment.Id}");
+            // Send notification to Tenant (BR-CONFIRM-05/Landlord note)
+            await _notificationService.CreateAsync(
+                userId: appointment.TenantUserId,
+                type: NotificationType.ViewingAppointmentConfirmed,
+                title: "✅ Lịch xem phòng đã được xác nhận",
+                body: $"Chủ trọ đã xác nhận lịch xem phòng {appointment.Room?.RoomNumber ?? ""} lúc {appointment.ScheduledAt:HH:mm 'ngày' dd/MM/yyyy}.",
+                referenceId: appointment.Id.ToString(),
+                referenceType: "ViewingAppointment",
+                cancellationToken: cancellationToken);
 
             return ViewingAppointmentMapper.ToResponse(appointment);
         }
@@ -345,6 +364,28 @@ namespace SmartRentalPlatform.Application.ViewingAppointments
                     "Lý do từ chối là bắt buộc.");
             }
 
+            // Validate proposal if provided
+            if (request.ProposedScheduledAt.HasValue)
+            {
+                if (request.ProposedScheduledAt.Value <= DateTimeOffset.UtcNow.AddHours(1))
+                {
+                    throw new BadRequestException(
+                        ErrorCodes.ViewingAppointmentTimeInPast,
+                        "Thời gian đề xuất phải cách hiện tại ít nhất 1 giờ.");
+                }
+
+                var proposedDuration = request.ProposedDurationMinutes ?? appointment.DurationMinutes;
+                if (proposedDuration <= 0)
+                {
+                    throw new BadRequestException(
+                        ErrorCodes.ValidationError,
+                        "Thời lượng đề xuất (proposed_duration_minutes) phải lớn hơn 0.");
+                }
+
+                appointment.ProposedScheduledAt = request.ProposedScheduledAt.Value;
+                appointment.ProposedDurationMinutes = proposedDuration;
+            }
+
             appointment.Status = ViewingAppointmentStatus.Rejected;
             appointment.RespondedAt = DateTimeOffset.UtcNow;
             // Lưu reject reason vào CancelReason (field dùng chung cho cả reject/cancel reason)
@@ -353,8 +394,29 @@ namespace SmartRentalPlatform.Application.ViewingAppointments
 
             await _context.SaveChangesAsync(cancellationToken);
 
-            // Stub for sending notification to Tenant
-            Console.WriteLine($"[Notification Stub] Notify tenant {appointment.TenantUserId} that appointment {appointment.Id} was rejected. Reason: {request.RejectReason}");
+            // Send notification to Tenant — with or without proposal info
+            if (request.ProposedScheduledAt.HasValue)
+            {
+                await _notificationService.CreateAsync(
+                    userId: appointment.TenantUserId,
+                    type: NotificationType.ViewingAppointmentRejected,
+                    title: "📅 Chủ trọ đề xuất lịch mới",
+                    body: $"Chủ trọ đã từ chối lịch xem phòng {appointment.Room?.RoomNumber ?? ""} và đề xuất khung giờ mới: {request.ProposedScheduledAt.Value:HH:mm 'ngày' dd/MM/yyyy}. Vui lòng phản hồi.",
+                    referenceId: appointment.Id.ToString(),
+                    referenceType: "ViewingAppointment",
+                    cancellationToken: cancellationToken);
+            }
+            else
+            {
+                await _notificationService.CreateAsync(
+                    userId: appointment.TenantUserId,
+                    type: NotificationType.ViewingAppointmentRejected,
+                    title: "❌ Lịch xem phòng bị từ chối",
+                    body: $"Lịch xem phòng {appointment.Room?.RoomNumber ?? ""} đã bị chủ trọ từ chối. Lý do: {request.RejectReason.Trim()}",
+                    referenceId: appointment.Id.ToString(),
+                    referenceType: "ViewingAppointment",
+                    cancellationToken: cancellationToken);
+            }
 
             return ViewingAppointmentMapper.ToResponse(appointment);
         }
@@ -392,8 +454,15 @@ namespace SmartRentalPlatform.Application.ViewingAppointments
 
             await _context.SaveChangesAsync(cancellationToken);
 
-            // Stub for sending notification to Landlord (BR-VIEW-TENANT-08)
-            Console.WriteLine($"[Notification Stub] Notify landlord {appointment.Room.RoomingHouse.LandlordUserId} that tenant {tenantUserId} cancelled appointment {appointment.Id}");
+            // Send notification to Landlord (BR-VIEW-TENANT-08)
+            await _notificationService.CreateAsync(
+                userId: appointment.Room.RoomingHouse.LandlordUserId,
+                type: NotificationType.ViewingAppointmentCancelled,
+                title: "🗑️ Khách thuê đã hủy lịch hẹn",
+                body: $"Khách thuê đã hủy lịch xem phòng {appointment.Room?.RoomNumber ?? ""} lúc {appointment.ScheduledAt:HH:mm 'ngày' dd/MM/yyyy}.",
+                referenceId: appointment.Id.ToString(),
+                referenceType: "ViewingAppointment",
+                cancellationToken: cancellationToken);
 
             return ViewingAppointmentMapper.ToResponse(appointment);
         }
@@ -438,8 +507,122 @@ namespace SmartRentalPlatform.Application.ViewingAppointments
 
             await _context.SaveChangesAsync(cancellationToken);
 
-            // Stub for sending notification to Tenant
-            Console.WriteLine($"[Notification Stub] Notify tenant {appointment.TenantUserId} that landlord {landlordUserId} cancelled confirmed appointment {appointment.Id}. Reason: {request.CancelReason}");
+            // Send notification to Tenant
+            await _notificationService.CreateAsync(
+                userId: appointment.TenantUserId,
+                type: NotificationType.ViewingAppointmentCancelled,
+                title: "🗑️ Chủ trọ đã hủy lịch hẹn",
+                body: $"Chủ trọ đã hủy lịch xem phòng {appointment.Room?.RoomNumber ?? ""} lúc {appointment.ScheduledAt:HH:mm 'ngày' dd/MM/yyyy}. Lý do: {request.CancelReason?.Trim()}",
+                referenceId: appointment.Id.ToString(),
+                referenceType: "ViewingAppointment",
+                cancellationToken: cancellationToken);
+
+            return ViewingAppointmentMapper.ToResponse(appointment);
+        }
+
+        public async Task<ViewingAppointmentResponse> AcceptProposalAsync(
+            Guid tenantUserId,
+            Guid appointmentId,
+            CancellationToken cancellationToken = default)
+        {
+            var appointment = await _context.ViewingAppointments
+                .Include(x => x.Room)
+                .ThenInclude(r => r.RoomingHouse)
+                .Include(x => x.TenantUser)
+                .FirstOrDefaultAsync(x => x.Id == appointmentId && x.TenantUserId == tenantUserId, cancellationToken);
+
+            if (appointment == null)
+            {
+                throw new NotFoundException(
+                    ErrorCodes.ViewingAppointmentNotFound,
+                    "Không tìm thấy lịch hẹn xem phòng.");
+            }
+
+            if (appointment.Status != ViewingAppointmentStatus.Rejected)
+            {
+                throw new BadRequestException(
+                    ErrorCodes.ViewingAppointmentInvalidStatus,
+                    "Chỉ có thể chấp nhận đề xuất lịch hẹn đã bị từ chối (Rejected).");
+            }
+
+            if (!appointment.ProposedScheduledAt.HasValue)
+            {
+                throw new BadRequestException(
+                    ErrorCodes.ViewingAppointmentInvalidStatus,
+                    "Lịch hẹn này không có đề xuất mới từ chủ trọ.");
+            }
+
+            // Apply the proposal — update actual schedule to proposed values
+            appointment.ScheduledAt = appointment.ProposedScheduledAt.Value;
+            appointment.DurationMinutes = appointment.ProposedDurationMinutes ?? appointment.DurationMinutes;
+            appointment.Status = ViewingAppointmentStatus.Confirmed;
+            appointment.ProposedScheduledAt = null;
+            appointment.ProposedDurationMinutes = null;
+            appointment.UpdatedAt = DateTimeOffset.UtcNow;
+
+            await _context.SaveChangesAsync(cancellationToken);
+
+            // Notify landlord
+            await _notificationService.CreateAsync(
+                userId: appointment.Room.RoomingHouse.LandlordUserId,
+                type: NotificationType.ViewingAppointmentConfirmed,
+                title: "✅ Khách thuê đã chấp nhận đề xuất",
+                body: $"Khách thuê đã đồng ý với lịch xem phòng {appointment.Room?.RoomNumber ?? ""} lúc {appointment.ScheduledAt:HH:mm 'ngày' dd/MM/yyyy}.",
+                referenceId: appointment.Id.ToString(),
+                referenceType: "ViewingAppointment",
+                cancellationToken: cancellationToken);
+
+            return ViewingAppointmentMapper.ToResponse(appointment);
+        }
+
+        public async Task<ViewingAppointmentResponse> RejectProposalAsync(
+            Guid tenantUserId,
+            Guid appointmentId,
+            CancellationToken cancellationToken = default)
+        {
+            var appointment = await _context.ViewingAppointments
+                .Include(x => x.Room)
+                .ThenInclude(r => r.RoomingHouse)
+                .Include(x => x.TenantUser)
+                .FirstOrDefaultAsync(x => x.Id == appointmentId && x.TenantUserId == tenantUserId, cancellationToken);
+
+            if (appointment == null)
+            {
+                throw new NotFoundException(
+                    ErrorCodes.ViewingAppointmentNotFound,
+                    "Không tìm thấy lịch hẹn xem phòng.");
+            }
+
+            if (appointment.Status != ViewingAppointmentStatus.Rejected)
+            {
+                throw new BadRequestException(
+                    ErrorCodes.ViewingAppointmentInvalidStatus,
+                    "Chỉ có thể từ chối đề xuất của lịch hẹn đã bị từ chối (Rejected).");
+            }
+
+            if (!appointment.ProposedScheduledAt.HasValue)
+            {
+                throw new BadRequestException(
+                    ErrorCodes.ViewingAppointmentInvalidStatus,
+                    "Lịch hẹn này không có đề xuất mới từ chủ trọ.");
+            }
+
+            // Clear proposal — stay Rejected (final)
+            appointment.ProposedScheduledAt = null;
+            appointment.ProposedDurationMinutes = null;
+            appointment.UpdatedAt = DateTimeOffset.UtcNow;
+
+            await _context.SaveChangesAsync(cancellationToken);
+
+            // Notify landlord
+            await _notificationService.CreateAsync(
+                userId: appointment.Room.RoomingHouse.LandlordUserId,
+                type: NotificationType.ViewingAppointmentRejected,
+                title: "❌ Khách thuê từ chối đề xuất",
+                body: $"Khách thuê đã từ chối đề xuất lịch xem phòng {appointment.Room?.RoomNumber ?? ""}.",
+                referenceId: appointment.Id.ToString(),
+                referenceType: "ViewingAppointment",
+                cancellationToken: cancellationToken);
 
             return ViewingAppointmentMapper.ToResponse(appointment);
         }
@@ -481,8 +664,15 @@ namespace SmartRentalPlatform.Application.ViewingAppointments
 
             await _context.SaveChangesAsync(cancellationToken);
 
-            // Stub for sending notification to Tenant
-            Console.WriteLine($"[Notification Stub] Notify tenant {appointment.TenantUserId} that appointment {appointment.Id} was completed.");
+            // Send notification to Tenant
+            await _notificationService.CreateAsync(
+                userId: appointment.TenantUserId,
+                type: NotificationType.ViewingAppointmentCompleted,
+                title: "✅ Buổi xem phòng đã hoàn tất",
+                body: $"Buổi xem phòng {appointment.Room?.RoomNumber ?? ""} đã được chủ trọ đánh dấu hoàn tất.",
+                referenceId: appointment.Id.ToString(),
+                referenceType: "ViewingAppointment",
+                cancellationToken: cancellationToken);
 
             return ViewingAppointmentMapper.ToResponse(appointment);
         }

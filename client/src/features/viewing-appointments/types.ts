@@ -19,6 +19,8 @@ export interface ViewingAppointment {
   landlordNote?: string | null;
   cancelReason?: string | null;
   respondedAt?: string | null;
+  proposedScheduledAt?: string | null;
+  proposedDurationMinutes?: number | null;
   createdAt: string;
   updatedAt: string;
   // UI extended info (populated from enriched server response)
@@ -41,6 +43,8 @@ export interface ConfirmViewingAppointmentRequest {
 
 export interface RejectViewingAppointmentRequest {
   rejectReason: string;
+  proposedScheduledAt?: string | null;
+  proposedDurationMinutes?: number | null;
 }
 
 export interface CancelViewingAppointmentRequest {

@@ -102,6 +102,8 @@ export function RegisterForm({ isSubmitting, onSubmit }: RegisterFormProps) {
         <Input
           id="register-email"
           type="email"
+          placeholder="Nhập email của bạn"
+          className="auth-input-icon auth-input-email"
           value={form.email}
           hasError={Boolean(errors.email)}
           disabled={isSubmitting}
@@ -114,6 +116,8 @@ export function RegisterForm({ isSubmitting, onSubmit }: RegisterFormProps) {
         <Input
           id="register-password"
           type="password"
+          placeholder="Tạo mật khẩu"
+          className="auth-input-icon auth-input-password"
           value={form.password}
           hasError={Boolean(errors.password)}
           disabled={isSubmitting}
@@ -129,6 +133,8 @@ export function RegisterForm({ isSubmitting, onSubmit }: RegisterFormProps) {
         <Input
           id="register-confirm-password"
           type="password"
+          placeholder="Nhập lại mật khẩu"
+          className="auth-input-icon auth-input-password"
           value={confirmPassword}
           hasError={Boolean(errors.confirmPassword)}
           disabled={isSubmitting}
@@ -140,6 +146,8 @@ export function RegisterForm({ isSubmitting, onSubmit }: RegisterFormProps) {
       <FormField label="Tên hiển thị" htmlFor="register-display-name" error={errors.displayName}>
         <Input
           id="register-display-name"
+          placeholder="Tên của bạn"
+          className="auth-input-icon auth-input-user"
           value={form.displayName}
           hasError={Boolean(errors.displayName)}
           disabled={isSubmitting}
@@ -151,6 +159,8 @@ export function RegisterForm({ isSubmitting, onSubmit }: RegisterFormProps) {
       <FormField label="Số điện thoại" htmlFor="register-phone" error={errors.phoneNumber}>
         <Input
           id="register-phone"
+          placeholder="Ví dụ: 0912345678"
+          className="auth-input-icon auth-input-phone"
           value={form.phoneNumber}
           hasError={Boolean(errors.phoneNumber)}
           disabled={isSubmitting}
@@ -159,7 +169,7 @@ export function RegisterForm({ isSubmitting, onSubmit }: RegisterFormProps) {
         />
       </FormField>
 
-      <Button type="submit" disabled={isSubmitting}>
+      <Button type="submit" disabled={isSubmitting} className="auth-submit-button">
         {isSubmitting ? 'Đang tạo tài khoản...' : 'Tạo tài khoản'}
       </Button>
     </form>

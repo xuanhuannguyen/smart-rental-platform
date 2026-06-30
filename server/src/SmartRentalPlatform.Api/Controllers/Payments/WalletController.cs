@@ -1,6 +1,6 @@
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
-using SmartRentalPlatform.Application.Common.Exceptions;
+using SmartRentalPlatform.Api.Extensions;
 using SmartRentalPlatform.Application.Common.Interfaces;
 using SmartRentalPlatform.Application.Wallets;
 using SmartRentalPlatform.Contracts.Common;
@@ -34,7 +34,7 @@ public class WalletController : ControllerBase
         return Ok(new ApiResponse<WalletResponse>
         {
             Success = true,
-            Message = "Lay thong tin vi thanh cong.",
+            Message = "Lấy thông tin ví thành công.",
             Data = result
         });
     }
@@ -51,20 +51,13 @@ public class WalletController : ControllerBase
         return Ok(new ApiResponse<PagedResult<WalletTransactionResponse>>
         {
             Success = true,
-            Message = "Lay lich su giao dich vi thanh cong.",
+            Message = "Lấy lịch sử giao dịch ví thành công.",
             Data = result
         });
     }
 
     private Guid GetCurrentUserId()
     {
-        if (!currentUserService.IsAuthenticated || currentUserService.UserId is null)
-        {
-            throw new UnauthorizedException(
-                ErrorCodes.Unauthorized,
-                "Ban can dang nhap de thuc hien thao tac nay.");
-        }
-
-        return currentUserService.UserId.Value;
+        return currentUserService.GetRequiredUserIdForAction();
     }
 }

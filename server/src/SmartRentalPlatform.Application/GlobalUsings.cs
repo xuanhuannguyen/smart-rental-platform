@@ -1,5 +1,6 @@
 global using SmartRentalPlatform.Domain.Enums.Common;
 global using SmartRentalPlatform.Domain.Enums.Kyc;
+global using SmartRentalPlatform.Domain.Enums.Notifications;
 global using SmartRentalPlatform.Domain.Enums.Properties;
 global using SmartRentalPlatform.Domain.Enums.Users;
 global using SmartRentalPlatform.Contracts.Admin.Requests;
@@ -9,8 +10,8 @@ global using SmartRentalPlatform.Contracts.Auth.Responses;
 global using SmartRentalPlatform.Contracts.Files.Responses;
 global using SmartRentalPlatform.Contracts.Kyc.Requests;
 global using SmartRentalPlatform.Contracts.Kyc.Responses;
-global using SmartRentalPlatform.Contracts.LeasePolicies.Requests;
-global using SmartRentalPlatform.Contracts.LeasePolicies.Responses;
+global using SmartRentalPlatform.Contracts.RentalPolicies.Requests;
+global using SmartRentalPlatform.Contracts.RentalPolicies.Responses;
 global using SmartRentalPlatform.Contracts.LegalDocuments.Requests;
 global using SmartRentalPlatform.Contracts.LegalDocuments.Responses;
 global using SmartRentalPlatform.Contracts.PropertyImages.Requests;

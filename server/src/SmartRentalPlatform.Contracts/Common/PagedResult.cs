@@ -11,4 +11,6 @@ public class PagedResult<T>
     public int TotalItems { get; set; }
 
     public int TotalPages { get; set; }
+
+    public object? Metadata { get; set; }
 }

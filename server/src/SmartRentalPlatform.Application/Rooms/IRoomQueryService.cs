@@ -13,4 +13,12 @@ public interface IRoomQueryService
         Guid landlordUserId,
         Guid roomId,
         CancellationToken cancellationToken = default);
+
+    Task<RoomResponse?> GetPublicRoomByIdAsync(
+        Guid roomId,
+        CancellationToken cancellationToken = default);
+
+    Task<List<RoomResponse>> GetPublicAvailableRoomsAsync(
+        Guid roomingHouseId,
+        CancellationToken cancellationToken = default);
 }

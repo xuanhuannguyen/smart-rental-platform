@@ -1,20 +1,26 @@
 import { apiClient } from '../../shared/api/apiClient';
 import type { ApiResponse } from '../../shared/api/apiResponse.types';
+import { ENDPOINTS } from '../../shared/api/endpoints';
 import type {
   Amenity,
-  LeasePolicy,
+  GuestRoomingHouseRecommendationRequest,
   LocationSuggestion,
   LocationSearchResult,
   PagedResult,
   PropertyImageRequest,
+  RoomingHouseListingItem,
+  RoomingHouseRecommendationResponse,
+  RoomingHouseAiChatRequest,
+  RoomingHouseAiChatResponse,
   RoomingHouseSearchItem,
   RoomingHouseSearchParams,
+  RentalPolicy,
   RoomingHouseBasicInfoRequest,
   RoomingHouseRule,
   RoomingHouseDetail,
   RoomingHouseOnboarding,
   RoomingHouseSummary,
-  UpdateLeasePolicyRequest,
+  UpdateRentalPolicyRequest,
   UpdateLegalDocumentRequest,
   UpsertRoomingHouseRuleRequest,
 } from './types';
@@ -74,12 +80,39 @@ export async function getPublicRoomingHouses(): Promise<RoomingHouseDetail[]> {
   return data.data;
 }
 
+export async function getPublicRoomingHouseListing(): Promise<RoomingHouseListingItem[]> {
+  const data = await apiClient<ApiResponse<RoomingHouseListingItem[]>>(
+    '/api/public/rooming-houses/listing'
+  );
+  return data.data;
+}
+
 export async function searchPublicRoomingHouses(
   params: RoomingHouseSearchParams = {}
 ): Promise<PagedResult<RoomingHouseSearchItem>> {
   const query = buildSearchQuery(params);
   const data = await apiClient<ApiResponse<PagedResult<RoomingHouseSearchItem>>>(
-    `/api/public/rooming-houses/search${query ? `?${query}` : ''}`
+    `${ENDPOINTS.PUBLIC.ROOMING_HOUSE_SEARCH}${query ? `?${query}` : ''}`
+  );
+  return data.data;
+}
+
+export async function getGuestRoomingHouseRecommendations(
+  request: GuestRoomingHouseRecommendationRequest
+): Promise<RoomingHouseRecommendationResponse> {
+  const data = await apiClient<ApiResponse<RoomingHouseRecommendationResponse>>(
+    ENDPOINTS.PUBLIC.GUEST_ROOMING_HOUSE_RECOMMENDATIONS,
+    { method: 'POST', body: request }
+  );
+  return data.data;
+}
+
+export async function chatRoomingHouseAssistant(
+  request: RoomingHouseAiChatRequest
+): Promise<RoomingHouseAiChatResponse> {
+  const data = await apiClient<ApiResponse<RoomingHouseAiChatResponse>>(
+    ENDPOINTS.PUBLIC.ROOMING_HOUSE_AI_CHAT,
+    { method: 'POST', body: request }
   );
   return data.data;
 }
@@ -145,20 +178,39 @@ export async function updateRoomingHouseLegalDocument(
   return data.data;
 }
 
-export async function getRoomingHouseLeasePolicy(id: string): Promise<LeasePolicy | null> {
-  const data = await apiClient<ApiResponse<LeasePolicy | null>>(
-    `/api/rooming-houses/${id}/lease-policy`,
+export async function updateRoomingHouseVisibility(
+  id: string,
+  visibilityStatus: 'Visible' | 'Hidden'
+): Promise<RoomingHouseDetail> {
+  const data = await apiClient<ApiResponse<RoomingHouseDetail>>(
+    `/api/rooming-houses/${id}/visibility`,
+    { method: 'PUT', auth: true, body: { visibilityStatus } }
+  );
+  return data.data;
+}
+
+export async function submitRoomingHouse(id: string): Promise<RoomingHouseDetail> {
+  const data = await apiClient<ApiResponse<RoomingHouseDetail>>(
+    `/api/rooming-houses/${id}/submit`,
+    { method: 'POST', auth: true }
+  );
+  return data.data;
+}
+
+export async function getRoomingHouseRentalPolicy(id: string): Promise<RentalPolicy | null> {
+  const data = await apiClient<ApiResponse<RentalPolicy | null>>(
+    `/api/rooming-houses/${id}/rental-policy`,
     { auth: true }
   );
   return data.data;
 }
 
-export async function updateRoomingHouseLeasePolicy(
+export async function updateRoomingHouseRentalPolicy(
   id: string,
-  request: UpdateLeasePolicyRequest
-): Promise<LeasePolicy> {
-  const data = await apiClient<ApiResponse<LeasePolicy>>(
-    `/api/rooming-houses/${id}/lease-policy`,
+  request: UpdateRentalPolicyRequest
+): Promise<RentalPolicy> {
+  const data = await apiClient<ApiResponse<RentalPolicy>>(
+    `/api/rooming-houses/${id}/rental-policy`,
     { method: 'PUT', auth: true, body: request }
   );
   return data.data;
@@ -183,12 +235,20 @@ export async function upsertRoomingHouseRule(
   return data.data;
 }
 
-export async function submitRoomingHouse(id: string): Promise<RoomingHouseDetail> {
-  const data = await apiClient<ApiResponse<RoomingHouseDetail>>(
-    `/api/rooming-houses/${id}/submit`,
-    { method: 'POST', auth: true }
+export async function previewRoomingHouseRule(
+  id: string,
+  request: UpsertRoomingHouseRuleRequest
+): Promise<Blob> {
+  const blob = await apiClient<Blob>(
+    `/api/rooming-houses/${id}/rule/preview`,
+    {
+      method: 'POST',
+      auth: true,
+      body: request,
+      responseType: 'blob',
+    }
   );
-  return data.data;
+  return blob;
 }
 
 function buildSearchQuery(params: RoomingHouseSearchParams) {

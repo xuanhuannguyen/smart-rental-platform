@@ -29,17 +29,26 @@ public class RoomingHouseQueryService : IRoomingHouseQueryService
 
     private readonly IAppDbContext context;
     private readonly IRoomingHouseSearchParser searchParser;
+    private readonly IEnumerable<IRoomingHouseSearchIntentEnricher> searchIntentEnrichers;
+    private readonly IRoomingHouseRecommendationScorer recommendationScorer;
+    private readonly IRoomingHouseRecommendationReranker recommendationReranker;
     private readonly IVietMapService vietMapService;
     private readonly ILogger<RoomingHouseQueryService> logger;
 
     public RoomingHouseQueryService(
         IAppDbContext context,
         IRoomingHouseSearchParser searchParser,
+        IEnumerable<IRoomingHouseSearchIntentEnricher> searchIntentEnrichers,
+        IRoomingHouseRecommendationScorer recommendationScorer,
+        IRoomingHouseRecommendationReranker recommendationReranker,
         IVietMapService vietMapService,
         ILogger<RoomingHouseQueryService> logger)
     {
         this.context = context;
         this.searchParser = searchParser;
+        this.searchIntentEnrichers = searchIntentEnrichers;
+        this.recommendationScorer = recommendationScorer;
+        this.recommendationReranker = recommendationReranker;
         this.vietMapService = vietMapService;
         this.logger = logger;
     }
@@ -110,11 +119,110 @@ public class RoomingHouseQueryService : IRoomingHouseQueryService
         return houses.Select(RoomingHouseReadModelMapper.ToDetailResponse).ToList();
     }
 
+    public async Task<List<RoomingHouseListingResponse>> GetPublicListingAsync(
+        CancellationToken cancellationToken = default)
+    {
+        return await context.RoomingHouses
+            .AsNoTracking()
+            .Where(x => x.DeletedAt == null &&
+                        x.ApprovalStatus == RoomingHouseApprovalStatus.Approved &&
+                        x.VisibilityStatus == RoomingHouseVisibilityStatus.Visible &&
+                        x.Rooms.Any(r => r.Status == RoomStatus.Available && r.DeletedAt == null))
+            .OrderByDescending(x => x.CreatedAt)
+            .Select(x => new RoomingHouseListingResponse
+            {
+                Id = x.Id,
+                Name = x.Name,
+                AddressDisplay = x.Ward != null && x.Province != null
+                    ? x.AddressLine + ", " + x.Ward.Name + ", " + x.Province.Name
+                    : x.AddressDisplay,
+                CoverImageUrl = x.Images
+                    .OrderBy(i => i.SortOrder)
+                    .Select(i => i.ImageUrl)
+                    .FirstOrDefault(),
+                AvailableRooms = x.Rooms.Count(r => r.Status == RoomStatus.Available && r.DeletedAt == null),
+                MinMonthlyRent = x.Rooms
+                    .Where(r => r.Status == RoomStatus.Available && r.DeletedAt == null)
+                    .SelectMany(r => r.PriceTiers)
+                    .Where(p => p.IsActive)
+                    .Select(p => (decimal?)p.MonthlyRent)
+                    .Min(),
+                MaxMonthlyRent = x.Rooms
+                    .Where(r => r.Status == RoomStatus.Available && r.DeletedAt == null)
+                    .SelectMany(r => r.PriceTiers)
+                    .Where(p => p.IsActive)
+                    .Select(p => (decimal?)p.MonthlyRent)
+                    .Max(),
+                MinAreaM2 = x.Rooms
+                    .Where(r => r.Status == RoomStatus.Available && r.DeletedAt == null && r.AreaM2 != null)
+                    .Select(r => (decimal?)r.AreaM2)
+                    .Min(),
+                MaxAreaM2 = x.Rooms
+                    .Where(r => r.Status == RoomStatus.Available && r.DeletedAt == null && r.AreaM2 != null)
+                    .Select(r => (decimal?)r.AreaM2)
+                    .Max(),
+                Amenities = x.RoomingHouseAmenities
+                    .Select(a => new AmenityResponse
+                    {
+                        Id = a.Amenity.Id,
+                        Name = a.Amenity.Name,
+                        Scope = a.Amenity.Scope.ToString(),
+                        IconCode = a.Amenity.IconCode
+                    })
+                    .ToList(),
+                CreatedAt = x.CreatedAt
+            })
+            .ToListAsync(cancellationToken);
+    }
+
     public async Task<PagedResult<RoomingHouseSearchItemResponse>> SearchPublicAsync(
         RoomingHouseSearchRequest request,
         CancellationToken cancellationToken = default)
     {
         var criteria = searchParser.Parse(request);
+        await PrepareSearchCriteriaAsync(criteria, cancellationToken);
+        var result = await ExecutePublicSearchAsync(criteria, cancellationToken);
+        SetSearchMetadata(result, request, criteria);
+        LogSearchParse(request, criteria, result.TotalItems);
+
+        if (result.TotalItems > 0 || string.IsNullOrWhiteSpace(request.Q))
+        {
+            return result;
+        }
+
+        try
+        {
+            var aiCriteria = searchParser.Parse(request);
+            var normalizedQuery = new QueryNormalizer().Normalize(request.Q);
+            var intentContext = new RoomingHouseSearchIntentContext(request, normalizedQuery, aiCriteria);
+            foreach (var enricher in searchIntentEnrichers)
+            {
+                await enricher.EnrichAsync(intentContext, cancellationToken);
+            }
+
+            if (!aiCriteria.AiAssisted)
+            {
+                return result;
+            }
+
+            await PrepareSearchCriteriaAsync(aiCriteria, cancellationToken);
+            var aiResult = await ExecutePublicSearchAsync(aiCriteria, cancellationToken);
+            SetSearchMetadata(aiResult, request, aiCriteria);
+            LogSearchParse(request, aiCriteria, aiResult.TotalItems);
+
+            return aiResult.TotalItems == 0 ? result : aiResult;
+        }
+        catch (Exception ex)
+        {
+            logger.LogWarning(ex, "AI search fallback failed.");
+            return result;
+        }
+    }
+
+    private async Task PrepareSearchCriteriaAsync(
+        ParsedRoomingHouseSearchCriteria criteria,
+        CancellationToken cancellationToken)
+    {
         await ApplyAdministrativeLocationCriteriaAsync(criteria, cancellationToken);
         ValidateSearchRequest(criteria);
 
@@ -126,21 +234,207 @@ public class RoomingHouseQueryService : IRoomingHouseQueryService
             criteria.CenterLng = location.Longitude;
             criteria.RadiusKm = GeoSearchHelper.NormalizeRadius(criteria.RadiusKm, hasPlaceText: true);
         }
+    }
 
+    private async Task<PagedResult<RoomingHouseSearchItemResponse>> ExecutePublicSearchAsync(
+        ParsedRoomingHouseSearchCriteria criteria,
+        CancellationToken cancellationToken)
+    {
+        // Phase 1: Build the query with WHERE filters (no .Include(), no entity loading)
+        var baseQuery = BuildSearchBaseQuery(criteria);
+
+        // Phase 2: Load ONLY the columns needed for scoring via .Select() projection.
+        // This generates a single SQL query with only the required columns — no full entity graph.
+        var candidateData = await baseQuery
+            .Select(x => new RoomingHouseSearchCandidateData
+            {
+                Id = x.Id,
+                Name = x.Name,
+                AddressDisplay = x.AddressDisplay,
+                AddressLine = x.AddressLine,
+                Description = x.Description,
+                ProvinceCode = x.ProvinceCode,
+                WardCode = x.WardCode,
+                Latitude = x.Latitude,
+                Longitude = x.Longitude,
+                UpdatedAt = x.UpdatedAt,
+                CreatedAt = x.CreatedAt,
+                ProvinceName = x.Province.Name,
+                WardName = x.Ward.Name,
+                ImageCount = x.Images.Count,
+                HasVerifiedKyc = x.Landlord.KycVerifications.Any(k => k.Status == KycVerificationStatus.Approved),
+                ReviewedAt = x.ReviewedAt,
+                HouseAmenities = x.RoomingHouseAmenities
+                    .Select(a => new CandidateAmenity
+                    {
+                        Id = a.Amenity.Id,
+                        Name = a.Amenity.Name
+                    })
+                    .ToList(),
+                AvailableRooms = x.Rooms
+                    .Where(r => r.Status == RoomStatus.Available && r.DeletedAt == null)
+                    .Select(r => new CandidateRoom
+                    {
+                        Id = r.Id,
+                        RoomNumber = r.RoomNumber,
+                        Floor = r.Floor,
+                        AreaM2 = r.AreaM2,
+                        MaxOccupants = r.MaxOccupants,
+                        ActivePrices = r.PriceTiers
+                            .Where(p => p.IsActive)
+                            .Select(p => p.MonthlyRent)
+                            .ToList(),
+                        RoomAmenities = r.RoomAmenities
+                            .Select(ra => new CandidateAmenity
+                            {
+                                Id = ra.Amenity.Id,
+                                Name = ra.Amenity.Name
+                            })
+                            .ToList(),
+                        ImageCount = r.Images.Count
+                    })
+                    .ToList()
+            })
+            .ToListAsync(cancellationToken);
+
+        var normalizedKeyword = RoomingHouseSearchParser.Normalize(criteria.Keyword ?? string.Empty);
+
+        // Phase 3: Score each candidate in memory on the lightweight DTO
+        var scored = candidateData
+            .Select(c => BuildSearchProjection(c, criteria, normalizedKeyword))
+            .Where(x => x is not null)
+            .Select(x => x!)
+            .ToList();
+
+        // Phase 4: Filter by keyword score and distance, then sort
+        if (!string.IsNullOrWhiteSpace(normalizedKeyword))
+        {
+            scored = scored
+                .Where(x => x.KeywordScore > 0)
+                .ToList();
+        }
+
+        if (criteria.CenterLat is not null && criteria.CenterLng is not null && criteria.RadiusKm is not null)
+        {
+            scored = scored
+                .Where(x => x.DistanceKm <= criteria.RadiusKm)
+                .ToList();
+        }
+
+        scored = ApplySearchSort(scored, criteria).ToList();
+
+        var totalItems = scored.Count;
+        var pagedCandidates = scored
+            .Skip((criteria.Page - 1) * criteria.PageSize)
+            .Take(criteria.PageSize)
+            .ToList();
+
+        // Phase 5: Load only the page's items with .Select() projection
+        var pageItemIds = pagedCandidates.Select(x => x.Id).ToList();
+        List<RoomingHouseSearchItemResponse> pageItems;
+        if (pageItemIds.Count > 0)
+        {
+            // Restore DistanceKm from scored candidates
+            var distanceByHouseId = pagedCandidates
+                .Where(x => x.DistanceKm is not null)
+                .ToDictionary(x => x.Id, x => x.DistanceKm);
+
+            var rawItems = await context.RoomingHouses
+                .AsNoTracking()
+                .Where(x => pageItemIds.Contains(x.Id))
+                .Select(x => new RoomingHouseSearchItemResponse
+                {
+                    Id = x.Id,
+                    Name = x.Name,
+                    AddressDisplay = x.Ward != null && x.Province != null
+                        ? x.AddressLine + ", " + x.Ward.Name + ", " + x.Province.Name
+                        : x.AddressDisplay,
+                    Latitude = x.Latitude,
+                    Longitude = x.Longitude,
+                    CoverImageUrl = x.Images
+                        .OrderBy(i => i.SortOrder)
+                        .Select(i => i.ImageUrl)
+                        .FirstOrDefault(),
+                    AvailableRooms = x.Rooms.Count(r => r.Status == RoomStatus.Available && r.DeletedAt == null),
+                    TotalRooms = x.Rooms.Count(r => r.DeletedAt == null),
+                    MinMonthlyRent = x.Rooms
+                        .Where(r => r.Status == RoomStatus.Available && r.DeletedAt == null)
+                        .SelectMany(r => r.PriceTiers)
+                        .Where(p => p.IsActive)
+                        .Select(p => (decimal?)p.MonthlyRent)
+                        .Min(),
+                    MaxMonthlyRent = x.Rooms
+                        .Where(r => r.Status == RoomStatus.Available && r.DeletedAt == null)
+                        .SelectMany(r => r.PriceTiers)
+                        .Where(p => p.IsActive)
+                        .Select(p => (decimal?)p.MonthlyRent)
+                        .Max(),
+                    MinAreaM2 = x.Rooms
+                        .Where(r => r.Status == RoomStatus.Available && r.DeletedAt == null && r.AreaM2 != null)
+                        .Select(r => (decimal?)r.AreaM2)
+                        .Min(),
+                    MaxAreaM2 = x.Rooms
+                        .Where(r => r.Status == RoomStatus.Available && r.DeletedAt == null && r.AreaM2 != null)
+                        .Select(r => (decimal?)r.AreaM2)
+                        .Max(),
+                    Amenities = x.RoomingHouseAmenities
+                        .Select(a => new AmenityResponse
+                        {
+                            Id = a.Amenity.Id,
+                            Name = a.Amenity.Name,
+                            Scope = a.Amenity.Scope.ToString(),
+                            IconCode = a.Amenity.IconCode
+                        })
+                        .ToList(),
+                    CreatedAt = x.CreatedAt
+                })
+                .ToListAsync(cancellationToken);
+
+            // Restore DistanceKm into the items and re-sort to match scored order
+            foreach (var item in rawItems)
+            {
+                if (distanceByHouseId.TryGetValue(item.Id, out var distance))
+                {
+                    item.DistanceKm = distance;
+                }
+            }
+
+            var idOrder = pagedCandidates
+                .Select((c, i) => (c.Id, Index: i))
+                .ToDictionary(x => x.Id, x => x.Index);
+            pageItems = rawItems
+                .OrderBy(x => idOrder.GetValueOrDefault(x.Id, int.MaxValue))
+                .ToList();
+        }
+        else
+        {
+            pageItems = new List<RoomingHouseSearchItemResponse>();
+        }
+
+        return new PagedResult<RoomingHouseSearchItemResponse>
+        {
+            Items = pageItems,
+            Page = criteria.Page,
+            PageSize = criteria.PageSize,
+            TotalItems = totalItems,
+            TotalPages = totalItems == 0 ? 0 : (int)Math.Ceiling(totalItems / (double)criteria.PageSize),
+            Metadata = new RoomingHouseSearchMetadataResponse
+            {
+                AiAssisted = criteria.AiAssisted,
+                InterpretedQuery = criteria.InterpretedQuery,
+                RelaxedFields = criteria.RelaxedFields
+            }
+        };
+    }
+
+    /// <summary>
+    /// Builds the base query with all WHERE filters applied but NO .Include().
+    /// The heavy data is loaded via .Select() projection instead.
+    /// </summary>
+    private IQueryable<RoomingHouse> BuildSearchBaseQuery(ParsedRoomingHouseSearchCriteria criteria)
+    {
         var query = context.RoomingHouses
             .AsNoTracking()
-            .Include(x => x.Province)
-            .Include(x => x.Ward)
-            .Include(x => x.Images)
-            .Include(x => x.Landlord)
-                .ThenInclude(x => x.KycVerifications)
-            .Include(x => x.RoomingHouseAmenities)
-                .ThenInclude(x => x.Amenity)
-            .Include(x => x.Rooms)
-                .ThenInclude(x => x.PriceTiers)
-            .Include(x => x.Rooms)
-                .ThenInclude(x => x.RoomAmenities)
-                    .ThenInclude(x => x.Amenity)
             .Where(x => x.DeletedAt == null &&
                         x.ApprovalStatus == RoomingHouseApprovalStatus.Approved &&
                         x.VisibilityStatus == RoomingHouseVisibilityStatus.Visible &&
@@ -221,48 +515,151 @@ public class RoomingHouseQueryService : IRoomingHouseQueryService
                 x.Longitude <= box.MaxLng);
         }
 
-        var houses = await query.ToListAsync(cancellationToken);
-        var normalizedKeyword = RoomingHouseSearchParser.Normalize(criteria.Keyword ?? string.Empty);
+        return query;
+    }
 
-        var projected = houses
-            .Select(house => BuildSearchProjection(house, criteria, normalizedKeyword))
-            .Where(x => x is not null)
-            .Select(x => x!)
-            .ToList();
-
-        if (!string.IsNullOrWhiteSpace(normalizedKeyword))
+    private static void SetSearchMetadata(
+        PagedResult<RoomingHouseSearchItemResponse> result,
+        RoomingHouseSearchRequest request,
+        ParsedRoomingHouseSearchCriteria criteria)
+    {
+        result.Metadata = new RoomingHouseSearchMetadataResponse
         {
-            projected = projected
-                .Where(x => x.KeywordScore > 0)
-                .ToList();
-        }
-
-        if (criteria.CenterLat is not null && criteria.CenterLng is not null && criteria.RadiusKm is not null)
-        {
-            projected = projected
-                .Where(x => x.Item.DistanceKm <= criteria.RadiusKm)
-                .ToList();
-        }
-
-        projected = ApplySearchSort(projected, criteria).ToList();
-
-        var totalItems = projected.Count;
-        LogSearchParse(request, criteria, totalItems);
-        var pageItems = projected
-            .Skip((criteria.Page - 1) * criteria.PageSize)
-            .Take(criteria.PageSize)
-            .Select(x => x.Item)
-            .ToList();
-
-        return new PagedResult<RoomingHouseSearchItemResponse>
-        {
-            Items = pageItems,
-            Page = criteria.Page,
-            PageSize = criteria.PageSize,
-            TotalItems = totalItems,
-            TotalPages = totalItems == 0 ? 0 : (int)Math.Ceiling(totalItems / (double)criteria.PageSize)
+            AiAssisted = criteria.AiAssisted,
+            OriginalQuery = request.Q,
+            InterpretedQuery = criteria.InterpretedQuery,
+            RelaxedFields = criteria.RelaxedFields
         };
     }
+
+    public async Task<RoomingHouseRecommendationResponse> GetGuestRecommendationsAsync(
+        GuestRoomingHouseRecommendationRequest request,
+        CancellationToken cancellationToken = default)
+    {
+        var pageSize = Math.Min(24, Math.Max(1, request.PageSize));
+        var candidatePageSize = pageSize;
+        var candidateCriteria = new ParsedRoomingHouseSearchCriteria
+        {
+            ProvinceCode = NormalizeEmpty(request.ProvinceCode),
+            WardCode = NormalizeEmpty(request.WardCode),
+            MinPrice = request.MinPrice,
+            MaxPrice = request.MaxPrice,
+            MinArea = request.MinAreaM2,
+            MaxArea = request.MaxAreaM2,
+            AmenityIds = request.PreferredAmenityIds.Distinct().ToList(),
+            RoomAmenityIds = request.PreferredRoomAmenityIds.Distinct().ToList(),
+            PreferredAmenityIds = request.PreferredAmenityIds.Distinct().ToList(),
+            PreferredRoomAmenityIds = request.PreferredRoomAmenityIds.Distinct().ToList(),
+            RecentRoomingHouseIds = request.RecentRoomingHouseIds
+                .Concat(request.ClickedRoomingHouseIds)
+                .Distinct()
+                .ToList(),
+            Sort = "relevance",
+            Page = 1,
+            PageSize = candidatePageSize
+        };
+
+        ValidateSearchRequest(candidateCriteria);
+        var candidateResult = await ExecutePublicSearchAsync(candidateCriteria, cancellationToken);
+        if (candidateResult.Items.Count == 0)
+        {
+            return new RoomingHouseRecommendationResponse
+            {
+                FallbackReason = "Không có ứng viên phù hợp với hành vi cục bộ."
+            };
+        }
+
+        var candidates = candidateResult.Items
+            .Select(ToRecommendationCandidate)
+            .ToList();
+        var rerankResult = await recommendationReranker.RerankAsync(request, candidates, cancellationToken);
+        if (rerankResult is null)
+        {
+            return new RoomingHouseRecommendationResponse
+            {
+                Items = candidateResult.Items.Take(pageSize).ToList(),
+                Reasons = BuildRuleBasedRecommendationReasons(candidateResult.Items.Take(pageSize)),
+                AiAssisted = false,
+                FallbackReason = "AI chưa khả dụng, dùng xếp hạng mặc định."
+            };
+        }
+
+        var itemById = candidateResult.Items.ToDictionary(x => x.Id);
+        var rankedItems = rerankResult.RankedIds
+            .Where(itemById.ContainsKey)
+            .Select(id => itemById[id])
+            .Concat(candidateResult.Items.Where(item => !rerankResult.RankedIds.Contains(item.Id)))
+            .Take(pageSize)
+            .ToList();
+
+        return new RoomingHouseRecommendationResponse
+        {
+            Items = rankedItems,
+            Reasons = rerankResult.Reasons
+                .Where(x => rankedItems.Any(item => item.Id == x.Key))
+                .ToDictionary(x => x.Key, x => x.Value),
+            AiAssisted = true
+        };
+    }
+
+    private static RoomingHouseRecommendationCandidate ToRecommendationCandidate(
+        RoomingHouseSearchItemResponse item)
+        => new()
+        {
+            Id = item.Id,
+            Name = item.Name,
+            AddressDisplay = item.AddressDisplay,
+            DistanceKm = item.DistanceKm,
+            MinMonthlyRent = item.MinMonthlyRent,
+            MaxMonthlyRent = item.MaxMonthlyRent,
+            MinAreaM2 = item.MinAreaM2,
+            MaxAreaM2 = item.MaxAreaM2,
+            AvailableRooms = item.AvailableRooms,
+            TotalRooms = item.TotalRooms,
+            HasCoverImage = !string.IsNullOrWhiteSpace(item.CoverImageUrl),
+            CreatedAt = item.CreatedAt,
+            Amenities = item.Amenities.Select(x => x.Name).ToList()
+        };
+
+    private static Dictionary<Guid, string> BuildRuleBasedRecommendationReasons(
+        IEnumerable<RoomingHouseSearchItemResponse> items)
+        => items.ToDictionary(
+            x => x.Id,
+            x =>
+            {
+                var parts = new List<string>();
+
+                if (x.AvailableRooms > 0)
+                {
+                    var ratio = x.TotalRooms > 0 ? (double)x.AvailableRooms / x.TotalRooms : 0;
+                    parts.Add(ratio > 0.5
+                        ? $"Còn {x.AvailableRooms}/{x.TotalRooms} phòng trống, nhiều lựa chọn."
+                        : $"Còn {x.AvailableRooms} phòng trống.");
+                }
+
+                if (x.MinMonthlyRent is not null)
+                {
+                    var rentDisplay = x.MaxMonthlyRent is not null && x.MinMonthlyRent != x.MaxMonthlyRent
+                        ? $"{x.MinMonthlyRent:N0} - {x.MaxMonthlyRent:N0} đ"
+                        : $"{x.MinMonthlyRent:N0} đ";
+                    parts.Add($"Giá thuê từ {rentDisplay}/tháng.");
+                }
+
+                if (x.MinAreaM2 is not null)
+                {
+                    parts.Add($"Diện tích từ {x.MinAreaM2:F0}m².");
+                }
+
+                if (x.Amenities.Count > 0)
+                {
+                    var topAmenities = x.Amenities.Take(3).Select(a => a.Name);
+                    parts.Add($"Tiện ích: {string.Join(", ", topAmenities)}.");
+                }
+
+                return parts.Count > 0
+                    ? string.Join(" ", parts)
+                    : "Khu trọ còn phòng và phù hợp để bạn tham khảo thêm.";
+            });
 
     private void LogSearchParse(
         RoomingHouseSearchRequest request,
@@ -282,6 +679,9 @@ public class RoomingHouseQueryService : IRoomingHouseQueryService
             criteria.MinOccupants,
             criteria.AmenityIds,
             criteria.RoomAmenityIds,
+            criteria.RecentRoomingHouseIds,
+            criteria.PreferredAmenityIds,
+            criteria.PreferredRoomAmenityIds,
             criteria.CenterLat,
             criteria.CenterLng,
             criteria.RadiusKm,
@@ -359,7 +759,72 @@ public class RoomingHouseQueryService : IRoomingHouseQueryService
         criteria.RadiusKm = GeoSearchHelper.NormalizeRadius(
             criteria.RadiusKm,
             hasPlaceText: !string.IsNullOrWhiteSpace(criteria.PlaceText));
+
+        ValidatePriceBounds(criteria.MinPrice, criteria.MaxPrice);
+        ValidateAreaBounds(criteria.MinArea, criteria.MaxArea);
         NormalizeSearchRanges(criteria);
+    }
+
+    private static void ValidatePriceBounds(decimal? minPrice, decimal? maxPrice)
+    {
+        if (minPrice is < 0m)
+        {
+            throw new BadRequestException(
+                ErrorCodes.ValidationError,
+                "Giá thuê tối thiểu không được âm.",
+                new { field = nameof(minPrice) });
+        }
+
+        if (maxPrice is < 0m)
+        {
+            throw new BadRequestException(
+                ErrorCodes.ValidationError,
+                "Giá thuê tối đa không được âm.",
+                new { field = nameof(maxPrice) });
+        }
+
+        if (minPrice is not null && minPrice < 500_000m)
+        {
+            throw new BadRequestException(
+                ErrorCodes.ValidationError,
+                "Giá thuê tối thiểu phải từ 500.000₫ trở lên.",
+                new { field = nameof(minPrice), value = minPrice });
+        }
+
+        if (maxPrice is not null && maxPrice > 30_000_000m)
+        {
+            throw new BadRequestException(
+                ErrorCodes.ValidationError,
+                "Giá thuê tối đa không được vượt quá 30.000.000₫.",
+                new { field = nameof(maxPrice), value = maxPrice });
+        }
+    }
+
+    private static void ValidateAreaBounds(decimal? minArea, decimal? maxArea)
+    {
+        if (minArea is < 0m)
+        {
+            throw new BadRequestException(
+                ErrorCodes.ValidationError,
+                "Diện tích tối thiểu không được âm.",
+                new { field = nameof(minArea) });
+        }
+
+        if (maxArea is < 0m)
+        {
+            throw new BadRequestException(
+                ErrorCodes.ValidationError,
+                "Diện tích tối đa không được âm.",
+                new { field = nameof(maxArea) });
+        }
+
+        if (minArea is not null && maxArea is not null && minArea > maxArea)
+        {
+            throw new BadRequestException(
+                ErrorCodes.ValidationError,
+                "Diện tích tối thiểu không được lớn hơn diện tích tối đa.",
+                new { field = nameof(minArea), minArea, maxArea });
+        }
     }
 
     private async Task ApplyAdministrativeLocationCriteriaAsync(
@@ -498,27 +963,29 @@ public class RoomingHouseQueryService : IRoomingHouseQueryService
         return value < 100_000m ? value * 1_000_000m : value;
     }
 
-    private static RoomingHouseSearchProjection? BuildSearchProjection(
-        RoomingHouse house,
+    private static string? NormalizeEmpty(string? value)
+        => string.IsNullOrWhiteSpace(value) ? null : value.Trim();
+
+    private ScoredCandidate? BuildSearchProjection(
+        RoomingHouseSearchCandidateData candidate,
         ParsedRoomingHouseSearchCriteria criteria,
         string normalizedKeyword)
     {
-        var availableRooms = house.Rooms
+        // Filter rooms matching search criteria in memory
+        var matchingRooms = candidate.AvailableRooms
             .Where(room => RoomMatchesSearchCriteria(room, criteria))
             .ToList();
 
-        if (availableRooms.Count == 0)
+        if (matchingRooms.Count == 0)
         {
             return null;
         }
 
-        var activePrices = availableRooms
-            .SelectMany(x => x.PriceTiers)
-            .Where(x => x.IsActive)
-            .Select(x => x.MonthlyRent)
+        var activePrices = matchingRooms
+            .SelectMany(x => x.ActivePrices)
             .ToList();
 
-        var areas = availableRooms
+        var areas = matchingRooms
             .Where(x => x.AreaM2 is not null)
             .Select(x => x.AreaM2!.Value)
             .ToList();
@@ -526,69 +993,55 @@ public class RoomingHouseQueryService : IRoomingHouseQueryService
         decimal? distanceKm = null;
         if (criteria.CenterLat is not null &&
             criteria.CenterLng is not null &&
-            house.Latitude is not null &&
-            house.Longitude is not null)
+            candidate.Latitude is not null &&
+            candidate.Longitude is not null)
         {
             distanceKm = GeoSearchHelper.CalculateDistanceKm(
                 criteria.CenterLat.Value,
                 criteria.CenterLng.Value,
-                house.Latitude.Value,
-                house.Longitude.Value);
+                candidate.Latitude.Value,
+                candidate.Longitude.Value);
         }
 
-        var item = new RoomingHouseSearchItemResponse
-        {
-            Id = house.Id,
-            Name = house.Name,
-            AddressDisplay = BuildAddressDisplay(house),
-            Latitude = house.Latitude,
-            Longitude = house.Longitude,
-            DistanceKm = distanceKm,
-            CoverImageUrl = house.Images.OrderBy(x => x.SortOrder).FirstOrDefault(x => x.IsCover)?.ImageUrl
-                ?? house.Images.OrderBy(x => x.SortOrder).FirstOrDefault()?.ImageUrl,
-            AvailableRooms = availableRooms.Count,
-            TotalRooms = house.Rooms.Count(x => x.DeletedAt == null),
-            MinMonthlyRent = activePrices.Count == 0 ? null : activePrices.Min(),
-            MaxMonthlyRent = activePrices.Count == 0 ? null : activePrices.Max(),
-            MinAreaM2 = areas.Count == 0 ? null : areas.Min(),
-            MaxAreaM2 = areas.Count == 0 ? null : areas.Max(),
-            Amenities = house.RoomingHouseAmenities
-                .Select(x => new AmenityResponse
-                {
-                    Id = x.Amenity.Id,
-                    Name = x.Amenity.Name,
-                    Scope = x.Amenity.Scope.ToString(),
-                    IconCode = x.Amenity.IconCode
-                })
-                .ToList(),
-            CreatedAt = house.CreatedAt
-        };
+        var keywordScore = CalculateKeywordScore(candidate, matchingRooms, normalizedKeyword);
+        var ruleScore = CalculateRelevanceScore(candidate, matchingRooms, criteria);
+        var behaviorScore = recommendationScorer.CalculateBehaviorScore(
+            new RoomingHouseSearchCandidate(candidate, criteria));
 
-        var keywordScore = CalculateKeywordScore(house, availableRooms, normalizedKeyword);
-        var ruleScore = CalculateRelevanceScore(house, availableRooms, criteria);
-
-        return new RoomingHouseSearchProjection(item, ruleScore + keywordScore, keywordScore);
+        return new ScoredCandidate(
+            candidate.Id,
+            ruleScore + keywordScore + behaviorScore,
+            keywordScore,
+            distanceKm,
+            activePrices.Count == 0 ? null : activePrices.Min(),
+            activePrices.Count == 0 ? null : activePrices.Max(),
+            areas.Count == 0 ? null : areas.Min(),
+            areas.Count == 0 ? null : areas.Max(),
+            candidate.CreatedAt);
     }
 
     private static int CalculateRelevanceScore(
-        RoomingHouse house,
-        List<Room> availableRooms,
+        RoomingHouseSearchCandidateData candidate,
+        List<CandidateRoom> matchingRooms,
         ParsedRoomingHouseSearchCriteria criteria)
     {
         var score = 0;
 
-        score += CalculateLocationScore(house, criteria);
-        score += CalculatePriceScore(availableRooms, criteria);
-        score += CalculateAmenityScore(house, availableRooms, criteria);
-        score += CalculateFreshnessScore(house.UpdatedAt);
-        score += CalculateTrustScore(house);
-        score += CalculateImageScore(house, availableRooms);
-        score -= CalculateQualityPenalty(house);
+        score += CalculateLocationScore(candidate, criteria);
+        score += CalculatePriceScore(matchingRooms, criteria);
+        score += CalculateAmenityScore(candidate, matchingRooms, criteria);
+        score += CalculateFreshnessScore(candidate.UpdatedAt);
+        score += CalculateTrustScore(candidate);
+        score += CalculateImageScore(candidate, matchingRooms);
+        score -= CalculateQualityPenalty(candidate);
 
         return score;
     }
 
-    private static int CalculateKeywordScore(RoomingHouse house, List<Room> availableRooms, string normalizedKeyword)
+    private static int CalculateKeywordScore(
+        RoomingHouseSearchCandidateData candidate,
+        List<CandidateRoom> matchingRooms,
+        string normalizedKeyword)
     {
         if (string.IsNullOrWhiteSpace(normalizedKeyword))
         {
@@ -596,15 +1049,15 @@ public class RoomingHouseQueryService : IRoomingHouseQueryService
         }
 
         var score = 0;
-        var searchableHouseName = RoomingHouseSearchParser.Normalize(house.Name);
-        var searchableAddress = RoomingHouseSearchParser.Normalize(BuildAddressDisplay(house));
-        var searchableDescription = RoomingHouseSearchParser.Normalize(house.Description ?? string.Empty);
+        var searchableHouseName = RoomingHouseSearchParser.Normalize(candidate.Name);
+        var searchableAddress = RoomingHouseSearchParser.Normalize(BuildAddressDisplay(candidate));
+        var searchableDescription = RoomingHouseSearchParser.Normalize(candidate.Description ?? string.Empty);
         var searchableHouseAmenities = RoomingHouseSearchParser.Normalize(
-            string.Join(" ", house.RoomingHouseAmenities.Select(x => x.Amenity.Name)));
+            string.Join(" ", candidate.HouseAmenities.Select(x => x.Name)));
         var searchableRoomAmenities = RoomingHouseSearchParser.Normalize(
-            string.Join(" ", availableRooms.SelectMany(x => x.RoomAmenities).Select(x => x.Amenity.Name)));
+            string.Join(" ", matchingRooms.SelectMany(x => x.RoomAmenities).Select(x => x.Name)));
         var searchableRoomNumbers = RoomingHouseSearchParser.Normalize(
-            string.Join(" ", availableRooms.Select(x => x.RoomNumber)));
+            string.Join(" ", matchingRooms.Select(x => x.RoomNumber)));
 
         if (ContainsSearchPhrase(searchableHouseName, normalizedKeyword))
         {
@@ -691,29 +1144,29 @@ public class RoomingHouseQueryService : IRoomingHouseQueryService
         return Regex.Replace(removed, @"\s+", " ").Trim();
     }
 
-    private static int CalculateLocationScore(RoomingHouse house, ParsedRoomingHouseSearchCriteria criteria)
+    private static int CalculateLocationScore(RoomingHouseSearchCandidateData candidate, ParsedRoomingHouseSearchCriteria criteria)
     {
         var score = 0;
 
-        if (!string.IsNullOrWhiteSpace(criteria.WardCode) && house.WardCode == criteria.WardCode)
+        if (!string.IsNullOrWhiteSpace(criteria.WardCode) && candidate.WardCode == criteria.WardCode)
         {
             score += 50;
         }
 
-        if (!string.IsNullOrWhiteSpace(criteria.ProvinceCode) && house.ProvinceCode == criteria.ProvinceCode)
+        if (!string.IsNullOrWhiteSpace(criteria.ProvinceCode) && candidate.ProvinceCode == criteria.ProvinceCode)
         {
             score += 25;
         }
 
         if (criteria.RadiusKm is not null && criteria.CenterLat is not null && criteria.CenterLng is not null)
         {
-            var distanceKm = house.Latitude is null || house.Longitude is null
+            var distanceKm = candidate.Latitude is null || candidate.Longitude is null
                 ? (decimal?)null
                 : GeoSearchHelper.CalculateDistanceKm(
                     criteria.CenterLat.Value,
                     criteria.CenterLng.Value,
-                    house.Latitude.Value,
-                    house.Longitude.Value);
+                    candidate.Latitude.Value,
+                    candidate.Longitude.Value);
 
             if (distanceKm is not null)
             {
@@ -724,12 +1177,10 @@ public class RoomingHouseQueryService : IRoomingHouseQueryService
         return score;
     }
 
-    private static int CalculatePriceScore(List<Room> availableRooms, ParsedRoomingHouseSearchCriteria criteria)
+    private static int CalculatePriceScore(List<CandidateRoom> matchingRooms, ParsedRoomingHouseSearchCriteria criteria)
     {
-        var activePrices = availableRooms
-            .SelectMany(room => room.PriceTiers)
-            .Where(price => price.IsActive)
-            .Select(price => price.MonthlyRent)
+        var activePrices = matchingRooms
+            .SelectMany(room => room.ActivePrices)
             .ToList();
 
         if (activePrices.Count == 0)
@@ -777,15 +1228,15 @@ public class RoomingHouseQueryService : IRoomingHouseQueryService
     }
 
     private static int CalculateAmenityScore(
-        RoomingHouse house,
-        List<Room> availableRooms,
+        RoomingHouseSearchCandidateData candidate,
+        List<CandidateRoom> matchingRooms,
         ParsedRoomingHouseSearchCriteria criteria)
     {
         var matchedHouseAmenities = criteria.AmenityIds.Count(id =>
-            house.RoomingHouseAmenities.Any(amenity => amenity.AmenityId == id));
+            candidate.HouseAmenities.Any(amenity => amenity.Id == id));
 
         var matchedRoomAmenities = criteria.RoomAmenityIds.Count(id =>
-            availableRooms.Any(room => room.RoomAmenities.Any(amenity => amenity.AmenityId == id)));
+            matchingRooms.Any(room => room.RoomAmenities.Any(amenity => amenity.Id == id)));
 
         return (matchedHouseAmenities + matchedRoomAmenities) * 14;
     }
@@ -796,15 +1247,15 @@ public class RoomingHouseQueryService : IRoomingHouseQueryService
         return ageDays <= 7 ? 20 : ageDays <= 30 ? 12 : ageDays <= 60 ? 6 : 0;
     }
 
-    private static int CalculateTrustScore(RoomingHouse house)
+    private static int CalculateTrustScore(RoomingHouseSearchCandidateData candidate)
     {
         var score = 15;
-        if (house.Landlord.KycVerifications.Any(x => x.Status == KycVerificationStatus.Approved))
+        if (candidate.HasVerifiedKyc)
         {
             score += 20;
         }
 
-        if (house.ReviewedAt is not null)
+        if (candidate.ReviewedAt is not null)
         {
             score += 10;
         }
@@ -812,27 +1263,27 @@ public class RoomingHouseQueryService : IRoomingHouseQueryService
         return score;
     }
 
-    private static int CalculateImageScore(RoomingHouse house, List<Room> availableRooms)
+    private static int CalculateImageScore(RoomingHouseSearchCandidateData candidate, List<CandidateRoom> matchingRooms)
     {
-        var imageCount = house.Images.Count + availableRooms.Sum(room => room.Images.Count);
+        var imageCount = candidate.ImageCount + matchingRooms.Sum(room => room.ImageCount);
         return imageCount >= 6 ? 15 : imageCount >= 3 ? 10 : imageCount > 0 ? 5 : 0;
     }
 
-    private static int CalculateQualityPenalty(RoomingHouse house)
+    private static int CalculateQualityPenalty(RoomingHouseSearchCandidateData candidate)
     {
         var penalty = 0;
 
-        if (house.Images.Count == 0)
+        if (candidate.ImageCount == 0)
         {
             penalty += 30;
         }
 
-        if (string.IsNullOrWhiteSpace(house.Description) || house.Description.Trim().Length < 50)
+        if (string.IsNullOrWhiteSpace(candidate.Description) || candidate.Description.Trim().Length < 50)
         {
             penalty += 15;
         }
 
-        if (house.Latitude is null || house.Longitude is null)
+        if (candidate.Latitude is null || candidate.Longitude is null)
         {
             penalty += 10;
         }
@@ -840,13 +1291,8 @@ public class RoomingHouseQueryService : IRoomingHouseQueryService
         return penalty;
     }
 
-    private static bool RoomMatchesSearchCriteria(Room room, ParsedRoomingHouseSearchCriteria criteria)
+    private static bool RoomMatchesSearchCriteria(CandidateRoom room, ParsedRoomingHouseSearchCriteria criteria)
     {
-        if (room.Status != RoomStatus.Available || room.DeletedAt is not null)
-        {
-            return false;
-        }
-
         if (criteria.MinArea is not null && (room.AreaM2 is null || room.AreaM2 < criteria.MinArea))
         {
             return false;
@@ -863,7 +1309,7 @@ public class RoomingHouseQueryService : IRoomingHouseQueryService
         }
 
         if (criteria.RoomAmenityIds.Count > 0 &&
-            criteria.RoomAmenityIds.Any(id => room.RoomAmenities.All(amenity => amenity.AmenityId != id)))
+            criteria.RoomAmenityIds.Any(id => room.RoomAmenities.All(amenity => amenity.Id != id)))
         {
             return false;
         }
@@ -873,15 +1319,13 @@ public class RoomingHouseQueryService : IRoomingHouseQueryService
             return true;
         }
 
-        return room.PriceTiers
-            .Where(price => price.IsActive)
-            .Any(price =>
-                (criteria.MinPrice is null || price.MonthlyRent >= criteria.MinPrice) &&
-                (criteria.MaxPrice is null || price.MonthlyRent <= criteria.MaxPrice));
+        return room.ActivePrices.Any(price =>
+            (criteria.MinPrice is null || price >= criteria.MinPrice) &&
+            (criteria.MaxPrice is null || price <= criteria.MaxPrice));
     }
 
-    private static IEnumerable<RoomingHouseSearchProjection> ApplySearchSort(
-        IEnumerable<RoomingHouseSearchProjection> projected,
+    private static List<ScoredCandidate> ApplySearchSort(
+        List<ScoredCandidate> candidates,
         ParsedRoomingHouseSearchCriteria criteria)
     {
         var sort = criteria.Sort.Trim();
@@ -895,27 +1339,27 @@ public class RoomingHouseQueryService : IRoomingHouseQueryService
 
         return sort switch
         {
-            "newest" => projected.OrderByDescending(x => x.Item.CreatedAt),
-            "priceAsc" => projected.OrderBy(x => x.Item.MinMonthlyRent ?? decimal.MaxValue),
-            "priceDesc" => projected.OrderByDescending(x => x.Item.MaxMonthlyRent ?? decimal.MinValue),
-            "areaAsc" => projected.OrderBy(x => x.Item.MinAreaM2 ?? decimal.MaxValue),
-            "areaDesc" => projected.OrderByDescending(x => x.Item.MaxAreaM2 ?? decimal.MinValue),
-            "distanceAsc" => projected.OrderBy(x => x.Item.DistanceKm ?? decimal.MaxValue),
-            _ => projected
+            "newest" => [.. candidates.OrderByDescending(x => x.CreatedAt)],
+            "priceAsc" => [.. candidates.OrderBy(x => x.MinMonthlyRent ?? decimal.MaxValue)],
+            "priceDesc" => [.. candidates.OrderByDescending(x => x.MaxMonthlyRent ?? decimal.MinValue)],
+            "areaAsc" => [.. candidates.OrderBy(x => x.MinAreaM2 ?? decimal.MaxValue)],
+            "areaDesc" => [.. candidates.OrderByDescending(x => x.MaxAreaM2 ?? decimal.MinValue)],
+            "distanceAsc" => [.. candidates.OrderBy(x => x.DistanceKm ?? decimal.MaxValue)],
+            _ => [.. candidates
                 .OrderByDescending(x => x.RelevanceScore)
-                .ThenByDescending(x => x.Item.CreatedAt)
+                .ThenByDescending(x => x.CreatedAt)]
         };
     }
 
-    private static string BuildAddressDisplay(RoomingHouse house)
+    private static string BuildAddressDisplay(RoomingHouseSearchCandidateData candidate)
     {
-        if (!string.IsNullOrWhiteSpace(house.Ward?.Name) &&
-            !string.IsNullOrWhiteSpace(house.Province?.Name))
+        if (!string.IsNullOrWhiteSpace(candidate.WardName) &&
+            !string.IsNullOrWhiteSpace(candidate.ProvinceName))
         {
-            return $"{house.AddressLine}, {house.Ward.Name}, {house.Province.Name}";
+            return $"{candidate.AddressLine}, {candidate.WardName}, {candidate.ProvinceName}";
         }
 
-        return house.AddressDisplay;
+        return candidate.AddressDisplay;
     }
 
     private IQueryable<RoomingHouse> BuildRoomingHouseQuery()
@@ -925,7 +1369,7 @@ public class RoomingHouseQueryService : IRoomingHouseQueryService
             .Include(x => x.Province)
             .Include(x => x.Ward)
             .Include(x => x.LegalDocument)
-            .Include(x => x.LeasePolicy)
+            .Include(x => x.RentalPolicy)
             .Include(x => x.HouseRule)
             .Include(x => x.Images)
             .Include(x => x.Rooms)
@@ -971,8 +1415,18 @@ public class RoomingHouseQueryService : IRoomingHouseQueryService
 
     private sealed record SearchLocationMatch(string Code, string? ProvinceCode, string Alias);
 
-    private sealed record RoomingHouseSearchProjection(
-        RoomingHouseSearchItemResponse Item,
+    /// <summary>
+    /// Lightweight scored candidate used for filtering, sorting, and pagination.
+    /// Does NOT hold the full response DTO — that is loaded separately for page items only.
+    /// </summary>
+    private sealed record ScoredCandidate(
+        Guid Id,
         int RelevanceScore,
-        int KeywordScore);
+        int KeywordScore,
+        decimal? DistanceKm,
+        decimal? MinMonthlyRent,
+        decimal? MaxMonthlyRent,
+        decimal? MinAreaM2,
+        decimal? MaxAreaM2,
+        DateTimeOffset CreatedAt);
 }

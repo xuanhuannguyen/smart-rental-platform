@@ -1,10 +1,15 @@
 using Microsoft.EntityFrameworkCore;
+using Microsoft.AspNetCore.DataProtection;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Options;
 using SmartRentalPlatform.Application.Common.Interfaces;
+using SmartRentalPlatform.Application.Common.Options;
+using SmartRentalPlatform.Infrastructure.Caching;
+using SmartRentalPlatform.Infrastructure.BackgroundServices;
 using SmartRentalPlatform.Infrastructure.ExternalServices.Ekyc;
 using SmartRentalPlatform.Infrastructure.ExternalServices.Email;
+using SmartRentalPlatform.Infrastructure.ExternalServices.Gemini;
 using SmartRentalPlatform.Infrastructure.ExternalServices.Google;
 using SmartRentalPlatform.Infrastructure.ExternalServices.PayOS;
 using SmartRentalPlatform.Infrastructure.ExternalServices.VietMap;
@@ -45,10 +50,25 @@ public static class DependencyInjection
             client.BaseAddress = new Uri(options.BaseUrl.TrimEnd('/') + "/");
             client.Timeout = TimeSpan.FromSeconds(options.TimeoutSeconds);
         });
+        services.Configure<GeminiOptions>(configuration.GetSection(GeminiOptions.SectionName));
+        services.AddHttpClient<IAiStructuredOutputService, GeminiStructuredOutputService>((provider, client) =>
+        {
+            var options = provider.GetRequiredService<IOptions<GeminiOptions>>().Value;
+            client.BaseAddress = new Uri("https://generativelanguage.googleapis.com/v1beta/");
+            client.Timeout = TimeSpan.FromSeconds(options.TimeoutSeconds);
+        });
         services.Configure<VnptEkycOptions>(configuration.GetSection(VnptEkycOptions.SectionName));
+        services.AddDataProtection();
         services.AddMemoryCache();
+        services.AddScoped<IConversationCacheService, ConversationCacheService>();
         services.AddScoped<IPrivateStorageService, LocalPrivateStorageService>();
         services.AddScoped<IHashService, Sha256HashService>();
+        services.AddScoped<ISensitiveDataProtector, DataProtectionSensitiveDataProtector>();
+        services.AddHostedService<RoomDepositExpirationWorker>();
+        services.AddHostedService<PaymentTransactionExpirationWorker>();
+        services.AddHostedService<RentalContractExpirationWorker>();
+        services.AddHostedService<RentalContractMoveInActivationWorker>();
+        services.AddHostedService<ContractAppendixApplicationWorker>();
         services.Configure<PayOSOptions>(configuration.GetSection(PayOSOptions.SectionName));
         services.AddHttpClient(PayOSClient.HttpClientName, (provider, client) =>
         {
@@ -68,7 +88,7 @@ public static class DependencyInjection
 
         var useMock = configuration
             .GetSection(VnptEkycOptions.SectionName)
-            .GetValue(nameof(VnptEkycOptions.UseMock), true);
+            .GetValue(nameof(VnptEkycOptions.UseMock), false);
 
         if (useMock)
         {
