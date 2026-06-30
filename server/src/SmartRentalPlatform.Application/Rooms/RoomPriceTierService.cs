@@ -1,8 +1,11 @@
 using Microsoft.EntityFrameworkCore;
+using SmartRentalPlatform.Application.Common.Exceptions;
 using SmartRentalPlatform.Application.Common.Interfaces;
+using SmartRentalPlatform.Contracts.Common;
 using SmartRentalPlatform.Contracts.RoomPriceTiers;
 using SmartRentalPlatform.Contracts.Rooms;
 using SmartRentalPlatform.Domain.Entities.Properties;
+using SmartRentalPlatform.Domain.Enums;
 
 namespace SmartRentalPlatform.Application.Rooms;
 
@@ -43,6 +46,7 @@ public class RoomPriceTierService : IRoomPriceTierService
             }
 
             roomAccessService.EnsureRoomingHouseApproved(room.RoomingHouse);
+            EnsureRoomCanEditPriceTiers(room);
             RoomValidationRules.ValidatePriceTiers(
                 request.PriceTiers,
                 room.MaxOccupants,
@@ -80,5 +84,16 @@ public class RoomPriceTierService : IRoomPriceTierService
         }
 
         return await roomQueryService.GetByIdAsync(landlordUserId, roomId, cancellationToken);
+    }
+
+    private static void EnsureRoomCanEditPriceTiers(Room room)
+    {
+        if (room.Status is RoomStatus.Reserved or RoomStatus.Occupied)
+        {
+            throw new ConflictException(
+                ErrorCodes.RoomInvalidStatus,
+                "Không thể chỉnh sửa bảng giá phòng khi phòng đang được giữ chỗ hoặc đang có hợp đồng active.",
+                new { currentStatus = room.Status.ToString() });
+        }
     }
 }

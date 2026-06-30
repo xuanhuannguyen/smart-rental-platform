@@ -1,5 +1,6 @@
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
+using SmartRentalPlatform.Api.Extensions;
 using SmartRentalPlatform.Contracts.Admin;
 using SmartRentalPlatform.Application.AdminApproval;
 using SmartRentalPlatform.Application.Common.Interfaces;
@@ -134,12 +135,7 @@ public class AdminKycController : ControllerBase
 
     private Guid GetCurrentUserId()
     {
-        if (!_currentUserService.IsAuthenticated || _currentUserService.UserId is null)
-        {
-            throw new UnauthorizedAccessException("Không tìm thấy người dùng admin hiện tại.");
-        }
-
-        return _currentUserService.UserId.Value;
+        return _currentUserService.GetRequiredUserId("Không tìm thấy người dùng admin hiện tại.");
     }
 
     private static ApiErrorResponse ValidationError(string message)

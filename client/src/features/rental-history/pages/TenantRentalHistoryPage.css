@@ -1,0 +1,270 @@
+/* client/src/features/rental-history/pages/TenantRentalHistoryPage.css */
+
+.tenant-history-page {
+  display: flex;
+  flex-direction: column;
+  gap: 24px;
+  animation: fadeIn 0.4s ease-out;
+}
+
+@keyframes fadeIn {
+  from { opacity: 0; transform: translateY(8px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+.history-filter-container {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  overflow-x: auto;
+  padding: 4px 0;
+  margin-bottom: 8px;
+  scrollbar-width: none; /* Firefox */
+}
+
+.history-filter-container::-webkit-scrollbar {
+  display: none; /* Chrome/Safari */
+}
+
+.history-filter-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 16px;
+  border-radius: 999px;
+  font-size: 13.5px;
+  font-weight: 600;
+  border: 1px solid #e2e8f0;
+  background: #ffffff;
+  color: #475569;
+  cursor: pointer;
+  white-space: nowrap;
+  transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+  height: 38px;
+  outline: none;
+}
+
+.history-filter-btn:hover {
+  background: #f8fafc;
+  color: #0f172a;
+  border-color: #cbd5e1;
+}
+
+.history-filter-btn.active {
+  background: #246bfe;
+  color: #ffffff;
+  border-color: #246bfe;
+  box-shadow: 0 4px 12px rgba(36, 107, 254, 0.18);
+}
+
+.history-filter-icon {
+  width: 14px;
+  height: 14px;
+  flex-shrink: 0;
+}
+
+.history-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(350px, 1fr));
+  gap: 24px;
+}
+
+.history-card {
+  background: #ffffff;
+  border-radius: 16px;
+  border: 1px solid #f1f5f9;
+  box-shadow: 0 4px 20px -2px rgba(15, 23, 42, 0.02), 0 2px 6px -1px rgba(15, 23, 42, 0.02);
+  transition: all 0.25s cubic-bezier(0.4, 0, 0.2, 1);
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+  position: relative;
+  padding: 20px 20px 20px 24px;
+  text-align: left;
+}
+
+.history-card:hover {
+  transform: translateY(-4px);
+  box-shadow: 0 12px 24px -4px rgba(15, 23, 42, 0.06), 0 4px 12px -2px rgba(36, 107, 254, 0.04);
+  border-color: #cbd5e1;
+}
+
+.history-card::after {
+  content: '';
+  position: absolute;
+  left: 0;
+  top: 0;
+  bottom: 0;
+  width: 4px;
+  background: #cbd5e1;
+  transition: background-color 0.2s;
+}
+
+.history-card.status-active::after {
+  background: #10b981;
+}
+
+.history-card.status-expired::after {
+  background: #246bfe;
+}
+
+.history-card.status-cancelled::after {
+  background: #ef4444;
+}
+
+.history-card-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  margin-bottom: 16px;
+  gap: 12px;
+}
+
+.history-card-title {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.history-house-icon {
+  background: #eff6ff;
+  color: #246bfe;
+  padding: 8px;
+  border-radius: 8px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+
+.history-house-icon svg {
+  width: 16px;
+  height: 16px;
+}
+
+.history-card-title-text h3 {
+  margin: 0;
+  font-size: 14.5px;
+  font-weight: 700;
+  color: #0f172a;
+  line-height: 1.4;
+  letter-spacing: -0.01em;
+}
+
+.status-badge {
+  padding: 4px 10px;
+  font-size: 11px;
+  font-weight: 800;
+  border-radius: 999px;
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+  white-space: nowrap;
+  line-height: 1;
+}
+
+.status-badge.active {
+  background: #ecfdf5;
+  color: #047857;
+}
+
+.status-badge.completed {
+  background: #eff6ff;
+  color: #246bfe;
+}
+
+.status-badge.terminated {
+  background: #fef2f2;
+  color: #b91c1c;
+}
+
+.history-card-body {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  flex: 1;
+  margin-bottom: 16px;
+}
+
+.history-role-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 10px;
+  background-color: #f1f5f9;
+  color: #475569;
+  border-radius: 6px;
+  font-size: 11.5px;
+  font-weight: 700;
+  width: fit-content;
+}
+
+.history-role-icon {
+  width: 12px;
+  height: 12px;
+  flex-shrink: 0;
+}
+
+.history-info-block {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  background: #f8fafc;
+  border-radius: 10px;
+  padding: 12px 14px;
+  border: 1px solid #f1f5f9;
+}
+
+.history-info-item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 13px;
+  color: #475569;
+}
+
+.history-info-icon {
+  width: 14px;
+  height: 14px;
+  color: #64748b;
+  flex-shrink: 0;
+}
+
+.history-info-item span {
+  font-weight: 500;
+}
+
+.history-info-item strong {
+  color: #0f172a;
+  font-weight: 700;
+}
+
+.history-card-footer {
+  border-top: 1px dashed #e2e8f0;
+  padding-top: 14px;
+  display: flex;
+  justify-content: flex-end;
+}
+
+.history-card-footer button {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-weight: 700;
+  font-size: 13px;
+  height: 34px;
+  padding: 0 14px;
+  border-radius: 8px;
+}
+
+.history-card-footer .button-icon {
+  width: 14px;
+  height: 14px;
+  stroke-width: 2.5;
+}
+
+/* Responsive adjustments */
+@media (max-width: 620px) {
+  .history-grid {
+    grid-template-columns: 1fr;
+  }
+}

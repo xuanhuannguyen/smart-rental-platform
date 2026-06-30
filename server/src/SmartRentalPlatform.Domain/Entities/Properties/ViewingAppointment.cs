@@ -16,6 +16,11 @@ namespace SmartRentalPlatform.Domain.Entities.Properties
         public string? LandlordNote { get; set; }
         public string? CancelReason { get; set; }
         public DateTimeOffset? RespondedAt { get; set; }
+
+        // Landlord proposal after rejection
+        public DateTimeOffset? ProposedScheduledAt { get; set; }
+        public int? ProposedDurationMinutes { get; set; }
+
         public DateTimeOffset CreatedAt { get; set; } = DateTimeOffset.UtcNow;
         public DateTimeOffset UpdatedAt { get; set; } = DateTimeOffset.UtcNow;
 

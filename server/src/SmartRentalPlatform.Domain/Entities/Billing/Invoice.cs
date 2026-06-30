@@ -1,5 +1,5 @@
-using SmartRentalPlatform.Domain.Entities.Leasing;
 using SmartRentalPlatform.Domain.Entities.Properties;
+using SmartRentalPlatform.Domain.Entities.RentalContracts;
 using SmartRentalPlatform.Domain.Entities.Users;
 
 namespace SmartRentalPlatform.Domain.Entities.Billing;
@@ -21,8 +21,6 @@ public class Invoice
     public decimal ServiceAmount { get; set; }
     public decimal DiscountAmount { get; set; }
     public decimal TotalAmount { get; set; }
-    public decimal PaidAmount { get; set; }
-    public decimal RemainingAmount { get; set; }
     public InvoiceStatus Status { get; set; } = InvoiceStatus.Draft;
     public string? Note { get; set; }
     public DateTimeOffset? SentAt { get; set; }
@@ -32,10 +30,10 @@ public class Invoice
     public DateTimeOffset CreatedAt { get; set; }
     public DateTimeOffset UpdatedAt { get; set; }
 
-    public Contract Contract { get; set; } = null!;
+    public RentalContract RentalContract { get; set; } = null!;
     public Room Room { get; set; } = null!;
     public User Tenant { get; set; } = null!;
     public User Landlord { get; set; } = null!;
     public ICollection<InvoiceItem> Items { get; set; } = new List<InvoiceItem>();
-    public ICollection<InvoicePayment> Payments { get; set; } = new List<InvoicePayment>();
+    public Guid? WalletTransferGroupId { get; set; }
 }

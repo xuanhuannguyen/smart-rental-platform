@@ -5,6 +5,8 @@ public sealed record InvoiceResponse(
     Guid ContractId,
     Guid RoomId,
     string RoomNumber,
+    Guid RoomingHouseId,
+    string RoomingHouseName,
     Guid TenantUserId,
     string TenantName,
     string TenantEmail,
@@ -19,11 +21,9 @@ public sealed record InvoiceResponse(
     decimal ServiceAmount,
     decimal DiscountAmount,
     decimal TotalAmount,
-    decimal PaidAmount,
-    decimal RemainingAmount,
     string Status,
     string? Note,
     DateTimeOffset? SentAt,
     DateTimeOffset? PaidAt,
     List<InvoiceItemResponse> Items,
-    List<InvoicePaymentResponse> Payments);
+    Guid? WalletTransferGroupId);

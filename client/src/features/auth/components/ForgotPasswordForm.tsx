@@ -38,6 +38,8 @@ export function ForgotPasswordForm({ isSubmitting, onSubmit }: ForgotPasswordFor
         <Input
           id="forgot-password-email"
           type="email"
+          placeholder="Nhập email của bạn"
+          className="auth-input-icon auth-input-email"
           value={email}
           hasError={Boolean(error)}
           disabled={isSubmitting}
@@ -45,7 +47,7 @@ export function ForgotPasswordForm({ isSubmitting, onSubmit }: ForgotPasswordFor
         />
       </FormField>
 
-      <Button type="submit" disabled={isSubmitting}>
+      <Button type="submit" disabled={isSubmitting} className="auth-submit-button">
         {isSubmitting ? 'Đang gửi OTP...' : 'Gửi OTP đặt lại mật khẩu'}
       </Button>
     </form>

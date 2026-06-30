@@ -1,0 +1,9 @@
+global using SmartRentalPlatform.Contracts.Auth.Requests;
+global using SmartRentalPlatform.Contracts.Kyc.Requests;
+global using SmartRentalPlatform.Contracts.RoomPriceTiers.Requests;
+global using SmartRentalPlatform.Contracts.RoomPriceTiers;
+global using SmartRentalPlatform.Contracts.Rooms.Requests;
+global using SmartRentalPlatform.Contracts.Rooms.Responses;
+global using SmartRentalPlatform.Domain.Enums.Kyc;
+global using SmartRentalPlatform.Domain.Enums.Properties;
+global using SmartRentalPlatform.Domain.Enums.Users;

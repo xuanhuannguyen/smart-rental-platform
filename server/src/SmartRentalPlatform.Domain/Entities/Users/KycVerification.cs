@@ -16,6 +16,7 @@ public class KycVerification
     public string? OcrFullName { get; set; }
     public string? OcrCitizenIdMasked { get; set; }
     public string CitizenIdHash { get; set; } = string.Empty;
+    public string? DocumentNumberEncrypted { get; set; }
     public DateOnly? OcrDateOfBirth { get; set; }
     public string? OcrGender { get; set; }
     public string? OcrAddress { get; set; }

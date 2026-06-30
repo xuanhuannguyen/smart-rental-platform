@@ -15,4 +15,10 @@ public interface IRoomingHouseRuleService
         Guid landlordUserId,
         UpsertRoomingHouseRuleRequest request,
         CancellationToken cancellationToken = default);
+
+    Task<System.IO.Stream> PreviewRuleAsync(
+        Guid roomingHouseId,
+        Guid landlordUserId,
+        UpsertRoomingHouseRuleRequest request,
+        CancellationToken cancellationToken = default);
 }

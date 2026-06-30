@@ -16,4 +16,11 @@ public interface IPayOSTopUpService
         int page,
         int pageSize,
         CancellationToken cancellationToken = default);
+
+    Task<WalletTopUpHistoryResponse> GetTopUpAsync(
+        Guid userId,
+        Guid paymentTransactionId,
+        CancellationToken cancellationToken = default);
+
+    Task<int> ExpireOverduePendingTopUpsAsync(CancellationToken cancellationToken = default);
 }

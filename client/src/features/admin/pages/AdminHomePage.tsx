@@ -23,6 +23,126 @@ type AdminMenu = 'users' | 'houses';
 type UserTab = 'list' | 'kyc';
 type HouseTab = 'public' | 'pending';
 
+// SVG Icons
+function ArrowLeftIcon() {
+  return (
+    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" style={{ display: 'inline-block', verticalAlign: 'middle' }}>
+      <line x1="19" y1="12" x2="5" y2="12" />
+      <polyline points="12 19 5 12 12 5" />
+    </svg>
+  );
+}
+
+function UserIcon() {
+  return (
+    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ display: 'inline-block', verticalAlign: 'middle' }}>
+      <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2" />
+      <circle cx="12" cy="7" r="4" />
+    </svg>
+  );
+}
+
+function MailIcon() {
+  return (
+    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ display: 'inline-block', verticalAlign: 'middle' }}>
+      <path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z" />
+      <polyline points="22,6 12,13 2,6" />
+    </svg>
+  );
+}
+
+function ShieldIcon() {
+  return (
+    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ display: 'inline-block', verticalAlign: 'middle' }}>
+      <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z" />
+    </svg>
+  );
+}
+
+function CalendarIcon() {
+  return (
+    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ display: 'inline-block', verticalAlign: 'middle' }}>
+      <rect x="3" y="4" width="18" height="18" rx="2" ry="2" />
+      <line x1="16" y1="2" x2="16" y2="6" />
+      <line x1="8" y1="2" x2="8" y2="6" />
+      <line x1="3" y1="10" x2="21" y2="10" />
+    </svg>
+  );
+}
+
+function MapPinIcon() {
+  return (
+    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ display: 'inline-block', verticalAlign: 'middle' }}>
+      <path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z" />
+      <circle cx="12" cy="10" r="3" />
+    </svg>
+  );
+}
+
+function CheckIcon() {
+  return (
+    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" style={{ display: 'inline-block', verticalAlign: 'middle' }}>
+      <polyline points="20 6 9 17 4 12" />
+    </svg>
+  );
+}
+
+function CloseIcon() {
+  return (
+    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" style={{ display: 'inline-block', verticalAlign: 'middle' }}>
+      <line x1="18" y1="6" x2="6" y2="18" />
+      <line x1="6" y1="6" x2="18" y2="18" />
+    </svg>
+  );
+}
+
+function PhoneIcon() {
+  return (
+    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ display: 'inline-block', verticalAlign: 'middle' }}>
+      <path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72 12.84 12.84 0 0 0 .7 2.81 2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45 12.84 12.84 0 0 0 2.81.7A2 2 0 0 1 22 16.92z" />
+    </svg>
+  );
+}
+
+function HouseIcon() {
+  return (
+    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ display: 'inline-block', verticalAlign: 'middle' }}>
+      <path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z" />
+      <polyline points="9 22 9 12 15 12 15 22" />
+    </svg>
+  );
+}
+
+function DescriptionIcon() {
+  return (
+    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ display: 'inline-block', verticalAlign: 'middle' }}>
+      <line x1="21" y1="10" x2="3" y2="10" />
+      <line x1="21" y1="6" x2="3" y2="6" />
+      <line x1="21" y1="14" x2="3" y2="14" />
+      <line x1="21" y1="18" x2="3" y2="18" />
+    </svg>
+  );
+}
+
+function LegalIcon() {
+  return (
+    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ display: 'inline-block', verticalAlign: 'middle' }}>
+      <rect x="3" y="11" width="18" height="11" rx="2" ry="2" />
+      <path d="M7 11V7a5 5 0 0 1 10 0v4" />
+    </svg>
+  );
+}
+
+function LogoutIcon() {
+  return (
+    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ display: 'inline-block', verticalAlign: 'middle' }}>
+      <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4" />
+      <polyline points="16 17 21 12 16 7" />
+      <line x1="21" y1="12" x2="9" y2="12" />
+    </svg>
+  );
+}
+
 export function AdminHomePage() {
   const { currentUser, logout } = useAuth();
   const navigate = useNavigate();
@@ -260,14 +380,14 @@ export function AdminHomePage() {
             className={`sidebar-menu-item ${activeMenu === 'users' ? 'active' : ''}`}
             onClick={() => handleMenuChange('users')}
           >
-            👤 Quản lý người dùng
+            <UserIcon /> Quản lý người dùng
           </button>
           <button
             type="button"
             className={`sidebar-menu-item ${activeMenu === 'houses' ? 'active' : ''}`}
             onClick={() => handleMenuChange('houses')}
           >
-            🏠 Quản lý khu trọ
+            <HouseIcon /> Quản lý khu trọ
           </button>
         </nav>
 
@@ -276,7 +396,7 @@ export function AdminHomePage() {
             Admin: <strong>{currentUser?.displayName || currentUser?.email}</strong>
           </div>
           <button type="button" className="sidebar-logout-btn" onClick={() => void logout()}>
-            🚪 Đăng xuất
+            <LogoutIcon /> Đăng xuất
           </button>
         </div>
       </aside>
@@ -338,146 +458,162 @@ export function AdminHomePage() {
               selectedUser ? (
                 /* View Chi tiết người dùng rộng toàn màn hình */
                 <div className="admin-detail-card">
-                  <div style={{ marginBottom: '24px' }}>
+                  <div className="admin-detail-card__header">
                     <button
                       type="button"
-                      className="pagination-btn"
+                      className="admin-back-btn"
                       onClick={() => setSearchParams({ menu: activeMenu, tab: activeTab, page: pageParam.toString() })}
-                      style={{ display: 'inline-flex', alignItems: 'center', gap: '8px', fontWeight: '600' }}
                     >
-                      ← Quay lại danh sách
+                      <ArrowLeftIcon />
+                      Quay lại danh sách
                     </button>
+                    <h2>Chi tiết Người dùng</h2>
                   </div>
 
-                  <h2 className="detail-section-title">Chi tiết Người dùng</h2>
-                  <div className="admin-grid-details">
-                    <div className="admin-detail-item">
-                      <label>Tên hiển thị</label>
-                      <span>{selectedUser.displayName}</span>
-                    </div>
-                    <div className="admin-detail-item">
-                      <label>Email</label>
-                      <span>{selectedUser.email}</span>
-                    </div>
-                    <div className="admin-detail-item">
-                      <label>Số điện thoại</label>
-                      <span>{selectedUser.phoneNumber || '—'}</span>
-                    </div>
-                    <div className="admin-detail-item">
-                      <label>Vai trò</label>
-                      <div style={{ display: 'flex', gap: '4px', flexWrap: 'wrap', marginTop: '4px' }}>
-                        {selectedUser.roles.map((role) => (
-                          <span key={role} className={`badge badge-${role.toLowerCase()}`}>
-                            {role}
-                          </span>
-                        ))}
-                      </div>
-                    </div>
-                    <div className="admin-detail-item">
-                      <label>Trạng thái tài khoản</label>
-                      <span>
-                        <span className={`badge ${selectedUser.status === 'Active' ? 'badge-active' : 'badge-suspended'}`}>
-                          {selectedUser.status}
-                        </span>
-                      </span>
-                    </div>
-                    <div className="admin-detail-item">
-                      <label>Trạng thái KYC</label>
-                      <span>
-                        <span className={`badge badge-${selectedUser.onboardingStatus.toLowerCase()}`}>
-                          {selectedUser.onboardingStatus === 'Completed' ? 'Đã KYC' : selectedUser.onboardingStatus}
-                        </span>
-                      </span>
-                    </div>
-                    <div className="admin-detail-item">
-                      <label>Ngày tham gia</label>
-                      <span>{new Date(selectedUser.createdAt).toLocaleString('vi-VN')}</span>
-                    </div>
-
-                    {/* Hiển thị Profile cá nhân nếu có */}
-                    {selectedUser.fullName && (
-                      <>
-                        <div className="admin-detail-item">
-                          <label>Họ và tên thật</label>
-                          <span>{selectedUser.fullName}</span>
-                        </div>
-                        <div className="admin-detail-item">
-                          <label>Ngày sinh</label>
-                          <span>{selectedUser.dateOfBirth ? new Date(selectedUser.dateOfBirth).toLocaleDateString('vi-VN') : '—'}</span>
-                        </div>
-                        <div className="admin-detail-item">
-                          <label>Giới tính</label>
-                          <span>{selectedUser.gender || '—'}</span>
-                        </div>
-                        <div className="admin-detail-item" style={{ gridColumn: 'span 2' }}>
-                          <label>Địa chỉ liên hệ</label>
-                          <span>{selectedUser.addressLine || '—'}</span>
-                        </div>
-                        <div className="admin-detail-item">
-                          <label>Số CCCD đã xác thực</label>
-                          <span style={{ color: 'var(--admin-primary-color)', fontWeight: '600' }}>
-                            {selectedUser.verifiedCitizenIdMasked || '—'}
-                          </span>
-                        </div>
-                        {selectedUser.emergencyContactName && (
+                  <div className="admin-detail-split-grid">
+                    {/* Cột trái: Thông tin tài khoản */}
+                    <div className="admin-detail-column-left">
+                      <div className="admin-detail-section">
+                        <h3 className="section-subtitle">Thông tin tài khoản</h3>
+                        <div className="admin-grid-details">
                           <div className="admin-detail-item">
-                            <label>Liên hệ khẩn cấp</label>
-                            <span>{selectedUser.emergencyContactName} ({selectedUser.emergencyContactPhone || '—'})</span>
+                            <label><UserIcon /> Tên hiển thị</label>
+                            <span>{selectedUser.displayName}</span>
                           </div>
-                        )}
-                      </>
-                    )}
-                  </div>
-
-                  {/* Hiển thị hình ảnh CCCD nếu đã được duyệt (Completed) */}
-                  {selectedUser.onboardingStatus === 'Completed' && selectedUser.kycInfo ? (
-                    <div className="admin-images-section" style={{ marginTop: '32px' }}>
-                      <div className="admin-images-title">Hình ảnh CCCD & Selfie xác thực (Đã duyệt)</div>
-                      <div className="admin-media-grid">
-                        <AdminImage label="Mặt trước CCCD" src={assetUrl(selectedUser.kycInfo.frontImageUrl)} />
-                        <AdminImage label="Mặt sau CCCD" src={assetUrl(selectedUser.kycInfo.backImageUrl)} />
-                        <AdminImage label="Ảnh Selfie" src={assetUrl(selectedUser.kycInfo.selfieImageUrl)} />
-                      </div>
-                      
-                      <div className="admin-grid-details" style={{ marginTop: '20px', borderTop: '1px solid rgba(255, 255, 255, 0.08)', paddingTop: '20px' }}>
-
-                        <div className="admin-detail-item">
-                          <label>Mức rủi ro KYC</label>
-                          <span className={`badge ${selectedUser.kycInfo.riskLevel === 'High' ? 'badge-rejected' : 'badge-pending'}`}>
-                            {selectedUser.kycInfo.riskLevel}
-                          </span>
-                        </div>
-                        <div className="admin-detail-item">
-                          <label>Kết quả hệ thống tự động (AI)</label>
-                          <span style={{ fontWeight: '600' }}>
-                            {selectedUser.kycInfo.ekycResult === 'Passed' ? 'Passed (Hợp lệ)' :
-                             selectedUser.kycInfo.ekycResult === 'NeedReview' ? 'NeedReview (Cần hậu kiểm)' :
-                             selectedUser.kycInfo.ekycResult === 'Failed' ? 'Failed (Không trùng khớp)' :
-                             selectedUser.kycInfo.ekycResult === 'ProviderError' ? 'ProviderError (Lỗi nhà cung cấp)' :
-                             selectedUser.kycInfo.ekycResult}
-                          </span>
-                        </div>
-                        <div className="admin-detail-item">
-                          <label>Trạng thái duyệt của Admin</label>
-                          <span>
-                            <span className="badge badge-active" style={{ display: 'inline-flex', alignItems: 'center', gap: '4px' }}>
-                              Đã duyệt thành công (Approved) ✅
+                          <div className="admin-detail-item">
+                            <label><MailIcon /> Email</label>
+                            <span>{selectedUser.email}</span>
+                          </div>
+                          <div className="admin-detail-item">
+                            <label><PhoneIcon /> Số điện thoại</label>
+                            <span>{selectedUser.phoneNumber || '—'}</span>
+                          </div>
+                          <div className="admin-detail-item">
+                            <label><ShieldIcon /> Vai trò</label>
+                            <div className="admin-detail-badges">
+                              {selectedUser.roles.map((role) => (
+                                <span key={role} className={`badge badge-${role.toLowerCase()}`}>
+                                  {role}
+                                </span>
+                              ))}
+                            </div>
+                          </div>
+                          <div className="admin-detail-item">
+                            <label>Trạng thái tài khoản</label>
+                            <span>
+                              <span className={`badge ${selectedUser.status === 'Active' ? 'badge-active' : 'badge-suspended'}`}>
+                                <span className="status-dot"></span>
+                                {selectedUser.status}
+                              </span>
                             </span>
-                          </span>
-                        </div>
-                        <div className="admin-detail-item">
-                          <label>Ngày duyệt KYC</label>
-                          <span>{selectedUser.kycInfo.approvedAt ? new Date(selectedUser.kycInfo.approvedAt).toLocaleString('vi-VN') : '—'}</span>
+                          </div>
+                          <div className="admin-detail-item">
+                            <label>Trạng thái KYC</label>
+                            <span>
+                              <span className={`badge badge-${selectedUser.onboardingStatus.toLowerCase()}`}>
+                                {selectedUser.onboardingStatus === 'Completed' ? 'Đã KYC' : selectedUser.onboardingStatus}
+                              </span>
+                            </span>
+                          </div>
+                          <div className="admin-detail-item" style={{ gridColumn: 'span 2' }}>
+                            <label><CalendarIcon /> Ngày tham gia</label>
+                            <span>{new Date(selectedUser.createdAt).toLocaleString('vi-VN')}</span>
+                          </div>
                         </div>
                       </div>
+
+                      {/* Thông tin hồ sơ cá nhân nếu có */}
+                      {selectedUser.fullName && (
+                        <div className="admin-detail-section" style={{ marginTop: '24px' }}>
+                          <h3 className="section-subtitle">Thông tin cá nhân (Hồ sơ)</h3>
+                          <div className="admin-grid-details">
+                            <div className="admin-detail-item">
+                              <label>Họ và tên thật</label>
+                              <span>{selectedUser.fullName}</span>
+                            </div>
+                            <div className="admin-detail-item">
+                              <label><CalendarIcon /> Ngày sinh</label>
+                              <span>{selectedUser.dateOfBirth ? new Date(selectedUser.dateOfBirth).toLocaleDateString('vi-VN') : '—'}</span>
+                            </div>
+                            <div className="admin-detail-item">
+                              <label>Giới tính</label>
+                              <span>{selectedUser.gender || '—'}</span>
+                            </div>
+                            <div className="admin-detail-item">
+                              <label>Số CCCD đã xác thực</label>
+                              <span className="verified-citizen-id">
+                                {selectedUser.verifiedCitizenIdMasked || '—'}
+                              </span>
+                            </div>
+                            <div className="admin-detail-item" style={{ gridColumn: 'span 2' }}>
+                              <label><MapPinIcon /> Địa chỉ liên hệ</label>
+                              <span>{selectedUser.addressLine || '—'}</span>
+                            </div>
+                            {selectedUser.emergencyContactName && (
+                              <div className="admin-detail-item" style={{ gridColumn: 'span 2' }}>
+                                <label>Liên hệ khẩn cấp</label>
+                                <span>{selectedUser.emergencyContactName} ({selectedUser.emergencyContactPhone || '—'})</span>
+                              </div>
+                            )}
+                          </div>
+                        </div>
+                      )}
                     </div>
-                  ) : (
-                    selectedUser.onboardingStatus === 'Completed' && (
-                      <div style={{ marginTop: '20px', color: 'var(--admin-text-muted)', fontSize: '0.9rem' }}>
-                        * Tài khoản này đã hoàn thành xác thực nhưng dữ liệu hồ sơ KYC gốc không còn tồn tại hoặc không tìm thấy.
-                      </div>
-                    )
-                  )}
+
+                    {/* Cột phải: Dữ liệu KYC đã duyệt */}
+                    <div className="admin-detail-column-right">
+                      {selectedUser.onboardingStatus === 'Completed' && selectedUser.kycInfo ? (
+                        <div className="admin-detail-section">
+                          <h3 className="section-subtitle">Tài liệu định danh & Selfie (Đã duyệt)</h3>
+                          
+                          <div className="admin-media-grid-vertical">
+                            <div className="media-container">
+                              <span className="media-label">Mặt trước CCCD</span>
+                              <AdminImage label="Mặt trước CCCD" src={assetUrl(selectedUser.kycInfo.frontImageUrl)} />
+                            </div>
+                            <div className="media-container">
+                              <span className="media-label">Mặt sau CCCD</span>
+                              <AdminImage label="Mặt sau CCCD" src={assetUrl(selectedUser.kycInfo.backImageUrl)} />
+                            </div>
+                            <div className="media-container">
+                              <span className="media-label">Ảnh Selfie</span>
+                              <AdminImage label="Ảnh Selfie" src={assetUrl(selectedUser.kycInfo.selfieImageUrl)} />
+                            </div>
+                          </div>
+
+                          <div className="admin-kyc-summary-panel">
+                            <div className="admin-grid-details" style={{ marginTop: '20px' }}>
+                              <div className="admin-detail-item">
+                                <label>Mức rủi ro KYC</label>
+                                <span className={`badge ${selectedUser.kycInfo.riskLevel === 'High' ? 'badge-rejected' : 'badge-pending'}`}>
+                                  {selectedUser.kycInfo.riskLevel}
+                                </span>
+                              </div>
+                              <div className="admin-detail-item">
+                                <label>Kết quả hệ thống tự động (AI)</label>
+                                <span className="system-result-text">
+                                  {selectedUser.kycInfo.ekycResult === 'Passed' ? 'Passed (Hợp lệ)' :
+                                   selectedUser.kycInfo.ekycResult === 'NeedReview' ? 'NeedReview (Cần hậu kiểm)' :
+                                   selectedUser.kycInfo.ekycResult === 'Failed' ? 'Failed (Không trùng khớp)' :
+                                   selectedUser.kycInfo.ekycResult === 'ProviderError' ? 'ProviderError (Lỗi nhà cung cấp)' :
+                                   selectedUser.kycInfo.ekycResult}
+                                </span>
+                              </div>
+                              <div className="admin-detail-item" style={{ gridColumn: 'span 2' }}>
+                                <label>Ngày duyệt KYC</label>
+                                <span>{selectedUser.kycInfo.approvedAt ? new Date(selectedUser.kycInfo.approvedAt).toLocaleString('vi-VN') : '—'}</span>
+                              </div>
+                            </div>
+                          </div>
+                        </div>
+                      ) : (
+                        <div className="admin-no-kyc-placeholder">
+                          <ShieldIcon />
+                          <span>Tài khoản này chưa hoàn thành hoặc chưa lưu dữ liệu KYC.</span>
+                        </div>
+                      )}
+                    </div>
+                  </div>
                 </div>
               ) : (
                 /* Bảng danh sách người dùng */
@@ -526,9 +662,8 @@ export function AdminHomePage() {
                               <td style={{ textAlign: 'right' }}>
                                 <button
                                   type="button"
-                                  className="pagination-btn"
+                                  className="admin-table-action-btn"
                                   onClick={() => void openUser(user.id)}
-                                  style={{ padding: '6px 12px', fontSize: '0.8rem', backgroundColor: 'var(--admin-primary-color)', color: '#fff', border: 'none', cursor: 'pointer' }}
                                 >
                                   Xem chi tiết
                                 </button>
@@ -572,104 +707,134 @@ export function AdminHomePage() {
             {activeMenu === 'users' && activeTab === 'kyc' && (
               selectedKyc ? (
                 /* View Chi tiết hồ sơ KYC động rộng toàn màn hình */
-                <div className="admin-detail-card">
-                  <div style={{ marginBottom: '24px' }}>
+                <div className="admin-detail-card admin-detail-card--split">
+                  <div className="admin-detail-card__header">
                     <button
                       type="button"
-                      className="pagination-btn"
+                      className="admin-back-btn"
                       onClick={() => setSearchParams({ menu: activeMenu, tab: activeTab, page: pageParam.toString() })}
-                      style={{ display: 'inline-flex', alignItems: 'center', gap: '8px', fontWeight: '600' }}
                     >
-                      ← Quay lại danh sách
+                      <ArrowLeftIcon />
+                      Quay lại danh sách
                     </button>
+                    <h2>Chi tiết Hồ sơ eKYC</h2>
                   </div>
                   
-                  <h2 className="detail-section-title">Chi tiết Hồ sơ eKYC</h2>
-                  <div className="admin-grid-details">
-                    <div className="admin-detail-item">
-                      <label>Tên chủ thẻ</label>
-                      <span>{selectedKyc.ocrFullName || selectedKyc.userDisplayName}</span>
-                    </div>
-                    <div className="admin-detail-item">
-                      <label>Email đăng ký</label>
-                      <span>{selectedKyc.userEmail}</span>
-                    </div>
-                    <div className="admin-detail-item">
-                      <label>Số CCCD / CMND</label>
-                      <span>{selectedKyc.ocrCitizenIdMasked || 'Chưa nhận dạng được'}</span>
-                    </div>
-                    <div className="admin-detail-item">
-                      <label>Ngày sinh</label>
-                      <span>
-                        {selectedKyc.ocrDateOfBirth
-                          ? new Date(selectedKyc.ocrDateOfBirth).toLocaleDateString('vi-VN')
-                          : 'Chưa nhận dạng được'}
-                      </span>
-                    </div>
-                    <div className="admin-detail-item">
-                      <label>Giới tính / Địa chỉ</label>
-                      <span>
-                        {selectedKyc.ocrGender || '—'} · {selectedKyc.ocrAddress || 'Chưa nhận dạng được'}
-                      </span>
-                    </div>
-                  </div>
-
-                  {/* Ảnh KYC */}
-                  <div className="admin-images-section">
-                    <div className="admin-images-title">Hình ảnh xác thực</div>
-                    <div className="admin-media-grid">
-                      <AdminImage label="Mặt trước CCCD" src={assetUrl(selectedKyc.frontImageUrl)} />
-                      <AdminImage label="Mặt sau CCCD" src={assetUrl(selectedKyc.backImageUrl)} />
-                      <AdminImage label="Ảnh Selfie" src={assetUrl(selectedKyc.selfieImageUrl)} />
-                    </div>
-                  </div>
-
-                  {/* Lịch sử eKYC của người dùng này */}
-                  <div className="kyc-history-section">
-                    <h3 className="detail-section-title" style={{ fontSize: '1rem', borderBottom: 'none', marginBottom: '16px' }}>
-                      Lịch sử duyệt KYC của tài khoản này
-                    </h3>
-                    {isLoadingKycHistory ? (
-                      <div style={{ fontSize: '0.875rem', color: 'var(--admin-text-muted)' }}>Đang tải lịch sử...</div>
-                    ) : kycHistory.length === 0 ? (
-                      <div style={{ fontSize: '0.875rem', color: 'var(--admin-text-muted)' }}>Chưa từng có yêu cầu duyệt nào trước đó.</div>
-                    ) : (
-                      <div className="kyc-timeline">
-                        {kycHistory.map((history) => (
-                          <div className="kyc-timeline-item" key={history.id}>
-                            <div className={`kyc-timeline-dot ${history.status}`}></div>
-                            <div className="kyc-timeline-header">
-                              <span className={`kyc-timeline-status ${history.status}`}>
-                                {history.status === 'Approved' ? 'Đã Duyệt' : history.status === 'Rejected' ? 'Bị Từ Chối' : history.status}
-                              </span>
-                              <span className="kyc-timeline-date">
-                                gửi lúc {new Date(history.submittedAt).toLocaleString('vi-VN')}
-                              </span>
-                            </div>
-                            {history.rejectedReason && (
-                              <div className="kyc-timeline-reason">Lý do từ chối: {history.rejectedReason}</div>
-                            )}
+                  <div className="admin-detail-split-grid">
+                    {/* Cột trái: Thông tin định danh + Lịch sử + Actions */}
+                    <div className="admin-detail-column-left">
+                      <div className="admin-detail-section">
+                        <h3 className="section-subtitle">Thông tin định danh (OCR)</h3>
+                        <div className="admin-grid-details">
+                          <div className="admin-detail-item">
+                            <label><UserIcon /> Tên chủ thẻ</label>
+                            <span>{selectedKyc.ocrFullName || selectedKyc.userDisplayName}</span>
                           </div>
-                        ))}
+                          <div className="admin-detail-item">
+                            <label><MailIcon /> Email đăng ký</label>
+                            <span>{selectedKyc.userEmail}</span>
+                          </div>
+                          <div className="admin-detail-item">
+                            <label><ShieldIcon /> Số CCCD / CMND</label>
+                            <span>{selectedKyc.ocrCitizenIdMasked || 'Chưa nhận dạng được'}</span>
+                          </div>
+                          <div className="admin-detail-item">
+                            <label><CalendarIcon /> Ngày sinh</label>
+                            <span>
+                              {selectedKyc.ocrDateOfBirth
+                                ? new Date(selectedKyc.ocrDateOfBirth).toLocaleDateString('vi-VN')
+                                : 'Chưa nhận dạng được'}
+                            </span>
+                          </div>
+                          <div className="admin-detail-item" style={{ gridColumn: 'span 2' }}>
+                            <label><MapPinIcon /> Giới tính & Địa chỉ</label>
+                            <span>
+                              {selectedKyc.ocrGender || '—'} · {selectedKyc.ocrAddress || 'Chưa nhận dạng được'}
+                            </span>
+                          </div>
+                        </div>
                       </div>
-                    )}
-                  </div>
 
-                  {/* Action Approval */}
-                  <div className="admin-action-area">
-                    <textarea
-                      className="admin-reason-textarea"
-                      value={reason}
-                      onChange={(e) => setReason(e.target.value)}
-                      placeholder="Nhập lý do từ chối (bắt buộc nếu nhấn từ chối hồ sơ)..."
-                    />
-                    <div className="admin-action-buttons">
-                      <Button type="button" disabled={isSubmitting} onClick={handleApprove}>
-                        Phê duyệt hồ sơ
-                      </Button>
-                      <Button type="button" variant="danger" disabled={isSubmitting} onClick={handleReject}>
-                        Từ chối duyệt
-                      </Button>
+                      {/* Lịch sử eKYC */}
+                      <div className="admin-detail-section kyc-history-section">
+                        <h3 className="section-subtitle">Lịch sử duyệt KYC của tài khoản</h3>
+                        {isLoadingKycHistory ? (
+                          <div className="loading-history">Đang tải lịch sử...</div>
+                        ) : kycHistory.length === 0 ? (
+                          <div className="no-history">Chưa từng có yêu cầu duyệt nào trước đó.</div>
+                        ) : (
+                          <div className="kyc-timeline">
+                            {kycHistory.map((history) => (
+                              <div className="kyc-timeline-item" key={history.id}>
+                                <div className={`kyc-timeline-dot ${history.status}`}></div>
+                                <div className="kyc-timeline-header">
+                                  <span className={`kyc-timeline-status ${history.status}`}>
+                                    {history.status === 'Approved' ? 'Đã Duyệt' : history.status === 'Rejected' ? 'Bị Từ Chối' : history.status}
+                                  </span>
+                                  <span className="kyc-timeline-date">
+                                    gửi lúc {new Date(history.submittedAt).toLocaleString('vi-VN')}
+                                  </span>
+                                </div>
+                                {history.rejectedReason && (
+                                  <div className="kyc-timeline-reason">Lý do từ chối: {history.rejectedReason}</div>
+                                )}
+                              </div>
+                            ))}
+                          </div>
+                        )}
+                      </div>
+
+                      {/* Action Approval */}
+                      <div className="admin-action-area">
+                        <h3 className="section-subtitle">Quyết định phê duyệt</h3>
+                        <textarea
+                          className="admin-reason-textarea"
+                          value={reason}
+                          onChange={(e) => setReason(e.target.value)}
+                          placeholder="Nhập lý do từ chối (bắt buộc nếu nhấn từ chối hồ sơ)..."
+                        />
+                        <div className="admin-action-buttons">
+                          <button
+                            type="button"
+                            className="admin-btn admin-btn--success"
+                            disabled={isSubmitting}
+                            onClick={handleApprove}
+                          >
+                            <CheckIcon />
+                            Phê duyệt hồ sơ
+                          </button>
+                          <button
+                            type="button"
+                            className="admin-btn admin-btn--danger"
+                            disabled={isSubmitting}
+                            onClick={handleReject}
+                          >
+                            <CloseIcon />
+                            Từ chối duyệt
+                          </button>
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* Cột phải: Hình ảnh xác thực */}
+                    <div className="admin-detail-column-right">
+                      <div className="admin-detail-section">
+                        <h3 className="section-subtitle">Tài liệu xác thực</h3>
+                        <div className="admin-media-grid-vertical">
+                          <div className="media-container">
+                            <span className="media-label">Mặt trước CCCD</span>
+                            <AdminImage label="Mặt trước CCCD" src={assetUrl(selectedKyc.frontImageUrl)} />
+                          </div>
+                          <div className="media-container">
+                            <span className="media-label">Mặt sau CCCD</span>
+                            <AdminImage label="Mặt sau CCCD" src={assetUrl(selectedKyc.backImageUrl)} />
+                          </div>
+                          <div className="media-container">
+                            <span className="media-label">Ảnh Selfie</span>
+                            <AdminImage label="Ảnh Selfie" src={assetUrl(selectedKyc.selfieImageUrl)} />
+                          </div>
+                        </div>
+                      </div>
                     </div>
                   </div>
                 </div>
@@ -710,9 +875,8 @@ export function AdminHomePage() {
                               <td style={{ textAlign: 'right' }}>
                                 <button
                                   type="button"
-                                  className="pagination-btn"
+                                  className="admin-table-action-btn"
                                   onClick={() => void openKyc(item.id)}
-                                  style={{ padding: '6px 12px', fontSize: '0.8rem', backgroundColor: 'var(--admin-primary-color)', color: '#fff', border: 'none', cursor: 'pointer' }}
                                 >
                                   Xem chi tiết
                                 </button>
@@ -756,123 +920,137 @@ export function AdminHomePage() {
             {activeMenu === 'houses' && activeTab === 'public' && (
               selectedHouse ? (
                 /* View Chi tiết khu trọ đã public (read-only) */
-                <div className="admin-detail-card">
-                  <div style={{ marginBottom: '24px' }}>
+                <div className="admin-detail-card admin-detail-card--split">
+                  <div className="admin-detail-card__header">
                     <button
                       type="button"
-                      className="pagination-btn"
+                      className="admin-back-btn"
                       onClick={() => setSearchParams({ menu: activeMenu, tab: activeTab, page: pageParam.toString() })}
-                      style={{ display: 'inline-flex', alignItems: 'center', gap: '8px', fontWeight: '600' }}
                     >
-                      ← Quay lại danh sách
+                      <ArrowLeftIcon />
+                      Quay lại danh sách
                     </button>
+                    <h2>Chi tiết Khu trọ đã duyệt</h2>
                   </div>
 
-                  <h2 className="detail-section-title">{selectedHouse.name}</h2>
-                  <div className="admin-grid-details">
-                    <div className="admin-detail-item">
-                      <label>Chủ trọ</label>
-                      <span>{selectedHouse.landlordName} ({selectedHouse.landlordEmail})</span>
-                    </div>
-                    <div className="admin-detail-item">
-                      <label>Địa chỉ hiển thị</label>
-                      <span>{selectedHouse.addressDisplay}</span>
-                    </div>
-                    <div className="admin-detail-item">
-                      <label>Địa chỉ chi tiết</label>
-                      <span>{selectedHouse.addressLine}</span>
-                    </div>
-                    <div className="admin-detail-item">
-                      <label>Trạng thái duyệt</label>
-                      <span><span className="badge badge-completed">Approved</span></span>
-                    </div>
-                    <div className="admin-detail-item">
-                      <label>Trạng thái hiển thị</label>
-                      <span>
-                        <span className={`badge ${selectedHouse.visibilityStatus === 'Visible' ? 'badge-active' : 'badge-suspended'}`}>
-                          {selectedHouse.visibilityStatus}
-                        </span>
-                      </span>
-                    </div>
-                    <div className="admin-detail-item" style={{ gridColumn: 'span 2' }}>
-                      <label>Mô tả khu trọ</label>
-                      <span>{selectedHouse.description || 'Chưa cung cấp mô tả.'}</span>
-                    </div>
-                    {selectedHouse.legalDocument && (
-                      <div className="admin-detail-item" style={{ gridColumn: 'span 2' }}>
-                        <label>Số giấy tờ pháp lý (CCCD / Giấy chứng nhận quyền sở hữu)</label>
-                        <span style={{ color: 'var(--admin-primary-color)', fontWeight: '600' }}>
-                          {selectedHouse.legalDocument.documentNumberMasked}
-                        </span>
-                      </div>
-                    )}
-                  </div>
-
-                  {/* Tiện ích */}
-                  <div style={{ marginBottom: '28px' }}>
-                    <div className="admin-images-title">Tiện ích khu trọ</div>
-                    <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
-                      {selectedHouse.amenities.length === 0 ? (
-                        <span style={{ fontSize: '0.85rem', color: 'var(--admin-text-muted)' }}>Chưa đăng ký tiện ích nào.</span>
-                      ) : (
-                        selectedHouse.amenities.map((a) => (
-                          <span key={a.id} className="badge badge-renter" style={{ padding: '6px 12px' }}>
-                            {a.name}
-                          </span>
-                        ))
-                      )}
-                    </div>
-                  </div>
-
-                  {/* Ảnh khu trọ & Giấy tờ */}
-                  <div className="admin-images-section">
-                    <div className="admin-images-title">Hình ảnh & Giấy tờ pháp lý</div>
-                    <div className="admin-media-grid">
-                      {selectedHouse.legalDocument && (
-                        <>
-                          <a
-                            href={assetUrl(`/uploads/${selectedHouse.legalDocument.frontImageObjectKey}`)}
-                            target="_blank"
-                            rel="noreferrer"
-                            className="admin-image-box"
-                          >
-                            <img src={assetUrl(`/uploads/${selectedHouse.legalDocument.frontImageObjectKey}`)} alt="Giấy tờ mặt trước" />
-                            <span>Giấy tờ mặt trước</span>
-                          </a>
-                          <a
-                            href={assetUrl(`/uploads/${selectedHouse.legalDocument.backImageObjectKey}`)}
-                            target="_blank"
-                            rel="noreferrer"
-                            className="admin-image-box"
-                          >
-                            <img src={assetUrl(`/uploads/${selectedHouse.legalDocument.backImageObjectKey}`)} alt="Giấy tờ mặt sau" />
-                            <span>Giấy tờ mặt sau</span>
-                          </a>
-                          {selectedHouse.legalDocument.extraImageObjectKey && (
-                            <a
-                              href={assetUrl(`/uploads/${selectedHouse.legalDocument.extraImageObjectKey}`)}
-                              target="_blank"
-                              rel="noreferrer"
-                              className="admin-image-box"
-                            >
-                              <img src={assetUrl(`/uploads/${selectedHouse.legalDocument.extraImageObjectKey}`)} alt="Giấy tờ khác" />
-                              <span>Giấy tờ khác</span>
-                            </a>
+                  <div className="admin-detail-split-grid">
+                    {/* Cột trái: Thông tin chi tiết */}
+                    <div className="admin-detail-column-left">
+                      <div className="admin-detail-section">
+                        <h3 className="section-subtitle">Thông tin cơ bản</h3>
+                        <h2 className="property-title">{selectedHouse.name}</h2>
+                        
+                        <div className="admin-grid-details" style={{ marginTop: '16px' }}>
+                          <div className="admin-detail-item">
+                            <label><UserIcon /> Chủ trọ</label>
+                            <span>{selectedHouse.landlordName}</span>
+                            <span className="sub-text">{selectedHouse.landlordEmail}</span>
+                          </div>
+                          <div className="admin-detail-item">
+                            <label><MapPinIcon /> Địa chỉ hiển thị</label>
+                            <span>{selectedHouse.addressDisplay}</span>
+                          </div>
+                          <div className="admin-detail-item" style={{ gridColumn: 'span 2' }}>
+                            <label><MapPinIcon /> Địa chỉ chi tiết</label>
+                            <span>{selectedHouse.addressLine}</span>
+                          </div>
+                          <div className="admin-detail-item">
+                            <label>Trạng thái duyệt</label>
+                            <span>
+                              <span className="badge badge-completed">
+                                <span className="status-dot"></span> Approved
+                              </span>
+                            </span>
+                          </div>
+                          <div className="admin-detail-item">
+                            <label>Trạng thái hiển thị</label>
+                            <span>
+                              <span className={`badge ${selectedHouse.visibilityStatus === 'Visible' ? 'badge-active' : 'badge-suspended'}`}>
+                                {selectedHouse.visibilityStatus}
+                              </span>
+                            </span>
+                          </div>
+                          <div className="admin-detail-item" style={{ gridColumn: 'span 2' }}>
+                            <label><DescriptionIcon /> Mô tả khu trọ</label>
+                            <span className="property-description">{selectedHouse.description || 'Chưa cung cấp mô tả.'}</span>
+                          </div>
+                          {selectedHouse.legalDocument && (
+                            <div className="admin-detail-item" style={{ gridColumn: 'span 2' }}>
+                              <label><LegalIcon /> Số giấy tờ pháp lý (CCCD / Giấy chứng nhận)</label>
+                              <span className="verified-citizen-id">
+                                {selectedHouse.legalDocument.documentNumberMasked}
+                              </span>
+                            </div>
                           )}
-                        </>
-                      )}
-                      {selectedHouse.images.map((image) => (
-                        <a
-                          key={image.id}
-                          href={assetUrl(image.imageUrl)}
-                          target="_blank"
-                          rel="noreferrer"
-                          className="admin-image-box"
-                        >
-                          <img src={assetUrl(image.imageUrl)} alt={image.isCover ? 'Ảnh bìa khu trọ' : image.caption || 'Ảnh chi tiết'} />
-                          <span>{image.isCover ? 'Ảnh bìa khu trọ' : image.caption || 'Ảnh chi tiết'}</span>
-                        </a>
-                      ))}
+                        </div>
+                      </div>
+
+                      {/* Tiện ích */}
+                      <div className="admin-detail-section" style={{ marginTop: '24px' }}>
+                        <h3 className="section-subtitle">Tiện ích khu trọ</h3>
+                        <div className="admin-amenities-tags">
+                          {selectedHouse.amenities.length === 0 ? (
+                            <span className="no-amenities-text">Chưa đăng ký tiện ích nào.</span>
+                          ) : (
+                            selectedHouse.amenities.map((a) => (
+                              <span key={a.id} className="badge badge-renter-tag">
+                                {a.name}
+                              </span>
+                            ))
+                          )}
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* Cột phải: Tài liệu pháp lý & Ảnh chụp */}
+                    <div className="admin-detail-column-right">
+                      <div className="admin-detail-section">
+                        <h3 className="section-subtitle">Tài liệu pháp lý & Hình ảnh</h3>
+                        
+                        <div className="admin-media-grid-vertical">
+                          {selectedHouse.legalDocument && (
+                            <>
+                              <div className="media-container">
+                                <span className="media-label">Mặt trước Giấy tờ Pháp lý</span>
+                                <AdminImage
+                                  label="Mặt trước Giấy tờ Pháp lý"
+                                  src={assetUrl(`/uploads/${selectedHouse.legalDocument.frontImageObjectKey}`)}
+                                />
+                              </div>
+                              <div className="media-container">
+                                <span className="media-label">Mặt sau Giấy tờ Pháp lý</span>
+                                <AdminImage
+                                  label="Mặt sau Giấy tờ Pháp lý"
+                                  src={assetUrl(`/uploads/${selectedHouse.legalDocument.backImageObjectKey}`)}
+                                />
+                              </div>
+                              {selectedHouse.legalDocument.extraImageObjectKey && (
+                                <div className="media-container">
+                                  <span className="media-label">Tài liệu pháp lý bổ sung</span>
+                                  <AdminImage
+                                    label="Tài liệu bổ sung"
+                                    src={assetUrl(`/uploads/${selectedHouse.legalDocument.extraImageObjectKey}`)}
+                                  />
+                                </div>
+                              )}
+                            </>
+                          )}
+
+                          <div className="property-photos-gallery">
+                            <span className="media-label">Hình ảnh thực tế khu trọ</span>
+                            <div className="gallery-thumbnail-grid">
+                              {selectedHouse.images.map((image) => (
+                                <div key={image.id} className="gallery-thumbnail-item">
+                                  <AdminImage
+                                    label={image.isCover ? 'Ảnh bìa' : image.caption || 'Ảnh chi tiết'}
+                                    src={assetUrl(image.imageUrl)}
+                                  />
+                                </div>
+                              ))}
+                            </div>
+                          </div>
+                        </div>
+                      </div>
                     </div>
                   </div>
                 </div>
@@ -917,9 +1095,8 @@ export function AdminHomePage() {
                               <td style={{ textAlign: 'right' }}>
                                 <button
                                   type="button"
-                                  className="pagination-btn"
+                                  className="admin-table-action-btn"
                                   onClick={() => void openHouse(house.id)}
-                                  style={{ padding: '6px 12px', fontSize: '0.8rem', backgroundColor: 'var(--admin-primary-color)', color: '#fff', border: 'none', cursor: 'pointer' }}
                                 >
                                   Xem chi tiết
                                 </button>
@@ -963,129 +1140,152 @@ export function AdminHomePage() {
             {activeMenu === 'houses' && activeTab === 'pending' && (
               selectedHouse ? (
                 /* View Chi tiết khu trọ rộng toàn màn hình */
-                <div className="admin-detail-card">
-                  <div style={{ marginBottom: '24px' }}>
+                <div className="admin-detail-card admin-detail-card--split">
+                  <div className="admin-detail-card__header">
                     <button
                       type="button"
-                      className="pagination-btn"
+                      className="admin-back-btn"
                       onClick={() => setSearchParams({ menu: activeMenu, tab: activeTab, page: pageParam.toString() })}
-                      style={{ display: 'inline-flex', alignItems: 'center', gap: '8px', fontWeight: '600' }}
                     >
-                      ← Quay lại danh sách
+                      <ArrowLeftIcon />
+                      Quay lại danh sách
                     </button>
+                    <h2>Chi tiết Khu trọ chờ duyệt</h2>
                   </div>
 
-                  <h2 className="detail-section-title">{selectedHouse.name}</h2>
-                  <div className="admin-grid-details">
-                    <div className="admin-detail-item">
-                      <label>Chủ trọ</label>
-                      <span>{selectedHouse.landlordName} ({selectedHouse.landlordEmail})</span>
-                    </div>
-                    <div className="admin-detail-item">
-                      <label>Địa chỉ hiển thị</label>
-                      <span>{selectedHouse.addressDisplay}</span>
-                    </div>
-                    <div className="admin-detail-item">
-                      <label>Địa chỉ chi tiết</label>
-                      <span>{selectedHouse.addressLine}</span>
-                    </div>
-                    <div className="admin-detail-item" style={{ gridColumn: 'span 2' }}>
-                      <label>Mô tả khu trọ</label>
-                      <span>{selectedHouse.description || 'Chưa cung cấp mô tả.'}</span>
-                    </div>
-                    {selectedHouse.legalDocument && (
-                      <div className="admin-detail-item" style={{ gridColumn: 'span 2' }}>
-                        <label>Số giấy tờ pháp lý (CCCD / Giấy chứng nhận quyền sở hữu)</label>
-                        <span style={{ color: 'var(--admin-primary-color)', fontWeight: '600' }}>
-                          {selectedHouse.legalDocument.documentNumberMasked}
-                        </span>
-                      </div>
-                    )}
-                  </div>
-
-                  {/* Tiện ích */}
-                  <div style={{ marginBottom: '28px' }}>
-                    <div className="admin-images-title">Tiện ích khu trọ</div>
-                    <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
-                      {selectedHouse.amenities.length === 0 ? (
-                        <span style={{ fontSize: '0.85rem', color: 'var(--admin-text-muted)' }}>Chưa đăng ký tiện ích nào.</span>
-                      ) : (
-                        selectedHouse.amenities.map((a) => (
-                          <span key={a.id} className="badge badge-renter" style={{ padding: '6px 12px' }}>
-                            {a.name}
-                          </span>
-                        ))
-                      )}
-                    </div>
-                  </div>
-
-                  {/* Ảnh khu trọ & Giấy tờ */}
-                  <div className="admin-images-section">
-                    <div className="admin-images-title">Hình ảnh & Giấy tờ pháp lý</div>
-                    <div className="admin-media-grid">
-                      {selectedHouse.legalDocument && (
-                        <>
-                          <a
-                            href={assetUrl(`/uploads/${selectedHouse.legalDocument.frontImageObjectKey}`)}
-                            target="_blank"
-                            rel="noreferrer"
-                            className="admin-image-box"
-                          >
-                            <img src={assetUrl(`/uploads/${selectedHouse.legalDocument.frontImageObjectKey}`)} alt="Giấy tờ mặt trước" />
-                            <span>Giấy tờ mặt trước</span>
-                          </a>
-                          <a
-                            href={assetUrl(`/uploads/${selectedHouse.legalDocument.backImageObjectKey}`)}
-                            target="_blank"
-                            rel="noreferrer"
-                            className="admin-image-box"
-                          >
-                            <img src={assetUrl(`/uploads/${selectedHouse.legalDocument.backImageObjectKey}`)} alt="Giấy tờ mặt sau" />
-                            <span>Giấy tờ mặt sau</span>
-                          </a>
-                          {selectedHouse.legalDocument.extraImageObjectKey && (
-                            <a
-                              href={assetUrl(`/uploads/${selectedHouse.legalDocument.extraImageObjectKey}`)}
-                              target="_blank"
-                              rel="noreferrer"
-                              className="admin-image-box"
-                            >
-                              <img src={assetUrl(`/uploads/${selectedHouse.legalDocument.extraImageObjectKey}`)} alt="Giấy tờ khác" />
-                              <span>Giấy tờ khác</span>
-                            </a>
+                  <div className="admin-detail-split-grid">
+                    {/* Cột trái: Thông tin chi tiết & xử lý duyệt */}
+                    <div className="admin-detail-column-left">
+                      <div className="admin-detail-section">
+                        <h3 className="section-subtitle">Thông tin cơ bản</h3>
+                        <h2 className="property-title">{selectedHouse.name}</h2>
+                        
+                        <div className="admin-grid-details" style={{ marginTop: '16px' }}>
+                          <div className="admin-detail-item">
+                            <label><UserIcon /> Chủ trọ</label>
+                            <span>{selectedHouse.landlordName}</span>
+                            <span className="sub-text">{selectedHouse.landlordEmail}</span>
+                          </div>
+                          <div className="admin-detail-item">
+                            <label><MapPinIcon /> Địa chỉ hiển thị</label>
+                            <span>{selectedHouse.addressDisplay}</span>
+                          </div>
+                          <div className="admin-detail-item" style={{ gridColumn: 'span 2' }}>
+                            <label><MapPinIcon /> Địa chỉ chi tiết</label>
+                            <span>{selectedHouse.addressLine}</span>
+                          </div>
+                          <div className="admin-detail-item" style={{ gridColumn: 'span 2' }}>
+                            <label><DescriptionIcon /> Mô tả khu trọ</label>
+                            <span className="property-description">{selectedHouse.description || 'Chưa cung cấp mô tả.'}</span>
+                          </div>
+                          {selectedHouse.legalDocument && (
+                            <div className="admin-detail-item" style={{ gridColumn: 'span 2' }}>
+                              <label><LegalIcon /> Số giấy tờ pháp lý (CCCD / Giấy chứng nhận)</label>
+                              <span className="verified-citizen-id">
+                                {selectedHouse.legalDocument.documentNumberMasked}
+                              </span>
+                            </div>
                           )}
-                        </>
-                      )}
-                      {selectedHouse.images.map((image) => (
-                        <a
-                          key={image.id}
-                          href={assetUrl(image.imageUrl)}
-                          target="_blank"
-                          rel="noreferrer"
-                          className="admin-image-box"
-                        >
-                          <img src={assetUrl(image.imageUrl)} alt={image.isCover ? 'Ảnh bìa khu trọ' : image.caption || 'Ảnh chi tiết'} />
-                          <span>{image.isCover ? 'Ảnh bìa khu trọ' : image.caption || 'Ảnh chi tiết'}</span>
-                        </a>
-                      ))}
-                    </div>
-                  </div>
+                        </div>
+                      </div>
 
-                  {/* Action Approval */}
-                  <div className="admin-action-area">
-                    <textarea
-                      className="admin-reason-textarea"
-                      value={reason}
-                      onChange={(e) => setReason(e.target.value)}
-                      placeholder="Nhập lý do từ chối (bắt buộc nếu nhấn từ chối duyệt khu trọ)..."
-                    />
-                    <div className="admin-action-buttons">
-                      <Button type="button" disabled={isSubmitting} onClick={handleApprove}>
-                        Duyệt & Cho phép Hoạt động
-                      </Button>
-                      <Button type="button" variant="danger" disabled={isSubmitting} onClick={handleReject}>
-                        Từ chối duyệt
-                      </Button>
+                      {/* Tiện ích */}
+                      <div className="admin-detail-section" style={{ marginTop: '24px' }}>
+                        <h3 className="section-subtitle">Tiện ích khu trọ</h3>
+                        <div className="admin-amenities-tags">
+                          {selectedHouse.amenities.length === 0 ? (
+                            <span className="no-amenities-text">Chưa đăng ký tiện ích nào.</span>
+                          ) : (
+                            selectedHouse.amenities.map((a) => (
+                              <span key={a.id} className="badge badge-renter-tag">
+                                {a.name}
+                              </span>
+                            ))
+                          )}
+                        </div>
+                      </div>
+
+                      {/* Action Approval */}
+                      <div className="admin-action-area">
+                        <h3 className="section-subtitle">Quyết định phê duyệt</h3>
+                        <textarea
+                          className="admin-reason-textarea"
+                          value={reason}
+                          onChange={(e) => setReason(e.target.value)}
+                          placeholder="Nhập lý do từ chối (bắt buộc nếu nhấn từ chối duyệt khu trọ)..."
+                        />
+                        <div className="admin-action-buttons">
+                          <button
+                            type="button"
+                            className="admin-btn admin-btn--success"
+                            disabled={isSubmitting}
+                            onClick={handleApprove}
+                          >
+                            <CheckIcon />
+                            Duyệt & Cho phép Hoạt động
+                          </button>
+                          <button
+                            type="button"
+                            className="admin-btn admin-btn--danger"
+                            disabled={isSubmitting}
+                            onClick={handleReject}
+                          >
+                            <CloseIcon />
+                            Từ chối duyệt
+                          </button>
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* Cột phải: Tài liệu pháp lý & Ảnh chụp */}
+                    <div className="admin-detail-column-right">
+                      <div className="admin-detail-section">
+                        <h3 className="section-subtitle">Tài liệu pháp lý & Hình ảnh</h3>
+                        
+                        <div className="admin-media-grid-vertical">
+                          {selectedHouse.legalDocument && (
+                            <>
+                              <div className="media-container">
+                                <span className="media-label">Mặt trước Giấy tờ Pháp lý</span>
+                                <AdminImage
+                                  label="Mặt trước Giấy tờ Pháp lý"
+                                  src={assetUrl(`/uploads/${selectedHouse.legalDocument.frontImageObjectKey}`)}
+                                />
+                              </div>
+                              <div className="media-container">
+                                <span className="media-label">Mặt sau Giấy tờ Pháp lý</span>
+                                <AdminImage
+                                  label="Mặt sau Giấy tờ Pháp lý"
+                                  src={assetUrl(`/uploads/${selectedHouse.legalDocument.backImageObjectKey}`)}
+                                />
+                              </div>
+                              {selectedHouse.legalDocument.extraImageObjectKey && (
+                                <div className="media-container">
+                                  <span className="media-label">Tài liệu pháp lý bổ sung</span>
+                                  <AdminImage
+                                    label="Tài liệu bổ sung"
+                                    src={assetUrl(`/uploads/${selectedHouse.legalDocument.extraImageObjectKey}`)}
+                                  />
+                                </div>
+                              )}
+                            </>
+                          )}
+
+                          <div className="property-photos-gallery">
+                            <span className="media-label">Hình ảnh thực tế khu trọ</span>
+                            <div className="gallery-thumbnail-grid">
+                              {selectedHouse.images.map((image) => (
+                                <div key={image.id} className="gallery-thumbnail-item">
+                                  <AdminImage
+                                    label={image.isCover ? 'Ảnh bìa' : image.caption || 'Ảnh chi tiết'}
+                                    src={assetUrl(image.imageUrl)}
+                                  />
+                                </div>
+                              ))}
+                            </div>
+                          </div>
+                        </div>
+                      </div>
                     </div>
                   </div>
                 </div>
@@ -1120,9 +1320,8 @@ export function AdminHomePage() {
                               <td style={{ textAlign: 'right' }}>
                                 <button
                                   type="button"
-                                  className="pagination-btn"
+                                  className="admin-table-action-btn"
                                   onClick={() => void openHouse(item.id)}
-                                  style={{ padding: '6px 12px', fontSize: '0.8rem', backgroundColor: 'var(--admin-primary-color)', color: '#fff', border: 'none', cursor: 'pointer' }}
                                 >
                                   Xem chi tiết
                                 </button>

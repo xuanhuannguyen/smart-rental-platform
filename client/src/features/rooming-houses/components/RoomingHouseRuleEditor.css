@@ -1,108 +1,370 @@
 .rooming-house-rule-editor {
   display: grid;
-  gap: 14px;
+  gap: 20px;
 }
 
-.rooming-house-rule-editor__message,
 .rooming-house-rule-editor__note {
   margin: 0;
-  padding: 10px 14px;
-  border-radius: 6px;
+  padding: 12px 16px;
+  border-radius: 8px;
   font-size: 14px;
   line-height: 1.5;
-}
-
-.rooming-house-rule-editor__message {
-  background: #fef9c3;
-  color: #92400e;
-}
-
-.rooming-house-rule-editor__note {
   background: #f1f5f9;
   color: #475569;
 }
 
+/* Alert banner */
+.rooming-house-rule-editor__alert {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 14px 18px;
+  border-radius: 8px;
+  font-size: 14px;
+  line-height: 1.5;
+}
+
+.rooming-house-rule-editor__alert svg {
+  flex-shrink: 0;
+  width: 20px;
+  height: 20px;
+}
+
+.rooming-house-rule-editor__alert--warning {
+  background: #fffbeb;
+  color: #b45309;
+  border: 1px solid #fcd34d;
+}
+
+.rooming-house-rule-editor__alert--warning svg {
+  color: #d97706;
+}
+
+.rooming-house-rule-editor__alert--success {
+  background: #f0fdf4;
+  color: #166534;
+  border: 1px solid #bbf7d0;
+}
+
+.rooming-house-rule-editor__alert--success svg {
+  color: #15803d;
+}
+
+.rooming-house-rule-editor__alert--danger {
+  background: #fef2f2;
+  color: #991b1b;
+  border: 1px solid #fecaca;
+}
+
+.rooming-house-rule-editor__alert--danger svg {
+  color: #dc2626;
+}
+
+/* Tab Switcher */
 .rooming-house-rule-editor__mode {
   display: flex;
   flex-wrap: wrap;
   gap: 8px;
+  margin-bottom: 4px;
 }
 
 .rooming-house-rule-editor__mode button {
-  min-height: 38px;
-  padding: 8px 14px;
-  border: 1px solid #cbd5e1;
-  border-radius: 6px;
-  background: #f8fafc;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  min-height: 42px;
+  padding: 8px 16px;
+  border: 1px solid #e2e8f0;
+  border-radius: 8px;
+  background: #ffffff;
   color: #475569;
   font: inherit;
-  font-weight: 700;
+  font-weight: 500;
+  font-size: 14px;
   cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.rooming-house-rule-editor__mode button:hover {
+  background: #f8fafc;
+  border-color: #cbd5e1;
+  color: #0f172a;
 }
 
 .rooming-house-rule-editor__mode button.active {
-  border-color: #246bfe;
+  border-color: #3b82f6;
   background: #eff6ff;
-  color: #1d4ed8;
+  color: #2563eb;
+  font-weight: 600;
 }
 
-.rooming-house-rule-editor__pdf {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
+/* PDF Section */
+.rooming-house-rule-pdf-section {
+  display: grid;
   gap: 12px;
-  min-height: 48px;
 }
 
-.rooming-house-rule-editor__pdf p {
+.pdf-status-text {
   margin: 0;
   color: #64748b;
+  font-size: 14.5px;
 }
 
-.rooming-house-rule-editor__pdf a {
+.pdf-view-link {
+  color: #2563eb;
+  text-decoration: none;
+  font-weight: 600;
+  margin-left: 4px;
+  display: inline-flex;
+  align-items: center;
+  transition: color 0.15s ease;
+}
+
+.pdf-view-link:hover {
   color: #1d4ed8;
-  font-weight: 700;
+  text-decoration: underline;
 }
 
+/* Dropzone style */
+.pdf-upload-dropzone {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 24px;
+  border: 1px solid #e2e8f0;
+  border-radius: 12px;
+  background: #ffffff;
+  gap: 16px;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.02);
+  transition: border-color 0.2s, box-shadow 0.2s;
+}
+
+.pdf-upload-dropzone:hover {
+  border-color: #cbd5e1;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.03);
+}
+
+.pdf-upload-dropzone__left {
+  flex-shrink: 0;
+}
+
+.pdf-icon-wrapper {
+  width: 48px;
+  height: 48px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.pdf-upload-dropzone__middle {
+  flex: 1;
+}
+
+.pdf-upload-dropzone__middle h5 {
+  margin: 0;
+  font-size: 15px;
+  font-weight: 600;
+  color: #0f172a;
+}
+
+.pdf-upload-dropzone__middle p {
+  margin: 4px 0 0;
+  font-size: 13.5px;
+  color: #64748b;
+  line-height: 1.4;
+}
+
+.pdf-upload-dropzone__right {
+  flex-shrink: 0;
+}
+
+/* Choose File Button */
+.choose-file-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  min-height: 38px;
+  padding: 8px 18px;
+  border: 1px solid #3b82f6;
+  border-radius: 8px;
+  background: #ffffff;
+  color: #2563eb;
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.choose-file-btn:hover {
+  background: #eff6ff;
+  border-color: #2563eb;
+}
+
+.choose-file-btn--secondary {
+  border-color: #cbd5e1;
+  color: #475569;
+}
+
+.choose-file-btn--secondary:hover {
+  background: #f8fafc;
+  border-color: #94a3b8;
+  color: #0f172a;
+}
+
+/* Form inputs styling */
 .rooming-house-rule-editor__form {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 20px;
+}
+
+.rooming-house-rule-card {
+  background: #ffffff;
+  border: 1px solid #e2e8f0;
+  border-radius: 12px;
+  padding: 20px;
+  display: flex;
+  flex-direction: column;
   gap: 14px;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.02);
+  transition: all 0.2s ease;
 }
 
-.rooming-house-rule-editor__field {
-  display: grid;
-  gap: 6px;
+.rooming-house-rule-card:hover {
+  border-color: #cbd5e1;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.03);
 }
 
-.rooming-house-rule-editor__field span {
+.rooming-house-rule-card--full {
+  grid-column: span 2;
+}
+
+.rooming-house-rule-card__header {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.rooming-house-rule-card__icon {
+  display: flex;
+  align-items: center;
+  justify-content: center;
   color: #475569;
-  font-size: 13px;
-  font-weight: 700;
+  width: 32px;
+  height: 32px;
+  background: #f1f5f9;
+  border-radius: 8px;
+  padding: 6px;
 }
 
-.rooming-house-rule-editor__field textarea {
+.rooming-house-rule-card__icon svg {
+  width: 20px;
+  height: 20px;
+}
+
+.rooming-house-rule-card__title {
+  color: #1e293b;
+  font-size: 15px;
+  font-weight: 600;
+}
+
+.rooming-house-rule-card__body textarea {
   width: 100%;
-  min-height: 96px;
+  min-height: 110px;
   resize: vertical;
-  padding: 10px;
+  padding: 12px;
   border: 1px solid #cbd5e1;
-  border-radius: 6px;
+  border-radius: 8px;
   font: inherit;
-  line-height: 1.45;
+  font-size: 14px;
+  line-height: 1.5;
+  color: #334155;
+  background: #f8fafc;
+  transition: all 0.2s ease;
 }
 
+.rooming-house-rule-card__body textarea:focus {
+  border-color: #246bfe;
+  background: #ffffff;
+  outline: none;
+  box-shadow: 0 0 0 3px rgba(36, 107, 254, 0.08);
+}
+
+.rooming-house-rule-card__body textarea::placeholder {
+  color: #94a3b8;
+}
+
+/* Action button area */
 .rooming-house-rule-editor__actions {
   display: flex;
   justify-content: flex-end;
+  gap: 12px;
+  margin-top: 12px;
 }
 
-@media (max-width: 720px) {
+.rooming-house-rule-editor__preview-btn,
+.rooming-house-editor__primary.primary-action {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  min-height: 42px;
+  padding: 8px 20px;
+  font: inherit;
+  font-weight: 600;
+  font-size: 14px;
+  border-radius: 8px;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.rooming-house-rule-editor__preview-btn {
+  background: #ffffff;
+  border: 1px solid #cbd5e1;
+  color: #334155;
+}
+
+.rooming-house-rule-editor__preview-btn:hover:not(:disabled) {
+  background: #f8fafc;
+  border-color: #94a3b8;
+}
+
+.rooming-house-editor__primary.primary-action {
+  background: #2563eb !important;
+  border: 1px solid #2563eb !important;
+  color: #ffffff !important;
+  box-shadow: 0 2px 4px rgba(37, 99, 235, 0.15);
+}
+
+.rooming-house-editor__primary.primary-action:hover:not(:disabled) {
+  background: #1d4ed8 !important;
+  border-color: #1d4ed8 !important;
+}
+
+.rooming-house-rule-editor__preview-btn:disabled,
+.rooming-house-editor__primary.primary-action:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+  box-shadow: none;
+}
+
+@media (max-width: 768px) {
   .rooming-house-rule-editor__form {
     grid-template-columns: 1fr;
   }
+  
+  .rooming-house-rule-card--full {
+    grid-column: span 1;
+  }
 
   .rooming-house-rule-editor__actions {
-    justify-content: flex-start;
+    flex-direction: column;
+  }
+  
+  .rooming-house-rule-editor__preview-btn,
+  .rooming-house-editor__primary.primary-action {
+    width: 100%;
   }
 }

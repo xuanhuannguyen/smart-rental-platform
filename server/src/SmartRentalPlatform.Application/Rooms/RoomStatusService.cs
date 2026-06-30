@@ -1,4 +1,4 @@
-using Microsoft.EntityFrameworkCore;
+﻿using Microsoft.EntityFrameworkCore;
 using SmartRentalPlatform.Application.Common.Exceptions;
 using SmartRentalPlatform.Application.Common.Interfaces;
 using SmartRentalPlatform.Contracts.Common;
@@ -88,13 +88,6 @@ public class RoomStatusService : IRoomStatusService
 
         roomAccessService.EnsureRoomingHouseApproved(room.RoomingHouse);
 
-        if (room.Status == RoomStatus.Hidden)
-        {
-            throw new ConflictException(
-                ErrorCodes.RoomInvalidStatus,
-                "Phòng đang ẩn phải được gửi hiển thị trước khi thay đổi trạng thái vận hành.",
-                new { currentStatus = room.Status.ToString() });
-        }
 
         if (!Enum.TryParse<RoomStatus>(request.Status, ignoreCase: true, out var status))
         {
@@ -104,13 +97,8 @@ public class RoomStatusService : IRoomStatusService
                 new { field = nameof(request.Status) });
         }
 
-        if (status == RoomStatus.Hidden)
-        {
-            throw new ConflictException(
-                ErrorCodes.RoomInvalidStatus,
-                "Phòng đã hiển thị không thể chuyển lại sang trạng thái ẩn bằng API trạng thái.",
-                new { requestedStatus = request.Status });
-        }
+
+        EnsureAllowedManualTransition(room.Status, status);
 
         room.Status = status;
         room.UpdatedAt = DateTimeOffset.UtcNow;
@@ -119,4 +107,31 @@ public class RoomStatusService : IRoomStatusService
 
         return await roomQueryService.GetByIdAsync(landlordUserId, roomId, cancellationToken);
     }
+
+    private static void EnsureAllowedManualTransition(RoomStatus currentStatus, RoomStatus requestedStatus)
+    {
+        if (currentStatus == requestedStatus)
+        {
+            return;
+        }
+
+        var allowed =
+            currentStatus == RoomStatus.Available && requestedStatus == RoomStatus.Maintenance ||
+            currentStatus == RoomStatus.Maintenance && requestedStatus == RoomStatus.Available;
+
+        if (allowed)
+        {
+            return;
+        }
+
+        throw new ConflictException(
+            ErrorCodes.RoomInvalidStatus,
+            "Chỉ có thể chuyển phòng giữa trạng thái còn trống và tạm ngưng. Phòng ẩn phải được publish, phòng giữ chỗ hoặc đang thuê không thể đổi trạng thái thủ công.",
+            new
+            {
+                currentStatus = currentStatus.ToString(),
+                requestedStatus = requestedStatus.ToString()
+            });
+    }
 }
+

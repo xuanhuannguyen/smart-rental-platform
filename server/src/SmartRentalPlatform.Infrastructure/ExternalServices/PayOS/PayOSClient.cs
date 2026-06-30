@@ -4,6 +4,7 @@ using System.Text;
 using System.Text.Json;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
+using Microsoft.Extensions.Hosting;
 using SmartRentalPlatform.Application.Common.Interfaces;
 using SmartRentalPlatform.Infrastructure.Options;
 
@@ -21,15 +22,18 @@ public class PayOSClient : IPayOSClient
 
     private readonly IHttpClientFactory httpClientFactory;
     private readonly PayOSOptions options;
+    private readonly IHostEnvironment environment;
     private readonly ILogger<PayOSClient> logger;
 
     public PayOSClient(
         IHttpClientFactory httpClientFactory,
         IOptions<PayOSOptions> options,
+        IHostEnvironment environment,
         ILogger<PayOSClient> logger)
     {
         this.httpClientFactory = httpClientFactory;
         this.options = options.Value;
+        this.environment = environment;
         this.logger = logger;
     }
 
@@ -140,10 +144,11 @@ public class PayOSClient : IPayOSClient
 
     private bool IsDevelopmentMockMode()
     {
-        return IsMissingOrPlaceholder(options.ClientId)
+        return environment.IsDevelopment() &&
+            (IsMissingOrPlaceholder(options.ClientId)
             || IsMissingOrPlaceholder(options.ApiKey)
             || IsMissingOrPlaceholder(options.ChecksumKey)
-            || IsMissingOrPlaceholder(options.BaseUrl);
+            || IsMissingOrPlaceholder(options.BaseUrl));
     }
 
     private static bool IsMissingOrPlaceholder(string? value)

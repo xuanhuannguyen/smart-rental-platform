@@ -26,8 +26,6 @@ public class InvoiceConfiguration : IEntityTypeConfiguration<Invoice>
         builder.Property(x => x.ServiceAmount).HasColumnName("service_amount").HasPrecision(12, 2).IsRequired();
         builder.Property(x => x.DiscountAmount).HasColumnName("discount_amount").HasPrecision(12, 2).IsRequired();
         builder.Property(x => x.TotalAmount).HasColumnName("total_amount").HasPrecision(12, 2).IsRequired();
-        builder.Property(x => x.PaidAmount).HasColumnName("paid_amount").HasPrecision(12, 2).IsRequired();
-        builder.Property(x => x.RemainingAmount).HasColumnName("remaining_amount").HasPrecision(12, 2).IsRequired();
         builder.Property(x => x.Status).HasColumnName("status").HasConversion<string>().HasMaxLength(30)
             .HasDefaultValue(InvoiceStatus.Draft)
             .IsRequired();
@@ -36,13 +34,16 @@ public class InvoiceConfiguration : IEntityTypeConfiguration<Invoice>
         builder.Property(x => x.PaidAt).HasColumnName("paid_at");
         builder.Property(x => x.CancelledAt).HasColumnName("cancelled_at");
         builder.Property(x => x.CancelReason).HasColumnName("cancel_reason").HasColumnType("text");
+        builder.Property(x => x.WalletTransferGroupId).HasColumnName("wallet_transfer_group_id");
         builder.Property(x => x.CreatedAt).HasColumnName("created_at").IsRequired();
         builder.Property(x => x.UpdatedAt).HasColumnName("updated_at").IsRequired();
 
         builder.HasIndex(x => x.InvoiceNo).IsUnique();
-        builder.HasIndex(x => new { x.ContractId, x.BillingPeriodStart, x.BillingPeriodEnd }).IsUnique();
+        builder.HasIndex(x => new { x.ContractId, x.BillingPeriodStart, x.BillingPeriodEnd })
+            .IsUnique()
+            .HasFilter("\"status\" <> 'Cancelled'");
 
-        builder.HasOne(x => x.Contract).WithMany(x => x.Invoices).HasForeignKey(x => x.ContractId).OnDelete(DeleteBehavior.Restrict);
+        builder.HasOne(x => x.RentalContract).WithMany().HasForeignKey(x => x.ContractId).OnDelete(DeleteBehavior.Restrict);
         builder.HasOne(x => x.Room).WithMany().HasForeignKey(x => x.RoomId).OnDelete(DeleteBehavior.Restrict);
         builder.HasOne(x => x.Tenant).WithMany().HasForeignKey(x => x.TenantUserId).OnDelete(DeleteBehavior.Restrict);
         builder.HasOne(x => x.Landlord).WithMany().HasForeignKey(x => x.LandlordUserId).OnDelete(DeleteBehavior.Restrict);

@@ -15,17 +15,20 @@ public class KycService : IKycService
     private readonly IPrivateStorageService _storage;
     private readonly IVnptEkycClient _vnptEkycClient;
     private readonly IHashService _hashService;
+    private readonly ISensitiveDataProtector _sensitiveDataProtector;
 
     public KycService(
         IAppDbContext context,
         IPrivateStorageService storage,
         IVnptEkycClient vnptEkycClient,
-        IHashService hashService)
+        IHashService hashService,
+        ISensitiveDataProtector sensitiveDataProtector)
     {
         _context = context;
         _storage = storage;
         _vnptEkycClient = vnptEkycClient;
         _hashService = hashService;
+        _sensitiveDataProtector = sensitiveDataProtector;
     }
 
     public async Task<KycSubmissionResponse> SubmitAsync(
@@ -93,10 +96,12 @@ public class KycService : IKycService
 
         string? ocrCitizenIdMasked = null;
         string? citizenIdHash = null;
+        string? documentNumberEncrypted = null;
         if (!string.IsNullOrWhiteSpace(ekyc.OcrCitizenId))
         {
             ocrCitizenIdMasked = MaskCitizenId(ekyc.OcrCitizenId);
             citizenIdHash = _hashService.HashSha256Hex(ekyc.OcrCitizenId);
+            documentNumberEncrypted = _sensitiveDataProtector.Encrypt(ekyc.OcrCitizenId);
 
             var duplicate = await _context.KycVerifications
                 .AsNoTracking()
@@ -132,6 +137,7 @@ public class KycService : IKycService
             OcrFullName = ekyc.OcrFullName,
             OcrCitizenIdMasked = ocrCitizenIdMasked,
             CitizenIdHash = citizenIdHash ?? string.Empty,
+            DocumentNumberEncrypted = documentNumberEncrypted,
             OcrDateOfBirth = ekyc.OcrDateOfBirth.HasValue
                 ? DateOnly.FromDateTime(ekyc.OcrDateOfBirth.Value)
                 : null,

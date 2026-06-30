@@ -1,10 +1,10 @@
 using Microsoft.EntityFrameworkCore;
 using SmartRentalPlatform.Application.Common.Interfaces;
 using SmartRentalPlatform.Domain.Entities.Billing;
-using SmartRentalPlatform.Domain.Entities.Leasing;
 using SmartRentalPlatform.Domain.Entities.Payments;
 using SmartRentalPlatform.Domain.Entities.Properties;
 using SmartRentalPlatform.Domain.Entities.Users;
+
 using SmartRentalPlatform.Domain.Enums;
 using SmartRentalPlatform.Domain.Enums.Billing;
 using SmartRentalPlatform.Domain.Enums.Payments;
@@ -15,17 +15,17 @@ namespace SmartRentalPlatform.Infrastructure.Persistence.Seed;
 public static class DevelopmentDataSeed
 {
     public const string AdminEmail = "admin.demo@example.com";
-    public const string TenantEmail = "tenant.demo@example.com";
-    public const string LandlordEmail = "landlord.demo@example.com";
+    public const string TenantEmail = "tenant.demo@example.com"; // "tenant.demo@example.com";
+    public const string LandlordEmail = "landlord.demo@example.com"; // "landlord.demo@example.com";
+    public const string CoTenantEmail = "cotenant.demo@example.com";
     public const string DemoPassword = "Demo@123456";
 
     private static readonly Guid AdminUserId = Guid.Parse("10000000-0000-0000-0000-000000000099");
     private static readonly Guid TenantUserId = Guid.Parse("10000000-0000-0000-0000-000000000001");
     private static readonly Guid LandlordUserId = Guid.Parse("10000000-0000-0000-0000-000000000002");
+    private static readonly Guid CoTenantUserId = Guid.Parse("10000000-0000-0000-0000-000000000003");
+    private static readonly Guid DummyLandlordUserId = Guid.Parse("10000000-0000-0000-0000-000000009999");
     private static readonly Guid TenantApprovedKycId = Guid.Parse("50000000-0000-0000-0000-000000000001");
-    private static readonly Guid TenantLinhUserId = Guid.Parse("10000000-0000-0000-0000-000000000003");
-    private static readonly Guid TenantMinhUserId = Guid.Parse("10000000-0000-0000-0000-000000000004");
-    private static readonly Guid LandlordMaiUserId = Guid.Parse("10000000-0000-0000-0000-000000000005");
     private static readonly Guid ApprovedHouseId = Guid.Parse("20000000-0000-0000-0000-000000000001");
     private static readonly Guid DraftHouseId = Guid.Parse("20000000-0000-0000-0000-000000000002");
     private static readonly Guid SunriseHouseId = Guid.Parse("20000000-0000-0000-0000-000000000003");
@@ -51,6 +51,10 @@ public static class DevelopmentDataSeed
     private static readonly Guid TenantLinhWalletAccountId = Guid.Parse("70000000-0000-0000-0000-000000000003");
     private static readonly Guid TenantMinhWalletAccountId = Guid.Parse("70000000-0000-0000-0000-000000000004");
     private static readonly Guid LandlordMaiWalletAccountId = Guid.Parse("70000000-0000-0000-0000-000000000005");
+    private static readonly Guid ElectricServiceTypeId = Guid.Parse("80000000-0000-0000-0000-000000000001");
+    private static readonly Guid WaterServiceTypeId = Guid.Parse("80000000-0000-0000-0000-000000000002");
+    private static readonly Guid InternetServiceTypeId = Guid.Parse("80000000-0000-0000-0000-000000000003");
+    private static readonly Guid TrashServiceTypeId = Guid.Parse("80000000-0000-0000-0000-000000000004");
     private static readonly DateTimeOffset SeededAt = new(2026, 1, 1, 0, 0, 0, TimeSpan.Zero);
 
     public static async Task SeedAsync(
@@ -65,10 +69,13 @@ public static class DevelopmentDataSeed
         }
 
         await SeedUsersAsync(context, passwordService, cancellationToken);
+        await SeedApprovedKycAsync(context, cancellationToken);
+        await SeedBillingServiceTypesAsync(context, cancellationToken);
         await SeedRoomingHousesAsync(context, location, cancellationToken);
         await SeedRoomsAsync(context, cancellationToken);
-        await SeedAdditionalRoomsAsync(context, cancellationToken);
-        await SeedBillingAsync(context, cancellationToken);
+        await LargeScaleRoomingHouseSeeder.SeedAsync(context, cancellationToken);
+        // await SeedAdditionalRoomsAsync(context, cancellationToken);
+        // await SeedBillingAsync(context, cancellationToken);
     }
 
     public static async Task SeedAdminAsync(
@@ -206,6 +213,18 @@ public static class DevelopmentDataSeed
         IPasswordService passwordService,
         CancellationToken cancellationToken)
     {
+        if (!await context.Users.AnyAsync(x => x.NormalizedEmail == CoTenantEmail.ToUpperInvariant(), cancellationToken))
+        {
+            context.Users.Add(CreateUser(CoTenantUserId, CoTenantEmail, "Lê CoTenant Demo", passwordService));
+            context.UserProfiles.Add(CreateProfile(CoTenantUserId, "Lê CoTenant Demo"));
+            context.UserRoles.Add(new UserRole
+            {
+                UserId = CoTenantUserId,
+                RoleId = RoleSeed.TenantRoleId,
+                CreatedAt = SeededAt
+            });
+        }
+
         if (!await context.Users.AnyAsync(x => x.NormalizedEmail == TenantEmail.ToUpperInvariant(), cancellationToken))
         {
             context.Users.Add(CreateUser(TenantUserId, TenantEmail, "Nguyễn Tenant Demo", passwordService));
@@ -230,58 +249,192 @@ public static class DevelopmentDataSeed
             });
         }
 
-        await SeedDemoUserAsync(
-            context,
-            passwordService,
-            TenantLinhUserId,
-            "linh.tenant.demo@example.com",
-            "Pham Linh",
-            RoleSeed.TenantRoleId,
-            cancellationToken);
+        if (!await context.Users.AnyAsync(x => x.Id == DummyLandlordUserId, cancellationToken))
+        {
+            context.Users.Add(CreateUser(DummyLandlordUserId, "landlord.mock@example.com", "Chủ trọ Mock", passwordService));
+            context.UserProfiles.Add(CreateProfile(DummyLandlordUserId, "Chủ trọ Mock"));
+            context.UserRoles.Add(new UserRole
+            {
+                UserId = DummyLandlordUserId,
+                RoleId = RoleSeed.LandlordRoleId,
+                CreatedAt = SeededAt
+            });
+        }
 
-        await SeedDemoUserAsync(
-            context,
-            passwordService,
-            TenantMinhUserId,
-            "minh.tenant.demo@example.com",
-            "Le Minh",
-            RoleSeed.TenantRoleId,
-            cancellationToken);
+        // await SeedDemoUserAsync(
+        //     context,
+        //     passwordService,
+        //     TenantLinhUserId,
+        //     "linh.tenant.demo@example.com",
+        //     "Pham Linh",
+        //     RoleSeed.TenantRoleId,
+        //     cancellationToken);
 
-        await SeedDemoUserAsync(
-            context,
-            passwordService,
-            LandlordMaiUserId,
-            "mai.landlord.demo@example.com",
-            "Hoang Mai",
-            RoleSeed.LandlordRoleId,
-            cancellationToken);
+        // await SeedDemoUserAsync(
+        //     context,
+        //     passwordService,
+        //     TenantMinhUserId,
+        //     "minh.tenant.demo@example.com",
+        //     "Le Minh",
+        //     RoleSeed.TenantRoleId,
+        //     cancellationToken);
+
+        // await SeedDemoUserAsync(
+        //     context,
+        //     passwordService,
+        //     LandlordMaiUserId,
+        //     "mai.landlord.demo@example.com",
+        //     "Hoang Mai",
+        //     RoleSeed.LandlordRoleId,
+        //     cancellationToken);
 
         await context.SaveChangesAsync(cancellationToken);
     }
 
-    private static async Task SeedDemoUserAsync(
-        AppDbContext context,
-        IPasswordService passwordService,
-        Guid userId,
-        string email,
-        string displayName,
-        int roleId,
-        CancellationToken cancellationToken)
+    private static async Task SeedBillingServiceTypesAsync(AppDbContext context, CancellationToken cancellationToken)
     {
-        if (await context.Users.AnyAsync(x => x.NormalizedEmail == email.ToUpperInvariant(), cancellationToken))
+        var now = DateTimeOffset.UtcNow;
+        var serviceTypes = new[]
         {
-            return;
+            new BillingServiceType
+            {
+                Id = ElectricServiceTypeId,
+                Name = "Điện",
+                SupportsMeterReading = true,
+                MeterUnitName = "kWh",
+                IsActive = true,
+                CreatedAt = now
+            },
+            new BillingServiceType
+            {
+                Id = WaterServiceTypeId,
+                Name = "Nước",
+                SupportsMeterReading = true,
+                MeterUnitName = "m3",
+                IsActive = true,
+                CreatedAt = now
+            },
+            new BillingServiceType
+            {
+                Id = InternetServiceTypeId,
+                Name = "Internet",
+                SupportsMeterReading = false,
+                MeterUnitName = null,
+                IsActive = true,
+                CreatedAt = now
+            },
+            new BillingServiceType
+            {
+                Id = TrashServiceTypeId,
+                Name = "Rác",
+                SupportsMeterReading = false,
+                MeterUnitName = null,
+                IsActive = true,
+                CreatedAt = now
+            }
+        };
+
+        var legacyInternetServiceName = "Wifi";
+        var serviceTypeNames = serviceTypes
+            .Select(x => x.Name)
+            .Append(legacyInternetServiceName)
+            .ToArray();
+        var existingServiceTypes = await context.BillingServiceTypes
+            .Where(x => serviceTypeNames.Contains(x.Name))
+            .ToListAsync(cancellationToken);
+
+        foreach (var serviceType in serviceTypes)
+        {
+            var existingServiceType = existingServiceTypes
+                .FirstOrDefault(x => x.Name == serviceType.Name);
+
+            if (serviceType.Id == InternetServiceTypeId && existingServiceType is null)
+            {
+                existingServiceType = existingServiceTypes
+                    .FirstOrDefault(x => x.Name == legacyInternetServiceName);
+            }
+
+            if (existingServiceType is null)
+            {
+                context.BillingServiceTypes.Add(serviceType);
+                continue;
+            }
+
+            existingServiceType.SupportsMeterReading = serviceType.SupportsMeterReading;
+            existingServiceType.MeterUnitName = serviceType.MeterUnitName;
+            existingServiceType.IsActive = serviceType.IsActive;
+
+            if (existingServiceType.Name == legacyInternetServiceName)
+            {
+                existingServiceType.Name = serviceType.Name;
+            }
         }
 
-        context.Users.Add(CreateUser(userId, email, displayName, passwordService));
-        context.UserProfiles.Add(CreateProfile(userId, displayName));
-        context.UserRoles.Add(new UserRole
+        await context.SaveChangesAsync(cancellationToken);
+    }
+
+    private static async Task SeedApprovedKycAsync(AppDbContext context, CancellationToken cancellationToken)
+    {
+        if (!await context.KycVerifications.AnyAsync(
+                x => x.UserId == TenantUserId && x.Status == KycVerificationStatus.Approved,
+                cancellationToken))
         {
+            context.KycVerifications.Add(CreateApprovedKyc(
+                Guid.Parse("60000000-0000-0000-0000-000000000001"),
+                TenantUserId,
+                "Nguyễn Tenant Demo",
+                "********901",
+                "demo-tenant-citizen-id-hash",
+                new DateOnly(2000, 1, 1)));
+        }
+
+        if (!await context.KycVerifications.AnyAsync(
+                x => x.UserId == CoTenantUserId && x.Status == KycVerificationStatus.Approved,
+                cancellationToken))
+        {
+            context.KycVerifications.Add(CreateApprovedKyc(
+                Guid.Parse("60000000-0000-0000-0000-000000000002"),
+                CoTenantUserId,
+                "Lê CoTenant Demo",
+                "********902",
+                "demo-cotenant-citizen-id-hash",
+                new DateOnly(2001, 2, 2)));
+        }
+
+        await context.SaveChangesAsync(cancellationToken);
+    }
+
+    private static KycVerification CreateApprovedKyc(
+        Guid id,
+        Guid userId,
+        string fullName,
+        string citizenIdMasked,
+        string citizenIdHash,
+        DateOnly dateOfBirth)
+    {
+        return new KycVerification
+        {
+            Id = id,
             UserId = userId,
-            RoleId = roleId,
-            CreatedAt = SeededAt
-        });
+            DocumentType = KycDocumentType.CCCD,
+            EkycProvider = EkycProvider.VNPT,
+            FrontImageObjectKey = $"demo/kyc/{userId}/front.jpg",
+            BackImageObjectKey = $"demo/kyc/{userId}/back.jpg",
+            SelfieImageObjectKey = $"demo/kyc/{userId}/selfie.jpg",
+            OcrFullName = fullName,
+            OcrCitizenIdMasked = citizenIdMasked,
+            CitizenIdHash = citizenIdHash,
+            OcrDateOfBirth = dateOfBirth,
+            OcrGender = "Male",
+            OcrAddress = "TP. Hồ Chí Minh",
+            EkycResult = EkycResult.Passed,
+            RiskLevel = KycRiskLevel.Low,
+            Status = KycVerificationStatus.Approved,
+            SubmittedAt = SeededAt,
+            ReviewedAt = SeededAt,
+            CreatedAt = SeededAt,
+            UpdatedAt = SeededAt
+        };
     }
 
     private static async Task SeedRoomingHousesAsync(
@@ -301,8 +454,8 @@ public static class DevelopmentDataSeed
                 ProvinceCode = location.ProvinceCode,
                 WardCode = location.WardCode,
                 AddressDisplay = $"123 Nguyễn Văn Cừ, {location.WardName}, {location.ProvinceName}",
-                Latitude = 10.762622m,
-                Longitude = 106.660172m,
+                Latitude = 15.975400m,
+                Longitude = 108.263800m,
                 ApprovalStatus = RoomingHouseApprovalStatus.Approved,
                 VisibilityStatus = RoomingHouseVisibilityStatus.Visible,
                 ReviewedAt = SeededAt,
@@ -340,6 +493,24 @@ public static class DevelopmentDataSeed
                 CreatedAt = SeededAt,
                 UpdatedAt = SeededAt
             });
+        } 
+
+        if (!await context.RentalPolicies.AnyAsync(x => x.RoomingHouseId == ApprovedHouseId, cancellationToken))
+        {
+            context.RentalPolicies.Add(new RentalPolicy
+            {
+                Id = Guid.Parse("50000000-0000-0000-0000-000000000001"),
+                RoomingHouseId = ApprovedHouseId,
+                MinRentalMonths = 3,
+                MaxRentalMonths = 12,
+                AllowShortTermRenewal = true,
+                RenewalNoticeDays = 30,
+                DepositMonths = 1m,
+                DefaultPaymentDay = 5,
+                IsActive = true,
+                CreatedAt = SeededAt,
+                UpdatedAt = SeededAt
+            });
         }
 
         if (!await context.RoomingHouses.AnyAsync(x => x.Id == DraftHouseId, cancellationToken))
@@ -347,7 +518,7 @@ public static class DevelopmentDataSeed
             context.RoomingHouses.Add(new RoomingHouse
             {
                 Id = DraftHouseId,
-                LandlordUserId = LandlordUserId,
+                LandlordUserId = DummyLandlordUserId,
                 Name = "Nhà trọ Minh Anh",
                 Description = "Bản nháp dùng để test chỉnh sửa khu trọ.",
                 AddressLine = "45 Lê Lợi",
@@ -366,15 +537,15 @@ public static class DevelopmentDataSeed
             location,
             SunriseHouseId,
             LandlordUserId,
-            "Sunrise Mini House",
-            "Can ho mini moi, gan khu cong nghe va sieu thi, phu hop sinh vien va nhan vien van phong.",
+            "Nhà trọ Sunrise",
+            "Nhà trọ mini mới, gần khu công nghệ và siêu thị, phù hợp sinh viên và nhân viên văn phòng.",
             "88 Duong So 7",
-            10.841021m,
-            106.809847m,
+            15.980000m,
+            108.265000m,
             RoomingHouseApprovalStatus.Approved,
             RoomingHouseVisibilityStatus.Visible,
             "demo/houses/sunrise/cover.jpg",
-            "Mat tien Sunrise Mini House",
+            "Mặt tiền Nhà trọ Sunrise",
             cancellationToken,
             AmenitySeed.WifiId,
             AmenitySeed.ParkingId,
@@ -385,16 +556,16 @@ public static class DevelopmentDataSeed
             context,
             location,
             GreenViewHouseId,
-            LandlordMaiUserId,
-            "Green View Residence",
-            "Khu tro yen tinh, co ban cong, may giat chung va khu de xe rieng.",
+            LandlordUserId,
+            "Nhà trọ Green View",
+            "Khu trọ yên tĩnh, có ban công, máy giặt chung và khu để xe riêng.",
             "12 Pham Van Dong",
-            10.821903m,
-            106.682179m,
+            15.972000m,
+            108.260000m,
             RoomingHouseApprovalStatus.Approved,
             RoomingHouseVisibilityStatus.Visible,
             "demo/houses/green-view/cover.jpg",
-            "Khong gian chung Green View Residence",
+            "Không gian chung Nhà trọ Green View",
             cancellationToken,
             AmenitySeed.WifiId,
             AmenitySeed.WashingMachineId,
@@ -405,16 +576,16 @@ public static class DevelopmentDataSeed
             context,
             location,
             PendingHouseId,
-            LandlordMaiUserId,
-            "Garden House Pending",
-            "Ho so nha tro dang cho admin duyet, dung de test luong kiem duyet.",
+            DummyLandlordUserId,
+            "Nhà trọ Garden Pending",
+            "Hồ sơ nhà trọ đang chờ admin duyệt, dùng để test luồng kiểm duyệt.",
             "36 Nguyen Huu Tho",
-            10.732681m,
-            106.702184m,
+            15.982000m,
+            108.268000m,
             RoomingHouseApprovalStatus.Pending,
             RoomingHouseVisibilityStatus.Hidden,
             "demo/houses/garden-pending/cover.jpg",
-            "Anh tong quan Garden House Pending",
+            "Ảnh tổng quan Nhà trọ Garden Pending",
             cancellationToken,
             AmenitySeed.WifiId,
             AmenitySeed.PrivateBathroomId);
@@ -423,16 +594,16 @@ public static class DevelopmentDataSeed
             context,
             location,
             RejectedHouseId,
-            LandlordUserId,
-            "Old Town Rooms",
-            "Ho so bi tu choi de test man hinh ly do va gui lai ho so.",
+            DummyLandlordUserId,
+            "Nhà trọ Old Town",
+            "Hồ sơ bị từ chối để test màn hình lý do và gửi lại hồ sơ.",
             "7 Tran Hung Dao",
-            10.776901m,
-            106.700914m,
+            15.970000m,
+            108.258000m,
             RoomingHouseApprovalStatus.Rejected,
             RoomingHouseVisibilityStatus.Hidden,
             "demo/houses/old-town/cover.jpg",
-            "Anh hien trang Old Town Rooms",
+            "Ảnh hiện trạng Nhà trọ Old Town",
             cancellationToken,
             AmenitySeed.WifiId,
             AmenitySeed.ParkingId);
@@ -457,8 +628,18 @@ public static class DevelopmentDataSeed
         CancellationToken cancellationToken,
         params int[] amenityIds)
     {
-        if (await context.RoomingHouses.AnyAsync(x => x.Id == roomingHouseId, cancellationToken))
+        var existing = await context.RoomingHouses.FirstOrDefaultAsync(x => x.Id == roomingHouseId, cancellationToken);
+        if (existing is not null)
         {
+            existing.Name = name;
+            existing.Description = description;
+
+            var coverImage = await context.PropertyImages
+                .FirstOrDefaultAsync(x => x.RoomingHouseId == roomingHouseId && x.IsCover, cancellationToken);
+            if (coverImage is not null)
+            {
+                coverImage.Caption = coverCaption;
+            }
             return;
         }
 
@@ -509,12 +690,13 @@ public static class DevelopmentDataSeed
     {
         if (await context.Rooms.AnyAsync(x => x.RoomingHouseId == ApprovedHouseId, cancellationToken))
         {
+            await EnsureSeedRoomPricingAsync(context, cancellationToken);
             return;
         }
 
         var rooms = new[]
         {
-            CreateRoom(Room101Id, "101", 1, 18m, 2, RoomStatus.Available),
+            CreateRoom(Room101Id, "101", 1, 18m, 3, RoomStatus.Available),
             CreateRoom(Room102Id, "102", 1, 20m, 2, RoomStatus.Occupied),
             CreateRoom(Room201Id, "201", 2, 24m, 3, RoomStatus.Hidden)
         };
@@ -533,6 +715,7 @@ public static class DevelopmentDataSeed
         context.RoomPriceTiers.AddRange(
             CreatePriceTier(Room101Id, 1, 2500000m),
             CreatePriceTier(Room101Id, 2, 3000000m),
+            CreatePriceTier(Room101Id, 3, 3500000m),
             CreatePriceTier(Room102Id, 1, 2800000m),
             CreatePriceTier(Room102Id, 2, 3300000m),
             CreatePriceTier(Room201Id, 1, 3500000m),
@@ -547,248 +730,28 @@ public static class DevelopmentDataSeed
         await context.SaveChangesAsync(cancellationToken);
     }
 
-    private static async Task SeedAdditionalRoomsAsync(AppDbContext context, CancellationToken cancellationToken)
+    private static async Task EnsureSeedRoomPricingAsync(AppDbContext context, CancellationToken cancellationToken)
     {
-        var rooms = new[]
-        {
-            CreateRoom(ApprovedHouseId, Room202Id, "202", 2, 22m, 2, RoomStatus.Maintenance),
-            CreateRoom(ApprovedHouseId, Room301Id, "301", 3, 28m, 4, RoomStatus.Available),
-            CreateRoom(SunriseHouseId, SunriseRoomA1Id, "A1", 1, 19m, 2, RoomStatus.Available),
-            CreateRoom(SunriseHouseId, SunriseRoomA2Id, "A2", 1, 21m, 2, RoomStatus.Reserved),
-            CreateRoom(SunriseHouseId, SunriseRoomB1Id, "B1", 2, 26m, 3, RoomStatus.Occupied),
-            CreateRoom(GreenViewHouseId, GreenViewRoom101Id, "GV-101", 1, 23m, 2, RoomStatus.Available),
-            CreateRoom(GreenViewHouseId, GreenViewRoom102Id, "GV-102", 1, 25m, 3, RoomStatus.Occupied),
-            CreateRoom(PendingHouseId, PendingRoomG1Id, "G1", 1, 18m, 2, RoomStatus.Hidden)
-        };
-
-        var roomIds = rooms.Select(x => x.Id).ToArray();
-        var existingRoomIds = await context.Rooms
-            .Where(x => roomIds.Contains(x.Id))
-            .Select(x => x.Id)
+        var seededRooms = await context.Rooms
+            .Where(x => x.Id == Room101Id || x.Id == Room102Id || x.Id == Room201Id)
             .ToListAsync(cancellationToken);
 
-        var newRooms = rooms.Where(x => !existingRoomIds.Contains(x.Id)).ToArray();
-        if (newRooms.Length == 0)
+        foreach (var room in seededRooms)
         {
-            return;
+            room.IsTieredPricing = true;
+            room.UpdatedAt = DateTimeOffset.UtcNow;
         }
 
-        context.Rooms.AddRange(newRooms);
-
-        foreach (var room in newRooms)
+        var room101 = seededRooms.FirstOrDefault(x => x.Id == Room101Id);
+        if (room101 is not null && room101.MaxOccupants < 3)
         {
-            AddRoomMockDetails(context, room);
+            room101.MaxOccupants = 3;
         }
 
-        await context.SaveChangesAsync(cancellationToken);
-    }
-
-    private static async Task SeedBillingAsync(AppDbContext context, CancellationToken cancellationToken)
-    {
-        if (!await context.Contracts.AnyAsync(x => x.Id == ActiveContractId, cancellationToken))
+        if (seededRooms.Count > 0)
         {
-            context.Contracts.Add(new Contract
-            {
-                Id = ActiveContractId,
-                RoomId = Room102Id,
-                MainTenantUserId = TenantUserId,
-                ContractNumber = "HD-DEMO-0001",
-                StartDate = new DateOnly(2026, 1, 1),
-                EndDate = new DateOnly(2026, 12, 31),
-                MonthlyRent = 2800000m,
-                DepositAmount = 2800000m,
-                PaymentDay = 5,
-                Status = ContractStatus.Active,
-                RoomSnapshot = "{\"roomNumber\":\"102\"}",
-                ActivatedAt = SeededAt,
-                CreatedAt = SeededAt
-            });
+            await context.SaveChangesAsync(cancellationToken);
         }
-
-        if (!await context.WalletAccounts.AnyAsync(x => x.Id == TenantWalletAccountId, cancellationToken))
-        {
-            context.WalletAccounts.Add(new WalletAccount
-            {
-                Id = TenantWalletAccountId,
-                UserId = TenantUserId,
-                Balance = 10000000m,
-                ReservedBalance = 0,
-                Currency = "VND",
-                Status = WalletAccountStatus.Active
-            });
-        }
-
-        if (!await context.WalletAccounts.AnyAsync(x => x.Id == LandlordWalletAccountId, cancellationToken))
-        {
-            context.WalletAccounts.Add(new WalletAccount
-            {
-                Id = LandlordWalletAccountId,
-                UserId = LandlordUserId,
-                Balance = 0,
-                ReservedBalance = 0,
-                Currency = "VND",
-                Status = WalletAccountStatus.Active
-            });
-        }
-
-        await SeedWalletAccountAsync(context, TenantLinhWalletAccountId, TenantLinhUserId, 6500000m, cancellationToken);
-        await SeedWalletAccountAsync(context, TenantMinhWalletAccountId, TenantMinhUserId, 2500000m, cancellationToken);
-        await SeedWalletAccountAsync(context, LandlordMaiWalletAccountId, LandlordMaiUserId, 1200000m, cancellationToken);
-
-        await SeedContractAsync(
-            context,
-            LinhContractId,
-            SunriseRoomB1Id,
-            TenantLinhUserId,
-            "HD-DEMO-0002",
-            new DateOnly(2026, 2, 1),
-            new DateOnly(2027, 1, 31),
-            3960000m,
-            3960000m,
-            10,
-            ContractStatus.Active,
-            cancellationToken);
-
-        await SeedContractAsync(
-            context,
-            MinhEndedContractId,
-            GreenViewRoom102Id,
-            TenantMinhUserId,
-            "HD-DEMO-0003",
-            new DateOnly(2025, 6, 1),
-            new DateOnly(2026, 5, 31),
-            4525000m,
-            4525000m,
-            15,
-            ContractStatus.Ended,
-            cancellationToken);
-
-        await SeedServicePriceAsync(context, BillingServiceCode.Electric, BillingMethod.Metered, "kWh", 4000m, cancellationToken);
-        await SeedServicePriceAsync(context, BillingServiceCode.Water, BillingMethod.Metered, "m3", 18000m, cancellationToken);
-        await SeedServicePriceAsync(context, BillingServiceCode.Wifi, BillingMethod.Fixed, "month", 100000m, cancellationToken);
-        await SeedServicePriceAsync(context, BillingServiceCode.Trash, BillingMethod.Fixed, "month", 50000m, cancellationToken);
-
-        await SeedServicePriceAsync(context, SunriseHouseId, BillingServiceCode.Electric, BillingMethod.Metered, "kWh", 4200m, cancellationToken);
-        await SeedServicePriceAsync(context, SunriseHouseId, BillingServiceCode.Water, BillingMethod.Metered, "m3", 20000m, cancellationToken);
-        await SeedServicePriceAsync(context, SunriseHouseId, BillingServiceCode.Wifi, BillingMethod.Fixed, "month", 90000m, cancellationToken);
-        await SeedServicePriceAsync(context, GreenViewHouseId, BillingServiceCode.Electric, BillingMethod.Metered, "kWh", 3900m, cancellationToken);
-        await SeedServicePriceAsync(context, GreenViewHouseId, BillingServiceCode.Water, BillingMethod.Metered, "m3", 17000m, cancellationToken);
-        await SeedServicePriceAsync(context, GreenViewHouseId, BillingServiceCode.Trash, BillingMethod.Fixed, "month", 60000m, cancellationToken);
-
-        await context.SaveChangesAsync(cancellationToken);
-    }
-
-    private static async Task SeedWalletAccountAsync(
-        AppDbContext context,
-        Guid walletAccountId,
-        Guid userId,
-        decimal balance,
-        CancellationToken cancellationToken)
-    {
-        if (await context.WalletAccounts.AnyAsync(x => x.Id == walletAccountId, cancellationToken))
-        {
-            return;
-        }
-
-        context.WalletAccounts.Add(new WalletAccount
-        {
-            Id = walletAccountId,
-            UserId = userId,
-            Balance = balance,
-            ReservedBalance = 0,
-            Currency = "VND",
-            Status = WalletAccountStatus.Active
-        });
-    }
-
-    private static async Task SeedContractAsync(
-        AppDbContext context,
-        Guid contractId,
-        Guid roomId,
-        Guid tenantUserId,
-        string contractNumber,
-        DateOnly startDate,
-        DateOnly endDate,
-        decimal monthlyRent,
-        decimal depositAmount,
-        int paymentDay,
-        ContractStatus status,
-        CancellationToken cancellationToken)
-    {
-        if (await context.Contracts.AnyAsync(x => x.Id == contractId, cancellationToken))
-        {
-            return;
-        }
-
-        context.Contracts.Add(new Contract
-        {
-            Id = contractId,
-            RoomId = roomId,
-            MainTenantUserId = tenantUserId,
-            ContractNumber = contractNumber,
-            StartDate = startDate,
-            EndDate = endDate,
-            MonthlyRent = monthlyRent,
-            DepositAmount = depositAmount,
-            PaymentDay = paymentDay,
-            Status = status,
-            RoomSnapshot = $"{{\"roomId\":\"{roomId}\",\"mock\":true}}",
-            ActivatedAt = status == ContractStatus.Active ? SeededAt : null,
-            CreatedAt = SeededAt
-        });
-    }
-
-    private static async Task SeedServicePriceAsync(
-        AppDbContext context,
-        BillingServiceCode serviceCode,
-        BillingMethod billingMethod,
-        string unitName,
-        decimal unitPrice,
-        CancellationToken cancellationToken)
-    {
-        await SeedServicePriceAsync(
-            context,
-            ApprovedHouseId,
-            serviceCode,
-            billingMethod,
-            unitName,
-            unitPrice,
-            cancellationToken);
-    }
-
-    private static async Task SeedServicePriceAsync(
-        AppDbContext context,
-        Guid roomingHouseId,
-        BillingServiceCode serviceCode,
-        BillingMethod billingMethod,
-        string unitName,
-        decimal unitPrice,
-        CancellationToken cancellationToken)
-    {
-        var serviceType = await context.BillingServiceTypes
-            .FirstOrDefaultAsync(x => x.Code == serviceCode, cancellationToken);
-
-        if (serviceType is null ||
-            await context.RoomingHouseServicePrices.AnyAsync(
-                x => x.RoomingHouseId == roomingHouseId && x.ServiceTypeId == serviceType.Id,
-                cancellationToken))
-        {
-            return;
-        }
-
-        context.RoomingHouseServicePrices.Add(new RoomingHouseServicePrice
-        {
-            Id = Guid.NewGuid(),
-            RoomingHouseId = roomingHouseId,
-            ServiceTypeId = serviceType.Id,
-            BillingMethod = billingMethod,
-            UnitName = unitName,
-            UnitPrice = unitPrice,
-            EffectiveFrom = new DateOnly(2026, 1, 1),
-            IsActive = true,
-            CreatedAt = SeededAt,
-            UpdatedAt = SeededAt
-        });
     }
 
     private static User CreateUser(
@@ -840,6 +803,7 @@ public static class DevelopmentDataSeed
             Floor = floor,
             AreaM2 = areaM2,
             MaxOccupants = maxOccupants,
+            IsTieredPricing = true,
             Status = status,
             Description = $"Phòng {roomNumber} dùng để test dashboard chủ trọ.",
             CreatedAt = SeededAt,
@@ -858,7 +822,7 @@ public static class DevelopmentDataSeed
     {
         var room = CreateRoom(id, roomNumber, floor, areaM2, maxOccupants, status);
         room.RoomingHouseId = roomingHouseId;
-        room.Description = $"Phong {roomNumber} mock data cho nha tro demo.";
+        room.Description = $"Phòng {roomNumber} mock data cho nhà trọ demo.";
         room.IsTieredPricing = maxOccupants > 1;
         return room;
     }
@@ -894,7 +858,7 @@ public static class DevelopmentDataSeed
         context.PropertyImages.Add(CreateRoomImage(
             room.Id,
             $"demo/rooms/{imageSlug}/cover.jpg",
-            $"Phong {room.RoomNumber}"));
+            $"Phòng {room.RoomNumber}"));
     }
 
     private static RoomPriceTier CreatePriceTier(Guid roomId, int occupantCount, decimal monthlyRent)
@@ -950,8 +914,7 @@ public static class DevelopmentDataSeed
     {
         var ward = await context.AdministrativeWards
             .AsNoTracking()
-            .Where(x => x.IsActive)
-            .OrderBy(x => x.Code)
+            .Where(x => x.IsActive && x.Code == "20285")
             .Select(x => new
             {
                 x.Code,

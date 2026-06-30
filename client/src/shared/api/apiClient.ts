@@ -3,15 +3,17 @@ import { ApiClientError, getApiErrorMessage } from './apiError';
 import type { ApiErrorResponse } from './apiResponse.types';
 import { tokenStorage } from './tokenStorage';
 
+type ResponseType = 'json' | 'blob' | 'text';
+
 type RequestOptions = Omit<RequestInit, 'body'> & {
   body?: BodyInit | unknown;
   auth?: boolean;
+  responseType?: ResponseType;
   skipAuthRefresh?: boolean;
 };
 
 export async function apiClient<T>(path: string, options: RequestOptions = {}) {
   const response = await sendRequest(path, options);
-  let payload = await response.json().catch(() => null);
 
   if (
     response.status === 401 &&
@@ -23,33 +25,11 @@ export async function apiClient<T>(path: string, options: RequestOptions = {}) {
 
     if (refreshed) {
       const retryResponse = await sendRequest(path, options);
-      payload = await retryResponse.json().catch(() => null);
-
-      if (retryResponse.ok) {
-        return payload as T;
-      }
-
-      const retryError = payload as ApiErrorResponse | null;
-      throw new ApiClientError(getApiErrorMessage(retryError), {
-        errorCode: retryError?.errorCode,
-        details: retryError?.details,
-        status: retryResponse.status,
-        response: retryError
-      });
+      return parseResponse<T>(retryResponse, options.responseType);
     }
   }
 
-  if (!response.ok) {
-    const error = payload as ApiErrorResponse | null;
-    throw new ApiClientError(getApiErrorMessage(error), {
-      errorCode: error?.errorCode,
-      details: error?.details,
-      status: response.status,
-      response: error
-    });
-  }
-
-  return payload as T;
+  return parseResponse<T>(response, options.responseType);
 }
 
 async function sendRequest(path: string, options: RequestOptions = {}) {
@@ -79,6 +59,32 @@ async function sendRequest(path: string, options: RequestOptions = {}) {
   });
 }
 
+async function parseResponse<T>(response: Response, responseType: ResponseType = 'json') {
+  if (!response.ok) {
+    const errorPayload = await response.json().catch(() => null);
+    const error = errorPayload as ApiErrorResponse | null;
+    throw new ApiClientError(getApiErrorMessage(error), {
+      errorCode: error?.errorCode,
+      details: error?.details,
+      status: response.status,
+      response: error
+    });
+  }
+
+  if (responseType === 'blob') {
+    const blob = await response.blob();
+    return blob as unknown as T;
+  }
+
+  if (responseType === 'text') {
+    const text = await response.text();
+    return text as unknown as T;
+  }
+
+  const payload = await response.json().catch(() => null);
+  return payload as T;
+}
+
 async function refreshAccessToken() {
   const refreshToken = tokenStorage.getRefreshToken();
   if (!refreshToken) {
@@ -86,12 +92,11 @@ async function refreshAccessToken() {
     return false;
   }
 
-  const headers = new Headers();
-  headers.set('Content-Type', 'application/json');
-
   const response = await fetch(`${env.apiBaseUrl}/api/auth/refresh-token`, {
     method: 'POST',
-    headers,
+    headers: {
+      'Content-Type': 'application/json'
+    },
     body: JSON.stringify({ refreshToken })
   });
 

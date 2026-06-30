@@ -27,11 +27,19 @@
 secrets/
 **/secrets/
 
-# App settings that can contain personal/local connection strings or keys
-**/appsettings.Development.json
-**/appsettings.Local.json
-**/appsettings.*.local.json
-**/appsettings.Production.json
+# Commit appsettings files with safe defaults/placeholders only.
+# Store real local values in .NET User Secrets or environment variables.
+server/src/SmartRentalPlatform.Api/appsettings.Local.json
+server/src/SmartRentalPlatform.Api/appsettings.*.Local.json
+
+# Private keys, certificate bundles, and provider credential exports
+*.pem
+*.key
+*.pfx
+*.p12
+*.keystore
+credentials*.json
+service-account*.json
 
 # Frontend dependencies, build output, and caches
 node_modules/
@@ -47,17 +55,31 @@ yarn-error.log*
 pnpm-debug.log*
 
 # .NET build output and temporary files
+server/nuget.config
 **/[Bb]in/
 **/[Oo]bj/
 [Dd]ebug/
 [Rr]elease/
 [Tt]est[Rr]esult*/
+**/[Tt]est[Rr]esults/
 *.trx
 *.coverage
 *.coveragexml
 *.nupkg
 *.snupkg
 *.binlog
+
+# Test/coverage generated output
+server/coverage-report/
+server/tests/**/[Tt]est[Rr]esults/
+server/tests/**/*.trx
+server/tests/**/*.coverage
+server/tests/**/*.coveragexml
+server/tests/**/coverage.cobertura.xml
+
+# Temporary files created while preparing/running backend tests
+server/tests/*.log
+server/tests/*.txt
 
 # IDE/editor/user-specific files
 .vs/

@@ -6,6 +6,7 @@ using SmartRentalPlatform.Application.Common.Exceptions;
 using SmartRentalPlatform.Application.Common.Interfaces;
 using SmartRentalPlatform.Contracts.Common;
 using SmartRentalPlatform.Contracts.Locations;
+using SmartRentalPlatform.Contracts.RoomingHouses.Responses;
 using SmartRentalPlatform.Infrastructure.Options;
 
 namespace SmartRentalPlatform.Infrastructure.ExternalServices.VietMap;
@@ -97,6 +98,41 @@ public class VietMapService : IVietMapService
         return suggestions;
     }
 
+    public async Task<List<NearbyPlaceResponse>> SearchNearbyPlacesAsync(
+        decimal latitude,
+        decimal longitude,
+        string keyword,
+        int radiusMeters = 1500,
+        int limit = 6,
+        CancellationToken cancellationToken = default)
+    {
+        ValidateSearchText(keyword);
+        ValidateApiKey();
+
+        radiusMeters = Math.Clamp(radiusMeters, 200, 5000);
+        limit = Math.Clamp(limit, 1, 10);
+
+        var searchResults = await GetAsync<List<VietMapSearchItem>>(
+            $"/api/search/v4?apikey={Url(options.ApiKey)}&text={Url(keyword.Trim())}&display_type={options.DisplayType}&circle_center={latitude},{longitude}&circle_radius={radiusMeters}",
+            cancellationToken);
+
+        return searchResults
+            .Where(item => !string.IsNullOrWhiteSpace(item.Name) || !string.IsNullOrWhiteSpace(item.Display))
+            .OrderBy(item => item.Distance ?? decimal.MaxValue)
+            .Take(limit)
+            .Select(item => new NearbyPlaceResponse
+            {
+                Name = FirstNotEmpty(item.Name, item.Display, keyword.Trim()) ?? keyword.Trim(),
+                Address = item.Address,
+                DisplayAddress = FirstNotEmpty(item.Display, item.Address),
+                Latitude = item.Lat,
+                Longitude = item.Lng,
+                DistanceKm = item.Distance,
+                Category = item.Categories.FirstOrDefault()
+            })
+            .ToList();
+    }
+
     private async Task<T> GetAsync<T>(string path, CancellationToken cancellationToken)
     {
         using var response = await httpClient.GetAsync(path, cancellationToken);
@@ -171,6 +207,18 @@ public class VietMapService : IVietMapService
 
         [JsonPropertyName("address")]
         public string? Address { get; set; }
+
+        [JsonPropertyName("lat")]
+        public decimal? Lat { get; set; }
+
+        [JsonPropertyName("lng")]
+        public decimal? Lng { get; set; }
+
+        [JsonPropertyName("distance")]
+        public decimal? Distance { get; set; }
+
+        [JsonPropertyName("categories")]
+        public List<string> Categories { get; set; } = new();
     }
 
     private sealed class VietMapPlaceResponse

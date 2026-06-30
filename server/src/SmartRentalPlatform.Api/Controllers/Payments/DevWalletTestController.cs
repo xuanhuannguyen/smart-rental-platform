@@ -1,6 +1,6 @@
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
-using SmartRentalPlatform.Application.Common.Exceptions;
+using SmartRentalPlatform.Api.Extensions;
 using SmartRentalPlatform.Application.Common.Interfaces;
 using SmartRentalPlatform.Application.Wallets;
 using SmartRentalPlatform.Contracts.Common;
@@ -171,19 +171,12 @@ public class DevWalletTestController : ControllerBase
 
     private bool IsEnabled()
     {
-        return environment.IsDevelopment() || User.IsInRole("Admin");
+        return environment.IsDevelopment();
     }
 
     private Guid GetCurrentUserId()
     {
-        if (!currentUserService.IsAuthenticated || currentUserService.UserId is null)
-        {
-            throw new UnauthorizedException(
-                ErrorCodes.Unauthorized,
-                "Ban can dang nhap de thuc hien thao tac nay.");
-        }
-
-        return currentUserService.UserId.Value;
+        return currentUserService.GetRequiredUserIdForAction();
     }
 
     private static WalletTransactionMetadata CreateMetadata(string? note, Guid? transferGroupId = null)

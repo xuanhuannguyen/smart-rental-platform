@@ -50,6 +50,39 @@ public class RoomQueryService : IRoomQueryService
         return room is null ? null : RoomReadModelMapper.ToResponse(room);
     }
 
+    public async Task<List<RoomResponse>> GetPublicAvailableRoomsAsync(
+        Guid roomingHouseId,
+        CancellationToken cancellationToken = default)
+    {
+        var rooms = await BuildRoomQuery()
+            .Where(x => x.RoomingHouseId == roomingHouseId && 
+                        x.DeletedAt == null &&
+                        x.Status == RoomStatus.Available &&
+                        x.RoomingHouse.VisibilityStatus == RoomingHouseVisibilityStatus.Visible &&
+                        x.RoomingHouse.ApprovalStatus == RoomingHouseApprovalStatus.Approved)
+            .OrderBy(x => x.Floor)
+            .ThenBy(x => x.RoomNumber)
+            .ToListAsync(cancellationToken);
+
+        return rooms.Select(RoomReadModelMapper.ToResponse).ToList();
+    }
+
+    public async Task<RoomResponse?> GetPublicRoomByIdAsync(
+        Guid roomId,
+        CancellationToken cancellationToken = default)
+    {
+        var room = await BuildRoomQuery()
+            .FirstOrDefaultAsync(
+                x => x.Id == roomId &&
+                     x.DeletedAt == null &&
+                     x.Status == RoomStatus.Available &&
+                     x.RoomingHouse.VisibilityStatus == RoomingHouseVisibilityStatus.Visible &&
+                     x.RoomingHouse.ApprovalStatus == RoomingHouseApprovalStatus.Approved,
+                cancellationToken);
+
+        return room is null ? null : RoomReadModelMapper.ToResponse(room);
+    }
+
     private IQueryable<Room> BuildRoomQuery()
     {
         return context.Rooms

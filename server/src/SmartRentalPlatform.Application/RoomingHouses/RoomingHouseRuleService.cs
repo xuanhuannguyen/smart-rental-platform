@@ -113,6 +113,42 @@ public class RoomingHouseRuleService : IRoomingHouseRuleService
         return ToResponse(rule);
     }
 
+    public async Task<System.IO.Stream> PreviewRuleAsync(
+        Guid roomingHouseId,
+        Guid landlordUserId,
+        UpsertRoomingHouseRuleRequest request,
+        CancellationToken cancellationToken = default)
+    {
+        var roomingHouse = await context.RoomingHouses
+            .AsNoTracking()
+            .FirstOrDefaultAsync(
+                x => x.Id == roomingHouseId &&
+                     x.LandlordUserId == landlordUserId &&
+                     x.DeletedAt == null,
+                cancellationToken);
+
+        if (roomingHouse is null)
+        {
+            throw new NotFoundException(
+                ErrorCodes.HouseNotFound,
+                "Không tìm thấy khu trọ.",
+                new { roomingHouseId });
+        }
+
+        var requestedSourceType = ParseSourceType(request.SourceType);
+        if (requestedSourceType == RoomingHouseRuleSourceType.PdfUpload)
+        {
+            throw new BadRequestException(
+                ErrorCodes.HouseRuleInvalid,
+                "Chỉ hỗ trợ xem trước luật khu trọ được tạo từ form.",
+                new { field = nameof(request.SourceType) });
+        }
+
+        ValidateRequest(requestedSourceType, request);
+
+        return RoomingHouseRulePdfGenerator.Generate(roomingHouse, request);
+    }
+
     private static RoomingHouseRuleSourceType ParseSourceType(string sourceType)
     {
         if (!Enum.TryParse<RoomingHouseRuleSourceType>(sourceType, ignoreCase: true, out var parsed))

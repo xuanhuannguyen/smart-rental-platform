@@ -142,11 +142,16 @@ export default function SearchSuggestionBox({
 
       {open && (
         <div className="search-suggestion-box__dropdown">
+          {/* Recent Section */}
           <div className="search-suggestion-box__tabs">
             <span>Gần đây</span>
             {recentSearches.length > 0 && (
-              <button type="button" onClick={clearRecent}>
-                Xóa lịch sử
+              <button type="button" className="search-suggestion-box__clear-btn" onClick={clearRecent}>
+                <span>Xóa lịch sử</span>
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" className="icon-trash">
+                  <polyline points="3 6 5 6 21 6" />
+                  <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2" />
+                </svg>
               </button>
             )}
           </div>
@@ -163,10 +168,15 @@ export default function SearchSuggestionBox({
                     type="button"
                     onClick={() => runSearch(item.query)}
                   >
-                    <span className="search-suggestion-box__icon">↺</span>
-                    <span>
-                      <strong>{item.query}</strong>
-                      <small> Tìm kiếm gần đây</small>
+                    <span className="search-suggestion-box__icon">
+                      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" className="icon-clock">
+                        <circle cx="12" cy="12" r="10" />
+                        <polyline points="12 6 12 12 16 14" />
+                      </svg>
+                    </span>
+                    <span className="search-suggestion-box__text-group">
+                      <strong className="search-suggestion-box__query">{item.query}</strong>
+                      <span className="search-suggestion-box__row-desc">Tìm kiếm gần đây</span>
                     </span>
                   </button>
                   <button
@@ -175,7 +185,10 @@ export default function SearchSuggestionBox({
                     type="button"
                     onClick={(event) => removeRecent(event, item.query)}
                   >
-                    ×
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" className="icon-close">
+                      <line x1="18" y1="6" x2="6" y2="18" />
+                      <line x1="6" y1="6" x2="18" y2="18" />
+                    </svg>
                   </button>
                 </div>
               ))}
@@ -186,6 +199,7 @@ export default function SearchSuggestionBox({
             <p className="search-suggestion-box__empty">Chưa có tìm kiếm gần đây.</p>
           )}
 
+          {/* Suggestions Section */}
           <div className="search-suggestion-box__suggestions">
             <h3>{hasQuery ? 'Gợi ý phù hợp' : 'Gợi ý cho bạn'}</h3>
             {visibleSuggestions.length > 0 ? (
@@ -196,13 +210,27 @@ export default function SearchSuggestionBox({
                   type="button"
                   onClick={() => runSearch(suggestion.query)}
                 >
-                  <span className="search-suggestion-box__icon">
-                    {suggestion.kind === 'location' ? '⌖' : '⌕'}
-                  </span>
-                  <span>
-                    <strong>{suggestion.query}</strong>
-                    {suggestion.description && <small> {suggestion.description}</small>}
-                  </span>
+                  <div className="search-suggestion-box__row-main">
+                    <span className="search-suggestion-box__icon">
+                      {suggestion.kind === 'location' ? (
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" className="icon-pin">
+                          <path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z" />
+                          <circle cx="12" cy="10" r="3" />
+                        </svg>
+                      ) : (
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" className="icon-search">
+                          <circle cx="11" cy="11" r="8" />
+                          <line x1="21" y1="21" x2="16.65" y2="16.65" />
+                        </svg>
+                      )}
+                    </span>
+                    <strong className="search-suggestion-box__query">{suggestion.query}</strong>
+                  </div>
+                  {suggestion.description && (
+                    <span className="search-suggestion-box__badge">
+                      {suggestion.description}
+                    </span>
+                  )}
                 </button>
               ))
             ) : (

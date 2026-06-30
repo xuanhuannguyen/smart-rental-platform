@@ -22,17 +22,36 @@ interface GoogleLoginButtonProps {
 }
 
 export function GoogleLoginButton({ onCredential }: GoogleLoginButtonProps) {
+  const containerRef = useRef<HTMLDivElement>(null);
   const buttonRef = useRef<HTMLDivElement>(null);
-  const renderedRef = useRef(false);
   const [scriptError, setScriptError] = useState('');
+  const [width, setWidth] = useState(280);
+
+  // Measure parent width using ResizeObserver to ensure exact calculated width
+  useEffect(() => {
+    if (!containerRef.current) return;
+
+    const observer = new ResizeObserver((entries) => {
+      for (const entry of entries) {
+        const parentW = entry.target.parentElement?.offsetWidth || entry.contentRect.width;
+        if (parentW > 0) {
+          const clamped = Math.max(200, Math.min(320, parentW));
+          setWidth(clamped);
+        }
+      }
+    });
+
+    observer.observe(containerRef.current);
+    return () => observer.disconnect();
+  }, []);
 
   useEffect(() => {
-    if (!env.googleClientId || !buttonRef.current) {
+    if (!env.googleClientId || !buttonRef.current || width === 0) {
       return;
     }
 
     const render = () => {
-      if (!window.google || !buttonRef.current || renderedRef.current) {
+      if (!window.google || !buttonRef.current) {
         return;
       }
 
@@ -45,9 +64,8 @@ export function GoogleLoginButton({ onCredential }: GoogleLoginButtonProps) {
       window.google.accounts.id.renderButton(buttonRef.current, {
         theme: 'outline',
         size: 'large',
-        width: 320
+        width: width
       });
-      renderedRef.current = true;
     };
 
     if (window.google) {
@@ -66,17 +84,19 @@ export function GoogleLoginButton({ onCredential }: GoogleLoginButtonProps) {
     script.async = true;
     script.defer = true;
     script.onload = render;
-    script.onerror = () => setScriptError('Khong tai duoc Google Sign-In. Kiem tra internet, ad blocker hoac OAuth origin.');
+    script.onerror = () => setScriptError('Không tải được Google Sign-In. Kiểm tra internet, ad blocker hoặc OAuth origin.');
     document.head.appendChild(script);
-  }, [onCredential]);
+  }, [onCredential, width]);
 
   if (!env.googleClientId) {
-    return <p className="auth-note">Thieu VITE_GOOGLE_CLIENT_ID trong file .env.</p>;
+    return <p className="auth-note">Thiếu VITE_GOOGLE_CLIENT_ID trong file .env.</p>;
   }
 
   return (
     <>
-      <div ref={buttonRef} />
+      <div className="auth-google-button" ref={containerRef} style={{ width: '100%', display: 'flex', justifyContent: 'center' }}>
+        <div key={width} ref={buttonRef} style={{ width: '100%', display: 'flex', justifyContent: 'center' }} />
+      </div>
       {scriptError && <p className="auth-note">{scriptError}</p>}
     </>
   );

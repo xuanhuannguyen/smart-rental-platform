@@ -65,7 +65,6 @@ public class DevMockPaymentsController : ControllerBase
 
     private bool IsMockEnabled()
     {
-        return environment.IsDevelopment()
-            || string.Equals(environment.EnvironmentName, "Test", StringComparison.OrdinalIgnoreCase);
+        return environment.IsDevelopment();
     }
 }

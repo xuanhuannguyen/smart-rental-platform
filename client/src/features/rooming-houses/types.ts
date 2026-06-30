@@ -1,3 +1,23 @@
+import {
+  Amenity,
+  PropertyImage,
+  LegalDocument,
+  RoomingHouseOnboarding,
+  RoomingHouseBasicInfoRequest,
+  RentalPolicy,
+  UpdateRentalPolicyRequest
+} from '../../shared/types';
+
+export type {
+  Amenity,
+  PropertyImage,
+  LegalDocument,
+  RoomingHouseOnboarding,
+  RoomingHouseBasicInfoRequest,
+  RentalPolicy,
+  UpdateRentalPolicyRequest
+};
+
 export type RoomingHouseSummary = {
   id: string;
   landlordUserId: string;
@@ -13,30 +33,16 @@ export type RoomingHouseSummary = {
   availableRooms?: number;
 };
 
-export type Amenity = {
-  id: number;
-  name: string;
-  scope: string;
-  iconCode?: string | null;
-};
-
 export type PagedResult<T> = {
   items: T[];
   page: number;
   pageSize: number;
   totalItems: number;
   totalPages: number;
+  metadata?: unknown;
 };
 
-export type PropertyImage = {
-  id: string;
-  objectKey: string;
-  imageUrl: string;
-  caption?: string | null;
-  isCover: boolean;
-  sortOrder: number;
-  createdAt: string;
-};
+
 
 export type PropertyImageRequest = {
   id?: string;
@@ -47,17 +53,6 @@ export type PropertyImageRequest = {
   sortOrder: number;
 };
 
-export type LegalDocument = {
-  roomingHouseId: string;
-  documentType: string;
-  frontImageObjectKey: string;
-  backImageObjectKey: string;
-  extraImageObjectKey?: string | null;
-  documentNumberMasked: string;
-  uploadedAt: string;
-  createdAt: string;
-  updatedAt: string;
-};
 
 export type HouseRuleSourceType = 'PdfUpload' | 'FormGenerated';
 
@@ -101,27 +96,6 @@ export type UpdateLegalDocumentRequest = {
   documentNumber: string;
 };
 
-export type RoomingHouseOnboarding = {
-  status: string;
-  hasRoomingHouse: boolean;
-  canCreateDraft: boolean;
-  canEdit: boolean;
-  canSubmit: boolean;
-  canEnterLandlordDashboard: boolean;
-  roomingHouseId?: string | null;
-  roomingHouse?: RoomingHouseDetail | null;
-};
-
-export type RoomingHouseBasicInfoRequest = {
-  name: string;
-  description?: string;
-  addressLine: string;
-  provinceCode: string;
-  wardCode: string;
-  latitude?: number | null;
-  longitude?: number | null;
-  googleMapUrl?: string | null;
-};
 
 export type RoomPriceTierSummary = {
   id: string;
@@ -156,8 +130,8 @@ export type RoomingHouseDetail = RoomingHouseSummary & {
   longitude?: number | null;
   googleMapUrl?: string | null;
   legalDocument?: LegalDocument | null;
-  leasePolicy?: LeasePolicy | null;
   houseRule?: RoomingHouseRule | null;
+  rentalPolicy?: RentalPolicy | null;
   images: PropertyImage[];
   amenities: Amenity[];
   rooms: RoomInHouseDetail[];
@@ -181,6 +155,13 @@ export type RoomingHouseSearchItem = {
   createdAt: string;
 };
 
+export type RoomingHouseSearchMetadata = {
+  aiAssisted: boolean;
+  originalQuery?: string | null;
+  interpretedQuery?: string | null;
+  relaxedFields: string[];
+};
+
 export type RoomingHouseSearchParams = {
   q?: string;
   provinceCode?: string;
@@ -192,12 +173,89 @@ export type RoomingHouseSearchParams = {
   minOccupants?: number;
   amenityIds?: number[];
   roomAmenityIds?: number[];
+  recentRoomingHouseIds?: string[];
+  preferredAmenityIds?: number[];
+  preferredRoomAmenityIds?: number[];
   centerLat?: number;
   centerLng?: number;
   radiusKm?: number;
   sortBy?: string;
   page?: number;
   pageSize?: number;
+};
+
+export type GuestRoomingHouseRecommendationRequest = {
+  recentQueries: string[];
+  recentRoomingHouseIds: string[];
+  clickedRoomingHouseIds: string[];
+  preferredAmenityIds: number[];
+  preferredRoomAmenityIds: number[];
+  provinceCode?: string | null;
+  wardCode?: string | null;
+  minPrice?: number | null;
+  maxPrice?: number | null;
+  minAreaM2?: number | null;
+  maxAreaM2?: number | null;
+  pageSize: number;
+};
+
+export type RoomingHouseRecommendationResponse = {
+  items: RoomingHouseSearchItem[];
+  reasons: Record<string, string>;
+  aiAssisted: boolean;
+  fallbackReason?: string | null;
+};
+
+export type RoomingHouseAiChatRequest = {
+  message: string;
+  context: 'home' | 'search' | 'detail';
+  roomingHouseId?: string | null;
+  mode?: 'fast' | 'detailed';
+  conversationId?: string | null;
+  chatHistory?: RoomingHouseAiChatHistoryMessage[];
+};
+
+export type RoomingHouseAiChatHistoryMessage = {
+  role: 'assistant' | 'user';
+  text: string;
+};
+
+export type NearbyPlace = {
+  name: string;
+  address?: string | null;
+  displayAddress?: string | null;
+  latitude?: number | null;
+  longitude?: number | null;
+  distanceKm?: number | null;
+  category?: string | null;
+};
+
+export type RoomingHouseAiChatResponse = {
+  reply: string;
+  intent: string;
+  confidence: number;
+  aiAssisted: boolean;
+  conversationId: string;
+  roomingHouses: RoomingHouseSearchItem[];
+  nearbyPlaces: NearbyPlace[];
+  followUpQuestions: string[];
+  missingInformation: string[];
+  usedSources: string[];
+};
+
+/** Lightweight listing item for home page cards. */
+export type RoomingHouseListingItem = {
+  id: string;
+  name: string;
+  addressDisplay: string;
+  coverImageUrl?: string | null;
+  availableRooms: number;
+  minMonthlyRent?: number | null;
+  maxMonthlyRent?: number | null;
+  minAreaM2?: number | null;
+  maxAreaM2?: number | null;
+  amenities: Amenity[];
+  createdAt: string;
 };
 
 export type LocationSearchResult = {
@@ -211,27 +269,3 @@ export type LocationSearchResult = {
 
 export type LocationSuggestion = LocationSearchResult;
 
-export type LeasePolicy = {
-  id: string;
-  roomingHouseId: string;
-  allowShortTermRenewal: boolean;
-  renewalNoticeDays: number;
-  depositMonths: number;
-  discount6MonthsPercent: number;
-  discount9MonthsPercent: number;
-  discount12MonthsPercent: number;
-  discount24MonthsPercent: number;
-  isActive: boolean;
-  createdAt: string;
-  updatedAt: string;
-};
-
-export type UpdateLeasePolicyRequest = {
-  allowShortTermRenewal: boolean;
-  renewalNoticeDays: number;
-  depositMonths: number;
-  discount6MonthsPercent: number;
-  discount9MonthsPercent: number;
-  discount12MonthsPercent: number;
-  discount24MonthsPercent: number;
-};

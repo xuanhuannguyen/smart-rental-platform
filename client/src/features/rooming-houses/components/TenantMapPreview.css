@@ -65,6 +65,7 @@
   cursor: pointer;
   padding: 0;
   flex-shrink: 0;
+  z-index: 0;
 }
 
 .tenant-map-preview-card__map-button:hover .tenant-map-preview-card__overlay {
@@ -82,7 +83,7 @@
   inset: 0;
   background: transparent;
   transition: background-color 0.2s ease;
-  z-index: 400; /* overlay above leaflet tiles */
+  z-index: 1; /* overlay above leaflet tiles */
 }
 
 /* Empty State */

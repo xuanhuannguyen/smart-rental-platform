@@ -96,3 +96,19 @@ export async function completeViewingAppointment(id: string): Promise<ViewingApp
   );
   return data.data;
 }
+
+export async function acceptProposal(id: string): Promise<ViewingAppointment> {
+  const data = await apiClient<ApiResponse<ViewingAppointment>>(
+    ENDPOINTS.VIEWING_APPOINTMENTS.ACCEPT_PROPOSAL(id),
+    { method: 'POST', auth: true }
+  );
+  return data.data;
+}
+
+export async function rejectProposal(id: string): Promise<ViewingAppointment> {
+  const data = await apiClient<ApiResponse<ViewingAppointment>>(
+    ENDPOINTS.VIEWING_APPOINTMENTS.REJECT_PROPOSAL(id),
+    { method: 'POST', auth: true }
+  );
+  return data.data;
+}

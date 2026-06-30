@@ -1,0 +1,508 @@
+/* client/src/features/rental-history/pages/TenantRentalHistoryDetailPage.css */
+
+.history-detail-page {
+  width: 100%;
+  display: flex;
+  flex-direction: column;
+  gap: 24px;
+  animation: fadeIn 0.4s ease-out;
+}
+
+.back-icon-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  background: #ffffff;
+  border: 1px solid #e2e8f0;
+  width: 40px;
+  height: 40px;
+  border-radius: 50%;
+  color: #475569;
+  cursor: pointer;
+  transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+  box-shadow: 0 2px 6px rgba(15, 23, 42, 0.02);
+  flex-shrink: 0;
+  outline: none;
+}
+
+.back-icon-btn:hover {
+  background: #f8fafc;
+  color: #0f172a;
+  border-color: #cbd5e1;
+  transform: translateX(-2px);
+  box-shadow: 0 4px 10px rgba(15, 23, 42, 0.05);
+}
+
+.overview-header-title-area {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  flex: 1;
+}
+
+.history-detail-tabs {
+  display: flex;
+  gap: 8px;
+  border-bottom: 1px solid #e2e8f0;
+  padding-bottom: 2px;
+  overflow-x: auto;
+  scrollbar-width: none; /* Firefox */
+}
+
+.history-detail-tabs::-webkit-scrollbar {
+  display: none; /* Chrome/Safari */
+}
+
+.history-detail-tab {
+  padding: 8px 16px;
+  border: 1px solid transparent;
+  background: transparent;
+  font-size: 13.5px;
+  font-weight: 600;
+  color: #64748b;
+  cursor: pointer;
+  border-radius: 999px;
+  transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+  white-space: nowrap;
+  height: 38px;
+  outline: none;
+}
+
+.history-detail-tab:hover {
+  background-color: #f1f5f9;
+  color: #1e293b;
+}
+
+.history-detail-tab.active {
+  background-color: #246bfe;
+  color: #ffffff;
+  border-color: #246bfe;
+  box-shadow: 0 4px 12px rgba(36, 107, 254, 0.18);
+}
+
+.history-detail-content {
+  background: #ffffff;
+  border-radius: 16px;
+  border: 1px solid #f1f5f9;
+  padding: 24px;
+  box-shadow: 0 4px 20px -2px rgba(15, 23, 42, 0.02), 0 2px 6px -1px rgba(15, 23, 42, 0.02);
+  min-height: 200px;
+}
+
+/* Occupants Tab */
+.occupants-filter {
+  display: flex;
+  gap: 8px;
+  margin-bottom: 20px;
+  overflow-x: auto;
+  scrollbar-width: none;
+}
+
+.occupants-filter::-webkit-scrollbar {
+  display: none;
+}
+
+.occupant-filter-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 14px;
+  border-radius: 999px;
+  font-size: 12.5px;
+  font-weight: 600;
+  border: 1px solid #cbd5e1;
+  background: #ffffff;
+  color: #475569;
+  cursor: pointer;
+  transition: all 0.2s;
+  height: 32px;
+  outline: none;
+}
+
+.occupant-filter-btn:hover {
+  background: #f8fafc;
+  border-color: #cbd5e1;
+}
+
+.occupant-filter-btn.active {
+  background: #246bfe;
+  color: #ffffff;
+  border-color: #246bfe;
+  box-shadow: 0 3px 8px rgba(36, 107, 254, 0.15);
+}
+
+.occupant-list {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.occupant-item {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 16px 20px;
+  border: 1px solid #e2e8f0;
+  border-radius: 12px;
+  background: #ffffff;
+  transition: all 0.2s;
+}
+
+.occupant-item:hover {
+  border-color: #cbd5e1;
+  box-shadow: 0 4px 12px rgba(15, 23, 42, 0.03);
+}
+
+.occupant-info h4 {
+  margin: 0 0 6px 0;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 14.5px;
+  font-weight: 700;
+  color: #0f172a;
+}
+
+.occupant-me-badge {
+  background-color: #eff6ff;
+  color: #246bfe;
+  padding: 2px 8px;
+  border-radius: 6px;
+  font-size: 10.5px;
+  font-weight: 800;
+}
+
+.occupant-role {
+  color: #64748b;
+  font-size: 13px;
+  margin-bottom: 4px;
+}
+
+.occupant-dates {
+  text-align: right;
+  font-size: 13px;
+  color: #475569;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+/* Contract Tab */
+.contract-info-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 24px;
+  margin-bottom: 24px;
+}
+
+.contract-info-block {
+  background: #f8fafc;
+  padding: 20px;
+  border-radius: 12px;
+  border: 1px solid #f1f5f9;
+}
+
+.contract-info-block h3 {
+  margin: 0 0 16px 0;
+  font-size: 14px;
+  font-weight: 800;
+  color: #0f172a;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  border-bottom: 1px dashed #cbd5e1;
+  padding-bottom: 10px;
+}
+
+.contract-info-item {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 12px;
+  font-size: 13.5px;
+}
+
+.contract-info-item:last-child {
+  margin-bottom: 0;
+}
+
+.contract-info-item .label {
+  color: #64748b;
+  font-weight: 500;
+}
+
+.contract-info-item .value {
+  font-weight: 700;
+  color: #0f172a;
+}
+
+.contract-actions {
+  display: flex;
+  gap: 12px;
+  flex-wrap: wrap;
+  padding-top: 20px;
+  border-top: 1px dashed #e2e8f0;
+  justify-content: flex-end;
+}
+
+/* Coming soon placeholder */
+.coming-soon-placeholder {
+  text-align: center;
+  padding: 60px 20px;
+  color: #64748b;
+}
+
+.coming-soon-placeholder h2 {
+  color: #0f172a;
+  font-size: 18px;
+  font-weight: 800;
+  margin-bottom: 8px;
+}
+
+.contract-invoices-section {
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+}
+
+.contract-invoices-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 16px;
+}
+
+.contract-invoices-header h2 {
+  margin: 0 0 4px;
+  font-size: 16px;
+  font-weight: 750;
+  color: #0f172a;
+}
+
+.contract-invoices-header p {
+  margin: 0;
+  font-size: 13.5px;
+  color: #64748b;
+}
+
+.invoice-status-tabs {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  overflow-x: auto;
+  padding-bottom: 4px;
+  scrollbar-width: none;
+}
+
+.invoice-status-tabs::-webkit-scrollbar {
+  display: none;
+}
+
+.invoice-status-tabs button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  height: 34px;
+  padding: 0 14px;
+  border-radius: 999px;
+  font-weight: 600;
+  font-size: 12.5px;
+  background: #f1f5f9;
+  color: #475569;
+  border: none;
+  cursor: pointer;
+  transition: all 0.2s;
+  outline: none;
+}
+
+.invoice-status-tabs button:hover {
+  background: #e2e8f0;
+  color: #0f172a;
+}
+
+.invoice-status-tabs button.active {
+  background: #1e293b;
+  color: #ffffff;
+}
+
+.invoice-inline-message {
+  border-radius: 12px;
+  padding: 12px 16px;
+  font-weight: 600;
+  font-size: 13.5px;
+}
+
+.invoice-inline-message.success {
+  background: #ecfdf5;
+  color: #047857;
+  border: 1px solid #a7f3d0;
+}
+
+.invoice-inline-message.error {
+  background: #fef2f2;
+  color: #b91c1c;
+  border: 1px solid #fecaca;
+}
+
+.contract-invoice-list {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.contract-invoice-card {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 16px;
+  align-items: center;
+  padding: 16px 20px;
+  border: 1px solid #e2e8f0;
+  border-radius: 12px;
+  background: #ffffff;
+  transition: all 0.2s;
+}
+
+.contract-invoice-card:hover {
+  border-color: #cbd5e1;
+  box-shadow: 0 4px 12px rgba(15, 23, 42, 0.03);
+}
+
+.contract-invoice-card.muted {
+  opacity: 0.65;
+  background: #f8fafc;
+}
+
+.contract-invoice-title {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+  margin-bottom: 6px;
+}
+
+.contract-invoice-title strong {
+  font-size: 14.5px;
+  color: #0f172a;
+}
+
+.contract-invoice-meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px 16px;
+  color: #64748b;
+  font-size: 12.5px;
+}
+
+.contract-invoice-actions {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 16px;
+}
+
+.contract-invoice-actions > strong {
+  white-space: nowrap;
+  color: #0f172a;
+  font-size: 15px;
+  font-weight: 800;
+}
+
+.contract-invoice-actions button {
+  height: 32px;
+  padding: 0 12px;
+  font-size: 12.5px;
+  font-weight: 700;
+  border-radius: 8px;
+}
+
+/* Appendices Tab */
+.appendices-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 20px;
+  border-bottom: 1px dashed #e2e8f0;
+  padding-bottom: 12px;
+  gap: 16px;
+}
+
+.appendices-header h3 {
+  margin: 0;
+  font-size: 15px;
+  font-weight: 750;
+  color: #0f172a;
+}
+
+.appendices-list {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.appendix-item {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 18px 20px;
+  border: 1px solid #e2e8f0;
+  border-radius: 12px;
+  background-color: #ffffff;
+  transition: all 0.2s;
+  gap: 16px;
+}
+
+.appendix-item:hover {
+  border-color: #cbd5e1;
+  box-shadow: 0 4px 12px rgba(15, 23, 42, 0.03);
+}
+
+.appendix-info {
+  flex: 1;
+}
+
+.appendix-info h4 {
+  margin: 0 0 6px 0;
+  color: #0f172a;
+  font-size: 14.5px;
+  font-weight: 700;
+}
+
+.appendix-dates {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  font-size: 13px;
+  color: #475569;
+}
+
+/* Responsive adjustments */
+@media (max-width: 768px) {
+  .contract-info-grid {
+    grid-template-columns: 1fr;
+    gap: 16px;
+  }
+  
+  .contract-invoice-card {
+    grid-template-columns: 1fr;
+    gap: 12px;
+  }
+  
+  .contract-invoice-actions {
+    justify-content: space-between;
+    width: 100%;
+    border-top: 1px dashed #f1f5f9;
+    padding-top: 10px;
+  }
+  
+  .appendix-item {
+    flex-direction: column;
+    align-items: stretch;
+    gap: 14px;
+  }
+  
+  .appendix-status-badge {
+    align-items: flex-start !important;
+    border-top: 1px dashed #f1f5f9;
+    padding-top: 10px;
+    width: 100%;
+  }
+}

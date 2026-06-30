@@ -128,6 +128,49 @@ public class UserService : IUserService
         };
     }
 
+    public async Task<OccupantAccountLookupResponse> LookupOccupantAccountAsync(
+        string email,
+        CancellationToken cancellationToken = default)
+    {
+        if (string.IsNullOrWhiteSpace(email))
+        {
+            throw new BadRequestException(
+                ErrorCodes.ValidationError,
+                "Email người ở không được để trống.");
+        }
+
+        var normalizedEmail = email.Trim().ToLowerInvariant();
+        var user = await _dbContext.Users
+            .AsNoTracking()
+            .FirstOrDefaultAsync(
+                x => x.Email.ToLower() == normalizedEmail && x.DeletedAt == null,
+                cancellationToken);
+
+        if (user is null)
+        {
+            return new OccupantAccountLookupResponse
+            {
+                Email = normalizedEmail,
+                Exists = false,
+                IsKycApproved = false
+            };
+        }
+
+        var isKycApproved = await _dbContext.KycVerifications
+            .AsNoTracking()
+            .AnyAsync(
+                x => x.UserId == user.Id && x.Status == KycVerificationStatus.Approved,
+                cancellationToken);
+
+        return new OccupantAccountLookupResponse
+        {
+            Email = user.Email,
+            Exists = true,
+            IsKycApproved = isKycApproved,
+            DisplayName = user.DisplayName
+        };
+    }
+
     public async Task<UserProfileResponse> UpdateUserProfileAsync(
         UpdateUserProfileRequest request,
         CancellationToken cancellationToken = default)
