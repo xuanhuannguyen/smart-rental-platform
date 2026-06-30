@@ -58,7 +58,7 @@ builder.Services.AddInfrastructure(builder.Configuration);
 
 var app = builder.Build();
 
-if (app.Environment.IsDevelopment())
+if (ShouldSeedDevelopmentData(app))
 {
     await using var scope = app.Services.CreateAsyncScope();
     var dbContext = scope.ServiceProvider.GetRequiredService<AppDbContext>();
@@ -67,9 +67,7 @@ if (app.Environment.IsDevelopment())
     await DevelopmentDataSeed.SeedAsync(dbContext, passwordService);
 }
 
-if (app.Environment.IsDevelopment()
-    || app.Environment.IsEnvironment("QA")
-    || app.Environment.IsEnvironment("Test"))
+if (ShouldSeedWalletQaData(app))
 {
     await using var scope = app.Services.CreateAsyncScope();
     var dbContext = scope.ServiceProvider.GetRequiredService<AppDbContext>();
@@ -144,6 +142,18 @@ if (app.Environment.IsDevelopment())
 app.MapControllers();
 
 app.Run();
+
+static bool ShouldSeedDevelopmentData(WebApplication app)
+{
+    return app.Environment.IsDevelopment() &&
+        app.Configuration.GetValue("SeedData:Development:Enabled", false);
+}
+
+static bool ShouldSeedWalletQaData(WebApplication app)
+{
+    return app.Environment.IsDevelopment() &&
+        app.Configuration.GetValue("SeedData:WalletQa:Enabled", false);
+}
 
 public sealed record TestEmailOtpRequest(string Email, string? DisplayName);
 

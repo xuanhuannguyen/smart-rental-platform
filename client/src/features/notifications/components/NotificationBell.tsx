@@ -269,6 +269,14 @@ export function NotificationBell({ navigateOnly = false, navigateTo }: Notificat
     return () => clearInterval(interval);
   }, [currentUser, loadUnreadCount]);
 
+  // Poll notifications list when dropdown is open
+  useEffect(() => {
+    if (!currentUser || !isOpen || navigateOnly) return;
+
+    const interval = setInterval(loadNotifications, 30000);
+    return () => clearInterval(interval);
+  }, [currentUser, isOpen, navigateOnly, loadNotifications]);
+
   // Close dropdown on outside click
   useEffect(() => {
     if (navigateOnly) return;

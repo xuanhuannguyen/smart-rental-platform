@@ -1,6 +1,6 @@
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
-using SmartRentalPlatform.Application.Common.Exceptions;
+using SmartRentalPlatform.Api.Extensions;
 using SmartRentalPlatform.Application.Common.Interfaces;
 using SmartRentalPlatform.Application.Kyc;
 using SmartRentalPlatform.Contracts.Common;
@@ -154,14 +154,7 @@ public class KycController : ControllerBase
 
     private Guid GetCurrentUserId()
     {
-        if (!_currentUserService.IsAuthenticated || _currentUserService.UserId is null)
-        {
-            throw new UnauthorizedException(
-                ErrorCodes.Unauthorized,
-                "Bạn cần đăng nhập để thực hiện thao tác này.");
-        }
-
-        return _currentUserService.UserId.Value;
+        return _currentUserService.GetRequiredUserIdForAction();
     }
 
     private async Task<string> UploadTestImageAsync(

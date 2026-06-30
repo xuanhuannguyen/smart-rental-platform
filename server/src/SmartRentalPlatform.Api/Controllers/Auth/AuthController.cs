@@ -78,13 +78,13 @@ public class AuthController : ControllerBase
     {
         var result = await _authService.LoginAsync(request, cancellationToken);
 
-    return Ok(new ApiResponse<LoginResponse>
-    {
-        Success = true,
-        Message = "Đăng nhập thành công.",
-        Data = result
-    });
-}
+        return Ok(new ApiResponse<LoginResponse>
+        {
+            Success = true,
+            Message = "Đăng nhập thành công.",
+            Data = result
+        });
+    }
 
     [HttpPost("refresh-token")]
     public async Task<ActionResult<ApiResponse<RefreshTokenResponse>>> RefreshToken(

@@ -55,17 +55,31 @@ yarn-error.log*
 pnpm-debug.log*
 
 # .NET build output and temporary files
+server/nuget.config
 **/[Bb]in/
 **/[Oo]bj/
 [Dd]ebug/
 [Rr]elease/
 [Tt]est[Rr]esult*/
+**/[Tt]est[Rr]esults/
 *.trx
 *.coverage
 *.coveragexml
 *.nupkg
 *.snupkg
 *.binlog
+
+# Test/coverage generated output
+server/coverage-report/
+server/tests/**/[Tt]est[Rr]esults/
+server/tests/**/*.trx
+server/tests/**/*.coverage
+server/tests/**/*.coveragexml
+server/tests/**/coverage.cobertura.xml
+
+# Temporary files created while preparing/running backend tests
+server/tests/*.log
+server/tests/*.txt
 
 # IDE/editor/user-specific files
 .vs/

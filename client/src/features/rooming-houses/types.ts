@@ -1,3 +1,23 @@
+import {
+  Amenity,
+  PropertyImage,
+  LegalDocument,
+  RoomingHouseOnboarding,
+  RoomingHouseBasicInfoRequest,
+  RentalPolicy,
+  UpdateRentalPolicyRequest
+} from '../../shared/types';
+
+export type {
+  Amenity,
+  PropertyImage,
+  LegalDocument,
+  RoomingHouseOnboarding,
+  RoomingHouseBasicInfoRequest,
+  RentalPolicy,
+  UpdateRentalPolicyRequest
+};
+
 export type RoomingHouseSummary = {
   id: string;
   landlordUserId: string;
@@ -13,13 +33,6 @@ export type RoomingHouseSummary = {
   availableRooms?: number;
 };
 
-export type Amenity = {
-  id: number;
-  name: string;
-  scope: string;
-  iconCode?: string | null;
-};
-
 export type PagedResult<T> = {
   items: T[];
   page: number;
@@ -29,15 +42,7 @@ export type PagedResult<T> = {
   metadata?: unknown;
 };
 
-export type PropertyImage = {
-  id: string;
-  objectKey: string;
-  imageUrl: string;
-  caption?: string | null;
-  isCover: boolean;
-  sortOrder: number;
-  createdAt: string;
-};
+
 
 export type PropertyImageRequest = {
   id?: string;
@@ -48,17 +53,6 @@ export type PropertyImageRequest = {
   sortOrder: number;
 };
 
-export type LegalDocument = {
-  roomingHouseId: string;
-  documentType: string;
-  frontImageObjectKey: string;
-  backImageObjectKey: string;
-  extraImageObjectKey?: string | null;
-  documentNumberMasked: string;
-  uploadedAt: string;
-  createdAt: string;
-  updatedAt: string;
-};
 
 export type HouseRuleSourceType = 'PdfUpload' | 'FormGenerated';
 
@@ -102,27 +96,6 @@ export type UpdateLegalDocumentRequest = {
   documentNumber: string;
 };
 
-export type RoomingHouseOnboarding = {
-  status: string;
-  hasRoomingHouse: boolean;
-  canCreateDraft: boolean;
-  canEdit: boolean;
-  canSubmit: boolean;
-  canEnterLandlordDashboard: boolean;
-  roomingHouseId?: string | null;
-  roomingHouse?: RoomingHouseDetail | null;
-};
-
-export type RoomingHouseBasicInfoRequest = {
-  name: string;
-  description?: string;
-  addressLine: string;
-  provinceCode: string;
-  wardCode: string;
-  latitude?: number | null;
-  longitude?: number | null;
-  googleMapUrl?: string | null;
-};
 
 export type RoomPriceTierSummary = {
   id: string;
@@ -296,25 +269,3 @@ export type LocationSearchResult = {
 
 export type LocationSuggestion = LocationSearchResult;
 
-export type RentalPolicy = {
-  id: string;
-  roomingHouseId: string;
-  minRentalMonths: number;
-  maxRentalMonths: number;
-  allowShortTermRenewal: boolean;
-  renewalNoticeDays: number;
-  depositMonths: number;
-  defaultPaymentDay: number;
-  isActive: boolean;
-  createdAt: string;
-  updatedAt: string;
-};
-
-export type UpdateRentalPolicyRequest = {
-  minRentalMonths: number;
-  maxRentalMonths: number;
-  allowShortTermRenewal: boolean;
-  renewalNoticeDays: number;
-  depositMonths: number;
-  defaultPaymentDay: number;
-};

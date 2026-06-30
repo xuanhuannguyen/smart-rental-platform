@@ -4,7 +4,7 @@ public class VnptEkycOptions
 {
     public const string SectionName = "VnptEkyc";
 
-    public bool UseMock { get; set; } = true;
+    public bool UseMock { get; set; }
 
     public string BaseUrl { get; set; } = "https://api.idg.vnpt.vn";
 

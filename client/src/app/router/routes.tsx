@@ -162,68 +162,69 @@ export const router = createBrowserRouter([
                         element: <NotificationsPage />
                     },
                     {
-                        path: ROUTE_PATHS.ME.VIEWING_APPOINTMENTS,
-                        element: <TenantAppointmentsPage />
-                    },
-                    {
-                        path: ROUTE_PATHS.LANDLORD.REGISTER,
-                        element: <CreateRoomingHousePage />
-                    },
-                    {
-                        element: <LandlordLayout />,
+                        element: <RoleGuard allowedRoles={['Landlord']} />,
                         children: [
                             {
-                                path: ROUTE_PATHS.LANDLORD.DASHBOARD,
-                                element: (
-                                    <div className="landlord-dashboard-page" style={{ display: 'contents' }}>
-                                        <main className="dashboard-main">
-                                            <div className="empty-panel">
-                                                <h2>Thống kê</h2>
-                                                <p>Tính năng thống kê đang được phát triển...</p>
+                                path: ROUTE_PATHS.LANDLORD.REGISTER,
+                                element: <CreateRoomingHousePage />
+                            },
+                            {
+                                element: <LandlordLayout />,
+                                children: [
+                                    {
+                                        path: ROUTE_PATHS.LANDLORD.DASHBOARD,
+                                        element: (
+                                            <div className="landlord-dashboard-page" style={{ display: 'contents' }}>
+                                                <main className="dashboard-main">
+                                                    <div className="empty-panel">
+                                                        <h2>Thống kê</h2>
+                                                        <p>Tính năng thống kê đang được phát triển...</p>
+                                                    </div>
+                                                </main>
                                             </div>
-                                        </main>
-                                    </div>
-                                )
-                            },
-                            {
-                                path: ROUTE_PATHS.LANDLORD.ROOMING_HOUSES,
-                                element: <LandlordDashboardPage />
-                            },
-                            {
-                                path: '/landlord/rooming-houses/:id',
-                                element: <RoomingHouseDetailPage />
-                            },
-                            {
-                                path: '/landlord/rooming-houses/:id/rooms/:roomId',
-                                element: <RoomDetailPage />
-                            },
-                            {
-                                path: ROUTE_PATHS.LANDLORD.VIEWING_APPOINTMENTS,
-                                element: <LandlordAppointmentsPage />
-                            },
-                            {
-                                path: ROUTE_PATHS.LANDLORD.RENTAL_REQUESTS,
-                                element: <LandlordRentalRequestsPage />
-                            },
-                            {
-                                path: '/landlord/rental-requests/:id',
-                                element: <LandlordRentalRequestDetailPage />
-                            },
-                            {
-                                path: ROUTE_PATHS.LANDLORD.INVOICES,
-                                element: <LandlordBillingPage />
-                            },
-                            {
-                                path: '/landlord/invoices/:invoiceId',
-                                element: <LandlordBillingPage />
-                            },
-                            {
-                                path: ROUTE_PATHS.LANDLORD.CONTRACTS,
-                                element: <LandlordContractsPage />
-                            },
-                            {
-                                path: '/landlord/contracts/:id',
-                                element: <LandlordContractDetailPage />
+                                        )
+                                    },
+                                    {
+                                        path: ROUTE_PATHS.LANDLORD.ROOMING_HOUSES,
+                                        element: <LandlordDashboardPage />
+                                    },
+                                    {
+                                        path: '/landlord/rooming-houses/:id',
+                                        element: <RoomingHouseDetailPage />
+                                    },
+                                    {
+                                        path: '/landlord/rooming-houses/:id/rooms/:roomId',
+                                        element: <RoomDetailPage />
+                                    },
+                                    {
+                                        path: ROUTE_PATHS.LANDLORD.VIEWING_APPOINTMENTS,
+                                        element: <LandlordAppointmentsPage />
+                                    },
+                                    {
+                                        path: ROUTE_PATHS.LANDLORD.RENTAL_REQUESTS,
+                                        element: <LandlordRentalRequestsPage />
+                                    },
+                                    {
+                                        path: '/landlord/rental-requests/:id',
+                                        element: <LandlordRentalRequestDetailPage />
+                                    },
+                                    {
+                                        path: ROUTE_PATHS.LANDLORD.INVOICES,
+                                        element: <LandlordBillingPage />
+                                    },
+                                    {
+                                        path: '/landlord/invoices/:invoiceId',
+                                        element: <LandlordBillingPage />
+                                    },
+                                    {
+                                        path: ROUTE_PATHS.LANDLORD.CONTRACTS,
+                                        element: <LandlordContractsPage />
+                                    },
+                                    {
+                                        path: '/landlord/contracts/:id',
+                                        element: <LandlordContractDetailPage />
+                                    }
+                                ]
                             }
                         ]
                     },

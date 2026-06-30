@@ -21,6 +21,7 @@ using SmartRentalPlatform.Domain.Entities.Rental;
 using SmartRentalPlatform.Domain.Entities.RentalContracts;
 using SmartRentalPlatform.Domain.Entities.Users;
 using SmartRentalPlatform.Domain.Enums.Billing;
+using SmartRentalPlatform.Domain.Enums.Kyc;
 using SmartRentalPlatform.Domain.Enums.Properties;
 using SmartRentalPlatform.Domain.Enums.Payments;
 using SmartRentalPlatform.Domain.Enums.Rental;
@@ -84,7 +85,7 @@ public class RentalContractService : IRentalContractService
 
 	public async Task<ContractDetailResponse?> GetActiveContractByRoomIdAsync(Guid landlordUserId, Guid roomId, CancellationToken cancellationToken = default(CancellationToken))
 	{
-		RentalContract contract = await BaseQuery().AsNoTracking().FirstOrDefaultAsync((RentalContract x) => x.RoomId == roomId && x.DeletedAt == null && (int)x.Status == 9 && x.Room.RoomingHouse.LandlordUserId == landlordUserId, cancellationToken);
+		RentalContract contract = await BaseQuery().AsNoTracking().FirstOrDefaultAsync((RentalContract x) => x.RoomId == roomId && x.DeletedAt == null && x.Status == RentalContractStatus.Active && x.Room.RoomingHouse.LandlordUserId == landlordUserId, cancellationToken);
 		if (contract == null)
 		{
 			return null;
@@ -95,7 +96,7 @@ public class RentalContractService : IRentalContractService
 
 	public async Task<IReadOnlyCollection<ContractOccupantResponse>?> GetActiveTenantsByRoomIdAsync(Guid landlordUserId, Guid roomId, CancellationToken cancellationToken = default(CancellationToken))
 	{
-		RentalContract contract = await BaseQuery().AsNoTracking().FirstOrDefaultAsync((RentalContract x) => x.RoomId == roomId && x.DeletedAt == null && (int)x.Status == 9 && x.Room.RoomingHouse.LandlordUserId == landlordUserId, cancellationToken);
+		RentalContract contract = await BaseQuery().AsNoTracking().FirstOrDefaultAsync((RentalContract x) => x.RoomId == roomId && x.DeletedAt == null && x.Status == RentalContractStatus.Active && x.Room.RoomingHouse.LandlordUserId == landlordUserId, cancellationToken);
 		if (contract == null)
 		{
 			return null;
@@ -108,7 +109,7 @@ public class RentalContractService : IRentalContractService
 	public async Task<IReadOnlyCollection<ContractHistoryItemResponse>> GetMyHistoryAsync(Guid tenantUserId, CancellationToken cancellationToken = default(CancellationToken))
 	{
 		List<RentalContract> contracts = await (from x in BaseQuery().AsNoTracking()
-			where x.DeletedAt == null && x.ActivatedAt != null && ((int)x.Status == 9 || (int)x.Status == 8 || (int)x.Status == 7) && (x.MainTenantUserId == tenantUserId || x.Occupants.Any((ContractOccupant occupant) => occupant.UserId == tenantUserId))
+			where x.DeletedAt == null && x.ActivatedAt != null && (x.Status == RentalContractStatus.Active || x.Status == RentalContractStatus.Expired || x.Status == RentalContractStatus.Cancelled) && (x.MainTenantUserId == tenantUserId || x.Occupants.Any((ContractOccupant occupant) => occupant.UserId == tenantUserId))
 			orderby x.ActivatedAt ?? x.UpdatedAt descending, x.CreatedAt descending
 			select x).ToListAsync(cancellationToken);
 		HashSet<Guid> awaitingIds = await GetAwaitingFinalInvoiceContractIdsAsync(contracts, cancellationToken);
@@ -123,7 +124,7 @@ public class RentalContractService : IRentalContractService
 	public async Task<IReadOnlyCollection<ContractHistoryItemResponse>> GetLandlordContractsAsync(Guid landlordUserId, CancellationToken cancellationToken = default(CancellationToken))
 	{
 		List<RentalContract> contracts = await (from x in BaseQuery().AsNoTracking()
-			where x.DeletedAt == null && x.ActivatedAt != null && ((int)x.Status == 9 || (int)x.Status == 8 || (int)x.Status == 7) && x.Room.RoomingHouse.LandlordUserId == landlordUserId
+			where x.DeletedAt == null && x.ActivatedAt != null && (x.Status == RentalContractStatus.Active || x.Status == RentalContractStatus.Expired || x.Status == RentalContractStatus.Cancelled) && x.Room.RoomingHouse.LandlordUserId == landlordUserId
 			orderby x.ActivatedAt ?? x.UpdatedAt descending, x.CreatedAt descending
 			select x).ToListAsync(cancellationToken);
 		HashSet<Guid> awaitingIds = await GetAwaitingFinalInvoiceContractIdsAsync(contracts, cancellationToken);
@@ -270,7 +271,7 @@ public class RentalContractService : IRentalContractService
 		}
 		ValidateTermsDuration(request, rentalPolicy.MinRentalMonths, rentalPolicy.MaxRentalMonths);
 		DateTimeOffset now = DateTimeOffset.UtcNow;
-		if (await context.RentalContracts.Where((RentalContract x) => x.Id == contractId && x.DeletedAt == null && (int)x.Status == 5).ExecuteUpdateAsync(delegate(UpdateSettersBuilder<RentalContract> setters)
+		if (await context.RentalContracts.Where((RentalContract x) => x.Id == contractId && x.DeletedAt == null && x.Status == RentalContractStatus.TenantRevisionRequested).ExecuteUpdateAsync(delegate(UpdateSettersBuilder<RentalContract> setters)
 		{
 			setters.SetProperty((RentalContract x) => x.StartDate, request.StartDate)
 				.SetProperty((RentalContract x) => x.EndDate, request.EndDate)
@@ -304,7 +305,7 @@ public class RentalContractService : IRentalContractService
 			{
 				await contractSignatureOtpService.VerifyAndConsumeOtpAsync(landlordUserId, contractId, ContractSignerRole.Landlord, request.Otp, cancellationToken);
 				context.ContractSignatures.Add(CreateSignature(contract.Id, landlordUserId, ContractSignerRole.Landlord, request, ipAddress, userAgent, now));
-				if (await context.RentalContracts.Where((RentalContract x) => x.Id == contractId && x.DeletedAt == null && ((int)x.Status == 2 || (int)x.Status == 5)).ExecuteUpdateAsync(delegate(UpdateSettersBuilder<RentalContract> setters)
+				if (await context.RentalContracts.Where((RentalContract x) => x.Id == contractId && x.DeletedAt == null && (x.Status == RentalContractStatus.PendingLandlordSignature || x.Status == RentalContractStatus.TenantRevisionRequested)).ExecuteUpdateAsync(delegate(UpdateSettersBuilder<RentalContract> setters)
 				{
 					setters.SetProperty((RentalContract x) => x.Status, RentalContractStatus.PendingTenantSignature).SetProperty((Expression<Func<RentalContract, string>>)((RentalContract x) => x.StatusReason), (string)null).SetProperty((RentalContract x) => x.SignatureDeadlineAt, now.Add(TenantSignatureTtl))
 						.SetProperty((RentalContract x) => x.UpdatedAt, now);
@@ -347,7 +348,7 @@ public class RentalContractService : IRentalContractService
 			{
 				await contractSignatureOtpService.VerifyAndConsumeOtpAsync(tenantUserId, contractId, ContractSignerRole.Tenant, request.Otp, cancellationToken);
 				context.ContractSignatures.Add(CreateSignature(contract.Id, tenantUserId, ContractSignerRole.Tenant, request, ipAddress, userAgent, now));
-				if (await context.RentalContracts.Where((RentalContract x) => x.Id == contractId && x.DeletedAt == null && (int)x.Status == 4).ExecuteUpdateAsync(delegate(UpdateSettersBuilder<RentalContract> setters)
+				if (await context.RentalContracts.Where((RentalContract x) => x.Id == contractId && x.DeletedAt == null && x.Status == RentalContractStatus.PendingTenantSignature).ExecuteUpdateAsync(delegate(UpdateSettersBuilder<RentalContract> setters)
 				{
 					setters.SetProperty((RentalContract x) => x.Status, RentalContractStatus.Active).SetProperty((Expression<Func<RentalContract, string>>)((RentalContract x) => x.StatusReason), (string)null).SetProperty((Expression<Func<RentalContract, DateTimeOffset?>>)((RentalContract x) => x.SignatureDeadlineAt), (DateTimeOffset?)null)
 						.SetProperty((RentalContract x) => x.ActivatedAt, now)
@@ -1035,7 +1036,7 @@ public class RentalContractService : IRentalContractService
 			userIds.Add(occupantUserId);
 		}
 		return (from x in await (from x in context.KycVerifications.AsNoTracking()
-				where userIds.Contains(x.UserId) && (int)x.Status == 4
+				where userIds.Contains(x.UserId) && x.Status == KycVerificationStatus.Approved
 				select x).ToListAsync(cancellationToken)
 			group x by x.UserId into x
 			select x.OrderByDescending((KycVerification k) => k.ReviewedAt ?? k.UpdatedAt).First() into x
@@ -1565,7 +1566,7 @@ public class RentalContractService : IRentalContractService
 		}
 		List<Guid> userIdsForKyc = users.Select((User x) => x.Id).ToList();
 		Dictionary<Guid, KycVerification> latestApprovedKycByUserId = (from x in await (from x in context.KycVerifications.AsNoTracking()
-				where userIdsForKyc.Contains(x.UserId) && (int)x.Status == 4
+				where userIdsForKyc.Contains(x.UserId) && x.Status == KycVerificationStatus.Approved
 				select x).ToListAsync(cancellationToken)
 			group x by x.UserId).ToDictionary((IGrouping<Guid, KycVerification> x) => x.Key, (IGrouping<Guid, KycVerification> x) => x.OrderByDescending((KycVerification k) => k.ReviewedAt ?? k.UpdatedAt).First());
 		List<Guid> notApprovedKycUserIds = userIdsForKyc.Except(latestApprovedKycByUserId.Keys).ToList();

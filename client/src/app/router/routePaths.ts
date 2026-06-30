@@ -10,8 +10,7 @@ export const ROUTE_PATHS = {
         ROOT: '/home',
         KYC: '/me/kyc',
         KYC_STATUS: '/me/kyc/status',
-        ROOM_DETAIL: (houseId: string, roomId: string) => `/rooming-houses/${houseId}/rooms/${roomId}`,
-        VIEWING_APPOINTMENTS: '/me/viewing-appointments'
+        ROOM_DETAIL: (houseId: string, roomId: string) => `/rooming-houses/${houseId}/rooms/${roomId}`
     },
     ACCOUNT: {
         ROOT: '/account',
@@ -22,13 +21,12 @@ export const ROUTE_PATHS = {
         TOPUP_RESULT: '/account/wallet/topup-result',
         VIEWING_APPOINTMENTS: '/account/viewing-appointments',
         NOTIFICATIONS: '/notifications',
-    RENTAL_REQUESTS: '/account/rental-requests',
+        RENTAL_REQUESTS: '/account/rental-requests',
         RENTAL_REQUEST_DETAIL: (id: string) => `/account/rental-requests/${id}`,
         RENTAL_HISTORY: '/account/rental-history',
         RENTAL_HISTORY_DETAIL: (id: string) => `/account/rental-history/${id}`,
         INVOICES: '/account/invoices',
-        INVOICE_DETAIL: (id: string) => `/account/invoices/${id}`,
-        CONTRACT_SETUP: (id: string) => `/account/contracts/${id}/setup`
+        INVOICE_DETAIL: (id: string) => `/account/invoices/${id}`
     },
     LANDLORD: {
         REGISTER: '/landlord/register',
@@ -45,12 +43,6 @@ export const ROUTE_PATHS = {
         INVOICE_DETAIL: (id: string) => `/landlord/invoices/${id}`,
         CONTRACTS: '/landlord/contracts',
         CONTRACT_DETAIL: (id: string) => `/landlord/contracts/${id}`
-    },
-    TEST: {
-        RENTAL_FLOW: '/test/rental-flow'
-    },
-    RENTAL_REQUESTS: {
-        SUBMIT: '/rental-requests/submit'
     },
     ADMIN: {
         ROOT: '/admin',

@@ -1,8 +1,7 @@
 import { useEffect, useState, useCallback } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
-import { ROUTE_PATHS } from '../../../app/router/routePaths';
 import { getNotifications, markAsRead, markAllAsRead, deleteNotification } from '../api';
-import { getMockNotifications, saveMockDeletedId } from '../mockNotifications';
+import { getNotificationCategory, getNotificationLink, getNotificationRole } from '../notificationUtils';
 import type { Notification } from '../types';
 import { LoadingState } from '../../../shared/components/feedback/LoadingState';
 import './NotificationsPage.css';
@@ -23,32 +22,10 @@ function formatDateTimeString(isoString: string): string {
   return `${timeStr}  •  ${day}/${month}/${year}`;
 }
 
-function getNotificationRole(notification: Notification): 'tenant' | 'landlord' {
-  const type = notification.type;
-  const title = notification.title.toLowerCase();
-  const body = notification.body.toLowerCase();
-  
-  if (
-    type === 'NewRentalRequest' ||
-    type === 'NewViewingAppointment' ||
-    title.includes('khách thuê') ||
-    body.includes('muốn xem phòng') ||
-    body.includes('đã gửi yêu cầu thuê') ||
-    title.includes('nhận thanh toán') ||
-    body.includes('nhận được thanh toán')
-  ) {
-    return 'landlord';
-  }
-  
-  return 'tenant';
-}
-
 function getNotificationCategoryInfo(notification: Notification) {
-  const isViewingAppointment = notification.referenceType === 'ViewingAppointment' || notification.type.toLowerCase().includes('viewing') || notification.title.toLowerCase().includes('lịch hẹn');
-  const isBilling = notification.referenceType === 'Billing' || notification.referenceType === 'Invoice' || notification.referenceType === 'Payment' || notification.title.toLowerCase().includes('hóa đơn') || notification.title.toLowerCase().includes('thanh toán');
-  const isRentalRequest = notification.referenceType === 'RentalRequest' || notification.type.toLowerCase().includes('rentalrequest') || notification.title.toLowerCase().includes('yêu cầu thuê');
+  const category = getNotificationCategory(notification);
 
-  if (isRentalRequest) {
+  if (category === 'rental') {
     return {
       theme: 'orange',
       label: 'Yêu cầu thuê trọ',
@@ -61,7 +38,7 @@ function getNotificationCategoryInfo(notification: Notification) {
     };
   }
 
-  if (isViewingAppointment) {
+  if (category === 'appointment') {
     return {
       theme: 'sky',
       label: 'Lịch hẹn',
@@ -76,7 +53,7 @@ function getNotificationCategoryInfo(notification: Notification) {
     };
   }
 
-  if (isBilling) {
+  if (category === 'billing') {
     return {
       theme: 'green',
       label: 'Thanh toán',
@@ -164,13 +141,9 @@ export default function NotificationsPage() {
     setLoading(true);
     try {
       const items = await getNotifications(100);
-      if (items.length > 0) {
-        setNotifications(items);
-      } else {
-        setNotifications(getMockNotifications());
-      }
+      setNotifications(items);
     } catch {
-      setNotifications(getMockNotifications());
+      setNotifications([]);
     } finally {
       setLoading(false);
     }
@@ -183,9 +156,7 @@ export default function NotificationsPage() {
   const handleMarkRead = async (notification: Notification) => {
     if (!notification.isRead) {
       try {
-        if (!notification.id.startsWith('mock-')) {
-          await markAsRead(notification.id);
-        }
+        await markAsRead(notification.id);
         setNotifications(prev =>
           prev.map(n => (n.id === notification.id ? { ...n, isRead: true } : n))
         );
@@ -194,37 +165,13 @@ export default function NotificationsPage() {
       }
     }
 
-    if (notification.id.startsWith('mock-')) return;
-    
-    const role = getNotificationRole(notification);
-    if (role === 'landlord') {
-      if (notification.referenceType === 'ViewingAppointment') {
-        navigate(ROUTE_PATHS.LANDLORD.VIEWING_APPOINTMENTS);
-      } else if (notification.referenceType === 'RentalRequest' && notification.referenceId) {
-        navigate(`/landlord/rental-requests/${notification.referenceId}`);
-      } else if ((notification.referenceType === 'Billing' || notification.referenceType === 'Invoice' || notification.referenceType === 'Payment') && notification.referenceId) {
-        navigate(`/landlord/invoices/${notification.referenceId}`);
-      }
-    } else {
-      if (notification.referenceType === 'ViewingAppointment') {
-        navigate(ROUTE_PATHS.ACCOUNT.VIEWING_APPOINTMENTS);
-      } else if (notification.referenceType === 'RentalRequest' && notification.referenceId) {
-        navigate(`/account/rental-requests/${notification.referenceId}`);
-      } else if ((notification.referenceType === 'Billing' || notification.referenceType === 'Invoice' || notification.referenceType === 'Payment') && notification.referenceId) {
-        navigate(`/account/invoices/${notification.referenceId}`);
-      }
-    }
+    navigate(getNotificationLink(notification));
   };
 
   const handleMarkAllRead = async () => {
     try {
-      const hasMock = notifications.some(n => n.id.startsWith('mock-'));
-      if (hasMock) {
-        setNotifications(prev => prev.map(n => ({ ...n, isRead: true })));
-      } else {
-        await markAllAsRead();
-        setNotifications(prev => prev.map(n => ({ ...n, isRead: true })));
-      }
+      await markAllAsRead();
+      setNotifications(prev => prev.map(n => ({ ...n, isRead: true })));
     } catch {
       setNotifications(prev => prev.map(n => ({ ...n, isRead: true })));
     }
@@ -235,11 +182,6 @@ export default function NotificationsPage() {
 
     // Always remove from local state first
     setNotifications(prev => prev.filter(n => n.id !== id));
-
-    if (id.startsWith('mock-')) {
-      saveMockDeletedId(id);
-      return;
-    }
 
     // Real notification: call API
     try {
@@ -257,23 +199,15 @@ export default function NotificationsPage() {
   const unreadCount = roleNotifications.filter(n => !n.isRead).length;
   
   const rentalCount = roleNotifications.filter(n => 
-    n.referenceType === 'RentalRequest' || 
-    n.type.toLowerCase().includes('rentalrequest') || 
-    n.title.toLowerCase().includes('yêu cầu thuê')
+    getNotificationCategory(n) === 'rental'
   ).length;
 
   const appointmentCount = roleNotifications.filter(n => 
-    n.referenceType === 'ViewingAppointment' || 
-    n.type.toLowerCase().includes('viewing') || 
-    n.title.toLowerCase().includes('lịch hẹn')
+    getNotificationCategory(n) === 'appointment'
   ).length;
 
   const billingCount = roleNotifications.filter(n => 
-    n.referenceType === 'Billing' || 
-    n.referenceType === 'Invoice' || 
-    n.referenceType === 'Payment' || 
-    n.title.toLowerCase().includes('hóa đơn') || 
-    n.title.toLowerCase().includes('thanh toán')
+    getNotificationCategory(n) === 'billing'
   ).length;
 
   const getFilteredItems = () => {
@@ -283,23 +217,15 @@ export default function NotificationsPage() {
       filtered = filtered.filter(n => !n.isRead);
     } else if (activeTab === 'rental') {
       filtered = filtered.filter(n => 
-        n.referenceType === 'RentalRequest' || 
-        n.type.toLowerCase().includes('rentalrequest') || 
-        n.title.toLowerCase().includes('yêu cầu thuê')
+        getNotificationCategory(n) === 'rental'
       );
     } else if (activeTab === 'appointment') {
       filtered = filtered.filter(n => 
-        n.referenceType === 'ViewingAppointment' || 
-        n.type.toLowerCase().includes('viewing') || 
-        n.title.toLowerCase().includes('lịch hẹn')
+        getNotificationCategory(n) === 'appointment'
       );
     } else if (activeTab === 'billing') {
       filtered = filtered.filter(n => 
-        n.referenceType === 'Billing' || 
-        n.referenceType === 'Invoice' || 
-        n.referenceType === 'Payment' || 
-        n.title.toLowerCase().includes('hóa đơn') || 
-        n.title.toLowerCase().includes('thanh toán')
+        getNotificationCategory(n) === 'billing'
       );
     }
     
@@ -343,13 +269,6 @@ export default function NotificationsPage() {
             </div>
           </div>
           <div className="notifications-header-actions">
-            <button className="notifications-settings-btn" type="button" onClick={() => alert('Chức năng cài đặt thông báo đang được phát triển.')}>
-              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
-                <circle cx="12" cy="12" r="3" />
-                <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z" />
-              </svg>
-              <span>Cài đặt</span>
-            </button>
             {unreadCount > 0 && (
               <button className="notifications-mark-read-btn" type="button" onClick={handleMarkAllRead}>
                 <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">

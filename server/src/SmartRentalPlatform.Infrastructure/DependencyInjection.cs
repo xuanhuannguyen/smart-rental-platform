@@ -88,7 +88,7 @@ public static class DependencyInjection
 
         var useMock = configuration
             .GetSection(VnptEkycOptions.SectionName)
-            .GetValue(nameof(VnptEkycOptions.UseMock), true);
+            .GetValue(nameof(VnptEkycOptions.UseMock), false);
 
         if (useMock)
         {

@@ -41,7 +41,6 @@ public static class DependencyInjection
         services.AddScoped<IRoomingHouseQueryService, RoomingHouseQueryService>();
         services.AddScoped<IRoomingHouseAiChatService, RoomingHouseAiChatService>();
         services.AddScoped<IRoomingHouseSearchParser, RoomingHouseSearchParser>();
-        services.AddScoped<IRoomingHouseSearchIntentEnricher, NoopRoomingHouseSearchIntentEnricher>();
         services.AddScoped<IRoomingHouseSearchIntentEnricher, GeminiRoomingHouseSearchIntentEnricher>();
         services.AddScoped<IRoomingHouseRecommendationScorer, RuleBasedRoomingHouseRecommendationScorer>();
         services.AddScoped<IRoomingHouseRecommendationReranker, GeminiRoomingHouseRecommendationReranker>();

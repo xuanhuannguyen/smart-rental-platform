@@ -1,5 +1,6 @@
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
+using SmartRentalPlatform.Api.Extensions;
 using SmartRentalPlatform.Application.Common.Interfaces;
 using SmartRentalPlatform.Application.RoomDeposits;
 using SmartRentalPlatform.Contracts.Common;
@@ -51,11 +52,6 @@ public class RoomDepositsController : ControllerBase
 
     private Guid GetCurrentUserId()
     {
-        if (!currentUserService.IsAuthenticated || currentUserService.UserId is null)
-        {
-            throw new UnauthorizedAccessException("Không tìm thấy mã người dùng đã đăng nhập.");
-        }
-
-        return currentUserService.UserId.Value;
+        return currentUserService.GetRequiredUserId("Không tìm thấy mã người dùng đã đăng nhập.");
     }
 }

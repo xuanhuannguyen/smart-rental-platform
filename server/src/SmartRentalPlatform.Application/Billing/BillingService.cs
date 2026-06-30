@@ -52,13 +52,9 @@ public class BillingService : IBillingService
             .Include(x => x.Room)
                 .ThenInclude(x => x.RoomingHouse)
             .Include(x => x.MainTenantUser)
+            .WhereActiveForOccupiedOrReservedRoom()
             .Where(x => x.RoomId == roomId &&
-                        x.Status == RentalContractStatus.Active &&
-                        (x.Room.Status == RoomStatus.Occupied ||
-                         x.Room.Status == RoomStatus.Reserved) &&
-                        x.Room.RoomingHouse.LandlordUserId == landlordUserId &&
-                        x.Room.DeletedAt == null &&
-                        x.Room.RoomingHouse.DeletedAt == null)
+                        x.Room.RoomingHouse.LandlordUserId == landlordUserId)
             .OrderByDescending(x => x.ActivatedAt ?? x.CreatedAt)
             .FirstOrDefaultAsync(cancellationToken)
             ?? throw new NotFoundException(
@@ -129,13 +125,9 @@ public class BillingService : IBillingService
             .AsNoTracking()
             .Include(x => x.Room)
                 .ThenInclude(x => x.RoomingHouse)
+            .WhereActiveForOccupiedOrReservedRoom()
             .Where(x => x.RoomId == roomId &&
-                        x.Status == RentalContractStatus.Active &&
-                        (x.Room.Status == RoomStatus.Occupied ||
-                         x.Room.Status == RoomStatus.Reserved) &&
-                        x.Room.RoomingHouse.LandlordUserId == landlordUserId &&
-                        x.Room.DeletedAt == null &&
-                        x.Room.RoomingHouse.DeletedAt == null)
+                        x.Room.RoomingHouse.LandlordUserId == landlordUserId)
             .OrderByDescending(x => x.ActivatedAt ?? x.CreatedAt)
             .FirstOrDefaultAsync(cancellationToken)
             ?? throw new NotFoundException(

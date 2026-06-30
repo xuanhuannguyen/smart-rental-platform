@@ -47,6 +47,17 @@ public class ExceptionHandlingMiddleware
                 Details = ex.Details
             });
         }
+        catch (UnauthorizedAccessException ex)
+        {
+            _logger.LogWarning("Unauthorized access exception: {Message}", ex.Message);
+
+            await WriteErrorResponse(context, StatusCodes.Status401Unauthorized, new ApiErrorResponse
+            {
+                Success = false,
+                ErrorCode = "UNAUTHORIZED",
+                Message = ex.Message
+            });
+        }
         catch (Exception ex)
         {
             // Lỗi không mong đợi — log error đầy đủ, trả 500 chung.

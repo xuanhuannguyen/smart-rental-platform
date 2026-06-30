@@ -1,5 +1,6 @@
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
+using SmartRentalPlatform.Api.Extensions;
 using SmartRentalPlatform.Application.Common.Interfaces;
 using SmartRentalPlatform.Application.ViewingAppointments;
 using SmartRentalPlatform.Contracts.Common;
@@ -219,12 +220,7 @@ namespace SmartRentalPlatform.Api.Controllers.Properties
 
         private Guid GetCurrentUserId()
         {
-            if (!_currentUserService.IsAuthenticated || _currentUserService.UserId is null)
-            {
-                throw new UnauthorizedAccessException("Không tìm thấy mã người dùng đã đăng nhập.");
-            }
-
-            return _currentUserService.UserId.Value;
+            return _currentUserService.GetRequiredUserId("Không tìm thấy mã người dùng đã đăng nhập.");
         }
     }
 }

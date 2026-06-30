@@ -5,6 +5,7 @@ using SmartRentalPlatform.Application.Common.Interfaces;
 using SmartRentalPlatform.Contracts.Billing.Requests;
 using SmartRentalPlatform.Contracts.Billing.Responses;
 using SmartRentalPlatform.Contracts.Common;
+using SmartRentalPlatform.Api.Extensions;
 
 namespace SmartRentalPlatform.Api.Controllers;
 
@@ -50,7 +51,7 @@ public class BillingController : ControllerBase
         return Ok(new ApiResponse<RoomBillingContextResponse>
         {
             Success = true,
-            Message = "Tai thong tin phong va hop dong active thanh cong.",
+            Message = "Tải thông tin phòng và hợp đồng active thành công.",
             Data = result
         });
     }
@@ -73,7 +74,7 @@ public class BillingController : ControllerBase
         return Ok(new ApiResponse<RoomInvoicePreviewResponse>
         {
             Success = true,
-            Message = "Tai thong tin xem truoc hoa don thanh cong.",
+            Message = "Tải thông tin xem trước hóa đơn thành công.",
             Data = result
         });
     }
@@ -132,7 +133,7 @@ public class BillingController : ControllerBase
         return Ok(new ApiResponse<List<InvoiceResponse>>
         {
             Success = true,
-            Message = "Tai danh sach hoa don thanh cong.",
+            Message = "Tải danh sách hóa đơn thành công.",
             Data = result
         });
     }
@@ -148,7 +149,7 @@ public class BillingController : ControllerBase
         return Ok(new ApiResponse<InvoiceResponse>
         {
             Success = true,
-            Message = "Tai chi tiet hoa don thanh cong.",
+            Message = "Tải chi tiết hóa đơn thành công.",
             Data = result
         });
     }
@@ -164,7 +165,7 @@ public class BillingController : ControllerBase
         return Ok(new ApiResponse<InvoiceResponse>
         {
             Success = true,
-            Message = "Phat hanh hoa don thanh cong.",
+            Message = "Phát hành hóa đơn thành công.",
             Data = result
         });
     }
@@ -181,7 +182,7 @@ public class BillingController : ControllerBase
         return Ok(new ApiResponse<InvoiceResponse>
         {
             Success = true,
-            Message = "Huy hoa don thanh cong.",
+            Message = "Hủy hóa đơn thành công.",
             Data = result
         });
     }
@@ -196,7 +197,7 @@ public class BillingController : ControllerBase
         return Ok(new ApiResponse<List<InvoiceResponse>>
         {
             Success = true,
-            Message = "Tai danh sach hoa don thanh cong.",
+            Message = "Tải danh sách hóa đơn thành công.",
             Data = result
         });
     }
@@ -250,7 +251,7 @@ public class BillingController : ControllerBase
         return Ok(new ApiResponse<InvoiceResponse>
         {
             Success = true,
-            Message = "Tai chi tiet hoa don thanh cong.",
+            Message = "Tải chi tiết hóa đơn thành công.",
             Data = result
         });
     }
@@ -266,18 +267,14 @@ public class BillingController : ControllerBase
         return Ok(new ApiResponse<InvoiceResponse>
         {
             Success = true,
-            Message = "Thanh toan hoa don thanh cong.",
+            Message = "Thanh toán hóa đơn thành công.",
             Data = result
         });
     }
 
     private Guid GetCurrentUserId()
     {
-        if (!currentUserService.IsAuthenticated || currentUserService.UserId is null)
-        {
-            throw new UnauthorizedAccessException("Khong tim thay nguoi dung dang dang nhap.");
-        }
-
-        return currentUserService.UserId.Value;
+        return currentUserService.GetRequiredUserId("Không tìm thấy người dùng đang đăng nhập.");
     }
 }
+
