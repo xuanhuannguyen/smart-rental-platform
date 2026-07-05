@@ -12,6 +12,7 @@ using SmartRentalPlatform.Infrastructure.ExternalServices.Email;
 using SmartRentalPlatform.Infrastructure.ExternalServices.Gemini;
 using SmartRentalPlatform.Infrastructure.ExternalServices.Google;
 using SmartRentalPlatform.Infrastructure.ExternalServices.PayOS;
+using SmartRentalPlatform.Infrastructure.ExternalServices.Ai;
 using SmartRentalPlatform.Infrastructure.ExternalServices.VietMap;
 using SmartRentalPlatform.Infrastructure.Identity;
 using SmartRentalPlatform.Infrastructure.Options;
@@ -43,6 +44,13 @@ public static class DependencyInjection
         services.AddHttpContextAccessor();
         services.AddScoped<ICurrentUserService, CurrentUserService>();
         services.AddScoped<IFileStorageService, LocalFileStorageService>();
+        services.Configure<MeterAiOptions>(configuration.GetSection(MeterAiOptions.SectionName));
+        services.AddHttpClient<IMeterAiClient, MeterAiClient>((provider, client) =>
+        {
+            var options = provider.GetRequiredService<IOptions<MeterAiOptions>>().Value;
+            client.BaseAddress = new Uri(options.BaseUrl.TrimEnd('/') + "/");
+            client.Timeout = TimeSpan.FromSeconds(options.TimeoutSeconds);
+        });
         services.Configure<VietMapOptions>(configuration.GetSection(VietMapOptions.SectionName));
         services.AddHttpClient<IVietMapService, VietMapService>((provider, client) =>
         {

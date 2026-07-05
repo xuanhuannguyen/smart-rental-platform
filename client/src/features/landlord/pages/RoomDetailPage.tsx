@@ -3,6 +3,7 @@ import { useParams, useNavigate, useLocation } from 'react-router-dom';
 import { useAuth } from '../../../app/providers/AuthProvider';
 import { ROUTE_PATHS } from '../../../app/router/routePaths';
 import { getApiErrorMessage } from '../../../shared/api/apiError';
+import { toAssetUrl } from '../../../shared/api/assets';
 import { Button } from '../../../shared/components/ui/Button';
 import { formatStatus, getStatusToneClass } from '../../../shared/utils/status';
 import { contractApi } from '../../contracts/api';
@@ -1199,6 +1200,18 @@ type ReadingDraft = {
   previousReading: number;
   currentReading: number;
   proofImageObjectKey: string;
+  proofImageUrl: string;
+  aiReading: number | null;
+  aiRawText: string;
+};
+
+const emptyInvoiceReadingDraft: ReadingDraft = {
+  previousReading: 0,
+  currentReading: 0,
+  proofImageObjectKey: '',
+  proofImageUrl: '',
+  aiReading: null,
+  aiRawText: '',
 };
 
 function CreateInvoiceWithReadingsModal({
@@ -1221,6 +1234,7 @@ function CreateInvoiceWithReadingsModal({
   const [note, setNote] = useState('');
   const [loading, setLoading] = useState(true);
   const [submitting, setSubmitting] = useState(false);
+  const [uploadingServiceId, setUploadingServiceId] = useState('');
   const [error, setError] = useState('');
   const latestReadingByServiceType = Object.fromEntries(
     (preview?.meteredServices ?? []).map((service) => [service.serviceTypeId, service.latestReading ?? null])
@@ -1290,9 +1304,9 @@ function CreateInvoiceWithReadingsModal({
         response.data.meteredServices.forEach((service) => {
           const latestReading = service.latestReading;
           nextReadings[service.serviceTypeId] = {
+            ...emptyInvoiceReadingDraft,
             previousReading: latestReading?.currentReading ?? 0,
             currentReading: latestReading?.currentReading ?? 0,
-            proofImageObjectKey: '',
           };
         });
         setReadings(nextReadings);
@@ -1335,10 +1349,44 @@ function CreateInvoiceWithReadingsModal({
     setReadings((current) => ({
       ...current,
       [serviceTypeId]: {
-        ...(current[serviceTypeId] ?? { previousReading: 0, currentReading: 0, proofImageObjectKey: '' }),
+        ...(current[serviceTypeId] ?? emptyInvoiceReadingDraft),
         ...patch,
       },
     }));
+  }
+
+  async function handleMeterImage(serviceTypeId: string, file?: File) {
+    if (!file || !period) return;
+    if (!['image/jpeg', 'image/png'].includes(file.type)) {
+      setError('Chỉ hỗ trợ ảnh đồng hồ định dạng JPG hoặc PNG.');
+      return;
+    }
+    if (file.size > 5 * 1024 * 1024) {
+      setError('Dung lượng ảnh đồng hồ không được vượt quá 5MB.');
+      return;
+    }
+
+    setUploadingServiceId(serviceTypeId);
+    setError('');
+    try {
+      const response = await billingApi.readMeterImage({
+        contractId: contract.id,
+        serviceTypeId,
+        billingPeriodStart: period.start,
+        file,
+      });
+      updateReading(serviceTypeId, {
+        currentReading: response.data.reading,
+        aiReading: response.data.reading,
+        aiRawText: response.data.rawText,
+        proofImageObjectKey: response.data.proofImageObjectKey,
+        proofImageUrl: response.data.proofImageUrl,
+      });
+    } catch (err) {
+      setError(getApiErrorMessage(err, 'Không thể đọc chỉ số từ ảnh. Vui lòng thử ảnh rõ hơn.'));
+    } finally {
+      setUploadingServiceId('');
+    }
   }
 
   async function handleSubmit(event: FormEvent) {
@@ -1356,17 +1404,23 @@ function CreateInvoiceWithReadingsModal({
     }
 
     const meterReadings: MeterReadingInput[] = meteredPrices.map((price) => {
-      const draft = readings[price.serviceTypeId] ?? { previousReading: 0, currentReading: 0, proofImageObjectKey: '' };
+      const draft = readings[price.serviceTypeId] ?? emptyInvoiceReadingDraft;
       const latestReading = latestReadingByServiceType[price.serviceTypeId];
       return {
         serviceTypeId: price.serviceTypeId,
         previousReading: latestReading ? null : Number(draft.previousReading),
         currentReading: Number(draft.currentReading),
         proofImageObjectKey: draft.proofImageObjectKey.trim() || null,
+        aiReading: draft.aiReading,
+        aiRawText: draft.aiRawText.trim() || null,
       };
     });
 
     for (const reading of meterReadings) {
+      if (!reading.proofImageObjectKey || reading.aiReading === null || !reading.aiRawText) {
+        setError('Vui lòng upload và đọc ảnh cho tất cả dịch vụ tính theo chỉ số.');
+        return;
+      }
       const latestReading = latestReadingByServiceType[reading.serviceTypeId];
       const previousReading = latestReading?.currentReading ?? reading.previousReading;
       if (previousReading !== null && previousReading !== undefined && reading.currentReading < previousReading) {
@@ -1464,44 +1518,52 @@ function CreateInvoiceWithReadingsModal({
                   ) : (
                     <div className="invoice-create-meter-list">
                       {meteredPrices.map((price) => {
-                        const draft = readings[price.serviceTypeId] ?? { previousReading: 0, currentReading: 0, proofImageObjectKey: '' };
+                        const draft = readings[price.serviceTypeId] ?? emptyInvoiceReadingDraft;
                         const latestReading = latestReadingByServiceType[price.serviceTypeId];
                         const previousReading = latestReading?.currentReading ?? Number(draft.previousReading);
                         const consumption = Math.max(0, Number(draft.currentReading) - previousReading);
                         const amount = Math.round(consumption * price.unitPrice);
                         return (
                           <div key={price.serviceTypeId} className="invoice-create-meter-card">
-                            <strong>{price.serviceName} ({formatMoneyString(price.unitPrice)} đ / {price.meterUnitName})</strong>
-                            <div className="invoice-create-grid">
-                              {latestReading ? (
+                            <div className="meter-reading-main">
+                              <strong className="meter-reading-title">{price.serviceName} ({formatMoneyString(price.unitPrice)} đ / {price.meterUnitName})</strong>
+                              <div className="meter-reading-fields">
                                 <div className="invoice-create-field">
                                   <span className="label">Chỉ số cũ</span>
-                                  <strong>{latestReading.currentReading}</strong>
+                                  <strong>{previousReading} {price.meterUnitName}</strong>
+                                  <small>Giữ nguyên từ kỳ trước</small>
                                 </div>
-                              ) : (
+                                <div className="invoice-create-field">
+                                  <span className="label">Chỉ số mới (AI)</span>
+                                  <strong>{draft.aiReading ?? '--'} {draft.aiReading !== null ? price.meterUnitName : ''}</strong>
+                                  <small>{draft.aiReading !== null ? 'Đọc từ ảnh' : 'Chưa upload ảnh'}</small>
+                                </div>
                                 <label className="invoice-create-field">
-                                  <span className="label">Chỉ số cũ</span>
-                                  <input
-                                    type="number"
-                                    min="0"
-                                    value={draft.previousReading}
-                                    onChange={(event) => updateReading(price.serviceTypeId, { previousReading: Number(event.target.value) })}
-                                  />
+                                  <span className="label">Chỉ số xác nhận cuối cùng</span>
+                                  <input type="number" min="0" value={draft.currentReading} disabled={draft.aiReading === null} onChange={(event) => updateReading(price.serviceTypeId, { currentReading: Number(event.target.value) })} />
+                                  {draft.aiReading !== null && (
+                                    <small className={draft.currentReading === draft.aiReading ? 'meter-ok' : 'meter-edited'}>
+                                      {draft.currentReading === draft.aiReading ? '✓ Không chỉnh sửa' : '✓ Đã chỉnh sửa kết quả AI'}
+                                    </small>
+                                  )}
                                 </label>
-                              )}
-                              <label className="invoice-create-field">
-                                <span className="label">Chỉ số mới</span>
-                                <input
-                                  type="number"
-                                  min="0"
-                                  value={draft.currentReading}
-                                  onChange={(event) => updateReading(price.serviceTypeId, { currentReading: Number(event.target.value) })}
-                                />
-                              </label>
-                              <div className="invoice-create-field invoice-create-total">
-                                <span className="label">Tạm tính</span>
-                                <strong>{formatMoneyString(consumption)} x {formatMoneyString(price.unitPrice)} = {formatMoneyString(amount)} đ</strong>
                               </div>
+                              <div className="meter-calculation">
+                                <span><small>TIÊU THỤ</small><strong>{formatMoneyString(consumption)} {price.meterUnitName}</strong></span>
+                                <b>×</b>
+                                <span><small>ĐƠN GIÁ</small><strong>{formatMoneyString(price.unitPrice)} / {price.meterUnitName}</strong></span>
+                                <b>=</b>
+                                <span><small>TẠM TÍNH</small><strong className="meter-amount">{formatMoneyString(amount)} đ</strong></span>
+                              </div>
+                            </div>
+                            <div className="meter-image-panel">
+                              <span className="label">ẢNH ĐỒNG HỒ {price.serviceName.toUpperCase()}</span>
+                              {draft.proofImageUrl ? <img src={toAssetUrl(draft.proofImageUrl)} alt={`Đồng hồ ${price.serviceName}`} /> : <div className="meter-image-empty">Chưa có ảnh đồng hồ</div>}
+                              <label className="meter-upload-button">
+                                {uploadingServiceId === price.serviceTypeId ? 'AI đang đọc ảnh...' : draft.proofImageUrl ? 'Thay ảnh' : 'Upload & đọc ảnh'}
+                                <input type="file" accept="image/jpeg,image/png" disabled={uploadingServiceId !== ''} onChange={(event) => { void handleMeterImage(price.serviceTypeId, event.target.files?.[0]); event.currentTarget.value = ''; }} />
+                              </label>
+                              <small>JPG, PNG · tối đa 5MB</small>
                             </div>
                           </div>
                         );
@@ -1530,7 +1592,7 @@ function CreateInvoiceWithReadingsModal({
 
           <div className="history-modal-footer">
             <Button variant="outline" type="button" onClick={onClose} disabled={submitting}>Đóng</Button>
-            <Button type="submit" disabled={loading || submitting || !period || !preview || Boolean(previewBlockReason)}>{submitting ? 'Đang tạo...' : 'Tạo hóa đơn nháp'}</Button>
+            <Button type="submit" disabled={loading || submitting || uploadingServiceId !== '' || !period || !preview || Boolean(previewBlockReason)}>{submitting ? 'Đang tạo...' : 'Tạo hóa đơn nháp'}</Button>
           </div>
         </form>
       </div>

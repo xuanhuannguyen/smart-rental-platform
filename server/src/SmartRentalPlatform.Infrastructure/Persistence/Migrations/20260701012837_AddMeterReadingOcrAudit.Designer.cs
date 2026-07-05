@@ -2,6 +2,7 @@
 using System;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
 using SmartRentalPlatform.Infrastructure.Persistence;
@@ -11,9 +12,11 @@ using SmartRentalPlatform.Infrastructure.Persistence;
 namespace SmartRentalPlatform.Infrastructure.Persistence.Migrations
 {
     [DbContext(typeof(AppDbContext))]
-    partial class AppDbContextModelSnapshot : ModelSnapshot
+    [Migration("20260701012837_AddMeterReadingOcrAudit")]
+    partial class AddMeterReadingOcrAudit
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        /// <inheritdoc />
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder
@@ -33973,14 +33976,14 @@ namespace SmartRentalPlatform.Infrastructure.Persistence.Migrations
                         .HasColumnType("numeric(12,2)")
                         .HasColumnName("current_reading");
 
-                    b.Property<string>("AiRawText")
+                    b.Property<string>("OcrRawText")
                         .HasColumnType("text")
-                        .HasColumnName("ai_raw_text");
+                        .HasColumnName("ocr_raw_text");
 
-                    b.Property<decimal?>("AiReading")
+                    b.Property<decimal?>("OcrReading")
                         .HasPrecision(12, 2)
                         .HasColumnType("numeric(12,2)")
-                        .HasColumnName("ai_reading");
+                        .HasColumnName("ocr_reading");
 
                     b.Property<decimal>("PreviousReading")
                         .HasPrecision(12, 2)

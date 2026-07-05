@@ -764,6 +764,121 @@ public class BillingService : IBillingService
         return await GetInvoiceResponseAsync(invoice.Id, cancellationToken);
     }
 
+    public async Task<BulkInvoiceResultResponse> GenerateBulkInvoicesAsync(
+        Guid landlordUserId,
+        GenerateBulkInvoicesRequest request,
+        CancellationToken cancellationToken = default)
+    {
+        if (request.RoomingHouseId == Guid.Empty)
+        {
+            throw new BadRequestException(ErrorCodes.InvoiceInvalidStatus, "Vui lòng chọn khu trọ.");
+        }
+
+        if (request.BillingPeriodEnd < request.BillingPeriodStart ||
+            request.BillingPeriodStart.Year != request.BillingPeriodEnd.Year ||
+            request.BillingPeriodStart.Month != request.BillingPeriodEnd.Month)
+        {
+            throw new BadRequestException(ErrorCodes.InvoiceInvalidStatus, "Kỳ hóa đơn không hợp lệ.");
+        }
+
+        if (request.Rooms is null || request.Rooms.Count == 0)
+        {
+            throw new BadRequestException(ErrorCodes.InvoiceInvalidStatus, "Vui lòng chọn ít nhất một phòng để tạo hóa đơn.");
+        }
+
+        var duplicatedContract = request.Rooms
+            .GroupBy(x => x.ContractId)
+            .FirstOrDefault(x => x.Count() > 1);
+        if (duplicatedContract is not null)
+        {
+            throw new BadRequestException(ErrorCodes.InvoiceInvalidStatus, "Mỗi phòng chỉ được gửi một lần trong yêu cầu tạo hàng loạt.");
+        }
+
+        var houseOwned = await context.RoomingHouses
+            .AsNoTracking()
+            .AnyAsync(x => x.Id == request.RoomingHouseId &&
+                           x.LandlordUserId == landlordUserId &&
+                           x.DeletedAt == null,
+                cancellationToken);
+        if (!houseOwned)
+        {
+            throw new NotFoundException(ErrorCodes.RoomNotFound, "Không tìm thấy khu trọ thuộc quyền quản lý.");
+        }
+
+        var activeContracts = await context.RentalContracts
+            .AsNoTracking()
+            .Include(x => x.Room)
+            .WhereActiveForOccupiedOrReservedRoom()
+            .Where(x => x.Room.RoomingHouseId == request.RoomingHouseId)
+            .OrderBy(x => x.Room.RoomNumber)
+            .Select(x => new { x.Id, x.RoomId, x.Room.RoomNumber })
+            .ToListAsync(cancellationToken);
+
+        if (activeContracts.Count == 0)
+        {
+            throw new BadRequestException(ErrorCodes.RentalContractNotFound, "Khu trọ không có phòng đang thuê với hợp đồng Active.");
+        }
+
+        var inputByContract = request.Rooms.ToDictionary(x => x.ContractId);
+        var activeContractIds = activeContracts.Select(x => x.Id).ToHashSet();
+        var results = new List<BulkInvoiceRoomResultResponse>();
+
+        foreach (var contract in activeContracts)
+        {
+            if (!inputByContract.TryGetValue(contract.Id, out var roomInput))
+            {
+                results.Add(new BulkInvoiceRoomResultResponse(
+                    contract.RoomId, contract.Id, contract.RoomNumber, "Skipped",
+                    "Chủ trọ đã bỏ qua phòng này.", null));
+                continue;
+            }
+
+            try
+            {
+                var invoice = await GenerateInvoiceWithReadingsAsync(
+                    landlordUserId,
+                    new GenerateInvoiceWithReadingsRequest(
+                        contract.Id,
+                        request.BillingPeriodStart,
+                        request.BillingPeriodEnd,
+                        roomInput.DiscountAmount,
+                        roomInput.Note,
+                        roomInput.MeterReadings ?? []),
+                    cancellationToken);
+
+                results.Add(new BulkInvoiceRoomResultResponse(
+                    contract.RoomId, contract.Id, contract.RoomNumber, "Created",
+                    "Đã tạo hóa đơn nháp.", invoice));
+            }
+            catch (ConflictException ex) when (ex.ErrorCode == ErrorCodes.InvoiceDuplicatePeriod)
+            {
+                results.Add(new BulkInvoiceRoomResultResponse(
+                    contract.RoomId, contract.Id, contract.RoomNumber, "Skipped",
+                    "Hóa đơn của phòng trong kỳ này đã tồn tại.", null));
+            }
+            catch (AppException ex)
+            {
+                results.Add(new BulkInvoiceRoomResultResponse(
+                    contract.RoomId, contract.Id, contract.RoomNumber, "MissingData",
+                    ex.Message, null));
+            }
+        }
+
+        foreach (var unknownInput in request.Rooms.Where(x => !activeContractIds.Contains(x.ContractId)))
+        {
+            results.Add(new BulkInvoiceRoomResultResponse(
+                Guid.Empty, unknownInput.ContractId, string.Empty, "MissingData",
+                "Phòng không có hợp đồng Active trong khu trọ đã chọn.", null));
+        }
+
+        return new BulkInvoiceResultResponse(
+            activeContracts.Count,
+            results.Count(x => x.Status == "Created"),
+            results.Count(x => x.Status == "Skipped"),
+            results.Count(x => x.Status == "MissingData"),
+            results);
+    }
+
     public async Task<InvoiceResponse> CreateNextTerminationInvoiceAsync(
         Guid landlordUserId,
         Guid contractId,
@@ -981,7 +1096,9 @@ public class BillingService : IBillingService
         RoomingHouseServicePrice Price,
         decimal PreviousReading,
         decimal CurrentReading,
-        string? ProofImageObjectKey);
+        string? ProofImageObjectKey,
+        decimal? AiReading,
+        string? AiRawText);
 
     private sealed record ResolvedBillingPeriod(
         DateOnly Start,
@@ -1426,6 +1543,9 @@ public class BillingService : IBillingService
                 CurrentReading = input.CurrentReading,
                 Consumption = consumption,
                 ProofImageObjectKey = input.ProofImageObjectKey,
+                AiReading = input.AiReading,
+                AiRawText = input.AiRawText,
+                WasManuallyCorrected = input.AiReading.HasValue && input.AiReading.Value != input.CurrentReading,
                 RecordedByLandlordUserId = landlordUserId,
                 ReadingAt = now,
                 CreatedAt = now,
@@ -1560,6 +1680,21 @@ public class BillingService : IBillingService
                     $"Dịch vụ {serviceType.Name} không hỗ trợ nhập chỉ số.");
             }
 
+            if (!string.IsNullOrWhiteSpace(input.ProofImageObjectKey) &&
+                !input.ProofImageObjectKey.StartsWith("meter-readings/", StringComparison.OrdinalIgnoreCase))
+            {
+                throw new BadRequestException(
+                    ErrorCodes.MeterReadingInvalid,
+                    $"Ảnh đồng hồ {serviceType.Name} không hợp lệ.");
+            }
+
+            if (input.AiReading.HasValue && input.AiReading.Value < 0)
+            {
+                throw new BadRequestException(
+                    ErrorCodes.MeterReadingInvalid,
+                    $"Kết quả AI của đồng hồ {serviceType.Name} không hợp lệ.");
+            }
+
             if (input.PreviousReading.HasValue && input.PreviousReading.Value < 0)
             {
                 throw new BadRequestException(
@@ -1628,7 +1763,11 @@ public class BillingService : IBillingService
                 price,
                 previousReading.Value,
                 input.CurrentReading,
-                input.ProofImageObjectKey));
+                input.ProofImageObjectKey?.Trim(),
+                input.AiReading,
+                string.IsNullOrWhiteSpace(input.AiRawText)
+                    ? null
+                    : input.AiRawText.Trim()[..Math.Min(input.AiRawText.Trim().Length, 4000)]));
         }
 
         return meteredInputs;
