@@ -156,6 +156,19 @@ export function AccountLayout() {
         </NavLink>
 
         <NavLink
+          to={ROUTE_PATHS.ACCOUNT.MESSAGES}
+          className={({ isActive }) => `account-sidebar-item ${isActive ? 'active' : ''}`}
+        >
+          <svg className="sidebar-item-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+            <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z" />
+          </svg>
+          <span className="sidebar-item-text">Tin nhắn</span>
+          <svg className="sidebar-item-chevron" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
+            <polyline points="9 18 15 12 9 6" />
+          </svg>
+        </NavLink>
+
+        <NavLink
           to={ROUTE_PATHS.ACCOUNT.TRANSACTIONS}
           className={({ isActive }) => `account-sidebar-item ${isActive ? 'active' : ''}`}
         >

@@ -2,7 +2,7 @@ import { useState, useEffect, useRef, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../../../app/providers/AuthProvider';
 import {
-  getUnreadCount, getNotifications, markAsRead, markAllAsRead, deleteNotification
+  getNotifications, markAsRead, deleteNotification
 } from '../api';
 import { getMockNotifications, saveMockDeletedId } from '../mockNotifications';
 import { ROUTE_PATHS } from '../../../app/router/routePaths';
@@ -22,6 +22,10 @@ function formatTime(isoString: string): string {
   const diffDay = Math.floor(diffHour / 24);
   if (diffDay < 7) return `${diffDay} ngày trước`;
   return date.toLocaleDateString('vi-VN');
+}
+
+function isChatNotification(notification: Notification): boolean {
+  return notification.referenceType === 'Conversation' || notification.type === 'NewChatMessage';
 }
 
 function getNotificationRole(notification: Notification): 'tenant' | 'landlord' {
@@ -46,6 +50,12 @@ function getNotificationRole(notification: Notification): 'tenant' | 'landlord' 
 
 function getNotificationLink(notification: Notification): string {
   if (notification.id.startsWith('mock-')) return '#';
+
+  if (notification.referenceType === 'Conversation' && notification.referenceId) {
+    const currentRole = window.location.pathname.startsWith('/landlord') ? 'landlord' : 'tenant';
+    const base = currentRole === 'landlord' ? ROUTE_PATHS.LANDLORD.MESSAGES : ROUTE_PATHS.ACCOUNT.MESSAGES;
+    return `${base}?conversationId=${notification.referenceId}`;
+  }
   
   const role = getNotificationRole(notification);
   
@@ -230,14 +240,10 @@ export function NotificationBell({ navigateOnly = false, navigateTo }: Notificat
 
   const loadUnreadCount = useCallback(async () => {
     try {
-      const count = await getUnreadCount();
-      if (notifications.length > 0 && notifications.some(n => n.id.startsWith('mock-'))) {
-        setUnreadCount(notifications.filter(n => !n.isRead).length);
-      } else {
-        setUnreadCount(count);
-      }
+      const items = await getNotifications(50);
+      setUnreadCount(items.filter(n => !isChatNotification(n) && !n.isRead).length);
     } catch {
-      // Silently fail
+      setUnreadCount(notifications.filter(n => !isChatNotification(n) && !n.isRead).length);
     }
   }, [notifications]);
 
@@ -246,15 +252,16 @@ export function NotificationBell({ navigateOnly = false, navigateTo }: Notificat
       let items = await getNotifications(20);
       if (items.length === 0) {
         items = getMockNotifications();
-        setNotifications(items);
-        setUnreadCount(items.filter(n => !n.isRead).length);
+        const visibleItems = items.filter(n => !isChatNotification(n));
+        setNotifications(visibleItems);
+        setUnreadCount(visibleItems.filter(n => !n.isRead).length);
       } else {
-        setNotifications(items);
-        const count = await getUnreadCount();
-        setUnreadCount(count);
+        const visibleItems = items.filter(n => !isChatNotification(n));
+        setNotifications(visibleItems);
+        setUnreadCount(visibleItems.filter(n => !n.isRead).length);
       }
     } catch {
-      const items = getMockNotifications();
+      const items = getMockNotifications().filter(n => !isChatNotification(n));
       setNotifications(items);
       setUnreadCount(items.filter(n => !n.isRead).length);
     }
@@ -354,7 +361,7 @@ export function NotificationBell({ navigateOnly = false, navigateTo }: Notificat
         setNotifications(prev => prev.map(n => ({ ...n, isRead: true })));
         setUnreadCount(0);
       } else {
-        await markAllAsRead();
+        await Promise.all(filteredItems.filter(n => !n.isRead).map(n => markAsRead(n.id)));
         setUnreadCount(0);
         setNotifications(prev => prev.map(n => ({ ...n, isRead: true })));
       }
@@ -369,11 +376,10 @@ export function NotificationBell({ navigateOnly = false, navigateTo }: Notificat
   }
 
   const getFilteredNotifications = () => {
-    return notifications.filter(n => getNotificationRole(n) === activeRole);
+    return notifications.filter(n => !isChatNotification(n) && getNotificationRole(n) === activeRole);
   };
 
   const filteredItems = getFilteredNotifications();
-  const hasUnread = notifications.some(n => !n.isRead);
 
   return (
     <div className="notification-bell-wrapper" ref={dropdownRef}>

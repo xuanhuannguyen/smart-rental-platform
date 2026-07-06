@@ -80,6 +80,12 @@
   align-items: center;
 }
 
+.home-header-message-action {
+  display: inline-flex;
+  align-items: center;
+  flex-shrink: 0;
+}
+
 .auth-buttons {
   display: flex;
   gap: 10px;

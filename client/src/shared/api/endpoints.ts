@@ -150,5 +150,20 @@ export const ENDPOINTS = {
     MARK_READ: (id: string) => `/api/notifications/${id}/read`,
     MARK_ALL_READ: '/api/notifications/read-all',
     DELETE: (id: string) => `/api/notifications/${id}`,
+  },
+  CHAT: {
+    CONVERSATIONS: '/api/chat/conversations',
+    DIRECT: '/api/chat/conversations/direct',
+    GROUPS: '/api/chat/conversations/groups',
+    CONVERSATION: (id: string) => `/api/chat/conversations/${id}`,
+    LEAVE: (id: string) => `/api/chat/conversations/${id}/leave`,
+    CLOSE: (id: string) => `/api/chat/conversations/${id}/close`,
+    PARTICIPANTS: (id: string) => `/api/chat/conversations/${id}/participants`,
+    PARTICIPANT: (id: string, userId: string) => `/api/chat/conversations/${id}/participants/${userId}`,
+    MESSAGES: (id: string) => `/api/chat/conversations/${id}/messages`,
+    READ: (id: string) => `/api/chat/conversations/${id}/read`,
+    IMAGES: '/api/chat/images',
+    QUICK_CONTACTS: '/api/chat/landlord/quick-contacts',
+    SEARCH_USERS: '/api/chat/users/search'
   }
 } as const;

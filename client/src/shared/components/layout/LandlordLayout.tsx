@@ -18,6 +18,7 @@ export function LandlordLayout() {
   const isRoomingHousesActive = location.pathname.startsWith('/landlord/rooming-houses') && !location.pathname.includes('/service-prices');
   const isRequestsActive = location.pathname.startsWith('/landlord/rental-requests');
   const isAppointmentsActive = location.pathname.startsWith('/landlord/viewing-appointments');
+  const isMessagesActive = location.pathname.startsWith('/landlord/messages');
   const isInvoicesActive = location.pathname.includes('/billing') || location.pathname.includes('/meter-readings') || location.pathname.includes('/invoices') || location.pathname.includes('/service-prices');
   const isContractsActive = location.pathname.startsWith('/landlord/contracts');
 
@@ -139,6 +140,23 @@ export function LandlordLayout() {
             </span>
             <span className="sidebar-item-text">Quản lý hóa đơn</span>
             {!isInvoicesActive && (
+              <svg className="sidebar-chevron" viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round">
+                <polyline points="9 18 15 12 9 6" />
+              </svg>
+            )}
+          </NavLink>
+
+          <NavLink
+            to={ROUTE_PATHS.LANDLORD.MESSAGES}
+            className={() => `sidebar-item ${isMessagesActive ? 'active' : ''}`}
+          >
+            <span className="sidebar-item-icon">
+              <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z" />
+              </svg>
+            </span>
+            <span className="sidebar-item-text">Tin nhắn</span>
+            {!isMessagesActive && (
               <svg className="sidebar-chevron" viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round">
                 <polyline points="9 18 15 12 9 6" />
               </svg>

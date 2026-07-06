@@ -90,6 +90,40 @@
   margin: 0;
 }
 
+.public-house-detail__contact-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+}
+
+.public-house-detail__message-button {
+  min-height: 42px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  border: 1px solid #246bfe;
+  border-radius: 8px;
+  padding: 0 16px;
+  background: #246bfe;
+  color: #ffffff;
+  font: inherit;
+  font-size: 13px;
+  font-weight: 800;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.public-house-detail__message-button:hover:not(:disabled) {
+  background: #1557d6;
+  border-color: #1557d6;
+}
+
+.public-house-detail__message-button:disabled {
+  cursor: not-allowed;
+  opacity: 0.6;
+}
+
 /* Mini-Map Preview Customizations */
 .hero-details-card .tenant-map-preview-container {
   border-radius: 12px; /* Reduced from 16px to match smaller geometry */

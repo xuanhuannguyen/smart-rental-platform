@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { Link, useLocation, useParams } from 'react-router-dom';
+import { Link, useLocation, useNavigate, useParams } from 'react-router-dom';
 import { getPublicRoomingHouseDetail } from './api';
 import TenantMapPreview from './components/TenantMapPreview';
 import HouseImageGallery from './components/HouseImageGallery';
@@ -10,6 +10,8 @@ import { getApiErrorMessage } from '../../shared/api/apiError';
 import { HomeHeader } from '../../shared/components/layout/HomeHeader';
 import { ROUTE_PATHS } from '../../app/router/routePaths';
 import { saveRoomingHouseView } from './rentalBehaviorStorage';
+import { useAuth } from '../../app/providers/AuthProvider';
+import { createDirectConversation } from '../chat/api';
 import './PublicRoomingHouseDetailPage.css';
 
 function formatCurrency(value: number) {
@@ -87,10 +89,35 @@ function getAmenityIcon(name: string) {
 export default function PublicRoomingHouseDetailPage() {
   const { id } = useParams();
   const location = useLocation();
+  const navigate = useNavigate();
+  const { currentUser } = useAuth();
   const [house, setHouse] = useState<RoomingHouseDetail | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
+  const [chatStarting, setChatStarting] = useState(false);
   const fromSearch = getSearchReturnUrl(location.state, new URLSearchParams(location.search));
+
+  async function handleMessageLandlord() {
+    if (!house) return;
+    if (!currentUser) {
+      navigate('/login', { state: { from: location.pathname } });
+      return;
+    }
+    if (currentUser.userId === house.landlordUserId) {
+      setError('Bạn đang xem khu trọ của chính mình.');
+      return;
+    }
+
+    setChatStarting(true);
+    try {
+      const conversation = await createDirectConversation(house.landlordUserId);
+      navigate(`${ROUTE_PATHS.ACCOUNT.MESSAGES}?conversationId=${conversation.id}`);
+    } catch (chatError) {
+      setError(getApiErrorMessage(chatError, 'Không thể mở cuộc trò chuyện với chủ trọ.'));
+    } finally {
+      setChatStarting(false);
+    }
+  }
 
   useEffect(() => {
     async function loadDetail() {
@@ -166,6 +193,20 @@ export default function PublicRoomingHouseDetailPage() {
               title={house.name}
             />
             {house.description && <p className="public-house-detail__description">{house.description}</p>}
+
+            <div className="public-house-detail__contact-actions">
+              <button
+                className="public-house-detail__message-button"
+                type="button"
+                onClick={() => void handleMessageLandlord()}
+                disabled={chatStarting || currentUser?.userId === house.landlordUserId}
+              >
+                <svg viewBox="0 0 24 24" width="17" height="17" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                  <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z" />
+                </svg>
+                <span>{chatStarting ? 'Đang mở chat...' : 'Nhắn tin chủ trọ'}</span>
+              </button>
+            </div>
             
             <div className="house-amenities-mini-section">
               <h3>Tiện ích</h3>

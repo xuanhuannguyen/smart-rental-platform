@@ -7,6 +7,7 @@ import { Toast } from '../ui/Toast';
 import { toAssetUrl } from '../../api/assets';
 import { getMyRoomingHouseOnboarding } from '../../../features/rooming-houses/api';
 import { NotificationBell } from '../../../features/notifications/components/NotificationBell';
+import { MessageShortcut } from './MessageShortcut';
 import './HomeHeader.css';
 
 interface HomeHeaderProps {
@@ -119,6 +120,9 @@ export function HomeHeader({ centerContent }: HomeHeaderProps) {
 
         {currentUser ? (
           <>
+            <div className="home-header-message-action">
+              <MessageShortcut to={ROUTE_PATHS.ACCOUNT.MESSAGES} />
+            </div>
             <NotificationBell />
             <div className="avatar-wrapper" ref={dropdownRef}>
             <button className="avatar-btn" onClick={() => setShowDropdown(!showDropdown)}>

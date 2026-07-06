@@ -39,6 +39,7 @@ import { LandlordRentalRequestDetailPage } from '../../features/landlord/pages/L
 import { MyWalletPage } from '../../features/wallet/pages/MyWalletPage';
 import { TransactionHistoryPage } from '../../features/wallet/pages/TransactionHistoryPage';
 import { TopUpResultPage } from '../../features/wallet/pages/TopUpResultPage';
+import { ChatPage } from '../../features/chat/pages/ChatPage';
 
 export const router = createBrowserRouter([
     {
@@ -147,6 +148,10 @@ export const router = createBrowserRouter([
                                 path: ROUTE_PATHS.ACCOUNT.VIEWING_APPOINTMENTS,
                                 element: <TenantAppointmentsPage />
                             },
+                            {
+                                path: ROUTE_PATHS.ACCOUNT.MESSAGES,
+                                element: <ChatPage />
+                            },
                         ]
                     },
                     {
@@ -199,6 +204,10 @@ export const router = createBrowserRouter([
                                     {
                                         path: ROUTE_PATHS.LANDLORD.VIEWING_APPOINTMENTS,
                                         element: <LandlordAppointmentsPage />
+                                    },
+                                    {
+                                        path: ROUTE_PATHS.LANDLORD.MESSAGES,
+                                        element: <ChatPage />
                                     },
                                     {
                                         path: ROUTE_PATHS.LANDLORD.RENTAL_REQUESTS,

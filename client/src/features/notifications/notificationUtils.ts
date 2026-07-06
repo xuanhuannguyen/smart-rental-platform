@@ -27,6 +27,11 @@ export function getNotificationRole(notification: Notification): NotificationRol
 export function getNotificationLink(notification: Notification): string {
   const role = getNotificationRole(notification);
 
+  if (notification.referenceType === 'Conversation' && notification.referenceId) {
+    const base = role === 'landlord' ? ROUTE_PATHS.LANDLORD.MESSAGES : ROUTE_PATHS.ACCOUNT.MESSAGES;
+    return `${base}?conversationId=${notification.referenceId}`;
+  }
+
   if (role === 'landlord') {
     if (notification.referenceType === 'ViewingAppointment') {
       return ROUTE_PATHS.LANDLORD.VIEWING_APPOINTMENTS;
