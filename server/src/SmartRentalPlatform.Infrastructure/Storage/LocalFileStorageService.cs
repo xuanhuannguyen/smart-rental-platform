@@ -13,7 +13,8 @@ public class LocalFileStorageService : IFileStorageService
         [FileUploadScope.Room] = "rooms",
         [FileUploadScope.LegalDocument] = "legal-documents",
         [FileUploadScope.Avatar] = "avatars",
-        [FileUploadScope.HouseRule] = "house-rules"
+        [FileUploadScope.HouseRule] = "house-rules",
+        [FileUploadScope.ChatImage] = "chat"
     };
 
     private readonly IWebHostEnvironment environment;

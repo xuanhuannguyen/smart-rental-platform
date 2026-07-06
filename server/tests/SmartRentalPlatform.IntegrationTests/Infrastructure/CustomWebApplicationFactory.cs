@@ -30,6 +30,14 @@ public class TestAuthHandler : AuthenticationHandler<AuthenticationSchemeOptions
     protected override Task<AuthenticateResult> HandleAuthenticateAsync()
     {
         var httpContext = Context;
+
+        if (string.Equals(
+            httpContext.Request.Headers["X-Test-Anonymous"].FirstOrDefault(),
+            "true",
+            StringComparison.OrdinalIgnoreCase))
+        {
+            return Task.FromResult(AuthenticateResult.NoResult());
+        }
         
         string userId = httpContext.Request.Headers["X-Test-User-Id"].FirstOrDefault() ?? "e2cfbf61-3444-42b7-a365-515a4430e386";
         string email = httpContext.Request.Headers["X-Test-User-Email"].FirstOrDefault() ?? "test@example.com";
@@ -66,6 +74,27 @@ public class CustomWebApplicationFactory : WebApplicationFactory<Program>, IAsyn
     public Task InitializeAsync() => Task.CompletedTask;
 
     public new Task DisposeAsync() => Task.CompletedTask;
+
+    public HttpClient CreateAnonymousClient()
+    {
+        var client = CreateClient();
+        client.DefaultRequestHeaders.Add("X-Test-Anonymous", "true");
+        return client;
+    }
+
+    public HttpClient CreateAuthenticatedClient(
+        string role,
+        Guid? userId = null,
+        string? email = null)
+    {
+        var client = CreateClient();
+        client.DefaultRequestHeaders.Add(
+            "X-Test-User-Id",
+            (userId ?? Guid.Parse("e2cfbf61-3444-42b7-a365-515a4430e386")).ToString());
+        client.DefaultRequestHeaders.Add("X-Test-User-Email", email ?? "test@example.com");
+        client.DefaultRequestHeaders.Add("X-Test-User-Roles", role);
+        return client;
+    }
 
     protected override void ConfigureWebHost(IWebHostBuilder builder)
     {

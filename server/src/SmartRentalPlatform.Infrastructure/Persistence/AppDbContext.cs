@@ -6,6 +6,7 @@ using SmartRentalPlatform.Domain.Entities.Administrative;
 using SmartRentalPlatform.Domain.Entities.Notifications;
 using SmartRentalPlatform.Domain.Entities.Payments;
 using SmartRentalPlatform.Domain.Entities.Billing;
+using SmartRentalPlatform.Domain.Entities.Chat;
 using SmartRentalPlatform.Domain.Entities.RentalContracts;
 using SmartRentalPlatform.Domain.Entities.Properties;
 using SmartRentalPlatform.Domain.Entities.Rental;
@@ -56,6 +57,10 @@ public class AppDbContext : DbContext, IAppDbContext
     public DbSet<MeterReading> MeterReadings => Set<MeterReading>();
     public DbSet<Invoice> Invoices => Set<Invoice>();
     public DbSet<InvoiceItem> InvoiceItems => Set<InvoiceItem>();
+    // Chat
+    public DbSet<Conversation> Conversations => Set<Conversation>();
+    public DbSet<ConversationParticipant> ConversationParticipants => Set<ConversationParticipant>();
+    public DbSet<ChatMessage> ChatMessages => Set<ChatMessage>();
 
     // Viewing appointments
     public DbSet<ViewingAppointment> ViewingAppointments => Set<ViewingAppointment>();

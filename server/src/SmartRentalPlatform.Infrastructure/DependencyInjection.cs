@@ -60,6 +60,7 @@ public static class DependencyInjection
         services.Configure<VnptEkycOptions>(configuration.GetSection(VnptEkycOptions.SectionName));
         services.AddDataProtection();
         services.AddMemoryCache();
+        services.AddSingleton<IChatPresenceTracker, InMemoryChatPresenceTracker>();
         services.AddScoped<IConversationCacheService, ConversationCacheService>();
         services.AddScoped<IPrivateStorageService, LocalPrivateStorageService>();
         services.AddScoped<IHashService, Sha256HashService>();

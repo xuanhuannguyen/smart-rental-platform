@@ -8,6 +8,7 @@ using SmartRentalPlatform.Domain.Entities.Rental;
 using SmartRentalPlatform.Domain.Entities.Users;
 using SmartRentalPlatform.Domain.Entities.Payments;
 using SmartRentalPlatform.Domain.Entities.Billing;
+using SmartRentalPlatform.Domain.Entities.Chat;
 
 
 namespace SmartRentalPlatform.Application.Common.Interfaces;
@@ -90,6 +91,12 @@ public interface IAppDbContext {
     DbSet<Invoice> Invoices { get; }
 
     DbSet<InvoiceItem> InvoiceItems { get; }
+
+    DbSet<Conversation> Conversations { get; }
+
+    DbSet<ConversationParticipant> ConversationParticipants { get; }
+
+    DbSet<ChatMessage> ChatMessages { get; }
 
 
 
