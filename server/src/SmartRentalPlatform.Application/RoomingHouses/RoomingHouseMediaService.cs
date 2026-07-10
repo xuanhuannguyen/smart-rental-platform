@@ -7,8 +7,10 @@ using SmartRentalPlatform.Contracts.Common;
 using SmartRentalPlatform.Contracts.LegalDocuments;
 using SmartRentalPlatform.Contracts.PropertyImages;
 using SmartRentalPlatform.Contracts.RoomingHouses;
+using SmartRentalPlatform.Domain.Entities.Media;
 using SmartRentalPlatform.Domain.Entities.Properties;
 using SmartRentalPlatform.Domain.Enums;
+using SmartRentalPlatform.Domain.Enums.Media;
 using System.Security.Cryptography;
 using System.Text;
 
@@ -205,6 +207,27 @@ public class RoomingHouseMediaService : IRoomingHouseMediaService
             legalDocument.FrontImageObjectKey = request.FrontImageObjectKey.Trim();
             legalDocument.BackImageObjectKey = request.BackImageObjectKey.Trim();
             legalDocument.ExtraImageObjectKey = NormalizeOptionalObjectKey(request.ExtraImageObjectKey);
+            legalDocument.FrontMediaAssetId = await EnsureLegalDocumentMediaAssetAsync(
+                roomingHouseId,
+                roomingHouse.LandlordUserId,
+                legalDocument.FrontImageObjectKey,
+                legalDocument.FrontMediaAssetId,
+                now,
+                cancellationToken);
+            legalDocument.BackMediaAssetId = await EnsureLegalDocumentMediaAssetAsync(
+                roomingHouseId,
+                roomingHouse.LandlordUserId,
+                legalDocument.BackImageObjectKey,
+                legalDocument.BackMediaAssetId,
+                now,
+                cancellationToken);
+            legalDocument.ExtraMediaAssetId = await EnsureOptionalLegalDocumentMediaAssetAsync(
+                roomingHouseId,
+                roomingHouse.LandlordUserId,
+                legalDocument.ExtraImageObjectKey,
+                legalDocument.ExtraMediaAssetId,
+                now,
+                cancellationToken);
 
             if (!documentNumber.Contains('*') || string.IsNullOrEmpty(legalDocument.DocumentNumberMasked))
             {
@@ -370,6 +393,107 @@ public class RoomingHouseMediaService : IRoomingHouseMediaService
         }
     }
 
+    private async Task<Guid> EnsureLegalDocumentMediaAssetAsync(
+        Guid roomingHouseId,
+        Guid landlordUserId,
+        string objectKey,
+        Guid? existingMediaAssetId,
+        DateTimeOffset now,
+        CancellationToken cancellationToken)
+    {
+        var normalizedObjectKey = NormalizeObjectKey(objectKey);
+
+        if (existingMediaAssetId.HasValue)
+        {
+            var currentLinkedAsset = await context.MediaAssets
+                .FirstOrDefaultAsync(x => x.Id == existingMediaAssetId.Value, cancellationToken);
+
+            if (currentLinkedAsset is not null &&
+                !string.Equals(currentLinkedAsset.ObjectKey, normalizedObjectKey, StringComparison.Ordinal))
+            {
+                currentLinkedAsset.LinkedEntityType = null;
+                currentLinkedAsset.LinkedEntityId = null;
+                currentLinkedAsset.Status = MediaStatus.Uploaded;
+                currentLinkedAsset.UpdatedAt = now;
+            }
+        }
+
+        var mediaAsset = await context.MediaAssets
+            .FirstOrDefaultAsync(x => x.ObjectKey == normalizedObjectKey, cancellationToken);
+
+        if (mediaAsset is null)
+        {
+            mediaAsset = new MediaAsset
+            {
+                Id = Guid.NewGuid(),
+                OwnerUserId = landlordUserId,
+                BucketName = "legacy-uploads",
+                ObjectKey = normalizedObjectKey,
+                OriginalFileName = Path.GetFileName(normalizedObjectKey),
+                StoredFileName = Path.GetFileName(normalizedObjectKey),
+                ContentType = GuessContentType(normalizedObjectKey),
+                FileSize = 0,
+                Scope = MediaScope.RoomingHouseLegalDocument,
+                Visibility = MediaVisibility.Private,
+                Status = MediaStatus.Linked,
+                LinkedEntityType = nameof(RoomingHouseLegalDocument),
+                LinkedEntityId = roomingHouseId,
+                CreatedAt = now,
+                UpdatedAt = now
+            };
+
+            context.MediaAssets.Add(mediaAsset);
+            return mediaAsset.Id;
+        }
+
+        mediaAsset.OwnerUserId = landlordUserId;
+        mediaAsset.Scope = MediaScope.RoomingHouseLegalDocument;
+        mediaAsset.Visibility = MediaVisibility.Private;
+        mediaAsset.Status = MediaStatus.Linked;
+        mediaAsset.LinkedEntityType = nameof(RoomingHouseLegalDocument);
+        mediaAsset.LinkedEntityId = roomingHouseId;
+        mediaAsset.DeletedAt = null;
+        mediaAsset.UpdatedAt = now;
+
+        return mediaAsset.Id;
+    }
+
+    private async Task<Guid?> EnsureOptionalLegalDocumentMediaAssetAsync(
+        Guid roomingHouseId,
+        Guid landlordUserId,
+        string? objectKey,
+        Guid? existingMediaAssetId,
+        DateTimeOffset now,
+        CancellationToken cancellationToken)
+    {
+        if (string.IsNullOrWhiteSpace(objectKey))
+        {
+            if (existingMediaAssetId.HasValue)
+            {
+                var currentLinkedAsset = await context.MediaAssets
+                    .FirstOrDefaultAsync(x => x.Id == existingMediaAssetId.Value, cancellationToken);
+
+                if (currentLinkedAsset is not null)
+                {
+                    currentLinkedAsset.LinkedEntityType = null;
+                    currentLinkedAsset.LinkedEntityId = null;
+                    currentLinkedAsset.Status = MediaStatus.Uploaded;
+                    currentLinkedAsset.UpdatedAt = now;
+                }
+            }
+
+            return null;
+        }
+
+        return await EnsureLegalDocumentMediaAssetAsync(
+            roomingHouseId,
+            landlordUserId,
+            objectKey,
+            existingMediaAssetId,
+            now,
+            cancellationToken);
+    }
+
     private static string MaskDocumentNumber(string documentNumber)
     {
         if (documentNumber.Length <= 4)
@@ -394,5 +518,22 @@ public class RoomingHouseMediaService : IRoomingHouseMediaService
     private static string? NormalizeOptionalObjectKey(string? objectKey)
     {
         return string.IsNullOrWhiteSpace(objectKey) ? null : objectKey.Trim();
+    }
+
+    private static string NormalizeObjectKey(string objectKey)
+    {
+        return objectKey.Replace('\\', '/').Trim().TrimStart('/');
+    }
+
+    private static string GuessContentType(string objectKey)
+    {
+        return Path.GetExtension(objectKey).ToLowerInvariant() switch
+        {
+            ".jpg" or ".jpeg" => "image/jpeg",
+            ".png" => "image/png",
+            ".webp" => "image/webp",
+            ".pdf" => "application/pdf",
+            _ => "application/octet-stream"
+        };
     }
 }

@@ -55,10 +55,16 @@ internal static class RoomingHouseReadModelMapper
             LegalDocument = house.LegalDocument is null ? null : new RoomingHouseLegalDocumentResponse
             {
                 RoomingHouseId = house.LegalDocument.RoomingHouseId,
+                FrontMediaAssetId = house.LegalDocument.FrontMediaAssetId,
+                BackMediaAssetId = house.LegalDocument.BackMediaAssetId,
+                ExtraMediaAssetId = house.LegalDocument.ExtraMediaAssetId,
                 DocumentType = house.LegalDocument.DocumentType.ToString(),
                 FrontImageObjectKey = house.LegalDocument.FrontImageObjectKey,
                 BackImageObjectKey = house.LegalDocument.BackImageObjectKey,
                 ExtraImageObjectKey = house.LegalDocument.ExtraImageObjectKey,
+                FrontImageUrl = BuildPrivateImageUrl(house.LegalDocument.FrontMediaAssetId),
+                BackImageUrl = BuildPrivateImageUrl(house.LegalDocument.BackMediaAssetId),
+                ExtraImageUrl = BuildOptionalPrivateImageUrl(house.LegalDocument.ExtraMediaAssetId),
                 DocumentNumberMasked = house.LegalDocument.DocumentNumberMasked,
                 UploadedAt = house.LegalDocument.UploadedAt,
                 CreatedAt = house.LegalDocument.CreatedAt,
@@ -133,5 +139,19 @@ internal static class RoomingHouseReadModelMapper
         return string.IsNullOrWhiteSpace(coverObjectKey)
             ? null
             : PublicMediaPathBuilder.Build(coverObjectKey);
+    }
+
+    private static string BuildPrivateImageUrl(Guid? mediaAssetId)
+    {
+        return mediaAssetId.HasValue
+            ? PrivateMediaPathBuilder.Build(mediaAssetId.Value)
+            : string.Empty;
+    }
+
+    private static string? BuildOptionalPrivateImageUrl(Guid? mediaAssetId)
+    {
+        return mediaAssetId.HasValue
+            ? PrivateMediaPathBuilder.Build(mediaAssetId.Value)
+            : null;
     }
 }

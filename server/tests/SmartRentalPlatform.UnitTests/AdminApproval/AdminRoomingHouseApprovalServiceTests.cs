@@ -3,8 +3,10 @@ using SmartRentalPlatform.Application.Users;
 using SmartRentalPlatform.Contracts.Users;
 using SmartRentalPlatform.Contracts.Users.Requests;
 using SmartRentalPlatform.Contracts.Users.Responses;
+using SmartRentalPlatform.Domain.Entities.Media;
 using SmartRentalPlatform.Domain.Entities.Properties;
 using SmartRentalPlatform.Domain.Enums.Properties;
+using SmartRentalPlatform.Domain.Enums.Media;
 using SmartRentalPlatform.UnitTests.Common;
 
 namespace SmartRentalPlatform.UnitTests.AdminApproval;
@@ -55,9 +57,44 @@ public class AdminRoomingHouseApprovalServiceTests : IDisposable
         _fixture.Context.PropertyImages.AddRange(
             new PropertyImage { Id = Guid.NewGuid(), RoomingHouseId = house.Id, ObjectKey = "second", ImageUrl = "/second.jpg", SortOrder = 2, CreatedAt = DateTimeOffset.UtcNow },
             new PropertyImage { Id = Guid.NewGuid(), RoomingHouseId = house.Id, ObjectKey = "first", ImageUrl = "/first.jpg", SortOrder = 1, CreatedAt = DateTimeOffset.UtcNow });
+        var frontAssetId = Guid.NewGuid();
+        var backAssetId = Guid.NewGuid();
+        _fixture.Context.MediaAssets.AddRange(
+            new MediaAsset
+            {
+                Id = frontAssetId,
+                BucketName = "local-media",
+                ObjectKey = "private/legal/front.jpg",
+                OriginalFileName = "front.jpg",
+                StoredFileName = "front.jpg",
+                ContentType = "image/jpeg",
+                FileSize = 10,
+                Scope = MediaScope.RoomingHouseLegalDocument,
+                Visibility = MediaVisibility.Private,
+                Status = MediaStatus.Linked,
+                CreatedAt = DateTimeOffset.UtcNow,
+                UpdatedAt = DateTimeOffset.UtcNow
+            },
+            new MediaAsset
+            {
+                Id = backAssetId,
+                BucketName = "local-media",
+                ObjectKey = "private/legal/back.jpg",
+                OriginalFileName = "back.jpg",
+                StoredFileName = "back.jpg",
+                ContentType = "image/jpeg",
+                FileSize = 10,
+                Scope = MediaScope.RoomingHouseLegalDocument,
+                Visibility = MediaVisibility.Private,
+                Status = MediaStatus.Linked,
+                CreatedAt = DateTimeOffset.UtcNow,
+                UpdatedAt = DateTimeOffset.UtcNow
+            });
         _fixture.Context.RoomingHouseLegalDocuments.Add(new RoomingHouseLegalDocument
         {
             RoomingHouseId = house.Id,
+            FrontMediaAssetId = frontAssetId,
+            BackMediaAssetId = backAssetId,
             FrontImageObjectKey = "front",
             BackImageObjectKey = "back",
             DocumentNumberMasked = "123***",
@@ -75,6 +112,8 @@ public class AdminRoomingHouseApprovalServiceTests : IDisposable
         Assert.NotNull(result);
         Assert.Equal(house.Id, result.Id);
         Assert.NotNull(result.LegalDocument);
+        Assert.Equal(frontAssetId, result.LegalDocument.FrontMediaAssetId);
+        Assert.Equal($"/api/media/private/{frontAssetId:D}", result.LegalDocument.FrontImageUrl);
         Assert.Equal(["first", "second"], result.Images.Select(x => x.ObjectKey));
         var mappedAmenity = Assert.Single(result.Amenities);
         Assert.Equal("Unit Amenity", mappedAmenity.Name);

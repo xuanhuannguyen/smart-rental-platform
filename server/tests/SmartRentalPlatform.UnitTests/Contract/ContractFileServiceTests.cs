@@ -361,7 +361,11 @@ public class ContractFileServiceTests : IClassFixture<TestDatabaseFixture>
     {
         public Guid? LastMediaAssetId { get; private set; }
 
-        public Task<MediaAccessResult> OpenReadAsync(Guid mediaAssetId, Guid? actorUserId = null, CancellationToken cancellationToken = default)
+        public Task<MediaAccessResult> OpenReadAsync(
+            Guid mediaAssetId,
+            Guid? actorUserId = null,
+            CancellationToken cancellationToken = default,
+            MediaAuditContext? auditContext = null)
         {
             LastMediaAssetId = mediaAssetId;
             return Task.FromResult(new MediaAccessResult
@@ -378,7 +382,12 @@ public class ContractFileServiceTests : IClassFixture<TestDatabaseFixture>
             });
         }
 
-        public Task<string> GetDownloadUrlAsync(Guid mediaAssetId, TimeSpan ttl, Guid? actorUserId = null, CancellationToken cancellationToken = default)
+        public Task<string> GetDownloadUrlAsync(
+            Guid mediaAssetId,
+            TimeSpan ttl,
+            Guid? actorUserId = null,
+            CancellationToken cancellationToken = default,
+            MediaAuditContext? auditContext = null)
         {
             return Task.FromResult($"/download/{mediaAssetId}");
         }

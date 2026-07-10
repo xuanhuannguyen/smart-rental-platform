@@ -6,6 +6,7 @@ using SmartRentalPlatform.Domain.Enums;
 using SmartRentalPlatform.Domain.Enums.Media;
 using SmartRentalPlatform.Domain.Enums.Properties;
 using SmartRentalPlatform.Domain.Enums.RentalContracts;
+using SmartRentalPlatform.Domain.Enums.Users;
 using SmartRentalPlatform.Infrastructure.Media;
 using SmartRentalPlatform.UnitTests.Common;
 
@@ -71,6 +72,138 @@ public class DefaultMediaPermissionServiceTests : IClassFixture<TestDatabaseFixt
 
         Assert.True(occupantAllowed);
         Assert.False(outsiderAllowed);
+    }
+
+    [Fact]
+    public async Task CanViewAsync_ForPrivateKycMedia_ShouldAllowAdmin()
+    {
+        var adminId = Guid.NewGuid();
+        fixture.Context.Users.Add(new User
+        {
+            Id = adminId,
+            Email = "admin-media@test.com",
+            NormalizedEmail = "ADMIN-MEDIA@TEST.COM",
+            DisplayName = "Admin",
+            Status = UserStatus.Active,
+            OnboardingStatus = OnboardingStatus.Completed,
+            UserRoles =
+            [
+                new UserRole
+                {
+                    UserId = adminId,
+                    RoleId = (int)RoleName.Admin
+                }
+            ]
+        });
+
+        var mediaAsset = new MediaAsset
+        {
+            Id = Guid.NewGuid(),
+            BucketName = "local-media",
+            ObjectKey = $"private/kyc-documents/{Guid.NewGuid():N}.jpg",
+            OriginalFileName = "front.jpg",
+            StoredFileName = "front.jpg",
+            ContentType = "image/jpeg",
+            FileSize = 10,
+            Scope = MediaScope.KycDocument,
+            Visibility = MediaVisibility.Private,
+            Status = MediaStatus.Linked,
+            CreatedAt = DateTimeOffset.UtcNow,
+            UpdatedAt = DateTimeOffset.UtcNow
+        };
+
+        fixture.Context.MediaAssets.Add(mediaAsset);
+        await fixture.Context.SaveChangesAsync();
+
+        var service = new DefaultMediaPermissionService(fixture.Context);
+
+        var allowed = await service.CanViewAsync(adminId, mediaAsset);
+
+        Assert.True(allowed);
+    }
+
+    [Fact]
+    public async Task CanViewAsync_ForPrivateLegalDocument_ShouldAllowLandlordAndDenyOccupant()
+    {
+        var landlordId = Guid.NewGuid();
+        var occupantId = Guid.NewGuid();
+        var roomingHouseId = Guid.NewGuid();
+
+        fixture.Context.Users.AddRange(
+            new User
+            {
+                Id = landlordId,
+                Email = "legal-landlord@test.com",
+                NormalizedEmail = "LEGAL-LANDLORD@TEST.COM",
+                DisplayName = "Landlord",
+                Status = UserStatus.Active,
+                OnboardingStatus = OnboardingStatus.Completed
+            },
+            new User
+            {
+                Id = occupantId,
+                Email = "legal-occupant@test.com",
+                NormalizedEmail = "LEGAL-OCCUPANT@TEST.COM",
+                DisplayName = "Occupant",
+                Status = UserStatus.Active,
+                OnboardingStatus = OnboardingStatus.Completed
+            });
+
+        fixture.Context.RoomingHouses.Add(new RoomingHouse
+        {
+            Id = roomingHouseId,
+            LandlordUserId = landlordId,
+            Name = "House",
+            AddressLine = "Addr",
+            WardCode = "001",
+            ProvinceCode = "001",
+            AddressDisplay = "Addr Display",
+            ApprovalStatus = RoomingHouseApprovalStatus.Draft,
+            VisibilityStatus = RoomingHouseVisibilityStatus.Hidden,
+            CreatedAt = DateTimeOffset.UtcNow,
+            UpdatedAt = DateTimeOffset.UtcNow
+        });
+
+        fixture.Context.RoomingHouseLegalDocuments.Add(new RoomingHouseLegalDocument
+        {
+            RoomingHouseId = roomingHouseId,
+            FrontImageObjectKey = "private/legal/front.jpg",
+            BackImageObjectKey = "private/legal/back.jpg",
+            DocumentNumberMasked = "123***",
+            DocumentNumberHash = "hash",
+            UploadedAt = DateTimeOffset.UtcNow,
+            CreatedAt = DateTimeOffset.UtcNow,
+            UpdatedAt = DateTimeOffset.UtcNow
+        });
+
+        var mediaAsset = new MediaAsset
+        {
+            Id = Guid.NewGuid(),
+            BucketName = "local-media",
+            ObjectKey = "private/legal/front.jpg",
+            OriginalFileName = "front.jpg",
+            StoredFileName = "front.jpg",
+            ContentType = "image/jpeg",
+            FileSize = 10,
+            Scope = MediaScope.RoomingHouseLegalDocument,
+            Visibility = MediaVisibility.Private,
+            Status = MediaStatus.Linked,
+            LinkedEntityType = nameof(RoomingHouseLegalDocument),
+            LinkedEntityId = roomingHouseId,
+            CreatedAt = DateTimeOffset.UtcNow,
+            UpdatedAt = DateTimeOffset.UtcNow
+        };
+
+        fixture.Context.MediaAssets.Add(mediaAsset);
+        await fixture.Context.SaveChangesAsync();
+
+        var service = new DefaultMediaPermissionService(fixture.Context);
+
+        var landlordAllowed = await service.CanViewAsync(landlordId, mediaAsset);
+        var occupantAllowed = await service.CanViewAsync(occupantId, mediaAsset);
+
+        Assert.True(landlordAllowed);
+        Assert.False(occupantAllowed);
     }
 
     private async Task<(Guid MainTenantId, Guid OccupantId, MediaAsset MediaAsset)> SeedContractFileGraphAsync(ContractFileVariant variant)

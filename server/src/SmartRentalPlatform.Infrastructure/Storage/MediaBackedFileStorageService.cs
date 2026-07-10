@@ -80,11 +80,12 @@ public sealed class MediaBackedFileStorageService : IFileStorageService
         CancellationToken cancellationToken)
     {
         var mediaScope = MapScope(scope);
-        const MediaVisibility visibility = MediaVisibility.Public;
+        var visibility = MapVisibility(scope);
         var objectKeyResult = _mediaObjectKeyFactory.Create(mediaScope, visibility, fileName);
         var resolvedFileSize = fileSize ?? TryGetFileSize(content);
 
         MediaStoredObjectResult storedObject;
+        Domain.Entities.Media.MediaAsset mediaAsset;
         try
         {
             storedObject = await _mediaStorageService.UploadAsync(
@@ -99,7 +100,7 @@ public sealed class MediaBackedFileStorageService : IFileStorageService
                 },
                 cancellationToken);
 
-            await _mediaAssetService.CreateAsync(
+            mediaAsset = await _mediaAssetService.CreateAsync(
                 new CreateMediaAssetRequest
                 {
                     OwnerUserId = _currentUserService.UserId,
@@ -127,8 +128,11 @@ public sealed class MediaBackedFileStorageService : IFileStorageService
 
         return new FileUploadResponse
         {
+            MediaAssetId = mediaAsset.Id,
             ObjectKey = storedObject.ObjectKey,
-            Url = storedObject.PublicUrl ?? PublicMediaPathBuilder.Build(storedObject.ObjectKey)
+            Url = visibility == MediaVisibility.Public
+                ? storedObject.PublicUrl ?? PublicMediaPathBuilder.Build(storedObject.ObjectKey)
+                : PrivateMediaPathBuilder.Build(mediaAsset.Id)
         };
     }
 
@@ -142,6 +146,15 @@ public sealed class MediaBackedFileStorageService : IFileStorageService
             FileUploadScope.Avatar => MediaScope.Avatar,
             FileUploadScope.HouseRule => MediaScope.RoomingHouseRulePdf,
             _ => throw new ArgumentOutOfRangeException(nameof(scope), scope, "Unsupported file upload scope.")
+        };
+    }
+
+    private static MediaVisibility MapVisibility(FileUploadScope scope)
+    {
+        return scope switch
+        {
+            FileUploadScope.LegalDocument => MediaVisibility.Private,
+            _ => MediaVisibility.Public
         };
     }
 

@@ -60,7 +60,7 @@ public class AdminKycApprovalServiceTests : IDisposable
         Assert.Equal(kyc.FrontMediaAssetId, result.FrontMediaAssetId);
         Assert.Equal(kyc.BackMediaAssetId, result.BackMediaAssetId);
         Assert.Equal(kyc.SelfieMediaAssetId, result.SelfieMediaAssetId);
-        Assert.Contains("front%2Fkey%201", result.FrontImageUrl);
+        Assert.Equal($"/api/admin/media/private/{kyc.FrontMediaAssetId:D}", result.FrontImageUrl);
         Assert.Equal(DocumentCheckResult.Valid.ToString(), result.DocumentCheckResult);
     }
 

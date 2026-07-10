@@ -105,10 +105,16 @@ public class AdminRoomingHouseApprovalService : IAdminRoomingHouseApprovalServic
                 : new RoomingHouseLegalDocumentResponse
                 {
                     RoomingHouseId = house.LegalDocument.RoomingHouseId,
+                    FrontMediaAssetId = house.LegalDocument.FrontMediaAssetId,
+                    BackMediaAssetId = house.LegalDocument.BackMediaAssetId,
+                    ExtraMediaAssetId = house.LegalDocument.ExtraMediaAssetId,
                     DocumentType = house.LegalDocument.DocumentType.ToString(),
                     FrontImageObjectKey = house.LegalDocument.FrontImageObjectKey,
                     BackImageObjectKey = house.LegalDocument.BackImageObjectKey,
                     ExtraImageObjectKey = house.LegalDocument.ExtraImageObjectKey,
+                    FrontImageUrl = BuildPrivateLegalDocumentUrl(house.LegalDocument.FrontMediaAssetId),
+                    BackImageUrl = BuildPrivateLegalDocumentUrl(house.LegalDocument.BackMediaAssetId),
+                    ExtraImageUrl = BuildOptionalPrivateLegalDocumentUrl(house.LegalDocument.ExtraMediaAssetId),
                     DocumentNumberMasked = house.LegalDocument.DocumentNumberMasked,
                     UploadedAt = house.LegalDocument.UploadedAt,
                     CreatedAt = house.LegalDocument.CreatedAt,
@@ -151,6 +157,20 @@ public class AdminRoomingHouseApprovalService : IAdminRoomingHouseApprovalServic
                 })
                 .ToList()
         };
+    }
+
+    private static string BuildPrivateLegalDocumentUrl(Guid? mediaAssetId)
+    {
+        return mediaAssetId.HasValue
+            ? PrivateMediaPathBuilder.Build(mediaAssetId.Value)
+            : string.Empty;
+    }
+
+    private static string? BuildOptionalPrivateLegalDocumentUrl(Guid? mediaAssetId)
+    {
+        return mediaAssetId.HasValue
+            ? PrivateMediaPathBuilder.Build(mediaAssetId.Value)
+            : null;
     }
 
     public async Task<bool> ApproveAsync(

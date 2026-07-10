@@ -86,7 +86,7 @@ public class AdminUserServiceTests : IDisposable
         Assert.NotNull(result.KycInfo);
         Assert.Equal(latestApproved.Id, result.KycInfo.KycId);
         Assert.Equal("Latest KYC", result.KycInfo.OcrFullName);
-        Assert.Contains("front%20latest", result.KycInfo.FrontImageUrl);
+        Assert.Equal($"/api/admin/media/private/{latestApproved.FrontMediaAssetId:D}", result.KycInfo.FrontImageUrl);
     }
 
     private static KycVerification BuildKyc(
@@ -103,6 +103,9 @@ public class AdminUserServiceTests : IDisposable
             Id = Guid.NewGuid(),
             UserId = userId,
             DocumentType = KycDocumentType.CCCD,
+            FrontMediaAssetId = Guid.NewGuid(),
+            BackMediaAssetId = Guid.NewGuid(),
+            SelfieMediaAssetId = Guid.NewGuid(),
             FrontImageObjectKey = frontKey,
             BackImageObjectKey = "back",
             SelfieImageObjectKey = "selfie",

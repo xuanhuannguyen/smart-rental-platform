@@ -25,13 +25,19 @@ public class MediaAccessService : IMediaAccessService
     public async Task<MediaAccessResult> OpenReadAsync(
         Guid mediaAssetId,
         Guid? actorUserId = null,
-        CancellationToken cancellationToken = default)
+        CancellationToken cancellationToken = default,
+        MediaAuditContext? auditContext = null)
     {
         var mediaAsset = await GetMediaAssetAsync(mediaAssetId, cancellationToken);
         await EnsureCanAccessAsync(actorUserId, mediaAsset, isDownload: false, cancellationToken);
 
         var stream = await _mediaStorageService.OpenReadAsync(mediaAsset.ObjectKey, cancellationToken);
-        await WriteAuditLogAsync(mediaAsset.Id, actorUserId, "OpenRead", cancellationToken);
+        await WriteAuditLogAsync(
+            mediaAsset.Id,
+            actorUserId,
+            string.IsNullOrWhiteSpace(auditContext?.Action) ? "View" : auditContext.Action,
+            auditContext,
+            cancellationToken);
 
         return new MediaAccessResult
         {
@@ -46,13 +52,19 @@ public class MediaAccessService : IMediaAccessService
         Guid mediaAssetId,
         TimeSpan ttl,
         Guid? actorUserId = null,
-        CancellationToken cancellationToken = default)
+        CancellationToken cancellationToken = default,
+        MediaAuditContext? auditContext = null)
     {
         var mediaAsset = await GetMediaAssetAsync(mediaAssetId, cancellationToken);
         await EnsureCanAccessAsync(actorUserId, mediaAsset, isDownload: true, cancellationToken);
 
         var url = await _mediaStorageService.GetDownloadUrlAsync(mediaAsset.ObjectKey, ttl, cancellationToken);
-        await WriteAuditLogAsync(mediaAsset.Id, actorUserId, "GenerateDownloadUrl", cancellationToken);
+        await WriteAuditLogAsync(
+            mediaAsset.Id,
+            actorUserId,
+            string.IsNullOrWhiteSpace(auditContext?.Action) ? "GenerateDownloadUrl" : auditContext.Action,
+            auditContext,
+            cancellationToken);
         return url;
     }
 
@@ -92,6 +104,7 @@ public class MediaAccessService : IMediaAccessService
         Guid mediaAssetId,
         Guid? actorUserId,
         string action,
+        MediaAuditContext? auditContext,
         CancellationToken cancellationToken)
     {
         _dbContext.MediaAuditLogs.Add(new MediaAuditLog
@@ -100,6 +113,10 @@ public class MediaAccessService : IMediaAccessService
             MediaAssetId = mediaAssetId,
             ActorUserId = actorUserId,
             Action = action,
+            IpAddress = auditContext?.IpAddress,
+            UserAgent = auditContext?.UserAgent,
+            Reason = auditContext?.Reason,
+            MetadataJson = auditContext?.MetadataJson,
             CreatedAt = DateTimeOffset.UtcNow
         });
 

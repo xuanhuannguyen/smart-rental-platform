@@ -2,9 +2,11 @@ using Microsoft.EntityFrameworkCore;
 using SmartRentalPlatform.Application.Common.Interfaces;
 using SmartRentalPlatform.Application.Common.Interfaces.Media;
 using SmartRentalPlatform.Domain.Entities.Media;
+using SmartRentalPlatform.Domain.Entities.Properties;
 using SmartRentalPlatform.Domain.Entities.RentalContracts;
 using SmartRentalPlatform.Domain.Enums.Media;
 using SmartRentalPlatform.Domain.Enums.RentalContracts;
+using SmartRentalPlatform.Domain.Enums.Users;
 using System.Text.Json;
 
 namespace SmartRentalPlatform.Infrastructure.Media;
@@ -60,9 +62,25 @@ public class DefaultMediaPermissionService : IMediaPermissionService
             return true;
         }
 
-        if (!actorUserId.HasValue ||
-            !string.Equals(mediaAsset.LinkedEntityType, nameof(ContractFile), StringComparison.Ordinal) ||
-            !mediaAsset.LinkedEntityId.HasValue)
+        if (actorUserId.HasValue && await IsAdminAsync(actorUserId.Value, cancellationToken))
+        {
+            return true;
+        }
+
+        if (!actorUserId.HasValue || !mediaAsset.LinkedEntityId.HasValue)
+        {
+            return false;
+        }
+
+        if (string.Equals(mediaAsset.LinkedEntityType, nameof(RoomingHouseLegalDocument), StringComparison.Ordinal))
+        {
+            return await CanAccessRoomingHouseLegalDocumentAsync(
+                actorUserId.Value,
+                mediaAsset.LinkedEntityId.Value,
+                cancellationToken);
+        }
+
+        if (!string.Equals(mediaAsset.LinkedEntityType, nameof(ContractFile), StringComparison.Ordinal))
         {
             return false;
         }
@@ -92,6 +110,20 @@ public class DefaultMediaPermissionService : IMediaPermissionService
         return CanViewContractFile(actorUserId.Value, contractFile.RentalContract, contractFile);
     }
 
+    private async Task<bool> CanAccessRoomingHouseLegalDocumentAsync(
+        Guid actorUserId,
+        Guid roomingHouseId,
+        CancellationToken cancellationToken)
+    {
+        var landlordUserId = await dbContext.RoomingHouseLegalDocuments
+            .AsNoTracking()
+            .Where(x => x.RoomingHouseId == roomingHouseId)
+            .Select(x => x.RoomingHouse.LandlordUserId)
+            .FirstOrDefaultAsync(cancellationToken);
+
+        return landlordUserId != Guid.Empty && landlordUserId == actorUserId;
+    }
+
     private static bool CanAccessByDefault(Guid? actorUserId, MediaAsset mediaAsset)
     {
         if (mediaAsset.Status == MediaStatus.Deleted)
@@ -107,6 +139,16 @@ public class DefaultMediaPermissionService : IMediaPermissionService
         return actorUserId.HasValue &&
             mediaAsset.OwnerUserId.HasValue &&
             actorUserId.Value == mediaAsset.OwnerUserId.Value;
+    }
+
+    private Task<bool> IsAdminAsync(Guid userId, CancellationToken cancellationToken)
+    {
+        return dbContext.Users
+            .AsNoTracking()
+            .AnyAsync(
+                x => x.Id == userId &&
+                     x.UserRoles.Any(ur => ur.RoleId == (int)RoleName.Admin),
+                cancellationToken);
     }
 
     private static bool CanViewContractFile(Guid userId, RentalContract contract, ContractFile file)

@@ -4,6 +4,7 @@ using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
 using Microsoft.EntityFrameworkCore;
+using SmartRentalPlatform.Application.Common.Media;
 using SmartRentalPlatform.Contracts.Admin;
 using SmartRentalPlatform.Application.Common.Interfaces;
 
@@ -113,9 +114,9 @@ public class AdminUserService : IAdminUserService
                     FrontMediaAssetId = approvedKyc.FrontMediaAssetId,
                     BackMediaAssetId = approvedKyc.BackMediaAssetId,
                     SelfieMediaAssetId = approvedKyc.SelfieMediaAssetId,
-                    FrontImageUrl = BuildPrivateMediaUrl(approvedKyc.FrontImageObjectKey),
-                    BackImageUrl = BuildPrivateMediaUrl(approvedKyc.BackImageObjectKey),
-                    SelfieImageUrl = BuildPrivateMediaUrl(approvedKyc.SelfieImageObjectKey),
+                    FrontImageUrl = BuildPrivateMediaUrl(approvedKyc.FrontMediaAssetId),
+                    BackImageUrl = BuildPrivateMediaUrl(approvedKyc.BackMediaAssetId),
+                    SelfieImageUrl = BuildPrivateMediaUrl(approvedKyc.SelfieMediaAssetId),
                     OcrFullName = approvedKyc.OcrFullName,
                     OcrCitizenIdMasked = approvedKyc.OcrCitizenIdMasked,
                     OcrDateOfBirth = approvedKyc.OcrDateOfBirth,
@@ -133,8 +134,10 @@ public class AdminUserService : IAdminUserService
         return response;
     }
 
-    private static string BuildPrivateMediaUrl(string objectKey)
+    private static string BuildPrivateMediaUrl(Guid? mediaAssetId)
     {
-        return $"/api/admin/media/private?objectKey={Uri.EscapeDataString(objectKey)}";
+        return mediaAssetId.HasValue
+            ? AdminPrivateMediaPathBuilder.Build(mediaAssetId.Value)
+            : string.Empty;
     }
 }
