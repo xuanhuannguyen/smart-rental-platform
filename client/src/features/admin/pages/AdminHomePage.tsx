@@ -5,9 +5,13 @@ import { ROUTE_PATHS } from '../../../app/router/routePaths';
 import { getApiErrorMessage } from '../../../shared/api/apiError';
 import { toAssetUrl } from '../../../shared/api/assets';
 import { Alert } from '../../../shared/components/ui/Alert';
+import { Toast } from '../../../shared/components/ui/Toast';
 import { Button } from '../../../shared/components/ui/Button';
 import { LoadingState } from '../../../shared/components/feedback/LoadingState';
 import { AdminImage } from '../components/AdminImage';
+import { AdminAmenitiesTab } from '../components/AdminAmenitiesTab';
+import { AdminBillingServicesTab } from '../components/AdminBillingServicesTab';
+import { AdminProvincesTab } from '../components/AdminProvincesTab';
 import { adminApprovalApi } from '../services/adminApprovalApi';
 import type {
   AdminKycDetail,
@@ -15,11 +19,13 @@ import type {
   AdminRoomingHouseDetail,
   AdminRoomingHouseListItem,
   AdminUserListItem,
-  AdminUserDetail
+  AdminUserDetail,
+  AdminReviewReportListItem,
+  AdminReviewReportDetail
 } from '../types/adminApproval.types';
 import './AdminHomePage.css';
 
-type AdminMenu = 'users' | 'houses';
+type AdminMenu = 'users' | 'houses' | 'reports' | 'provinces' | 'amenities' | 'billing-services';
 type UserTab = 'list' | 'kyc';
 type HouseTab = 'public' | 'pending';
 
@@ -124,6 +130,15 @@ function DescriptionIcon() {
   );
 }
 
+function FlagIcon() {
+  return (
+    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ display: 'inline-block', verticalAlign: 'middle' }}>
+      <path d="M4 15s1-1 4-1 5 2 8 2 4-1 4-1V3s-1 1-4 1-5-2-8-2-4 1-4 1z" />
+      <line x1="4" y1="22" x2="4" y2="15" />
+    </svg>
+  );
+}
+
 function LegalIcon() {
   return (
     <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ display: 'inline-block', verticalAlign: 'middle' }}>
@@ -150,7 +165,7 @@ export function AdminHomePage() {
 
   // URL state management
   const activeMenu = (searchParams.get('menu') as AdminMenu) || 'users';
-  const activeTab = searchParams.get('tab') || (activeMenu === 'users' ? 'list' : 'public');
+  const activeTab = searchParams.get('tab') || (activeMenu === 'users' ? 'list' : activeMenu === 'reports' ? 'pending' : 'public');
   const pageParam = parseInt(searchParams.get('page') || '1', 10);
   const selectedId = searchParams.get('id') || null;
 
@@ -172,11 +187,15 @@ export function AdminHomePage() {
   const [housePendingTotal, setHousePendingTotal] = useState(0);
   const [selectedHouse, setSelectedHouse] = useState<AdminRoomingHouseDetail | null>(null);
 
+  const [reports, setReports] = useState<AdminReviewReportListItem[]>([]);
+  const [reportTotal, setReportTotal] = useState(0);
+  const [selectedReport, setSelectedReport] = useState<AdminReviewReportDetail | null>(null);
+
   const [reason, setReason] = useState('');
   const [isLoading, setIsLoading] = useState(true);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [error, setError] = useState('');
-  const [successMessage, setSuccessMessage] = useState('');
+  const [toast, setToast] = useState<{ message: string; type: 'success' | 'error' | 'info' } | null>(null);
 
   const isAdmin = currentUser?.roles.includes('Admin');
 
@@ -219,6 +238,14 @@ export function AdminHomePage() {
     setSelectedKyc(null);
   }
 
+  async function fetchReportDetail(id: string) {
+    const response = await adminApprovalApi.getReviewReportDetail(id);
+    setSelectedReport(response.data);
+    setSelectedKyc(null);
+    setSelectedHouse(null);
+    setSelectedUser(null);
+  }
+
   async function loadData() {
     setIsLoading(true);
     setError('');
@@ -230,33 +257,41 @@ export function AdminHomePage() {
           await fetchKycDetail(selectedId);
         } else if (activeMenu === 'houses' && (activeTab === 'pending' || activeTab === 'public')) {
           await fetchHouseDetail(selectedId);
+        } else if (activeMenu === 'reports') {
+          await fetchReportDetail(selectedId);
         }
       } else {
         setSelectedUser(null);
         setSelectedKyc(null);
         setSelectedHouse(null);
+        setSelectedReport(null);
         setKycHistory([]);
 
         if (activeMenu === 'users') {
           if (activeTab === 'list') {
             const response = await adminApprovalApi.getUsers(pageParam, 20);
             setUsers(response.data.items);
-            setUserTotalCount(response.data.totalCount);
+            setUserTotalCount(response.data.totalItems);
           } else if (activeTab === 'kyc') {
             const response = await adminApprovalApi.getPendingKyc(pageParam, 20);
             setKycPendingItems(response.data.items);
-            setKycPendingTotal(response.data.totalCount);
+            setKycPendingTotal(response.data.totalItems);
           }
         } else if (activeMenu === 'houses') {
           if (activeTab === 'public') {
             const response = await adminApprovalApi.getPublicRoomingHouses(pageParam, 20);
             setHousesPublic(response.data.items);
-            setHousePublicTotal(response.data.totalCount);
+            setHousePublicTotal(response.data.totalItems);
           } else if (activeTab === 'pending') {
             const response = await adminApprovalApi.getPendingRoomingHouses(pageParam, 20);
             setHousesPending(response.data.items);
-            setHousePendingTotal(response.data.totalCount);
+            setHousePendingTotal(response.data.totalItems);
           }
+        } else if (activeMenu === 'reports') {
+          const status = activeTab === 'pending' ? 'Pending' : 'Processed';
+          const response = await adminApprovalApi.getReviewReports(pageParam, 20, status);
+          setReports(response.data.items);
+          setReportTotal(response.data.totalItems);
         }
       }
     } catch (err) {
@@ -267,34 +302,45 @@ export function AdminHomePage() {
   }
 
   function handleMenuChange(menu: AdminMenu) {
-    setSuccessMessage('');
+    setToast(null);
     setError('');
-    setSearchParams({ menu, tab: menu === 'users' ? 'list' : 'public', page: '1' });
+    let defaultTab = 'public';
+    if (menu === 'users') defaultTab = 'list';
+    else if (menu === 'reports') defaultTab = 'pending';
+
+    setSearchParams({ menu, tab: defaultTab, page: '1' });
   }
 
   function handleTabChange(tab: string) {
-    setSuccessMessage('');
+    setToast(null);
     setError('');
     setSearchParams({ menu: activeMenu, tab, page: '1' });
   }
 
   function openUser(id: string) {
     setError('');
-    setSuccessMessage('');
+    setToast(null);
     setReason('');
     setSearchParams({ menu: activeMenu, tab: activeTab, page: pageParam.toString(), id });
   }
 
   function openKyc(id: string) {
     setError('');
-    setSuccessMessage('');
+    setToast(null);
     setReason('');
     setSearchParams({ menu: activeMenu, tab: activeTab, page: pageParam.toString(), id });
   }
 
   function openHouse(id: string) {
     setError('');
-    setSuccessMessage('');
+    setToast(null);
+    setReason('');
+    setSearchParams({ menu: activeMenu, tab: activeTab, page: pageParam.toString(), id });
+  }
+
+  function openReport(id: string) {
+    setError('');
+    setToast(null);
     setReason('');
     setSearchParams({ menu: activeMenu, tab: activeTab, page: pageParam.toString(), id });
   }
@@ -302,19 +348,19 @@ export function AdminHomePage() {
   async function handleApprove() {
     setIsSubmitting(true);
     setError('');
-    setSuccessMessage('');
+    setToast(null);
     try {
       if (activeMenu === 'users' && activeTab === 'kyc' && selectedKyc) {
         const response = await adminApprovalApi.approveKyc(selectedKyc.id);
-        setSuccessMessage(response.message ?? 'Đã duyệt KYC thành công.');
+        setToast({ message: response.message ?? 'Đã duyệt KYC thành công.', type: 'success' });
         setSearchParams({ menu: activeMenu, tab: activeTab, page: pageParam.toString() });
       } else if (activeMenu === 'houses' && activeTab === 'pending' && selectedHouse) {
         const response = await adminApprovalApi.approveRoomingHouse(selectedHouse.id);
-        setSuccessMessage(response.message ?? 'Đã duyệt khu trọ thành công.');
+        setToast({ message: response.message ?? 'Đã duyệt khu trọ thành công.', type: 'success' });
         setSearchParams({ menu: activeMenu, tab: activeTab, page: pageParam.toString() });
       }
     } catch (err) {
-      setError(getApiErrorMessage(err, 'Không thể duyệt hồ sơ.'));
+      setToast({ message: getApiErrorMessage(err, 'Không thể duyệt hồ sơ.'), type: 'error' });
     } finally {
       setIsSubmitting(false);
     }
@@ -322,25 +368,46 @@ export function AdminHomePage() {
 
   async function handleReject() {
     if (!reason.trim()) {
-      setError('Vui lòng nhập lý do từ chối.');
+      setToast({ message: 'Vui lòng nhập lý do từ chối.', type: 'error' });
       return;
     }
     setIsSubmitting(true);
     setError('');
-    setSuccessMessage('');
+    setToast(null);
     try {
       if (activeMenu === 'users' && activeTab === 'kyc' && selectedKyc) {
         const response = await adminApprovalApi.rejectKyc(selectedKyc.id, reason);
-        setSuccessMessage(response.message ?? 'Đã từ chối KYC.');
+        setToast({ message: response.message ?? 'Đã từ chối KYC.', type: 'success' });
         setSearchParams({ menu: activeMenu, tab: activeTab, page: pageParam.toString() });
       } else if (activeMenu === 'houses' && activeTab === 'pending' && selectedHouse) {
         const response = await adminApprovalApi.rejectRoomingHouse(selectedHouse.id, reason);
-        setSuccessMessage(response.message ?? 'Đã từ chối khu trọ.');
+        setToast({ message: response.message ?? 'Đã từ chối khu trọ.', type: 'success' });
         setSearchParams({ menu: activeMenu, tab: activeTab, page: pageParam.toString() });
       }
       setReason('');
     } catch (err) {
-      setError(getApiErrorMessage(err, 'Không thể từ chối hồ sơ.'));
+      setToast({ message: getApiErrorMessage(err, 'Không thể từ chối hồ sơ.'), type: 'error' });
+    } finally {
+      setIsSubmitting(false);
+    }
+  }
+
+  async function handleProcessReport(action: 'Dismiss' | 'DeleteReview') {
+    if (!selectedReport) return;
+    if (action === 'DeleteReview' && !reason.trim()) {
+      setToast({ message: 'Vui lòng nhập lý do (Admin notes) khi ẩn đánh giá.', type: 'error' });
+      return;
+    }
+    setIsSubmitting(true);
+    setError('');
+    setToast(null);
+    try {
+      const response = await adminApprovalApi.processReviewReport(selectedReport.id, action, reason);
+      setToast({ message: 'Đã xử lý báo cáo thành công.', type: 'success' });
+      setSearchParams({ menu: activeMenu, tab: activeTab, page: pageParam.toString() });
+      setReason('');
+    } catch (err) {
+      setToast({ message: getApiErrorMessage(err, 'Không thể xử lý báo cáo.'), type: 'error' });
     } finally {
       setIsSubmitting(false);
     }
@@ -389,6 +456,34 @@ export function AdminHomePage() {
           >
             <HouseIcon /> Quản lý khu trọ
           </button>
+          <button
+            type="button"
+            className={`sidebar-menu-item ${activeMenu === 'reports' ? 'active' : ''}`}
+            onClick={() => handleMenuChange('reports')}
+          >
+            <FlagIcon /> Quản lý báo cáo
+          </button>
+          <button
+            type="button"
+            className={`sidebar-menu-item ${activeMenu === 'provinces' ? 'active' : ''}`}
+            onClick={() => handleMenuChange('provinces')}
+          >
+            <MapPinIcon /> Quản lý khu vực
+          </button>
+          <button
+            type="button"
+            className={`sidebar-menu-item ${activeMenu === 'amenities' ? 'active' : ''}`}
+            onClick={() => handleMenuChange('amenities')}
+          >
+            <CheckIcon /> Quản lý tiện ích
+          </button>
+          <button
+            type="button"
+            className={`sidebar-menu-item ${activeMenu === 'billing-services' ? 'active' : ''}`}
+            onClick={() => handleMenuChange('billing-services')}
+          >
+            <CalendarIcon /> Quản lý dịch vụ
+          </button>
         </nav>
 
         <div className="sidebar-footer">
@@ -404,12 +499,19 @@ export function AdminHomePage() {
       {/* Main Content bên phải */}
       <main className="admin-main-content">
         <div className="content-header">
-          <h1>{activeMenu === 'users' ? 'Quản lý Người dùng' : 'Quản lý Khu trọ'}</h1>
-          <p>Hệ thống giám sát, xác thực thành viên và khu trọ toàn nền tảng.</p>
+          <h1>
+            {activeMenu === 'users' ? 'Quản lý Người dùng' :
+              activeMenu === 'houses' ? 'Quản lý Khu trọ' :
+              activeMenu === 'reports' ? 'Quản lý Báo cáo' :
+              activeMenu === 'provinces' ? 'Quản lý Khu vực' :
+              activeMenu === 'amenities' ? 'Quản lý Tiện ích' :
+                'Quản lý Dịch vụ'}
+          </h1>
+          <p>Hệ thống giám sát, xác thực thành viên, khu trọ và các nội dung trên nền tảng.</p>
         </div>
 
         {error && <Alert type="error">{error}</Alert>}
-        {successMessage && <Alert type="success">{successMessage}</Alert>}
+        
 
         {/* Cấu trúc Tabs */}
         {activeMenu === 'users' ? (
@@ -429,7 +531,7 @@ export function AdminHomePage() {
               Duyệt eKYC
             </button>
           </div>
-        ) : (
+        ) : activeMenu === 'houses' ? (
           <div className="admin-tabs">
             <button
               type="button"
@@ -446,7 +548,24 @@ export function AdminHomePage() {
               Khu trọ chờ duyệt
             </button>
           </div>
-        )}
+        ) : activeMenu === 'reports' ? (
+          <div className="admin-tabs">
+            <button
+              type="button"
+              className={`admin-tab-btn ${activeTab === 'pending' ? 'active' : ''}`}
+              onClick={() => handleTabChange('pending')}
+            >
+              Báo cáo chờ xử lý
+            </button>
+            <button
+              type="button"
+              className={`admin-tab-btn ${activeTab === 'processed' ? 'active' : ''}`}
+              onClick={() => handleTabChange('processed')}
+            >
+              Báo cáo đã xử lý
+            </button>
+          </div>
+        ) : null}
 
         {/* Nội dung tương ứng theo Tab */}
         {isLoading ? (
@@ -565,7 +684,7 @@ export function AdminHomePage() {
                       {selectedUser.onboardingStatus === 'Completed' && selectedUser.kycInfo ? (
                         <div className="admin-detail-section">
                           <h3 className="section-subtitle">Tài liệu định danh & Selfie (Đã duyệt)</h3>
-                          
+
                           <div className="admin-media-grid-vertical">
                             <div className="media-container">
                               <span className="media-label">Mặt trước CCCD</span>
@@ -593,10 +712,10 @@ export function AdminHomePage() {
                                 <label>Kết quả hệ thống tự động (AI)</label>
                                 <span className="system-result-text">
                                   {selectedUser.kycInfo.ekycResult === 'Passed' ? 'Passed (Hợp lệ)' :
-                                   selectedUser.kycInfo.ekycResult === 'NeedReview' ? 'NeedReview (Cần hậu kiểm)' :
-                                   selectedUser.kycInfo.ekycResult === 'Failed' ? 'Failed (Không trùng khớp)' :
-                                   selectedUser.kycInfo.ekycResult === 'ProviderError' ? 'ProviderError (Lỗi nhà cung cấp)' :
-                                   selectedUser.kycInfo.ekycResult}
+                                    selectedUser.kycInfo.ekycResult === 'NeedReview' ? 'NeedReview (Cần hậu kiểm)' :
+                                      selectedUser.kycInfo.ekycResult === 'Failed' ? 'Failed (Không trùng khớp)' :
+                                        selectedUser.kycInfo.ekycResult === 'ProviderError' ? 'ProviderError (Lỗi nhà cung cấp)' :
+                                          selectedUser.kycInfo.ekycResult}
                                 </span>
                               </div>
                               <div className="admin-detail-item" style={{ gridColumn: 'span 2' }}>
@@ -719,7 +838,7 @@ export function AdminHomePage() {
                     </button>
                     <h2>Chi tiết Hồ sơ eKYC</h2>
                   </div>
-                  
+
                   <div className="admin-detail-split-grid">
                     {/* Cột trái: Thông tin định danh + Lịch sử + Actions */}
                     <div className="admin-detail-column-left">
@@ -939,7 +1058,7 @@ export function AdminHomePage() {
                       <div className="admin-detail-section">
                         <h3 className="section-subtitle">Thông tin cơ bản</h3>
                         <h2 className="property-title">{selectedHouse.name}</h2>
-                        
+
                         <div className="admin-grid-details" style={{ marginTop: '16px' }}>
                           <div className="admin-detail-item">
                             <label><UserIcon /> Chủ trọ</label>
@@ -1006,7 +1125,7 @@ export function AdminHomePage() {
                     <div className="admin-detail-column-right">
                       <div className="admin-detail-section">
                         <h3 className="section-subtitle">Tài liệu pháp lý & Hình ảnh</h3>
-                        
+
                         <div className="admin-media-grid-vertical">
                           {selectedHouse.legalDocument && (
                             <>
@@ -1159,7 +1278,7 @@ export function AdminHomePage() {
                       <div className="admin-detail-section">
                         <h3 className="section-subtitle">Thông tin cơ bản</h3>
                         <h2 className="property-title">{selectedHouse.name}</h2>
-                        
+
                         <div className="admin-grid-details" style={{ marginTop: '16px' }}>
                           <div className="admin-detail-item">
                             <label><UserIcon /> Chủ trọ</label>
@@ -1241,7 +1360,7 @@ export function AdminHomePage() {
                     <div className="admin-detail-column-right">
                       <div className="admin-detail-section">
                         <h3 className="section-subtitle">Tài liệu pháp lý & Hình ảnh</h3>
-                        
+
                         <div className="admin-media-grid-vertical">
                           {selectedHouse.legalDocument && (
                             <>
@@ -1360,9 +1479,224 @@ export function AdminHomePage() {
                 </div>
               )
             )}
+            {/* Tab: Báo cáo đánh giá */}
+            {activeMenu === 'reports' && (
+              selectedReport ? (
+                /* View Chi tiết báo cáo rộng toàn màn hình */
+                <div className="admin-detail-card admin-detail-card--split">
+                  <div className="admin-detail-card__header">
+                    <button
+                      type="button"
+                      className="admin-back-btn"
+                      onClick={() => setSearchParams({ menu: activeMenu, tab: activeTab, page: pageParam.toString() })}
+                    >
+                      <ArrowLeftIcon />
+                      Quay lại danh sách
+                    </button>
+                    <h2>Chi tiết Báo cáo Đánh giá</h2>
+                  </div>
+
+                  <div className="admin-detail-split-grid">
+                    <div className="admin-detail-column-left">
+                      <div className="admin-detail-section">
+                        <h3 className="section-subtitle">Thông tin Đánh giá bị báo cáo</h3>
+                        <div className="admin-grid-details">
+                          <div className="admin-detail-item">
+                            <label><UserIcon /> Người đánh giá (Tenant)</label>
+                            <span>{selectedReport.review?.tenantDisplayName}</span>
+                          </div>
+                          <div className="admin-detail-item">
+                            <label><HouseIcon /> Khu trọ</label>
+                            <span>{selectedReport.roomingHouseName}</span>
+                          </div>
+                          <div className="admin-detail-item">
+                            <label>Số sao</label>
+                            <span style={{ color: '#fbbf24', fontWeight: 'bold' }}>{selectedReport.review?.rating} ⭐</span>
+                          </div>
+                          <div className="admin-detail-item" style={{ gridColumn: 'span 2' }}>
+                            <label><DescriptionIcon /> Nội dung đánh giá</label>
+                            <span className="property-description">{selectedReport.review?.comment || '(Không có nội dung)'}</span>
+                          </div>
+                        </div>
+
+                        {selectedReport.review?.images && selectedReport.review.images.length > 0 && (
+                          <div style={{ marginTop: '16px' }}>
+                            <label className="section-subtitle" style={{ fontSize: '13px' }}>Ảnh đính kèm trong đánh giá:</label>
+                            <div className="property-photos-gallery" style={{ marginTop: '8px' }}>
+                              <div className="gallery-thumbnail-grid">
+                                {selectedReport.review.images.map((img) => (
+                                  <div key={img.id} className="gallery-thumbnail-item">
+                                    <AdminImage
+                                      label="Ảnh đánh giá"
+                                      src={assetUrl(img.imageUrl)}
+                                    />
+                                  </div>
+                                ))}
+                              </div>
+                            </div>
+                          </div>
+                        )}
+                      </div>
+
+                      <div className="admin-detail-section" style={{ marginTop: '24px' }}>
+                        <h3 className="section-subtitle">Thông tin người báo cáo</h3>
+                        <div className="admin-grid-details">
+                          <div className="admin-detail-item">
+                            <label><UserIcon /> Người báo cáo</label>
+                            <span>{selectedReport.reporterDisplayName}</span>
+                          </div>
+                          <div className="admin-detail-item">
+                            <label><CalendarIcon /> Ngày báo cáo</label>
+                            <span>{new Date(selectedReport.createdAt).toLocaleString('vi-VN')}</span>
+                          </div>
+                          <div className="admin-detail-item" style={{ gridColumn: 'span 2' }}>
+                            <label><DescriptionIcon /> Lý do báo cáo</label>
+                            <span className="property-description" style={{ color: '#dc2626' }}>{selectedReport.reason}</span>
+                          </div>
+                        </div>
+                      </div>
+
+                      {selectedReport.status === 'Pending' && (
+                        <div className="admin-action-area">
+                          <h3 className="section-subtitle">Xử lý báo cáo</h3>
+                          <textarea
+                            className="admin-reason-textarea"
+                            value={reason}
+                            onChange={(e) => setReason(e.target.value)}
+                            placeholder="Nhập ghi chú xử lý của Admin (bắt buộc nếu ẩn đánh giá)..."
+                          />
+                          <div className="admin-action-buttons">
+                            <button
+                              type="button"
+                              className="admin-btn admin-btn--danger"
+                              disabled={isSubmitting}
+                              onClick={() => handleProcessReport('Dismiss')}
+                            >
+                              <CloseIcon />
+                              Bỏ qua báo cáo
+                            </button>
+                            <button
+                              type="button"
+                              className="admin-btn admin-btn--success"
+                              disabled={isSubmitting}
+                              onClick={() => handleProcessReport('DeleteReview')}
+                            >
+                              <CheckIcon />
+                              Ẩn đánh giá vi phạm
+                            </button>
+                          </div>
+                        </div>
+                      )}
+
+                      {selectedReport.status !== 'Pending' && (
+                        <div className="admin-detail-section" style={{ marginTop: '24px' }}>
+                          <h3 className="section-subtitle">Kết quả xử lý</h3>
+                          <div className="admin-grid-details">
+                            <div className="admin-detail-item">
+                              <label>Trạng thái</label>
+                              <span className={`badge ${selectedReport.status === 'Resolved' ? 'badge-active' : 'badge-rejected'}`}>
+                                {selectedReport.status === 'Resolved' ? 'Đã ẩn' : selectedReport.status === 'Dismissed' ? 'Bỏ qua' : selectedReport.status}
+                              </span>
+                            </div>
+                            <div className="admin-detail-item">
+                              <label><CalendarIcon /> Ngày xử lý</label>
+                              <span>{selectedReport.resolvedAt ? new Date(selectedReport.resolvedAt).toLocaleString('vi-VN') : '—'}</span>
+                            </div>
+                            {selectedReport.adminNote && (
+                              <div className="admin-detail-item" style={{ gridColumn: 'span 2' }}>
+                                <label>Ghi chú của Admin</label>
+                                <span>{selectedReport.adminNote}</span>
+                              </div>
+                            )}
+                          </div>
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                </div>
+              ) : (
+                /* Bảng danh sách Báo cáo */
+                <div className="admin-card">
+                  <div className="table-responsive">
+                    <table className="admin-table">
+                      <thead>
+                        <tr>
+                          <th>Người báo cáo</th>
+                          <th>Khu trọ</th>
+                          <th>Lý do báo cáo</th>
+                          <th>Ngày gửi</th>
+                          <th style={{ textAlign: 'right' }}>Hành động</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {reports.length === 0 ? (
+                          <tr>
+                            <td colSpan={5} style={{ textAlign: 'center', padding: '32px' }}>
+                              Không có báo cáo nào.
+                            </td>
+                          </tr>
+                        ) : (
+                          reports.map((item) => (
+                            <tr key={item.id}>
+                              <td><strong>{item.reporterDisplayName}</strong></td>
+                              <td>{item.roomingHouseName}</td>
+                              <td>
+                                <div style={{ maxWidth: '300px', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                                  {item.reason}
+                                </div>
+                              </td>
+                              <td>{new Date(item.createdAt).toLocaleDateString('vi-VN')}</td>
+                              <td style={{ textAlign: 'right' }}>
+                                <button
+                                  type="button"
+                                  className="admin-table-action-btn"
+                                  onClick={() => void openReport(item.id)}
+                                >
+                                  Xem chi tiết
+                                </button>
+                              </td>
+                            </tr>
+                          ))
+                        )}
+                      </tbody>
+                    </table>
+                  </div>
+
+                  {/* Phân trang Báo cáo */}
+                  <div className="admin-pagination">
+                    <span className="pagination-info">
+                      Hiển thị tối đa 20 dòng · Tổng cộng {reportTotal} báo cáo
+                    </span>
+                    <div className="pagination-actions">
+                      <button
+                        type="button"
+                        className="pagination-btn"
+                        disabled={pageParam <= 1}
+                        onClick={() => setSearchParams({ menu: activeMenu, tab: activeTab, page: (pageParam - 1).toString() })}
+                      >
+                        Trước
+                      </button>
+                      <button
+                        type="button"
+                        className="pagination-btn"
+                        disabled={pageParam * 20 >= reportTotal}
+                        onClick={() => setSearchParams({ menu: activeMenu, tab: activeTab, page: (pageParam + 1).toString() })}
+                      >
+                        Sau
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              )
+            )}
           </>
         )}
+        
+        {!isLoading && activeMenu === 'provinces' && <AdminProvincesTab />}
+        {!isLoading && activeMenu === 'amenities' && <AdminAmenitiesTab />}
+        {!isLoading && activeMenu === 'billing-services' && <AdminBillingServicesTab />}
       </main>
+      {toast && <Toast message={toast.message} type={toast.type} onClose={() => setToast(null)} />}
     </div>
   );
 }
