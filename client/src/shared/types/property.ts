@@ -7,6 +7,7 @@ export interface Amenity {
 
 export interface PropertyImage {
   id: string;
+  mediaAssetId?: string | null;
   objectKey: string;
   imageUrl: string;
   caption?: string | null;

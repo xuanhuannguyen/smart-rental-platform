@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import type { PropertyImage } from '../types';
-import { toAssetUrl } from '../../../shared/api/assets';
+import { toPublicAssetUrl } from '../../../shared/api/assets';
 import './HouseImageGallery.css';
 
 type HouseImageGalleryProps = {
@@ -36,7 +36,7 @@ export default function HouseImageGallery({ images = [], houseName }: HouseImage
         <img
           className="house-image-gallery__main-img"
           alt={`${houseName} - Ảnh số ${activeIndex + 1}`}
-          src={toAssetUrl(activeImage.imageUrl || activeImage.objectKey)}
+          src={toPublicAssetUrl(activeImage.imageUrl, activeImage.objectKey)}
           key={activeImage.id} // Changing key forces keyframe animation reload for smooth fade-in
         />
 
@@ -87,7 +87,7 @@ export default function HouseImageGallery({ images = [], houseName }: HouseImage
               onClick={() => setActiveIndex(index)}
               aria-label={`Xem ảnh số ${index + 1}`}
             >
-              <img alt={`Thumbnail ${index + 1}`} src={toAssetUrl(image.imageUrl || image.objectKey)} />
+              <img alt={`Thumbnail ${index + 1}`} src={toPublicAssetUrl(image.imageUrl, image.objectKey)} />
             </button>
           ))}
         </div>

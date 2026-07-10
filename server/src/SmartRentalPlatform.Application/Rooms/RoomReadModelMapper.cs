@@ -39,6 +39,7 @@ internal static class RoomReadModelMapper
                 .Select(x => new PropertyImageResponse
                 {
                     Id = x.Id,
+                    MediaAssetId = x.MediaAssetId,
                     ObjectKey = x.ObjectKey,
                     ImageUrl = BuildImageUrl(x.ObjectKey),
                     Caption = x.Caption,

@@ -90,6 +90,7 @@ internal static class RoomingHouseReadModelMapper
                 .Select(x => new PropertyImageResponse
                 {
                     Id = x.Id,
+                    MediaAssetId = x.MediaAssetId,
                     ObjectKey = x.ObjectKey,
                     ImageUrl = PublicMediaPathBuilder.Build(x.ObjectKey),
                     Caption = x.Caption,

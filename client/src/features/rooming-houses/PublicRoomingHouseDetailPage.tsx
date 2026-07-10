@@ -5,7 +5,7 @@ import TenantMapPreview from './components/TenantMapPreview';
 import HouseImageGallery from './components/HouseImageGallery';
 import RentalAiChatbot from './components/RentalAiChatbot';
 import type { RoomingHouseDetail } from './types';
-import { toAssetUrl } from '../../shared/api/assets';
+import { toAssetUrl, toPublicAssetUrl } from '../../shared/api/assets';
 import { getApiErrorMessage } from '../../shared/api/apiError';
 import { HomeHeader } from '../../shared/components/layout/HomeHeader';
 import { ROUTE_PATHS } from '../../app/router/routePaths';
@@ -373,7 +373,7 @@ export default function PublicRoomingHouseDetailPage() {
                   <Link to={ROUTE_PATHS.ME.ROOM_DETAIL(house.id, room.id)} className="public-room-card" key={room.id}>
                     <div className="public-room-card__img-wrapper">
                       {roomImage ? (
-                        <img alt={`Phòng ${room.roomNumber}`} src={toAssetUrl(roomImage.imageUrl || roomImage.objectKey)} />
+                        <img alt={`Phòng ${room.roomNumber}`} src={toPublicAssetUrl(roomImage.imageUrl, roomImage.objectKey)} />
                       ) : (
                         <div className="public-room-card__placeholder">Chưa có ảnh</div>
                       )}

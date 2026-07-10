@@ -35,6 +35,8 @@ Mỗi phase sau phải cập nhật tiếp vào file này, không tạo lại ch
 - `[x]` Phase 6 hoàn thành cho `KycVerification` media migration
 - `[x]` Phase 7 hoàn thành cho admin private media access + audit wiring
 - `[x]` Phase 8 hoàn thành cho `RoomingHouseLegalDocument` media migration
+- `[x]` Phase 9 hoàn thành cho backend property image migration
+- `[x]` Phase 10 hoàn thành cho frontend public property image migration ở mức consumption/helper
 - `[x]` Runtime code chính hiện bind `IMediaStorageService` và `IPrivateStorageService` sang `S3StorageService`
 - `[~]` Open risk hiện tập trung ở private module còn lại, admin access/audit, legal/property/billing migration và cleanup phase sau
 
@@ -606,6 +608,95 @@ Mỗi phase sau phải cập nhật tiếp vào file này, không tạo lại ch
 - `[ ]` Chưa có backfill dữ liệu cũ
 - `[ ]` Chưa bỏ fallback field cũ
 - `[ ]` Chưa xóa hoàn toàn object-key based access cũ
+
+---
+
+## Phase 9 Audit
+
+### Mục tiêu phase
+
+- `[x]` Chuyển backend `PropertyImage` sang media core
+- `[x]` Giữ compatibility cho frontend public image flow hiện tại
+- `[x]` Backfill property image legacy sang `media_assets`
+
+### Đã làm
+
+- `[x]` Thêm `PropertyImage.MediaAssetId`
+- `[x]` Thêm EF config/index/FK cho `PropertyImage.MediaAssetId`
+- `[x]` Tạo migration `AddPropertyImageMediaAssets`
+- `[x]` Migration có backfill property image legacy sang `media_assets`
+- `[x]` `RoomingHouseMediaService.UpdateImagesAsync` đã link ảnh khu trọ sang `MediaAsset`
+- `[x]` `RoomMediaService.UpdateImagesAsync` đã link ảnh phòng sang `MediaAsset`
+- `[x]` `PropertyImageResponse` expose `MediaAssetId`
+- `[x]` `RoomingHouseReadModelMapper` map `MediaAssetId` cho ảnh public
+- `[x]` `RoomReadModelMapper` map `MediaAssetId` cho ảnh public
+- `[x]` `AdminRoomingHouseApprovalService` map `MediaAssetId` cho ảnh public
+
+### Chưa hoàn chỉnh
+
+- `[~]` Public route hiện vẫn đọc qua `/api/media/public/{objectKey}`, chưa chuyển sang media-backed public resolver
+- `[~]` Frontend vẫn còn có thể phụ thuộc vào `ObjectKey/ImageUrl` ở một số chỗ cho đến Phase 10
+- `[~]` Legacy field `ObjectKey` và `ImageUrl` vẫn phải giữ để compatibility
+
+### Không làm trong phase này
+
+- `[x]` Không migrate frontend public image flow
+- `[x]` Không bỏ `ObjectKey`
+- `[x]` Không thêm permission gate mới cho public route
+
+### Tests / Verify
+
+- `[x]` `dotnet build server/src/SmartRentalPlatform.Api/SmartRentalPlatform.Api.csproj --no-restore` pass
+- `[x]` `dotnet test server/tests/SmartRentalPlatform.UnitTests/SmartRentalPlatform.UnitTests.csproj --no-restore --filter "FullyQualifiedName~RoomingHouseMediaServiceTests|FullyQualifiedName~RoomMediaServiceTests|FullyQualifiedName~AdminRoomingHouseApprovalServiceTests|FullyQualifiedName~MediaBackedFileStorageServiceTests"` pass
+
+### Findings / risk mở
+
+- `[!]` Public object access runtime hiện vẫn object-key based; `MediaAssetId` mới đang là metadata source of truth ở backend write/read-model layer, chưa phải fetch layer cuối
+- `[!]` Rooming house/room image cũ được backfill metadata nhưng không đổi object key vật lý
+- `[!]` Phase 10 phải dọn frontend helper để tránh tiếp tục coi `objectKey` là API contract chính
+
+---
+
+## Phase 10 Audit
+
+### Mục tiêu phase
+
+- `[x]` Dọn frontend public image flow để ưu tiên contract mới từ backend
+- `[x]` Giảm phụ thuộc `toAssetUrl(objectKey)` ở property image UI
+- `[x]` Giữ compatibility cho các module chưa migrate hết
+
+### Đã làm
+
+- `[x]` Tách helper `toPublicAssetUrl(imageUrl, objectKey)` cho public property image
+- `[x]` `HouseImageGallery` dùng helper public riêng
+- `[x]` `PropertyImageEditor` dùng helper public riêng
+- `[x]` `PublicRoomingHouseDetailPage` dùng helper public riêng cho room image
+- `[x]` Client type `PropertyImage` expose `mediaAssetId`
+- `[x]` Client type `PropertyImageRequest` giữ được `mediaAssetId` trong local state
+- `[x]` Upload response client type đã hiểu `mediaAssetId`
+
+### Chưa hoàn chỉnh
+
+- `[~]` `toAssetUrl` generic vẫn còn cần cho avatar/legal/pdf/private compatibility flows
+- `[~]` Các listing/card dùng `coverImageUrl` vẫn đi qua helper generic, nhưng backend field này đã là URL-ready nên chưa phải blocker
+- `[~]` Frontend chưa dùng `MediaAssetId` để fetch public object trực tiếp; phase này chỉ dọn consumption/helper
+
+### Không làm trong phase này
+
+- `[x]` Không refactor layout/UI
+- `[x]` Không đổi legal document/private image viewer
+- `[x]` Không thay public fetch API ở backend
+
+### Tests / Verify
+
+- `[x]` `rg` không còn pattern `image.imageUrl || image.objectKey` ở các component property image chính sau khi migrate
+- `[x]` Diff Phase 10 tập trung ở helper/types/components public image
+- `[~]` `npm.cmd run build` bị chặn bởi lỗi sẵn có ở `react-pdf` preview modules, không phải do Phase 10
+
+### Findings / risk mở
+
+- `[!]` Frontend build hiện đang fail ở `ContractPreviewModal.tsx` và `AppendixPreviewModal.tsx` vì `react-pdf`, nên chưa có full frontend build green cho repo tại thời điểm chốt Phase 10
+- `[!]` `toAssetUrl` generic vẫn tồn tại nên phase sau cần tiếp tục thu hẹp nơi sử dụng nếu muốn cleanup sâu hơn
 
 ---
 

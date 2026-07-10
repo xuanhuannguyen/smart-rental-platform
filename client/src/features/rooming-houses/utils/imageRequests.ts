@@ -2,6 +2,7 @@ import type { PropertyImageRequest } from '../types';
 
 type ExistingImage = {
   id: string;
+  mediaAssetId?: string | null;
   objectKey: string;
   imageUrl?: string;
   caption?: string | null;
@@ -12,6 +13,7 @@ type ExistingImage = {
 export function toImageRequests(images: ExistingImage[]): PropertyImageRequest[] {
   return images.map((image) => ({
     id: image.id,
+    mediaAssetId: image.mediaAssetId,
     objectKey: image.objectKey,
     imageUrl: image.imageUrl,
     caption: image.caption,

@@ -2,7 +2,7 @@ import { useState, useRef } from 'react';
 import type { DragEvent } from 'react';
 import { uploadImage, type FileUploadScope } from '../../files/api';
 import { getApiErrorMessage } from '../../../shared/api/apiError';
-import { toAssetUrl } from '../../../shared/api/assets';
+import { toPublicAssetUrl } from '../../../shared/api/assets';
 import type { PropertyImageRequest } from '../types';
 import './RoomingHouseEditor.css';
 
@@ -79,6 +79,7 @@ export default function PropertyImageEditor({
         if (result.status !== 'fulfilled') return;
 
         uploadedImages.push({
+          mediaAssetId: result.value.mediaAssetId,
           objectKey: result.value.objectKey,
           imageUrl: result.value.url,
           caption: '',
@@ -244,7 +245,7 @@ export default function PropertyImageEditor({
           >
             <img
               alt={image.caption || 'Ảnh khu trọ'}
-              src={toAssetUrl(image.imageUrl || image.objectKey)}
+              src={toPublicAssetUrl(image.imageUrl, image.objectKey)}
             />
             {image.isCover && <span className="property-image-cover-badge">Ảnh bìa</span>}
             <div className="property-image-card-overlay">

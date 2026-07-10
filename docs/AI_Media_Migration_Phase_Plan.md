@@ -24,6 +24,8 @@ Theo code hiện có trong repo:
 - `Phase 6 - KYC media migration` đã được implement cho upload + schema + admin read-model preparation
 - `Phase 7 - Admin private media access + audit` đã được implement
 - `Phase 8 - Legal document migration` đã được implement
+- `Phase 9 - Public property image migration backend` đã được implement
+- `Phase 10 - Public property image migration frontend` đã được implement ở mức public image consumption
 
 Các điểm chưa hoàn chỉnh nhưng đã biết từ code hiện tại:
 
@@ -35,10 +37,11 @@ Các điểm chưa hoàn chỉnh nhưng đã biết từ code hiện tại:
 - upload compatibility vẫn đang trả contract cũ `ObjectKey/Url`
 - contract appendix chưa có migration/backfill cho dữ liệu appendix legacy cũ
 - legal document object cũ có thể vẫn đang nằm ở public object key cũ ở tầng storage thật dù metadata đã được migrate sang private semantics
+- public property image route vẫn đang mở theo `objectKey`; frontend hiện đã ưu tiên `imageUrl` backend trả về nhưng fetch layer public chưa chuyển hẳn sang `MediaAssetId`
 
 Nếu tiếp tục bám đúng code hiện tại, phase kế tiếp mặc định là:
 
-- `Phase 9 - Public property image migration backend`
+- `Phase 11 - Billing proof image migration`
 - phase-specific plan: `docs/AI_Media_Migration_Phase4_ContractFile_Plan.md`
 
 ---
@@ -604,6 +607,16 @@ Backend chuyển sang `MediaAssetId` nhưng vẫn có response an toàn cho fron
 
 - frontend cũ chưa cần đổi nhiều vẫn chạy
 
+### Trạng thái hiện tại
+
+- `PropertyImage` đã có `MediaAssetId`
+- `RoomingHouseMediaService.UpdateImagesAsync` đã link ảnh khu trọ sang `media_assets`
+- `RoomMediaService.UpdateImagesAsync` đã link ảnh phòng sang `media_assets`
+- `PropertyImageResponse` đã expose `MediaAssetId`
+- `RoomingHouseDetailResponse`, `RoomResponse`, `AdminRoomingHouseDetailResponse` vẫn trả `ImageUrl` compatibility cho frontend cũ
+- migration `AddPropertyImageMediaAssets` đã backfill property image legacy sang `media_assets`
+- `ObjectKey` và `ImageUrl` legacy vẫn được giữ để compatibility
+
 ---
 
 ## Phase 10 - Public property image migration frontend
@@ -634,6 +647,15 @@ Dọn frontend public image theo API mới, giảm phụ thuộc `toAssetUrl(obj
 
 - gallery/load image pass
 - không còn hardcoded path private/public bị trộn lẫn
+
+### Trạng thái hiện tại
+
+- frontend đã có helper `toPublicAssetUrl(imageUrl, objectKey)` cho public property image
+- `HouseImageGallery` đã ưu tiên `imageUrl` backend trả về thay vì tự ghép URL từ `objectKey`
+- `PropertyImageEditor` đã giữ `mediaAssetId` trong state upload/result
+- `PublicRoomingHouseDetailPage` đã dùng helper public riêng cho room image preview
+- `PropertyImageRequest` và `PropertyImage` client types đã hiểu `mediaAssetId`
+- helper generic `toAssetUrl` vẫn còn để giữ compatibility cho avatar/legal/pdf/private-path cũ
 
 ---
 

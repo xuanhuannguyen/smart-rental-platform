@@ -2,6 +2,7 @@ using Microsoft.EntityFrameworkCore;
 using SmartRentalPlatform.Application.RoomingHouses;
 using SmartRentalPlatform.Contracts.Common;
 using SmartRentalPlatform.Contracts.LegalDocuments.Requests;
+using SmartRentalPlatform.Contracts.PropertyImages.Requests;
 using SmartRentalPlatform.Contracts.RoomingHouses;
 using SmartRentalPlatform.Contracts.RoomingHouses.Requests;
 using SmartRentalPlatform.Contracts.RoomingHouses.Responses;
@@ -17,6 +18,90 @@ namespace SmartRentalPlatform.UnitTests.Property;
 public class RoomingHouseMediaServiceTests : IDisposable
 {
     private readonly TestDatabaseFixture _fixture = new();
+
+    [Fact]
+    public async Task UpdateImagesAsync_ShouldLinkPublicMediaAssetsAndReturnMediaAssetIds()
+    {
+        var landlord = TestDataBuilder.BuildUser(email: "house-image-owner@unit.test", displayName: "House Image Owner");
+        var house = TestDataBuilder.BuildRoomingHouse(landlord.Id, status: RoomingHouseApprovalStatus.Draft);
+        var imageObjectKey = "public/rooming-house-images/cover.jpg";
+
+        _fixture.Context.Users.Add(landlord);
+        _fixture.Context.RoomingHouses.Add(house);
+        _fixture.Context.MediaAssets.Add(new MediaAsset
+        {
+            Id = Guid.NewGuid(),
+            OwnerUserId = landlord.Id,
+            BucketName = "local-media",
+            ObjectKey = imageObjectKey,
+            OriginalFileName = "cover.jpg",
+            StoredFileName = "cover.jpg",
+            ContentType = "image/jpeg",
+            FileSize = 11,
+            Scope = MediaScope.RoomingHouseImage,
+            Visibility = MediaVisibility.Public,
+            Status = MediaStatus.Uploaded,
+            CreatedAt = DateTimeOffset.UtcNow,
+            UpdatedAt = DateTimeOffset.UtcNow
+        });
+        await _fixture.Context.SaveChangesAsync();
+
+        var service = new RoomingHouseMediaService(
+            _fixture.Context,
+            new FakeRoomingHouseQueryService(_fixture.Context));
+
+        var result = await service.UpdateImagesAsync(
+            house.Id,
+            new UpdatePropertyImagesRequest
+            {
+                Images =
+                [
+                    new UpdatePropertyImageItemRequest
+                    {
+                        ObjectKey = imageObjectKey,
+                        IsCover = true,
+                        SortOrder = 0
+                    },
+                    new UpdatePropertyImageItemRequest
+                    {
+                        ObjectKey = "public/rooming-house-images/second.jpg",
+                        IsCover = false,
+                        SortOrder = 1
+                    },
+                    new UpdatePropertyImageItemRequest
+                    {
+                        ObjectKey = "public/rooming-house-images/third.jpg",
+                        IsCover = false,
+                        SortOrder = 2
+                    }
+                ]
+            });
+
+        Assert.NotNull(result);
+        Assert.Equal(3, result!.Images.Count);
+        Assert.All(result.Images, image => Assert.NotNull(image.MediaAssetId));
+        Assert.Equal($"/api/media/public/{imageObjectKey}", result.Images[0].ImageUrl);
+
+        var imagesInDb = await _fixture.Context.PropertyImages
+            .Where(x => x.RoomingHouseId == house.Id)
+            .OrderBy(x => x.SortOrder)
+            .ToListAsync();
+
+        Assert.Equal(3, imagesInDb.Count);
+        Assert.All(imagesInDb, image => Assert.NotNull(image.MediaAssetId));
+
+        var linkedAssets = await _fixture.Context.MediaAssets
+            .Where(x => x.LinkedEntityType == nameof(PropertyImage))
+            .ToListAsync();
+
+        Assert.Equal(3, linkedAssets.Count);
+        Assert.All(linkedAssets, asset =>
+        {
+            Assert.Equal(MediaScope.RoomingHouseImage, asset.Scope);
+            Assert.Equal(MediaVisibility.Public, asset.Visibility);
+            Assert.Equal(MediaStatus.Linked, asset.Status);
+        });
+    }
 
     [Fact]
     public async Task UpdateLegalDocumentAsync_ShouldLinkMediaAssetsAndReturnPrivateUrls()
@@ -139,6 +224,20 @@ public class RoomingHouseMediaServiceTests : IDisposable
                     VisibilityStatus = house.VisibilityStatus.ToString(),
                     CreatedAt = house.CreatedAt,
                     UpdatedAt = house.UpdatedAt,
+                    Images = house.Images
+                        .OrderBy(x => x.SortOrder)
+                        .Select(x => new Contracts.PropertyImages.Responses.PropertyImageResponse
+                        {
+                            Id = x.Id,
+                            MediaAssetId = x.MediaAssetId,
+                            ObjectKey = x.ObjectKey,
+                            ImageUrl = $"/api/media/public/{x.ObjectKey}",
+                            Caption = x.Caption,
+                            IsCover = x.IsCover,
+                            SortOrder = x.SortOrder,
+                            CreatedAt = x.CreatedAt
+                        })
+                        .ToList(),
                     LegalDocument = house.LegalDocument is null
                         ? null
                         : new Contracts.LegalDocuments.Responses.RoomingHouseLegalDocumentResponse

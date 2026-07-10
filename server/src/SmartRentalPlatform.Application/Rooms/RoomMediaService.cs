@@ -5,7 +5,9 @@ using SmartRentalPlatform.Contracts.Amenities;
 using SmartRentalPlatform.Contracts.Common;
 using SmartRentalPlatform.Contracts.PropertyImages;
 using SmartRentalPlatform.Contracts.Rooms;
+using SmartRentalPlatform.Domain.Entities.Media;
 using SmartRentalPlatform.Domain.Entities.Properties;
+using SmartRentalPlatform.Domain.Enums.Media;
 
 namespace SmartRentalPlatform.Application.Rooms;
 
@@ -138,6 +140,7 @@ public class RoomMediaService : IRoomMediaService
 
             foreach (var imageRequest in request.Images)
             {
+                var now = DateTimeOffset.UtcNow;
                 var objectKey = imageRequest.ObjectKey.Trim();
 
                 if (imageRequest.Id.HasValue)
@@ -148,10 +151,18 @@ public class RoomMediaService : IRoomMediaService
                     existingImage.Caption = imageRequest.Caption;
                     existingImage.IsCover = imageRequest.IsCover;
                     existingImage.SortOrder = imageRequest.SortOrder;
+                    existingImage.MediaAssetId = await EnsurePropertyImageMediaAssetAsync(
+                        existingImage.Id,
+                        room.RoomingHouse.LandlordUserId,
+                        objectKey,
+                        existingImage.MediaAssetId,
+                        MediaScope.RoomImage,
+                        now,
+                        cancellationToken);
                 }
                 else
                 {
-                    context.PropertyImages.Add(new PropertyImage
+                    var propertyImage = new PropertyImage
                     {
                         Id = Guid.NewGuid(),
                         RoomId = roomId,
@@ -160,10 +171,21 @@ public class RoomMediaService : IRoomMediaService
                         Caption = imageRequest.Caption,
                         IsCover = imageRequest.IsCover,
                         SortOrder = imageRequest.SortOrder,
-                        CreatedAt = DateTimeOffset.UtcNow
-                    });
+                        CreatedAt = now
+                    };
+                    propertyImage.MediaAssetId = await EnsurePropertyImageMediaAssetAsync(
+                        propertyImage.Id,
+                        room.RoomingHouse.LandlordUserId,
+                        objectKey,
+                        propertyImage.MediaAssetId,
+                        MediaScope.RoomImage,
+                        now,
+                        cancellationToken);
+                    context.PropertyImages.Add(propertyImage);
                 }
             }
+
+            await UnlinkPropertyImageMediaAssetsAsync(imagesToDelete, DateTimeOffset.UtcNow, cancellationToken);
 
             room.UpdatedAt = DateTimeOffset.UtcNow;
             await context.SaveChangesAsync(cancellationToken);
@@ -176,5 +198,117 @@ public class RoomMediaService : IRoomMediaService
         }
 
         return await roomQueryService.GetByIdAsync(landlordUserId, roomId, cancellationToken);
+    }
+
+    private async Task<Guid> EnsurePropertyImageMediaAssetAsync(
+        Guid propertyImageId,
+        Guid ownerUserId,
+        string objectKey,
+        Guid? existingMediaAssetId,
+        MediaScope scope,
+        DateTimeOffset now,
+        CancellationToken cancellationToken)
+    {
+        var normalizedObjectKey = NormalizeObjectKey(objectKey);
+
+        if (existingMediaAssetId.HasValue)
+        {
+            var currentLinkedAsset = await context.MediaAssets
+                .FirstOrDefaultAsync(x => x.Id == existingMediaAssetId.Value, cancellationToken);
+
+            if (currentLinkedAsset is not null &&
+                !string.Equals(currentLinkedAsset.ObjectKey, normalizedObjectKey, StringComparison.Ordinal))
+            {
+                currentLinkedAsset.LinkedEntityType = null;
+                currentLinkedAsset.LinkedEntityId = null;
+                currentLinkedAsset.Status = MediaStatus.Uploaded;
+                currentLinkedAsset.UpdatedAt = now;
+            }
+        }
+
+        var mediaAsset = await context.MediaAssets
+            .FirstOrDefaultAsync(x => x.ObjectKey == normalizedObjectKey, cancellationToken);
+
+        if (mediaAsset is null)
+        {
+            mediaAsset = new MediaAsset
+            {
+                Id = Guid.NewGuid(),
+                OwnerUserId = ownerUserId,
+                BucketName = "legacy-public-storage",
+                ObjectKey = normalizedObjectKey,
+                OriginalFileName = Path.GetFileName(normalizedObjectKey),
+                StoredFileName = Path.GetFileName(normalizedObjectKey),
+                ContentType = GuessContentType(normalizedObjectKey),
+                FileSize = 0,
+                Scope = scope,
+                Visibility = MediaVisibility.Public,
+                Status = MediaStatus.Linked,
+                LinkedEntityType = nameof(PropertyImage),
+                LinkedEntityId = propertyImageId,
+                CreatedAt = now,
+                UpdatedAt = now
+            };
+
+            context.MediaAssets.Add(mediaAsset);
+            return mediaAsset.Id;
+        }
+
+        mediaAsset.OwnerUserId = ownerUserId;
+        mediaAsset.Scope = scope;
+        mediaAsset.Visibility = MediaVisibility.Public;
+        mediaAsset.Status = MediaStatus.Linked;
+        mediaAsset.LinkedEntityType = nameof(PropertyImage);
+        mediaAsset.LinkedEntityId = propertyImageId;
+        mediaAsset.DeletedAt = null;
+        mediaAsset.UpdatedAt = now;
+
+        return mediaAsset.Id;
+    }
+
+    private async Task UnlinkPropertyImageMediaAssetsAsync(
+        IEnumerable<PropertyImage> images,
+        DateTimeOffset now,
+        CancellationToken cancellationToken)
+    {
+        var mediaAssetIds = images
+            .Where(x => x.MediaAssetId.HasValue)
+            .Select(x => x.MediaAssetId!.Value)
+            .Distinct()
+            .ToList();
+
+        if (mediaAssetIds.Count == 0)
+        {
+            return;
+        }
+
+        var mediaAssets = await context.MediaAssets
+            .Where(x => mediaAssetIds.Contains(x.Id))
+            .ToListAsync(cancellationToken);
+
+        foreach (var mediaAsset in mediaAssets)
+        {
+            mediaAsset.LinkedEntityType = null;
+            mediaAsset.LinkedEntityId = null;
+            mediaAsset.Status = MediaStatus.Uploaded;
+            mediaAsset.UpdatedAt = now;
+        }
+    }
+
+    private static string NormalizeObjectKey(string objectKey)
+    {
+        return objectKey.Replace('\\', '/').Trim().TrimStart('/');
+    }
+
+    private static string GuessContentType(string objectKey)
+    {
+        return Path.GetExtension(objectKey).ToLowerInvariant() switch
+        {
+            ".jpg" or ".jpeg" => "image/jpeg",
+            ".png" => "image/png",
+            ".webp" => "image/webp",
+            ".pdf" => "application/pdf",
+            _ => "application/octet-stream"
+        };
     }
 }

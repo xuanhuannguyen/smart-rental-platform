@@ -5,6 +5,7 @@ export type FileUploadScope = 'RoomingHouse' | 'LegalDocument' | 'Room' | 'Avata
 export interface FileUploadResponse {
   objectKey: string;
   url: string;
+  mediaAssetId?: string | null;
 }
 
 export async function uploadImage(file: File, scope: FileUploadScope): Promise<FileUploadResponse> {

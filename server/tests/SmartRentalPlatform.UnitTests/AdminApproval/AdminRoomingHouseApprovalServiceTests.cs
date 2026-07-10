@@ -54,9 +54,10 @@ public class AdminRoomingHouseApprovalServiceTests : IDisposable
         _fixture.Context.Rooms.AddRange(roomA, roomB, deletedRoom);
         _fixture.Context.Amenities.Add(amenity);
         _fixture.Context.RoomingHouseAmenities.Add(new RoomingHouseAmenity { RoomingHouseId = house.Id, AmenityId = amenity.Id });
+        var firstImageAssetId = Guid.NewGuid();
         _fixture.Context.PropertyImages.AddRange(
             new PropertyImage { Id = Guid.NewGuid(), RoomingHouseId = house.Id, ObjectKey = "second", ImageUrl = "/second.jpg", SortOrder = 2, CreatedAt = DateTimeOffset.UtcNow },
-            new PropertyImage { Id = Guid.NewGuid(), RoomingHouseId = house.Id, ObjectKey = "first", ImageUrl = "/first.jpg", SortOrder = 1, CreatedAt = DateTimeOffset.UtcNow });
+            new PropertyImage { Id = Guid.NewGuid(), RoomingHouseId = house.Id, MediaAssetId = firstImageAssetId, ObjectKey = "first", ImageUrl = "/first.jpg", SortOrder = 1, CreatedAt = DateTimeOffset.UtcNow });
         var frontAssetId = Guid.NewGuid();
         var backAssetId = Guid.NewGuid();
         _fixture.Context.MediaAssets.AddRange(
@@ -115,6 +116,7 @@ public class AdminRoomingHouseApprovalServiceTests : IDisposable
         Assert.Equal(frontAssetId, result.LegalDocument.FrontMediaAssetId);
         Assert.Equal($"/api/media/private/{frontAssetId:D}", result.LegalDocument.FrontImageUrl);
         Assert.Equal(["first", "second"], result.Images.Select(x => x.ObjectKey));
+        Assert.Equal(firstImageAssetId, result.Images[0].MediaAssetId);
         var mappedAmenity = Assert.Single(result.Amenities);
         Assert.Equal("Unit Amenity", mappedAmenity.Name);
         Assert.Equal([roomB.Id, roomA.Id], result.Rooms.Select(x => x.Id));

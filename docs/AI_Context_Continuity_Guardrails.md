@@ -276,17 +276,15 @@ Yêu cầu:
 
 Nếu tiếp tục ngay từ trạng thái code hiện tại, phase kế tiếp mặc định nên là:
 
-- `Phase 9 - Public property image migration backend`
+- `Phase 11 - Billing proof image migration`
 
-Phase 8 vừa hoàn thành với các điểm chốt:
-- `RoomingHouseLegalDocument` đã có `Front/Back/ExtraMediaAssetId`
-- `RoomingHouseMediaService.UpdateLegalDocumentAsync` đã link legal doc object keys sang `MediaAsset`
-- legal document response đã có `MediaAssetId` và private `ImageUrl`
-- upload `FileUploadScope.LegalDocument` mới đã tạo private media object
-- `MediaController` đã có authenticated route `/api/media/private/{mediaAssetId}`
-- `DefaultMediaPermissionService` đã cho phép landlord sở hữu khu trọ và admin xem legal document private media
-- legal doc cũ đã có migration backfill sang `media_assets`
-- rủi ro còn lại: một số object legal cũ có thể vẫn đang dùng public object key cũ ở tầng storage thật
+Phase 10 vừa hoàn thành với các điểm chốt:
+- frontend đã có helper `toPublicAssetUrl(imageUrl, objectKey)` cho public property image
+- `HouseImageGallery`, `PropertyImageEditor`, `PublicRoomingHouseDetailPage` đã ưu tiên helper public riêng
+- client `PropertyImage` và `PropertyImageRequest` đã giữ được `mediaAssetId`
+- upload response client type đã hiểu `mediaAssetId`
+- helper generic `toAssetUrl` vẫn còn giữ để compatibility cho avatar/legal/pdf/private flows
+- rủi ro còn lại: frontend build full repo hiện đang fail ở module `react-pdf` cũ, không phải do Phase 10
 
 trừ khi audit checklist đã được cập nhật rõ ràng sang hướng khác.
 

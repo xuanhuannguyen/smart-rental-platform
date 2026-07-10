@@ -46,6 +46,7 @@ export type PagedResult<T> = {
 
 export type PropertyImageRequest = {
   id?: string;
+  mediaAssetId?: string | null;
   objectKey: string;
   imageUrl?: string;
   caption?: string | null;
