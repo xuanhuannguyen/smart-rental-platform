@@ -2,6 +2,7 @@
 using System;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
 using SmartRentalPlatform.Infrastructure.Persistence;
@@ -11,9 +12,11 @@ using SmartRentalPlatform.Infrastructure.Persistence;
 namespace SmartRentalPlatform.Infrastructure.Persistence.Migrations
 {
     [DbContext(typeof(AppDbContext))]
-    partial class AppDbContextModelSnapshot : ModelSnapshot
+    [Migration("20260709040901_AddMediaSchemaFoundation")]
+    partial class AddMediaSchemaFoundation
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        /// <inheritdoc />
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder
@@ -35703,10 +35706,6 @@ namespace SmartRentalPlatform.Infrastructure.Persistence.Migrations
                         .HasDefaultValue("Raw")
                         .HasColumnName("file_variant");
 
-                    b.Property<Guid?>("MediaAssetId")
-                        .HasColumnType("uuid")
-                        .HasColumnName("media_asset_id");
-
                     b.Property<Guid?>("RentalContractAppendixId")
                         .HasColumnType("uuid")
                         .HasColumnName("appendix_id");
@@ -35721,8 +35720,6 @@ namespace SmartRentalPlatform.Infrastructure.Persistence.Migrations
                         .HasColumnName("storage_object_key");
 
                     b.HasKey("Id");
-
-                    b.HasIndex("MediaAssetId");
 
                     b.HasIndex("RentalContractAppendixId");
 
@@ -37131,11 +37128,6 @@ namespace SmartRentalPlatform.Infrastructure.Persistence.Migrations
 
             modelBuilder.Entity("SmartRentalPlatform.Domain.Entities.RentalContracts.ContractFile", b =>
                 {
-                    b.HasOne("SmartRentalPlatform.Domain.Entities.Media.MediaAsset", "MediaAsset")
-                        .WithMany()
-                        .HasForeignKey("MediaAssetId")
-                        .OnDelete(DeleteBehavior.Restrict);
-
                     b.HasOne("SmartRentalPlatform.Domain.Entities.RentalContracts.ContractAppendix", "RentalContractAppendix")
                         .WithMany("Files")
                         .HasForeignKey("RentalContractAppendixId")
@@ -37146,8 +37138,6 @@ namespace SmartRentalPlatform.Infrastructure.Persistence.Migrations
                         .HasForeignKey("RentalContractId")
                         .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired();
-
-                    b.Navigation("MediaAsset");
 
                     b.Navigation("RentalContract");
 

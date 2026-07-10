@@ -1,3 +1,4 @@
+using SmartRentalPlatform.Domain.Entities.Media;
 using SmartRentalPlatform.Domain.Enums.RentalContracts;
 
 namespace SmartRentalPlatform.Domain.Entities.RentalContracts
@@ -10,6 +11,8 @@ namespace SmartRentalPlatform.Domain.Entities.RentalContracts
 
         public Guid? RentalContractAppendixId { get; set; }
 
+        public Guid? MediaAssetId { get; set; }
+
         public string StorageObjectKey { get; set; } = string.Empty;
 
         public ContractFileVariant FileVariant { get; set; } = ContractFileVariant.Raw;
@@ -21,5 +24,7 @@ namespace SmartRentalPlatform.Domain.Entities.RentalContracts
         public RentalContract RentalContract { get; set; } = null!;
 
         public ContractAppendix? RentalContractAppendix { get; set; }
+
+        public MediaAsset? MediaAsset { get; set; }
     }
 }

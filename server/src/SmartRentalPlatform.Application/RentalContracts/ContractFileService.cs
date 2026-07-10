@@ -1,12 +1,15 @@
-﻿using Microsoft.EntityFrameworkCore;
-using System.Security.Cryptography;
-using System.Text.Json;
+using Microsoft.EntityFrameworkCore;
 using SmartRentalPlatform.Application.Common.Exceptions;
 using SmartRentalPlatform.Application.Common.Interfaces;
+using SmartRentalPlatform.Application.Common.Interfaces.Media;
+using SmartRentalPlatform.Application.Common.Models.Media;
 using SmartRentalPlatform.Contracts.Common;
 using SmartRentalPlatform.Contracts.RentalContracts.Responses;
 using SmartRentalPlatform.Domain.Entities.RentalContracts;
+using SmartRentalPlatform.Domain.Enums.Media;
 using SmartRentalPlatform.Domain.Enums.RentalContracts;
+using System.Security.Cryptography;
+using System.Text.Json;
 
 namespace SmartRentalPlatform.Application.RentalContracts;
 
@@ -17,17 +20,29 @@ public class ContractFileService : IContractFileService
     private readonly IAppDbContext context;
     private readonly IContractPdfRenderer contractPdfRenderer;
     private readonly IPrivateStorageService privateStorageService;
+    private readonly IMediaObjectKeyFactory mediaObjectKeyFactory;
+    private readonly IMediaStorageService mediaStorageService;
+    private readonly IMediaAssetService mediaAssetService;
+    private readonly IMediaAccessService mediaAccessService;
     private readonly ISensitiveDataProtector sensitiveDataProtector;
 
     public ContractFileService(
         IAppDbContext context,
         IContractPdfRenderer contractPdfRenderer,
         IPrivateStorageService privateStorageService,
+        IMediaObjectKeyFactory mediaObjectKeyFactory,
+        IMediaStorageService mediaStorageService,
+        IMediaAssetService mediaAssetService,
+        IMediaAccessService mediaAccessService,
         ISensitiveDataProtector sensitiveDataProtector)
     {
         this.context = context;
         this.contractPdfRenderer = contractPdfRenderer;
         this.privateStorageService = privateStorageService;
+        this.mediaObjectKeyFactory = mediaObjectKeyFactory;
+        this.mediaStorageService = mediaStorageService;
+        this.mediaAssetService = mediaAssetService;
+        this.mediaAccessService = mediaAccessService;
         this.sensitiveDataProtector = sensitiveDataProtector;
     }
 
@@ -47,20 +62,25 @@ public class ContractFileService : IContractFileService
         EnsureCanAccess(userId, contract);
         EnsureCanGenerateSignedFile(userId, contract);
 
+        await using var transaction = await context.BeginTransactionAsync(cancellationToken);
+
         var now = DateTimeOffset.UtcNow;
         var rawFile = await EnsureContractFileVariantAsync(
             contract,
             ContractFileVariant.Raw,
+            userId,
             now,
             cancellationToken);
 
         await EnsureContractFileVariantAsync(
             contract,
             ContractFileVariant.Masked,
+            userId,
             now,
             cancellationToken);
 
         await context.SaveChangesAsync(cancellationToken);
+        await transaction.CommitAsync(cancellationToken);
 
         return MapToResponse(rawFile);
     }
@@ -129,6 +149,12 @@ public class ContractFileService : IContractFileService
 
         EnsureCanViewFile(userId, contract, file);
 
+        if (file.MediaAssetId.HasValue)
+        {
+            var mediaAccess = await mediaAccessService.OpenReadAsync(file.MediaAssetId.Value, userId, cancellationToken);
+            return (mediaAccess.Stream, mediaAccess.ContentType, mediaAccess.DownloadFileName);
+        }
+
         var stream = await privateStorageService.OpenReadAsync(file.StorageObjectKey, cancellationToken);
         return (stream, GuessContentType(file.StorageObjectKey), Path.GetFileName(file.StorageObjectKey));
     }
@@ -176,6 +202,7 @@ public class ContractFileService : IContractFileService
     private async Task<ContractFile> EnsureContractFileVariantAsync(
         RentalContract contract,
         ContractFileVariant fileVariant,
+        Guid userId,
         DateTimeOffset now,
         CancellationToken cancellationToken)
     {
@@ -193,29 +220,71 @@ public class ContractFileService : IContractFileService
 
         var renderOptions = await BuildSignedFileRenderOptionsAsync(contract, fileVariant, cancellationToken);
         var pdfBytes = contractPdfRenderer.RenderSignedRentalContract(contract, renderOptions);
-        var objectKey = BuildObjectKey(contract, fileVariant, now);
+        var originalFileName = BuildLegacyFileName(contract, fileVariant, now);
+        var mediaObjectKey = mediaObjectKeyFactory.Create(MediaScope.ContractPdf, MediaVisibility.Private, originalFileName);
 
-        await using var stream = new MemoryStream(pdfBytes);
-        var storageObjectKey = await privateStorageService.UploadAsync(
-            stream,
-            PdfContentType,
-            objectKey,
-            cancellationToken);
+        MediaStoredObjectResult? storedObject = null;
 
-        var contractFile = new ContractFile
+        try
         {
-            Id = Guid.NewGuid(),
-            RentalContractId = contract.Id,
-            StorageObjectKey = storageObjectKey,
-            FileVariant = fileVariant,
-            FileUrl = null,
-            CreatedAt = now
-        };
+            await using var stream = new MemoryStream(pdfBytes);
+            storedObject = await mediaStorageService.UploadAsync(
+                new MediaUploadRequest
+                {
+                    Content = stream,
+                    OriginalFileName = originalFileName,
+                    ContentType = PdfContentType,
+                    FileSize = pdfBytes.Length,
+                    ObjectKey = mediaObjectKey.ObjectKey,
+                    Visibility = MediaVisibility.Private
+                },
+                cancellationToken);
 
-        context.ContractFiles.Add(contractFile);
-        contract.Files.Add(contractFile);
+            var contractFileId = Guid.NewGuid();
+            var contractFile = new ContractFile
+            {
+                Id = contractFileId,
+                RentalContractId = contract.Id,
+                StorageObjectKey = storedObject.ObjectKey,
+                FileVariant = fileVariant,
+                FileUrl = null,
+                CreatedAt = now
+            };
 
-        return contractFile;
+            var mediaAsset = await mediaAssetService.CreateAsync(
+                new CreateMediaAssetRequest
+                {
+                    OwnerUserId = userId,
+                    BucketName = storedObject.BucketName,
+                    ObjectKey = storedObject.ObjectKey,
+                    OriginalFileName = originalFileName,
+                    StoredFileName = storedObject.StoredFileName,
+                    ContentType = PdfContentType,
+                    FileSize = pdfBytes.Length,
+                    FileHash = ComputeSha256Hex(pdfBytes),
+                    Scope = MediaScope.ContractPdf,
+                    Visibility = MediaVisibility.Private,
+                    Status = MediaStatus.Linked,
+                    LinkedEntityType = nameof(ContractFile),
+                    LinkedEntityId = contractFileId
+                },
+                cancellationToken);
+
+            contractFile.MediaAssetId = mediaAsset.Id;
+            context.ContractFiles.Add(contractFile);
+            contract.Files.Add(contractFile);
+
+            return contractFile;
+        }
+        catch
+        {
+            if (storedObject is not null)
+            {
+                await mediaStorageService.DeleteAsync(storedObject.ObjectKey, cancellationToken);
+            }
+
+            throw;
+        }
     }
 
     private async Task<IReadOnlyDictionary<Guid, string?>> GetDecryptedUserDocumentNumbersAsync(
@@ -592,12 +661,17 @@ public class ContractFileService : IContractFileService
             new { contract.Id });
     }
 
-    private static string BuildObjectKey(
+    private static string BuildLegacyFileName(
         RentalContract contract,
         ContractFileVariant fileVariant,
         DateTimeOffset now)
     {
-        return $"contracts/{contract.Id:N}/signed-contract-{fileVariant.ToString().ToLowerInvariant()}-{now:yyyyMMddHHmmss}.pdf";
+        return $"signed-contract-{contract.Id:N}-{fileVariant.ToString().ToLowerInvariant()}-{now:yyyyMMddHHmmss}.pdf";
+    }
+
+    private static string ComputeSha256Hex(byte[] content)
+    {
+        return Convert.ToHexString(SHA256.HashData(content)).ToLowerInvariant();
     }
 
     private static ContractFileResponse MapToResponse(ContractFile file)
@@ -607,6 +681,7 @@ public class ContractFileService : IContractFileService
             Id = file.Id,
             RentalContractId = file.RentalContractId,
             RentalContractAppendixId = file.RentalContractAppendixId,
+            MediaAssetId = file.MediaAssetId,
             StorageObjectKey = file.StorageObjectKey,
             FileVariant = file.FileVariant.ToString(),
             FileUrl = file.FileUrl,
@@ -625,4 +700,3 @@ public class ContractFileService : IContractFileService
         };
     }
 }
-

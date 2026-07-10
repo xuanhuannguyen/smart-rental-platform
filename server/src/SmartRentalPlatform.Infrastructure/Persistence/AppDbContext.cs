@@ -2,6 +2,7 @@ using Microsoft.EntityFrameworkCore;
 using SmartRentalPlatform.Application.Common.Interfaces;
 using SmartRentalPlatform.Domain.Entities.AdminApproval;
 using SmartRentalPlatform.Domain.Entities.Administrative;
+using SmartRentalPlatform.Domain.Entities.Media;
 
 using SmartRentalPlatform.Domain.Entities.Notifications;
 using SmartRentalPlatform.Domain.Entities.Payments;
@@ -45,6 +46,8 @@ public class AppDbContext : DbContext, IAppDbContext
     public DbSet<RoomingHouseRule> RoomingHouseRules => Set<RoomingHouseRule>();
     public DbSet<RentalPolicy> RentalPolicies => Set<RentalPolicy>();
     public DbSet<ApprovalAuditLog> ApprovalAuditLogs => Set<ApprovalAuditLog>();
+    public DbSet<MediaAsset> MediaAssets => Set<MediaAsset>();
+    public DbSet<MediaAuditLog> MediaAuditLogs => Set<MediaAuditLog>();
     // Payments
     public DbSet<WalletAccount> WalletAccounts => Set<WalletAccount>();
     public DbSet<WalletTransaction> WalletTransactions => Set<WalletTransaction>();

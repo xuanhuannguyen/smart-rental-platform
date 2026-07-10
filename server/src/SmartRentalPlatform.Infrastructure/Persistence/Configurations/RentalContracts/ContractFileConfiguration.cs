@@ -1,5 +1,6 @@
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Metadata.Builders;
+using SmartRentalPlatform.Domain.Entities.Media;
 using SmartRentalPlatform.Domain.Entities.RentalContracts;
 using SmartRentalPlatform.Domain.Enums.RentalContracts;
 
@@ -16,6 +17,7 @@ public class ContractFileConfiguration : IEntityTypeConfiguration<ContractFile>
         builder.Property(x => x.Id).HasColumnName("id");
         builder.Property(x => x.RentalContractId).HasColumnName("contract_id").IsRequired();
         builder.Property(x => x.RentalContractAppendixId).HasColumnName("appendix_id");
+        builder.Property(x => x.MediaAssetId).HasColumnName("media_asset_id");
         builder.Property(x => x.StorageObjectKey).HasColumnName("storage_object_key").HasColumnType("text").IsRequired();
         builder.Property(x => x.FileVariant)
             .HasColumnName("file_variant")
@@ -36,8 +38,14 @@ public class ContractFileConfiguration : IEntityTypeConfiguration<ContractFile>
             .HasForeignKey(x => x.RentalContractAppendixId)
             .OnDelete(DeleteBehavior.Cascade);
 
+        builder.HasOne<MediaAsset>(x => x.MediaAsset)
+            .WithMany()
+            .HasForeignKey(x => x.MediaAssetId)
+            .OnDelete(DeleteBehavior.Restrict);
+
         builder.HasIndex(x => x.RentalContractId);
         builder.HasIndex(x => x.RentalContractAppendixId);
+        builder.HasIndex(x => x.MediaAssetId);
         builder.HasIndex(x => new { x.RentalContractId, x.RentalContractAppendixId, x.FileVariant });
     }
 }

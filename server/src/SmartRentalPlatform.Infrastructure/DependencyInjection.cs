@@ -4,6 +4,7 @@ using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Options;
 using SmartRentalPlatform.Application.Common.Interfaces;
+using SmartRentalPlatform.Application.Common.Interfaces.Media;
 using SmartRentalPlatform.Application.Common.Options;
 using SmartRentalPlatform.Infrastructure.Caching;
 using SmartRentalPlatform.Infrastructure.BackgroundServices;
@@ -14,6 +15,7 @@ using SmartRentalPlatform.Infrastructure.ExternalServices.Google;
 using SmartRentalPlatform.Infrastructure.ExternalServices.PayOS;
 using SmartRentalPlatform.Infrastructure.ExternalServices.VietMap;
 using SmartRentalPlatform.Infrastructure.Identity;
+using SmartRentalPlatform.Infrastructure.Media;
 using SmartRentalPlatform.Infrastructure.Options;
 using SmartRentalPlatform.Infrastructure.Persistence;
 using SmartRentalPlatform.Infrastructure.Security;
@@ -42,7 +44,12 @@ public static class DependencyInjection
         services.AddScoped<IGoogleAuthService, GoogleAuthService>();
         services.AddHttpContextAccessor();
         services.AddScoped<ICurrentUserService, CurrentUserService>();
-        services.AddScoped<IFileStorageService, LocalFileStorageService>();
+        services.AddScoped<IFileStorageService, MediaBackedFileStorageService>();
+        services.AddSingleton<IMediaObjectKeyFactory, MediaObjectKeyFactory>();
+        services.AddScoped<IMediaStorageService, LocalMediaStorageService>();
+        services.AddScoped<IMediaAssetService, MediaAssetService>();
+        services.AddScoped<IMediaAccessService, MediaAccessService>();
+        services.AddScoped<IMediaPermissionService, DefaultMediaPermissionService>();
         services.Configure<VietMapOptions>(configuration.GetSection(VietMapOptions.SectionName));
         services.AddHttpClient<IVietMapService, VietMapService>((provider, client) =>
         {

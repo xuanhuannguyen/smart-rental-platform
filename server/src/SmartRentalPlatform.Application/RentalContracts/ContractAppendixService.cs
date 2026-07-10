@@ -2344,6 +2344,7 @@ public class ContractAppendixService : IContractAppendixService
             Id = file.Id,
             RentalContractId = file.RentalContractId,
             RentalContractAppendixId = file.RentalContractAppendixId,
+            MediaAssetId = file.MediaAssetId,
             StorageObjectKey = file.StorageObjectKey,
             FileUrl = file.FileUrl,
             CreatedAt = file.CreatedAt

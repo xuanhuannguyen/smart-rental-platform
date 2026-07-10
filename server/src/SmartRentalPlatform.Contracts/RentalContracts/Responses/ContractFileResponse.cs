@@ -8,6 +8,8 @@ public class ContractFileResponse
 
     public Guid? RentalContractAppendixId { get; set; }
 
+    public Guid? MediaAssetId { get; set; }
+
     public string StorageObjectKey { get; set; } = string.Empty;
 
     public string FileVariant { get; set; } = string.Empty;
