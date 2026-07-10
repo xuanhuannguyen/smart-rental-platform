@@ -4,7 +4,9 @@ import type { WalletResponse, WalletTopUpResponse, WalletTopUpStatus } from '../
 import './Wallet.css';
 import { formatMoneyString } from '../../../shared/utils/format';
 import { Button } from '../../../shared/components/ui/Button';
+import { PageHeader } from '../../../shared/components/ui/PageHeader';
 import { Alert } from '../../../shared/components/ui/Alert';
+import { Toast } from '../../../shared/components/ui/Toast';
 import { ROUTE_PATHS } from '../../../app/router/routePaths';
 
 const TOP_UP_PAGE_SIZE = 10;
@@ -16,7 +18,9 @@ export const MyWalletPage: React.FC = () => {
   const [hasMoreTopUps, setHasMoreTopUps] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
   const [isTopUpsLoading, setIsTopUpsLoading] = useState(false);
-  const [error, setError] = useState<string | null>(null);
+  const [pageError, setPageError] = useState<string | null>(null);
+  const [validationError, setValidationError] = useState<string | null>(null);
+  const [toast, setToast] = useState<{ message: string; type: 'success' | 'error' | 'info' } | null>(null);
   const [showTopUp, setShowTopUp] = useState(false);
   const [topUpAmount, setTopUpAmount] = useState<number | ''>('');
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -27,7 +31,7 @@ export const MyWalletPage: React.FC = () => {
 
   const fetchInitialData = async () => {
     setIsLoading(true);
-    setError(null);
+    setPageError(null);
 
     await Promise.all([
       fetchWallet(),
@@ -43,10 +47,10 @@ export const MyWalletPage: React.FC = () => {
       if (res.success && res.data) {
         setWallet(res.data);
       } else {
-        setError(res.message || 'Không thể tải thông tin ví.');
+        setPageError(res.message || 'Không thể tải thông tin ví.');
       }
     } catch (err: any) {
-      setError(err.message || 'Đã xảy ra lỗi khi tải thông tin ví.');
+      setPageError(err.message || 'Đã xảy ra lỗi khi tải thông tin ví.');
     }
   };
 
@@ -60,10 +64,10 @@ export const MyWalletPage: React.FC = () => {
         setTopUpPage(pageNumber);
         setHasMoreTopUps(res.data.page < res.data.totalPages);
       } else {
-        setError(res.message || 'Không thể tải lịch sử yêu cầu nạp ví.');
+        setPageError(res.message || 'Không thể tải lịch sử yêu cầu nạp ví.');
       }
     } catch (err: any) {
-      setError(err.message || 'Đã xảy ra lỗi khi tải lịch sử yêu cầu nạp ví.');
+      setPageError(err.message || 'Đã xảy ra lỗi khi tải lịch sử yêu cầu nạp ví.');
     } finally {
       setIsTopUpsLoading(false);
     }
@@ -72,13 +76,13 @@ export const MyWalletPage: React.FC = () => {
   const handleTopUpSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!topUpAmount || topUpAmount < 10000 || !Number.isInteger(Number(topUpAmount))) {
-      setError('Số tiền nạp tối thiểu là 10.000đ và phải là số nguyên.');
+      setValidationError('Số tiền nạp tối thiểu là 10.000đ và phải là số nguyên.');
       return;
     }
 
     try {
       setIsSubmitting(true);
-      setError(null);
+      setValidationError(null);
       const returnUrl = `${window.location.origin}${ROUTE_PATHS.ACCOUNT.TOPUP_RESULT}`;
       const res = await walletApi.createPayOSTopUp({
         amount: Number(topUpAmount),
@@ -89,11 +93,11 @@ export const MyWalletPage: React.FC = () => {
       if (res.success && res.data?.paymentUrl) {
         window.location.href = res.data.paymentUrl;
       } else {
-        setError(res.message || 'Không thể tạo yêu cầu nạp tiền.');
+        setToast({ message: res.message || 'Không thể tạo yêu cầu nạp tiền.', type: 'error' });
         setIsSubmitting(false);
       }
     } catch (err: any) {
-      setError(err.message || 'Đã xảy ra lỗi khi tạo yêu cầu nạp tiền.');
+      setToast({ message: err.message || 'Đã xảy ra lỗi khi tạo yêu cầu nạp tiền.', type: 'error' });
       setIsSubmitting(false);
     }
   };
@@ -167,33 +171,21 @@ export const MyWalletPage: React.FC = () => {
 
   return (
     <div className="wallet-page-container">
-      <div className="wallet-header-band">
-        <div className="wallet-header-title-row">
-          <div className="wallet-header-icon-box">
-            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
+      <PageHeader
+        icon={
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#2563eb" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
               <rect x="2" y="5" width="20" height="14" rx="2" ry="2" />
               <line x1="2" y1="10" x2="22" y2="10" />
             </svg>
           </div>
-          <div>
-            <p className="wallet-modal-eyebrow" style={{ margin: '0 0 4px 0', fontSize: '11px', color: '#246bfe', fontWeight: 'bold' }}>QUẢN LÝ</p>
-            <h2 style={{ margin: 0, fontSize: '24px', fontWeight: 'bold', color: '#0f172a' }}>Ví của tôi</h2>
-            <p className="text-secondary" style={{ margin: '4px 0 0 0', fontSize: '13px', color: '#64748b' }}>Quản lý số dư và nạp tiền vào ví của bạn</p>
-          </div>
-        </div>
-        <div className="wallet-header-illustration">
-          <svg width="120" height="80" viewBox="0 0 120 80" fill="none" xmlns="http://www.w3.org/2000/svg">
-            <rect x="15" y="20" width="90" height="55" rx="8" fill="#eff6ff" stroke="#cbd5e1" strokeWidth="1.5" />
-            <rect x="25" y="10" width="70" height="15" rx="4" fill="#3b82f6" opacity="0.15" />
-            <path d="M85 35H105C107.761 35 110 37.2386 110 40V50C110 52.7614 107.761 55 105 55H85V35Z" fill="#eff6ff" stroke="#cbd5e1" strokeWidth="1.5" />
-            <circle cx="95" cy="45" r="3" fill="#3b82f6" />
-            <circle cx="50" cy="45" r="10" fill="#fbcfe8" opacity="0.25" />
-            <circle cx="50" cy="45" r="6" fill="#ec4899" opacity="0.15" />
-          </svg>
-        </div>
-      </div>
+        }
+        eyebrow="QUẢN LÝ"
+        title="Ví của tôi"
+        description="Quản lý số dư và nạp tiền vào ví của bạn"
+      />
 
-      {error && <Alert type="error">{error}</Alert>}
+      {pageError && <Alert type="error">{pageError}</Alert>}
 
       {wallet && (
         <>
@@ -299,6 +291,7 @@ export const MyWalletPage: React.FC = () => {
             onMouseDown={(event) => {
               if (event.target === event.currentTarget && !isSubmitting) {
                 setShowTopUp(false);
+                setValidationError(null);
               }
             }}
           >
@@ -311,7 +304,7 @@ export const MyWalletPage: React.FC = () => {
                 <button
                   type="button"
                   className="wallet-modal-close"
-                  onClick={() => setShowTopUp(false)}
+                  onClick={() => { setShowTopUp(false); setValidationError(null); }}
                   disabled={isSubmitting}
                   aria-label="Đóng"
                 >
@@ -345,6 +338,11 @@ export const MyWalletPage: React.FC = () => {
                     min={10000}
                     step={1000}
                   />
+                  {validationError && (
+                    <div style={{ color: '#dc2626', marginTop: '8px', fontSize: '13px' }}>
+                      {validationError}
+                    </div>
+                  )}
                 </div>
                 <Button
                   type="submit"
@@ -452,6 +450,7 @@ export const MyWalletPage: React.FC = () => {
           </div>
         )}
       </div>
+      {toast && <Toast message={toast.message} type={toast.type} onClose={() => setToast(null)} />}
     </div>
   );
 };

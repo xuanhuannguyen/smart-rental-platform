@@ -1,8 +1,11 @@
+import { Alert } from '../../../shared/components/ui/Alert';
+import { PageHeader } from '../../../shared/components/ui/PageHeader';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { useAuth } from '../../../app/providers/AuthProvider';
 import { ROUTE_PATHS } from '../../../app/router/routePaths';
 import { getApiErrorMessage } from '../../../shared/api/apiError';
+import { Toast } from '../../../shared/components/ui/Toast';
 import { toAssetUrl } from '../../../shared/api/assets';
 import { Button } from '../../../shared/components/ui/Button';
 import { billingApi } from '../api';
@@ -29,6 +32,7 @@ export function TenantInvoicesPanel({ invoiceId: controlledInvoiceId, onOpenInvo
   const [loading, setLoading] = useState(true);
   const [busy, setBusy] = useState('');
   const [message, setMessage] = useState('');
+  const [toast, setToast] = useState<{ message: string; type: 'success' | 'error' | 'info' } | null>(null);
   const [error, setError] = useState('');
   const [confirmPay, setConfirmPay] = useState<Invoice | null>(null);
 
@@ -87,15 +91,15 @@ export function TenantInvoicesPanel({ invoiceId: controlledInvoiceId, onOpenInvo
 
   async function handlePay(invoice: Invoice) {
     setBusy(invoice.id);
-    setMessage('');
+    setToast(null);
     setError('');
     try {
       const response = await billingApi.payInvoice(invoice.id);
       setInvoices((prev) => prev.map((item) => item.id === invoice.id ? response.data : item));
       setSelectedId(response.data.id);
-      setMessage(`Thanh toán thành công hóa đơn ${response.data.invoiceNo}. Trạng thái đã cập nhật Đã thanh toán.`);
+      setToast({ message: `Thanh toán thành công hóa đơn ${response.data.invoiceNo}. Trạng thái đã cập nhật Đã thanh toán.`, type: 'success' });
     } catch (err) {
-      setError(getApiErrorMessage(err, 'Thanh toán hóa đơn thất bại.'));
+      setToast({ message: getApiErrorMessage(err, 'Thanh toán hóa đơn thất bại.'), type: 'error' });
     } finally {
       setBusy('');
       setConfirmPay(null);
@@ -104,14 +108,20 @@ export function TenantInvoicesPanel({ invoiceId: controlledInvoiceId, onOpenInvo
 
   return (
     <>
-      <div className="invoice-overview-band">
-        <div className="overview-left">
-          <span className="billing-kicker">Hóa đơn hằng tháng</span>
-          <h2>Theo dõi &amp; Thanh toán</h2>
-          <p className="overview-description">Xem các hóa đơn đã phát hành và có thể thanh toán các khoản còn nợ qua ví nội bộ.</p>
-        </div>
-        <div className="invoice-overview-right">
-          <div className="invoice-filter-group">
+      <PageHeader
+        icon={
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+            <svg viewBox="0 0 24 24" width="24" height="24" fill="none" stroke="#2563eb" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
+              <path d="M14 2H6a2 2 0 0 0-2 2v16c0 1.1.9 2 2 2h12a2 2 0 0 0 2-2V8l-6-6z" />
+              <path d="M14 3v5h5M16 13H8M16 17H8M10 9H8" />
+            </svg>
+          </div>
+        }
+        eyebrow="Hóa đơn hằng tháng"
+        title="Theo dõi &amp; Thanh toán"
+        description="Xem các hóa đơn đã phát hành và có thể thanh toán các khoản còn nợ qua ví nội bộ."
+        rightContent={
+          <div className="invoice-filter-group" style={{ display: 'flex', gap: '16px', alignItems: 'center' }}>
             <div className="invoice-filter-item">
               <label>Trạng thái</label>
               <select className="invoice-filter-select" value={statusFilter} onChange={(event) => setStatusFilter(event.target.value)}>
@@ -124,12 +134,12 @@ export function TenantInvoicesPanel({ invoiceId: controlledInvoiceId, onOpenInvo
               <input type="month" className="invoice-filter-select" value={periodFilter} onChange={(event) => setPeriodFilter(event.target.value)} />
             </div>
           </div>
-        </div>
-      </div>
+        }
+      />
 
       <TenantNotification invoices={invoices} />
-      {message && <div className="billing-alert success">{message}</div>}
-      {error && <div className="billing-alert error">{error}</div>}
+      {toast && <Toast message={toast.message} type={toast.type} onClose={() => setToast(null)} />}
+      {error && <Alert type="error">{error}</Alert>}
 
       {loading && invoices.length === 0 ? (
         <div className="billing-panel"><div className="state-block loading-state">Đang tải hóa đơn...</div></div>

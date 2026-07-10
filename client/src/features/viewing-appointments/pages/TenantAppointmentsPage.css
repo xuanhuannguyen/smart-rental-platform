@@ -102,6 +102,36 @@
   gap: 20px;
 }
 
+.appointments-grid.tenant-appointment-list {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  width: 100%;
+}
+
+.tenant-appointment-span-full {
+  grid-column: 1 / -1;
+}
+
+.tenant-appointment-note {
+  border-radius: 10px;
+  font-size: 13.5px;
+  line-height: 1.5;
+  padding: 10px 12px;
+}
+
+.tenant-appointment-note--tenant {
+  background: #f8fafc;
+  border: 1px solid #e2e8f0;
+  color: #475569;
+}
+
+.tenant-appointment-note--landlord {
+  background: #f0f9ff;
+  border: 1px solid #bae6fd;
+  color: #0369a1;
+}
+
 .appointment-card {
   background-color: #ffffff;
   border-radius: 12px;

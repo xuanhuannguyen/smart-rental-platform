@@ -1,20 +1,62 @@
 import { useCallback, useEffect, useState, type FormEvent } from 'react';
+import { PageHeader } from '../../../shared/components/ui/PageHeader';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../../../app/providers/AuthProvider';
 import { ROUTE_PATHS } from '../../../app/router/routePaths';
 import { Alert } from '../../../shared/components/ui/Alert';
+import { Toast } from '../../../shared/components/ui/Toast';
 import { Button } from '../../../shared/components/ui/Button';
 import { FormField } from '../../../shared/components/ui/FormField';
 import { OtpInput } from '../../../shared/components/ui/OtpInput';
+import { Tabs } from '../../../shared/components/ui/Tabs';
 import { LoadingState } from '../../../shared/components/feedback/LoadingState';
 import { authApi } from '../../auth/services/authApi';
 import { profileApi } from '../services/profileApi';
 import type { UserSession } from '../types/profile.types';
 import { getApiErrorMessage } from '../../../shared/api/apiError';
+import { ConfirmModal } from '../../../shared/components/ui/ConfirmModal';
 import './MyProfilePage.css'; // Reuse CSS
 
 type SecurityTab = 'change-password' | 'devices' | 'activity-logs';
 type PasswordMethod = 'current-password' | 'email-otp';
+
+function getSecurityTabIcon(tab: SecurityTab) {
+  const props = {
+    className: 'security-tab-icon',
+    viewBox: '0 0 24 24',
+    fill: 'none',
+    stroke: 'currentColor',
+    strokeWidth: 2.2,
+    strokeLinecap: 'round' as const,
+    strokeLinejoin: 'round' as const,
+  };
+
+  switch (tab) {
+    case 'devices':
+      return (
+        <svg {...props}>
+          <rect x="2" y="3" width="20" height="14" rx="2" ry="2" />
+          <line x1="8" y1="21" x2="16" y2="21" />
+          <line x1="12" y1="17" x2="12" y2="21" />
+        </svg>
+      );
+    case 'activity-logs':
+      return (
+        <svg {...props}>
+          <circle cx="12" cy="12" r="10" />
+          <polyline points="12 6 12 12 16 14" />
+          <path d="M12 2a10 10 0 1 0 10 10" />
+        </svg>
+      );
+    default:
+      return (
+        <svg {...props}>
+          <rect x="3" y="11" width="18" height="11" rx="2" ry="2" />
+          <path d="M7 11V7a5 5 0 0 1 10 0v4" />
+        </svg>
+      );
+  }
+}
 
 function getPasswordStrength(password: string): number {
   if (!password) return 0;
@@ -61,8 +103,14 @@ export function SecurityPage() {
   const [isSendingOtp, setIsSendingOtp] = useState(false);
   const [otpVerified, setOtpVerified] = useState(false);
   const [isVerifyingOtp, setIsVerifyingOtp] = useState(false);
-  const [securityMessage, setSecurityMessage] = useState<string | null>(null);
-  const [securityError, setSecurityError] = useState<string | null>(null);
+  const [validationError, setValidationError] = useState<string | null>(null);
+  const [toast, setToast] = useState<{ message: string; type: 'success' | 'error' | 'info' } | null>(null);
+
+  const [revokeModalState, setRevokeModalState] = useState<{
+    isOpen: boolean;
+    sessionId: string | null;
+    isCurrentSession: boolean;
+  }>({ isOpen: false, sessionId: null, isCurrentSession: false });
 
   const loadSessions = useCallback(async () => {
     setIsLoadingSessions(true);
@@ -90,21 +138,22 @@ export function SecurityPage() {
 
   async function handleChangeWithCurrentPassword(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
-    setSecurityError(null);
-    setSecurityMessage(null);
+    setValidationError(null);
+    setToast(null);
+
 
     if (!currentPasswordForm.currentPassword || !currentPasswordForm.newPassword) {
-      setSecurityError('Vui lòng nhập mật khẩu hiện tại và mật khẩu mới.');
+      setValidationError('Vui lòng nhập mật khẩu hiện tại và mật khẩu mới.');
       return;
     }
 
     if (currentPasswordForm.newPassword.length < 6) {
-      setSecurityError('Mật khẩu mới phải có ít nhất 6 ký tự.');
+      setValidationError('Mật khẩu mới phải có ít nhất 6 ký tự.');
       return;
     }
 
     if (currentPasswordForm.newPassword !== currentPasswordForm.confirmPassword) {
-      setSecurityError('Xác nhận mật khẩu mới không khớp.');
+      setValidationError('Xác nhận mật khẩu mới không khớp.');
       return;
     }
 
@@ -118,18 +167,19 @@ export function SecurityPage() {
       clearSession();
       navigate(ROUTE_PATHS.AUTH.LOGIN, { replace: true });
     } catch (changeError) {
-      setSecurityError(getApiErrorMessage(changeError, 'Không thể đổi mật khẩu.'));
+      setToast({ message: getApiErrorMessage(changeError, 'Không thể đổi mật khẩu.'), type: 'error' });
     } finally {
       setIsSubmitting(false);
     }
   }
 
   async function handleSendOtp() {
-    setSecurityError(null);
-    setSecurityMessage(null);
+    setValidationError(null);
+    setToast(null);
+
 
     if (!otpForm.email.trim()) {
-      setSecurityError('Vui lòng nhập email.');
+      setValidationError('Vui lòng nhập email.');
       return;
     }
 
@@ -137,20 +187,21 @@ export function SecurityPage() {
 
     try {
       await authApi.forgotPassword({ email: otpForm.email.trim() });
-      setSecurityMessage('OTP đặt lại mật khẩu đã được gửi. Vui lòng kiểm tra Gmail.');
+      setToast({ message: 'OTP đặt lại mật khẩu đã được gửi. Vui lòng kiểm tra Gmail.', type: 'success' });
     } catch (sendError) {
-      setSecurityError(getApiErrorMessage(sendError, 'Không thể gửi OTP.'));
+      setToast({ message: getApiErrorMessage(sendError, 'Không thể gửi OTP.'), type: 'error' });
     } finally {
       setIsSendingOtp(false);
     }
   }
 
   async function handleVerifyOtp() {
-    setSecurityError(null);
-    setSecurityMessage(null);
+    setValidationError(null);
+    setToast(null);
+
 
     if (!otpForm.email.trim() || !otpForm.otp.trim()) {
-      setSecurityError('Vui lòng nhập email và mã OTP.');
+      setValidationError('Vui lòng nhập email và mã OTP.');
       return;
     }
 
@@ -162,9 +213,9 @@ export function SecurityPage() {
         otp: otpForm.otp.trim()
       });
       setOtpVerified(true);
-      setSecurityMessage('OTP hợp lệ! Vui lòng nhập mật khẩu mới bên dưới.');
+      setToast({ message: 'OTP hợp lệ! Vui lòng nhập mật khẩu mới bên dưới.', type: 'success' });
     } catch (verifyError) {
-      setSecurityError(getApiErrorMessage(verifyError, 'OTP không hợp lệ hoặc đã hết hạn.'));
+      setToast({ message: getApiErrorMessage(verifyError, 'OTP không hợp lệ hoặc đã hết hạn.'), type: 'error' });
     } finally {
       setIsVerifyingOtp(false);
     }
@@ -172,21 +223,22 @@ export function SecurityPage() {
 
   async function handleResetWithOtp(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
-    setSecurityError(null);
-    setSecurityMessage(null);
+    setValidationError(null);
+    setToast(null);
+
 
     if (!otpForm.newPassword) {
-      setSecurityError('Vui lòng nhập mật khẩu mới.');
+      setValidationError('Vui lòng nhập mật khẩu mới.');
       return;
     }
 
     if (otpForm.newPassword.length < 6) {
-      setSecurityError('Mật khẩu mới phải có ít nhất 6 ký tự.');
+      setValidationError('Mật khẩu mới phải có ít nhất 6 ký tự.');
       return;
     }
 
     if (otpForm.newPassword !== otpForm.confirmPassword) {
-      setSecurityError('Xác nhận mật khẩu mới không khớp.');
+      setValidationError('Xác nhận mật khẩu mới không khớp.');
       return;
     }
 
@@ -201,133 +253,102 @@ export function SecurityPage() {
       clearSession();
       navigate(ROUTE_PATHS.AUTH.LOGIN, { replace: true });
     } catch (resetError) {
-      setSecurityError(getApiErrorMessage(resetError, 'Không thể đặt lại mật khẩu.'));
+      setToast({ message: getApiErrorMessage(resetError, 'Không thể đặt lại mật khẩu.'), type: 'error' });
     } finally {
       setIsSubmitting(false);
     }
   }
 
-  async function handleRevokeSession(sessionId: string, isCurrentSession: boolean) {
-    const confirmMsg = isCurrentSession
-      ? 'Bạn đang đăng xuất khỏi thiết bị hiện tại. Bạn sẽ phải đăng nhập lại. Tiếp tục?'
-      : 'Bạn có chắc chắn muốn đăng xuất khỏi thiết bị này?';
-    if (!window.confirm(confirmMsg)) {
-      return;
-    }
-    setSecurityError(null);
-    setSecurityMessage(null);
+  const handleRevokeSessionClick = (sessionId: string, isCurrentSession: boolean) => {
+    setRevokeModalState({ isOpen: true, sessionId, isCurrentSession });
+  };
+
+  const handleConfirmRevoke = async () => {
+    if (!revokeModalState.sessionId) return;
+
+    setValidationError(null);
+    setToast(null);
+
     try {
-      await profileApi.revokeSession(sessionId);
-      if (isCurrentSession) {
+      await profileApi.revokeSession(revokeModalState.sessionId);
+      if (revokeModalState.isCurrentSession) {
         clearSession();
         navigate(ROUTE_PATHS.AUTH.LOGIN, { replace: true });
         return;
       }
-      setSecurityMessage('Đã đăng xuất thiết bị thành công.');
+      setToast({ message: 'Đã đăng xuất thiết bị thành công.', type: 'success' });
       void loadSessions();
     } catch (err) {
-      setSecurityError(getApiErrorMessage(err, 'Không thể đăng xuất thiết bị.'));
+      setToast({ message: getApiErrorMessage(err, 'Không thể đăng xuất thiết bị.'), type: 'error' });
+    } finally {
+      setRevokeModalState({ isOpen: false, sessionId: null, isCurrentSession: false });
     }
-  }
+  };
 
   function parseUserAgent(uaString?: string | null): string {
     if (!uaString) return 'Thiết bị không xác định';
     const ua = uaString.toLowerCase();
     let os = 'Hệ điều hành không xác định';
     let browser = 'Trình duyệt không xác định';
-  
+
     if (ua.includes('windows')) os = 'Windows';
     else if (ua.includes('macintosh') || ua.includes('mac os')) os = 'macOS';
     else if (ua.includes('iphone') || ua.includes('ipad') || ua.includes('ipod')) os = 'iOS';
     else if (ua.includes('android')) os = 'Android';
     else if (ua.includes('linux')) os = 'Linux';
-  
+
     if (ua.includes('edg/')) browser = 'Edge';
     else if (ua.includes('chrome') && !ua.includes('chromium')) browser = 'Chrome';
     else if (ua.includes('safari') && !ua.includes('chrome')) browser = 'Safari';
     else if (ua.includes('firefox')) browser = 'Firefox';
     else if (ua.includes('opr/') || ua.includes('opera')) browser = 'Opera';
-  
+
     return `${browser} trên ${os}`;
+  }
+
+  function handleSecurityTabChange(tab: SecurityTab) {
+    setActiveTab(tab);
+    setValidationError(null);
+    setToast(null);
   }
 
   return (
     <div>
-      <div className="security-header-row">
-        <div className="security-header-icon-box">
-          <svg viewBox="0 0 24 24" width="24" height="24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
-            <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z" />
-            <path d="m9 11 2 2 4-4" />
-          </svg>
-        </div>
-        <div>
-          <p className="eyebrow" style={{ margin: 0 }}>TÀI KHOẢN</p>
-          <h2 style={{ fontSize: '24px', fontWeight: 700, color: '#0f172a', margin: '4px 0 0 0' }}>Quản lý bảo mật</h2>
-          <p className="overview-description" style={{ margin: '4px 0 0 0', color: '#64748b', fontSize: '14px' }}>
-            Quản lý mật khẩu và các thiết bị đã đăng nhập của bạn
-          </p>
-        </div>
-      </div>
+      <PageHeader
+        icon={
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+            <svg viewBox="0 0 24 24" width="24" height="24" fill="none" stroke="#2563eb" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
+              <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z" />
+              <path d="m9 11 2 2 4-4" />
+            </svg>
+          </div>
+        }
+        eyebrow="TÀI KHOẢN"
+        title="Quản lý bảo mật"
+        description="Quản lý mật khẩu và các thiết bị đã đăng nhập của bạn"
+      />
 
-      <nav className="security-tabs-nav">
-        <button
-          type="button"
-          className={`security-tab-btn ${activeTab === 'change-password' ? 'active' : ''}`}
-          onClick={() => {
-            setActiveTab('change-password');
-            setSecurityError(null);
-            setSecurityMessage(null);
-          }}
-        >
-          <svg className="security-tab-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
-            <rect x="3" y="11" width="18" height="11" rx="2" ry="2" />
-            <path d="M7 11V7a5 5 0 0 1 10 0v4" />
-          </svg>
-          Đổi mật khẩu
-        </button>
-        <button
-          type="button"
-          className={`security-tab-btn ${activeTab === 'devices' ? 'active' : ''}`}
-          onClick={() => {
-            setActiveTab('devices');
-            setSecurityError(null);
-            setSecurityMessage(null);
-          }}
-        >
-          <svg className="security-tab-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
-            <rect x="2" y="3" width="20" height="14" rx="2" ry="2" />
-            <line x1="8" y1="21" x2="16" y2="21" />
-            <line x1="12" y1="17" x2="12" y2="21" />
-          </svg>
-          Thiết bị đăng nhập
-        </button>
-        <button
-          type="button"
-          className={`security-tab-btn ${activeTab === 'activity-logs' ? 'active' : ''}`}
-          onClick={() => {
-            setActiveTab('activity-logs');
-            setSecurityError(null);
-            setSecurityMessage(null);
-          }}
-        >
-          <svg className="security-tab-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
-            <circle cx="12" cy="12" r="10" />
-            <polyline points="12 6 12 12 16 14" />
-            <path d="M12 2a10 10 0 1 0 10 10" />
-          </svg>
-          Lịch sử hoạt động
-        </button>
-      </nav>
+      <Tabs
+        className="attached-bottom"
+        variant="segmented-secondary"
+        activeId={activeTab}
+        onChange={(tab) => handleSecurityTabChange(tab as SecurityTab)}
+        items={[
+          { id: 'change-password', label: 'Đổi mật khẩu', icon: getSecurityTabIcon('change-password') },
+          { id: 'devices', label: 'Thiết bị đăng nhập', icon: getSecurityTabIcon('devices') },
+          { id: 'activity-logs', label: 'Lịch sử hoạt động', icon: getSecurityTabIcon('activity-logs') },
+        ]}
+      />
 
-      {(securityError || securityMessage) && (
+      {validationError && (
         <div style={{ maxWidth: '760px', margin: '0 auto 16px auto' }}>
-          {securityError ? <Alert type="error">{securityError}</Alert> : null}
-          {securityMessage ? <Alert type="success">{securityMessage}</Alert> : null}
+          <Alert type="error">{validationError}</Alert>
+
         </div>
       )}
 
       {activeTab === 'change-password' && (
-        <div className="security-card">
+        <div className="security-card tab-attached-panel tab-attached-panel--compact">
           <div className="security-card-icon-box">
             <svg viewBox="0 0 24 24" width="24" height="24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
               <rect x="3" y="11" width="18" height="11" rx="2" ry="2" />
@@ -344,8 +365,9 @@ export function SecurityPage() {
               onClick={() => {
                 setPasswordMethod('current-password');
                 setOtpVerified(false);
-                setSecurityError(null);
-                setSecurityMessage(null);
+                setValidationError(null);
+                setToast(null);
+
               }}
             >
               Dùng mật khẩu hiện tại
@@ -357,8 +379,9 @@ export function SecurityPage() {
                 setPasswordMethod('email-otp');
                 setOtpVerified(false);
                 setOtpForm(c => ({ ...c, otp: '', newPassword: '', confirmPassword: '' }));
-                setSecurityError(null);
-                setSecurityMessage(null);
+                setValidationError(null);
+                setToast(null);
+
               }}
             >
               Nhận mã OTP qua Email
@@ -437,7 +460,7 @@ export function SecurityPage() {
                     )}
                   </button>
                 </div>
-                
+
                 <div className="password-strength-section">
                   <div className="strength-indicator-row">
                     <div className="strength-bars">
@@ -660,7 +683,7 @@ export function SecurityPage() {
       )}
 
       {activeTab === 'devices' && (
-        <div className="security-devices-card">
+        <div className="security-devices-card tab-attached-panel tab-attached-panel--compact">
           <h3>Thiết bị đang đăng nhập</h3>
           <p className="card-desc">Quản lý và đăng xuất khỏi các phiên đăng nhập hoạt động trên các thiết bị khác nhau.</p>
 
@@ -708,7 +731,7 @@ export function SecurityPage() {
                       <button
                         type="button"
                         className="device-revoke-btn"
-                        onClick={() => void handleRevokeSession(session.id, session.isCurrentSession)}
+                        onClick={() => handleRevokeSessionClick(session.id, session.isCurrentSession)}
                       >
                         Đăng xuất
                       </button>
@@ -722,7 +745,7 @@ export function SecurityPage() {
       )}
 
       {activeTab === 'activity-logs' && (
-        <div className="security-devices-card">
+        <div className="security-devices-card tab-attached-panel tab-attached-panel--compact">
           <h3>Lịch sử hoạt động</h3>
           <p className="card-desc">Xem nhật ký các hoạt động bảo mật gần đây trên tài khoản của bạn để đảm bảo an toàn.</p>
 
@@ -791,6 +814,21 @@ export function SecurityPage() {
           </div>
         </div>
       )}
+
+      <ConfirmModal
+        isOpen={revokeModalState.isOpen}
+        title="Đăng xuất thiết bị"
+        message={
+          revokeModalState.isCurrentSession
+            ? 'Bạn đang đăng xuất khỏi thiết bị hiện tại. Bạn sẽ phải đăng nhập lại. Tiếp tục?'
+            : 'Bạn có chắc chắn muốn đăng xuất khỏi thiết bị này?'
+        }
+        confirmText="Đăng xuất"
+        isDanger={true}
+        onConfirm={handleConfirmRevoke}
+        onCancel={() => setRevokeModalState({ isOpen: false, sessionId: null, isCurrentSession: false })}
+      />
+      {toast && <Toast message={toast.message} type={toast.type} onClose={() => setToast(null)} />}
     </div>
   );
 }

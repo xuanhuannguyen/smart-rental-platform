@@ -6,6 +6,7 @@ import type { RoomingHouseDetail, RoomInHouseDetail } from '../../rooming-houses
 import { getApiErrorMessage } from '../../../shared/api/apiError';
 import { useAuth } from '../../../app/providers/AuthProvider';
 import { Alert } from '../../../shared/components/ui/Alert';
+import { Toast } from '../../../shared/components/ui/Toast';
 import ViewingAppointmentModal from '../../viewing-appointments/components/ViewingAppointmentModal';
 import SubmitRentalRequestModal from '../../rental-requests/components/SubmitRentalRequestModal';
 import { ROUTE_PATHS } from '../../../app/router/routePaths';
@@ -79,7 +80,7 @@ export default function PublicRoomDetailPage() {
   const [error, setError] = useState('');
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [isRentalModalOpen, setIsRentalModalOpen] = useState(false);
-  const [successMessage, setSuccessMessage] = useState('');
+  const [toast, setToast] = useState<{ message: string; type: 'success' | 'error' | 'info' } | null>(null);
 
   const handleBookingClick = () => {
     if (!currentUser) {
@@ -121,7 +122,7 @@ export default function PublicRoomDetailPage() {
       <>
         <HomeHeader />
         <main className="public-room-detail public-room-detail--state">
-          <p className="public-room-detail__error-text">{error || 'Không tìm thấy thông tin khu trọ.'}</p>
+          <Alert type="error">{error || 'Không tìm thấy thông tin khu trọ.'}</Alert>
           <Link to="/home" className="public-room-detail__home-link">Quay về trang chủ</Link>
         </main>
       </>
@@ -135,7 +136,7 @@ export default function PublicRoomDetailPage() {
       <>
         <HomeHeader />
         <main className="public-room-detail public-room-detail--state">
-          <p className="public-room-detail__error-text">Không tìm thấy thông tin phòng trọ này.</p>
+          <Alert type="error">Không tìm thấy thông tin phòng trọ này.</Alert>
           <Link to={`/rooming-houses/${house.id}`} className="public-room-detail__home-link">Quay lại khu trọ</Link>
         </main>
       </>
@@ -157,11 +158,7 @@ export default function PublicRoomDetailPage() {
           <span>Quay về khu trọ: {house.name}</span>
         </Link>
 
-        {successMessage && (
-          <div style={{ margin: '16px 0' }}>
-            <Alert type="success">{successMessage}</Alert>
-          </div>
-        )}
+
 
         <div className="public-room-detail__container">
           {/* Left Column: Room Gallery */}
@@ -337,8 +334,7 @@ export default function PublicRoomDetailPage() {
             houseName={house.name}
             onClose={() => setIsModalOpen(false)}
             onSuccess={(msg) => {
-              setSuccessMessage(msg);
-              setTimeout(() => setSuccessMessage(''), 5000);
+              setToast({ message: msg, type: 'success' });
             }}
           />
         )}
@@ -351,11 +347,11 @@ export default function PublicRoomDetailPage() {
             maxOccupants={room.maxOccupants}
             onClose={() => setIsRentalModalOpen(false)}
             onSuccess={(msg) => {
-              setSuccessMessage(msg);
-              setTimeout(() => setSuccessMessage(''), 5000);
+              setToast({ message: msg, type: 'success' });
             }}
           />
         )}
+        {toast && <Toast message={toast.message} type={toast.type} onClose={() => setToast(null)} />}
       </main>
     </>
   );

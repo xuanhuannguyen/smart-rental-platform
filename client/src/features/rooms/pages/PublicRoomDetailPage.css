@@ -17,13 +17,6 @@
   gap: 12px;
 }
 
-.public-room-detail__error-text {
-  font-size: 16px;
-  color: #ef4444;
-  margin-bottom: 12px;
-  font-weight: 600;
-}
-
 .public-room-detail__home-link {
   color: #246bfe;
   text-decoration: none;

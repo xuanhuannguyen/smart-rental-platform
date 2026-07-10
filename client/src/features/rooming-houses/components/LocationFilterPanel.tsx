@@ -1,3 +1,4 @@
+import { Alert } from '../../../shared/components/ui/Alert';
 import { useEffect, useState } from 'react';
 import { getProvinces, getWardsByProvince } from '../../administrative/api';
 import type { Province, Ward } from '../../administrative/types';
@@ -270,7 +271,7 @@ export function LocationFilterPanel({
                 onChange={(e) => setLocalRadiusKm(Number(e.target.value))}
               />
             </div>
-            {nearbyError && <p className="nearby-error-text">{nearbyError}</p>}
+            {nearbyError && <Alert type="error">{nearbyError}</Alert>}
           </div>
         </>
       ) : (

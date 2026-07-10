@@ -1,3 +1,4 @@
+import { PageHeader } from '../../../shared/components/ui/PageHeader';
 import { useEffect, useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { ROUTE_PATHS } from '../../../app/router/routePaths';
@@ -102,51 +103,42 @@ export const TenantRentalRequestDetailPage = () => {
   return (
     <div className="rd-page">
       {/* ── Hero Header ── */}
-      <div className="rd-hero">
-        <div className="rd-hero__left">
-          <button
-            type="button"
-            className="rd-hero__back"
-            onClick={() => navigate(ROUTE_PATHS.ACCOUNT.RENTAL_REQUESTS)}
-            title="Quay về danh sách"
-          >
-            <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
-              <line x1="19" y1="12" x2="5" y2="12"/><polyline points="12 19 5 12 12 5"/>
-            </svg>
-          </button>
-          <div className="rd-hero__icon">
-            <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+            <PageHeader
+        onBack={() => navigate(ROUTE_PATHS.ACCOUNT.RENTAL_REQUESTS)}
+        icon={
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+            <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#2563eb" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
               <rect x="2" y="7" width="20" height="15" rx="2"/>
               <path d="M16 21V7a2 2 0 0 0-2-2h-4a2 2 0 0 0-2 2v14"/>
             </svg>
           </div>
-          <div className="rd-hero__texts">
-            <p className="rd-hero__house">{request.roomingHouseName}</p>
-            <h2 className="rd-hero__room">Phòng {request.roomNumber}</h2>
-            <p className="rd-hero__meta">
-              <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                <circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/>
-              </svg>
-              Thời gian gửi: {formatDateTime(request.createdAt)}
-            </p>
-          </div>
-        </div>
-        <div className="rd-hero__right">
-          <span className={`rd-badge rd-badge--${statusBadgeCls}`}>
-            {formatRequestStatus(request.status)}
+        }
+        eyebrow={request.roomingHouseName}
+        title={`Phòng ${request.roomNumber}`}
+        description={
+          <span style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+              <circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/>
+            </svg>
+            Thời gian gửi: {formatDateTime(request.createdAt)}
           </span>
-          {request.status === 'Pending' && (
-            <div className="rd-hero__actions">
-              <button className="rd-btn rd-btn--danger" onClick={() => setShowCancelModal(true)}>
+        }
+        rightContent={
+          <div style={{ display: 'flex', alignItems: 'center', gap: '16px' }}>
+            <span className={`rd-badge rd-badge--${statusBadgeCls}`} style={{ fontSize: '1rem', padding: '8px 16px', borderRadius: '999px', fontWeight: 600 }}>
+              {formatRequestStatus(request.status)}
+            </span>
+            {request.status === 'Pending' && (
+              <button className="rd-btn rd-btn--danger" onClick={() => setShowCancelModal(true)} style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
                 <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
                   <line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/>
                 </svg>
                 Hủy yêu cầu
               </button>
-            </div>
-          )}
-        </div>
-      </div>
+            )}
+          </div>
+        }
+      />
 
       {/* ── Rejected Reason ── */}
       {request.rejectedReason && (

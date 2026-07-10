@@ -3,6 +3,7 @@ import { useNavigate, useParams } from 'react-router-dom';
 import { ROUTE_PATHS } from '../../../app/router/routePaths';
 import { getApiErrorMessage } from '../../../shared/api/apiError';
 import { Alert } from '../../../shared/components/ui/Alert';
+import { PageHeader } from '../../../shared/components/ui/PageHeader';
 import { Toast } from '../../../shared/components/ui/Toast';
 import type { ContractBriefResponse } from '../../contracts/types';
 import { ContractPreviewModal } from '../../rental-contracts/components/ContractPreviewModal';
@@ -92,61 +93,52 @@ export function LandlordRentalRequestDetailPage() {
         <div className="rd-page">
 
           {/* ── Hero Header ── */}
-          <div className="rd-hero">
-            <div className="rd-hero__left">
-              <button
-                type="button"
-                className="rd-hero__back"
-                onClick={() => navigate(ROUTE_PATHS.LANDLORD.RENTAL_REQUESTS)}
-                title="Quay về danh sách"
-              >
-                <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
-                  <line x1="19" y1="12" x2="5" y2="12"/><polyline points="12 19 5 12 12 5"/>
+          <PageHeader
+            onBack={() => navigate(ROUTE_PATHS.LANDLORD.RENTAL_REQUESTS)}
+            icon={
+              <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <rect x="2" y="7" width="20" height="15" rx="2"/>
+                <path d="M16 21V7a2 2 0 0 0-2-2h-4a2 2 0 0 0-2 2v14"/>
+              </svg>
+            }
+            eyebrow={request.roomingHouseName}
+            title={`Phòng ${request.roomNumber}`}
+            description={
+              <span className="rd-hero__meta" style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                  <circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/>
                 </svg>
-              </button>
-              <div className="rd-hero__icon">
-                <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                  <rect x="2" y="7" width="20" height="15" rx="2"/>
-                  <path d="M16 21V7a2 2 0 0 0-2-2h-4a2 2 0 0 0-2 2v14"/>
-                </svg>
-              </div>
-              <div className="rd-hero__texts">
-                <p className="rd-hero__house">{request.roomingHouseName}</p>
-                <h2 className="rd-hero__room">Phòng {request.roomNumber}</h2>
-                <p className="rd-hero__meta">
-                  <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                    <circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/>
-                  </svg>
-                  Thời gian gửi: {formatDateTime(request.createdAt)}
-                </p>
-              </div>
-            </div>
-            <div className="rd-hero__right">
-              <span className={`rd-badge rd-badge--${statusBadgeCls}`}>
-                {formatRequestStatus(request.status)}
+                Thời gian gửi: {formatDateTime(request.createdAt)}
               </span>
-              {request.status === 'Pending' && (
-                <div className="rd-hero__actions">
-                  <button className="rd-btn rd-btn--danger" onClick={() => setShowRejectModal(true)}>
-                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
-                      <line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/>
-                    </svg>
-                    Từ chối
-                  </button>
-                  <button
-                    className="rd-btn rd-btn--primary"
-                    onClick={() => setShowApproveModal(true)}
-                    disabled={!canApproveByStartDate}
-                  >
-                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
-                      <polyline points="20 6 9 17 4 12"/>
-                    </svg>
-                    Duyệt yêu cầu
-                  </button>
-                </div>
-              )}
-            </div>
-          </div>
+            }
+            rightContent={
+              <>
+                <span className={`rd-badge rd-badge--${statusBadgeCls}`}>
+                  {formatRequestStatus(request.status)}
+                </span>
+                {request.status === 'Pending' && (
+                  <div className="rd-hero__actions">
+                    <button className="rd-btn rd-btn--danger" onClick={() => setShowRejectModal(true)}>
+                      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                        <line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/>
+                      </svg>
+                      Từ chối
+                    </button>
+                    <button
+                      className="rd-btn rd-btn--primary"
+                      onClick={() => setShowApproveModal(true)}
+                      disabled={!canApproveByStartDate}
+                    >
+                      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                        <polyline points="20 6 9 17 4 12"/>
+                      </svg>
+                      Duyệt yêu cầu
+                    </button>
+                  </div>
+                )}
+              </>
+            }
+          />
 
           {/* ── Rejected Reason ── */}
           {request.rejectedReason && (

@@ -1,8 +1,12 @@
+import { Alert } from '../../../shared/components/ui/Alert';
 import { useEffect, useMemo, useState } from 'react';
 import type { Dispatch, FormEvent, ReactNode, SetStateAction } from 'react';
 import { useLocation, useNavigate, useParams } from 'react-router-dom';
 import { ROUTE_PATHS } from '../../../app/router/routePaths';
 import { getApiErrorMessage } from '../../../shared/api/apiError';
+import { Toast } from '../../../shared/components/ui/Toast';
+import { Tabs } from '../../../shared/components/ui/Tabs';
+import { PageHeader } from '../../../shared/components/ui/PageHeader';
 import { contractApi } from '../../contracts/api';
 import { billingApi } from '../api';
 import type { ContractAppendixResponse, ContractHistoryItemResponse } from '../../contracts/types';
@@ -47,6 +51,7 @@ export default function LandlordBillingPage() {
   const [loadingInvoices, setLoadingInvoices] = useState(false);
   const [busy, setBusy] = useState('');
   const [message, setMessage] = useState('');
+  const [toast, setToast] = useState<{ message: string; type: 'success' | 'error' | 'info' } | null>(null);
   const [error, setError] = useState('');
   const [statusFilter, setStatusFilter] = useState('all');
   const [selectedHouseId, setSelectedHouseId] = useState('');
@@ -216,17 +221,17 @@ export default function LandlordBillingPage() {
     event.preventDefault();
     setBusy('price');
     setError('');
-    setMessage('');
+    setToast(null);
     try {
       const response = await billingApi.createServicePrice(roomingHouseId, {
         ...priceForm,
         unitPrice: Number(priceForm.unitPrice),
         note: priceForm.note?.trim() || null
       });
-      setMessage(`Đã tạo giá mới cho ${response.data.serviceName}. Giá cũ đã được lưu vào lịch sử.`);
+      setToast({ message: `Đã tạo giá mới cho ${response.data.serviceName}. Giá cũ đã được lưu vào lịch sử.`, type: 'success' });
       await loadPrices();
     } catch (err) {
-      setError(getApiErrorMessage(err, 'Không tạo được bảng giá dịch vụ.'));
+      setToast({ message: getApiErrorMessage(err, 'Không tạo được bảng giá dịch vụ.'), type: 'error' });
     } finally {
       setBusy('');
     }
@@ -235,14 +240,14 @@ export default function LandlordBillingPage() {
   async function issueInvoice(invoice: Invoice) {
     setBusy('issue');
     setError('');
-    setMessage('');
+    setToast(null);
     try {
       const response = await billingApi.issueInvoice(invoice.id);
       setSelectedInvoice(response.data);
       setInvoices((prev) => prev.map((item) => item.id === response.data.id ? response.data : item));
       setMessage(`Đã phát hành hóa đơn ${response.data.invoiceNo}. Người thuê có thể xem và thanh toán.`);
     } catch (err) {
-      setError(getApiErrorMessage(err, 'Không phát hành được hóa đơn.'));
+      setToast({ message: getApiErrorMessage(err, 'Không phát hành được hóa đơn.'), type: 'error' });
     } finally {
       setBusy('');
       setConfirmAction(null);
@@ -252,14 +257,14 @@ export default function LandlordBillingPage() {
   async function cancelInvoice(invoice: Invoice) {
     setBusy('cancel');
     setError('');
-    setMessage('');
+    setToast(null);
     try {
       const response = await billingApi.cancelInvoice(invoice.id, 'Chủ trọ đã hủy hóa đơn');
       setSelectedInvoice(response.data);
       setInvoices((prev) => prev.map((item) => item.id === response.data.id ? response.data : item));
       setMessage(`Đã hủy hóa đơn ${response.data.invoiceNo}.`);
     } catch (err) {
-      setError(getApiErrorMessage(err, 'Không hủy được hóa đơn.'));
+      setToast({ message: getApiErrorMessage(err, 'Không hủy được hóa đơn.'), type: 'error' });
     } finally {
       setBusy('');
       setConfirmAction(null);
@@ -288,8 +293,9 @@ export default function LandlordBillingPage() {
         )}
 
         {tab !== 'invoices' && <NotificationStrip invoices={invoices} />}
-        {message && <div className="billing-alert success">{message}</div>}
-        {error && <div className="billing-alert error">{error}</div>}
+        {toast && <Toast message={toast.message} type={toast.type} onClose={() => setToast(null)} />}
+        {toast && <Toast message={toast.message} type={toast.type} onClose={() => setToast(null)} />}
+        {error && <Alert type="error">{error}</Alert>}
 
         {tab === 'prices' && (
           <ServicePricesSection
@@ -520,14 +526,21 @@ function InvoiceListSection({
   return (
     <div className="landlord-billing-page">
       {/* ── Overview Band ── */}
-      <section className="invoice-overview-band">
-        <div className="overview-left">
-          <p className="eyebrow">Quản lý</p>
-          <h2>Hóa đơn cho thuê</h2>
-          <p className="overview-description">Xem và lọc hóa đơn theo khu trọ, phòng và trạng thái thanh toán.</p>
-        </div>
-
-        <div className="invoice-overview-right">
+      <PageHeader
+        icon={
+          <svg viewBox="0 0 24 24" width="24" height="24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+            <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" />
+            <polyline points="14 2 14 8 20 8" />
+            <line x1="16" y1="13" x2="8" y2="13" />
+            <line x1="16" y1="17" x2="8" y2="17" />
+            <polyline points="10 9 9 9 8 9" />
+          </svg>
+        }
+        eyebrow="Quản lý"
+        title="Hóa đơn cho thuê"
+        description="Xem và lọc hóa đơn theo khu trọ, phòng và trạng thái thanh toán."
+        rightContent={
+          <div className="invoice-overview-right">
           <div className="invoice-filter-group">
             <div className="invoice-filter-item">
               <label>Khu trọ</label>
@@ -566,90 +579,100 @@ function InvoiceListSection({
             Tạo hóa đơn
           </button>
         </div>
-      </section>
+        }
+      />
+
 
       {/* ── Status Tabs ── */}
-      <div className="invoice-tabs-container">
-        <div className="invoice-tabs-wrapper">
-          <InvoiceStatusTab status="all" activeStatus={statusFilter} onClick={onStatusChange}>Tất cả</InvoiceStatusTab>
-          {invoiceStatuses.map((status) => (
-            <InvoiceStatusTab key={status} status={status} activeStatus={statusFilter} onClick={onStatusChange}>
-              {getInvoiceStatusLabel(status)}
-            </InvoiceStatusTab>
-          ))}
-        </div>
-      </div>
+      <div className="invoice-list-wrapper">
+        <Tabs
+          className="attached-bottom"
+        variant="segmented-secondary"
+        activeId={statusFilter}
+        onChange={onStatusChange}
+        items={[
+          { id: 'all', label: 'Tất cả', icon: getTabIcon('all') },
+          ...invoiceStatuses.map((status) => ({
+            id: status,
+            label: getInvoiceStatusLabel(status),
+            icon: getTabIcon(status),
+          })),
+        ]}
+      />
 
       {/* ── Invoice List ── */}
-      {loading ? (
-        <div className="empty-panel">Đang tải dữ liệu hóa đơn...</div>
-      ) : invoices.length === 0 ? (
-        <div className="empty-panel">
-          <h2>Không tìm thấy hóa đơn</h2>
-          <p>Chưa có hóa đơn nào phù hợp với bộ lọc hiện tại.</p>
-        </div>
-      ) : (
-        <section className="invoice-grid">
-          {invoices.map((invoice) => (
-            <div
-              className={`invoice-card status-${invoice.status.toLowerCase()}`}
-              key={invoice.id}
-              onClick={() => onOpen(invoice)}
-            >
-              {/* Card Header */}
-              <div className="invoice-card-header">
-                <div className="invoice-no-box">
-                  <svg className="invoice-file-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                    <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" />
-                    <polyline points="14 2 14 8 20 8" />
-                    <line x1="16" y1="13" x2="8" y2="13" />
-                    <line x1="16" y1="17" x2="8" y2="17" />
-                  </svg>
-                  <h3>{invoice.invoiceNo}</h3>
+      <section className="tab-attached-panel tab-attached-panel--cards">
+        {loading ? (
+          <div className="empty-panel">Đang tải dữ liệu hóa đơn...</div>
+        ) : invoices.length === 0 ? (
+          <div className="empty-panel">
+            <h2>Không tìm thấy hóa đơn</h2>
+            <p>Chưa có hóa đơn nào phù hợp với bộ lọc hiện tại.</p>
+          </div>
+        ) : (
+          <section className="invoice-grid">
+            {invoices.map((invoice) => (
+              <div
+                className={`invoice-card status-${invoice.status.toLowerCase()}`}
+                key={invoice.id}
+                onClick={() => onOpen(invoice)}
+              >
+                {/* Card Header */}
+                <div className="invoice-card-header">
+                  <div className="invoice-no-box">
+                    <svg className="invoice-file-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                      <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" />
+                      <polyline points="14 2 14 8 20 8" />
+                      <line x1="16" y1="13" x2="8" y2="13" />
+                      <line x1="16" y1="17" x2="8" y2="17" />
+                    </svg>
+                    <h3>{invoice.invoiceNo}</h3>
+                  </div>
+                  <span className={`invoice-status-badge ${invoice.status.toLowerCase()}`}>
+                    {getInvoiceStatusLabel(invoice.status)}
+                  </span>
                 </div>
-                <span className={`invoice-status-badge ${invoice.status.toLowerCase()}`}>
-                  {getInvoiceStatusLabel(invoice.status)}
-                </span>
+
+                {/* Card Body */}
+                <div className="invoice-card-body">
+                  <div className="house-info">
+                    <svg className="info-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                      <path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z" />
+                      <polyline points="9 22 9 12 15 12 15 22" />
+                    </svg>
+                    <span>{invoice.roomingHouseName}</span>
+                    <span className="room-badge">Phòng {invoice.roomNumber}</span>
+                  </div>
+
+                  <ul className="invoice-details-list">
+                    <li className="invoice-detail-row">
+                      <span className="label">Người thuê</span>
+                      <span className="value tenant-name">{invoice.tenantName || invoice.tenantEmail}</span>
+                    </li>
+                    <li className="invoice-detail-row">
+                      <span className="label">Kỳ hóa đơn</span>
+                      <span className="value">{invoice.billingPeriodStart} – {invoice.billingPeriodEnd}</span>
+                    </li>
+                    <li className="invoice-detail-row">
+                      <span className="label">Hạn thanh toán</span>
+                      <span className="value due-date">{invoice.dueDate}</span>
+                    </li>
+                  </ul>
+
+                  {/* Card Footer */}
+                  <div className="invoice-card-footer">
+                    <span className="amount-label">Tổng tiền</span>
+                    <p className={`amount-value ${invoice.status.toLowerCase()}`}>
+                      {formatMoney(invoice.totalAmount)}
+                    </p>
+                  </div>
+                </div>
               </div>
-
-              {/* Card Body */}
-              <div className="invoice-card-body">
-                <div className="house-info">
-                  <svg className="info-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                    <path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z" />
-                    <polyline points="9 22 9 12 15 12 15 22" />
-                  </svg>
-                  <span>{invoice.roomingHouseName}</span>
-                  <span className="room-badge">Phòng {invoice.roomNumber}</span>
-                </div>
-
-                <ul className="invoice-details-list">
-                  <li className="invoice-detail-row">
-                    <span className="label">Người thuê</span>
-                    <span className="value tenant-name">{invoice.tenantName || invoice.tenantEmail}</span>
-                  </li>
-                  <li className="invoice-detail-row">
-                    <span className="label">Kỳ hóa đơn</span>
-                    <span className="value">{invoice.billingPeriodStart} – {invoice.billingPeriodEnd}</span>
-                  </li>
-                  <li className="invoice-detail-row">
-                    <span className="label">Hạn thanh toán</span>
-                    <span className="value due-date">{invoice.dueDate}</span>
-                  </li>
-                </ul>
-
-                {/* Card Footer */}
-                <div className="invoice-card-footer">
-                  <span className="amount-label">Tổng tiền</span>
-                  <p className={`amount-value ${invoice.status.toLowerCase()}`}>
-                    {formatMoney(invoice.totalAmount)}
-                  </p>
-                </div>
-              </div>
-            </div>
-          ))}
-        </section>
-      )}
+            ))}
+          </section>
+        )}
+      </section>
+      </div>
     </div>
   );
 }
@@ -687,6 +710,7 @@ function CentralCreateInvoiceModal({
   const [loadingDetails, setLoadingDetails] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState('');
+  const [toast, setToast] = useState<{ message: string; type: 'success' | 'error' | 'info' } | null>(null);
 
   const houses = useMemo(() => {
     const map = new Map<string, string>();
@@ -906,17 +930,17 @@ function CentralCreateInvoiceModal({
     setError('');
 
     if (!selectedContract) {
-      setError('Vui lòng chọn phòng cần tạo hóa đơn.');
+      setToast({ message: 'Vui lòng chọn phòng cần tạo hóa đơn.', type: 'error' });
       return;
     }
 
     if (!period) {
-      setError(periodValidationMessage || 'Kỳ hóa đơn không hợp lệ.');
+      setToast({ message: periodValidationMessage || 'Kỳ hóa đơn không hợp lệ.', type: 'error' });
       return;
     }
 
     if (previewBlockReason) {
-      setError(previewBlockReason);
+      setToast({ message: previewBlockReason, type: 'error' });
       return;
     }
 
@@ -935,7 +959,7 @@ function CentralCreateInvoiceModal({
       const latestReading = latestReadingByServiceType[reading.serviceTypeId];
       const previousReading = latestReading?.currentReading ?? reading.previousReading;
       if (previousReading !== null && previousReading !== undefined && reading.currentReading < previousReading) {
-        setError('Chỉ số mới không được nhỏ hơn chỉ số cũ.');
+        setToast({ message: 'Chỉ số mới không được nhỏ hơn chỉ số cũ.', type: 'error' });
         return;
       }
     }
@@ -952,7 +976,7 @@ function CentralCreateInvoiceModal({
       });
       onCreated(response.data);
     } catch (err) {
-      setError(getApiErrorMessage(err, 'Không thể tạo hóa đơn.'));
+      setToast({ message: getApiErrorMessage(err, 'Không thể tạo hóa đơn.'), type: 'error' });
     } finally {
       setSubmitting(false);
     }
@@ -968,7 +992,8 @@ function CentralCreateInvoiceModal({
 
         <form onSubmit={handleSubmit}>
           <div className="history-modal-body">
-            {error && <div className="billing-alert error" style={{ marginBottom: '12px' }}>{error}</div>}
+            {toast && <Toast message={toast.message} type={toast.type} onClose={() => setToast(null)} />}
+            {error && <Alert type="error">{error}</Alert>}
 
             <div className="invoice-create-selector">
               <label className="invoice-create-field">
@@ -1011,8 +1036,8 @@ function CentralCreateInvoiceModal({
               <p>Đang tải dữ liệu hóa đơn...</p>
             ) : (
               <div className="invoice-create-stack">
-                {periodValidationMessage && <div className="billing-alert error" style={{ marginTop: '16px', marginBottom: '-4px' }}>{periodValidationMessage}</div>}
-                {previewBlockReason && <div className="billing-alert error" style={{ marginTop: '16px', marginBottom: '-4px' }}>{previewBlockReason}</div>}
+                {periodValidationMessage && <Alert type="error">{periodValidationMessage}</Alert>}
+                {previewBlockReason && <Alert type="error">{previewBlockReason}</Alert>}
                 <div className="invoice-create-grid">
                   <div className="invoice-create-field">
                     <span className="label">Phòng</span>
@@ -1139,16 +1164,15 @@ function CentralCreateInvoiceModal({
   );
 }
 
-function getTabIcon(status: string, active: boolean) {
-  const color = active ? '#ffffff' : '#64748b';
-  const props = { width: 14, height: 14, viewBox: '0 0 24 24', fill: 'none', stroke: color, strokeWidth: 2, strokeLinecap: 'round' as const, strokeLinejoin: 'round' as const, className: 'invoice-tab-icon' };
+function getTabIcon(status: string) {
+  const props = { width: 14, height: 14, viewBox: '0 0 24 24', fill: 'none', stroke: 'currentColor', strokeWidth: 2, strokeLinecap: 'round' as const, strokeLinejoin: 'round' as const, className: 'invoice-tab-icon' };
 
   switch (status.toLowerCase()) {
     case 'all':
       return (
         <svg {...props}>
           <circle cx="12" cy="12" r="10" />
-          <circle cx="12" cy="12" r="3" fill={color} stroke="none" />
+          <circle cx="12" cy="12" r="3" fill="currentColor" stroke="none" />
         </svg>
       );
     case 'draft':
@@ -1186,31 +1210,6 @@ function getTabIcon(status: string, active: boolean) {
     default:
       return null;
   }
-}
-
-function InvoiceStatusTab({
-  status,
-  activeStatus,
-  onClick,
-  children
-}: {
-  status: string;
-  activeStatus: string;
-  onClick: (value: string) => void;
-  children: ReactNode;
-}) {
-  const active = activeStatus === status;
-
-  return (
-    <button
-      type="button"
-      onClick={() => onClick(status)}
-      className={`invoice-tab-btn${active ? ' active' : ''}`}
-    >
-      {getTabIcon(status, active)}
-      {children}
-    </button>
-  );
 }
 
 function LegacyInvoiceListSection({

@@ -1,0 +1,213 @@
+/* Container */
+.shared-tabs-wrapper {
+  width: 100%;
+}
+
+/* -------------------------------------
+ * Mobile View: Dropdown Select
+ * ------------------------------------- */
+.shared-tabs-mobile {
+  display: block;
+}
+
+.shared-tabs-select {
+  display: block;
+  width: 100%;
+  padding: 10px 12px;
+  background-color: #f9fafb;
+  border: 1px solid #d1d5db;
+  color: #111827;
+  font-size: 14px;
+  border-radius: 8px;
+  box-shadow: 0 1px 2px 0 rgba(0, 0, 0, 0.05);
+  outline: none;
+  cursor: pointer;
+  transition: border-color 0.15s ease, box-shadow 0.15s ease;
+}
+
+.shared-tabs-select:focus {
+  border-color: #2563eb;
+  box-shadow: 0 0 0 1px #2563eb;
+}
+
+/* -------------------------------------
+ * Desktop View: Button Group (Flex)
+ * ------------------------------------- */
+.shared-tabs-desktop {
+  display: none;
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  font-size: 14px;
+  font-weight: 500;
+  text-align: center;
+  color: #6b7280;
+  margin-left: 1px; /* Offset for the negative margin */
+}
+
+@media (min-width: 640px) {
+  .shared-tabs-mobile {
+    display: none;
+  }
+  .shared-tabs-desktop {
+    display: flex;
+  }
+}
+
+.shared-tab-item {
+  width: 100%; /* w-full */
+  margin-left: -1px; /* -space-x-px: overlap borders */
+  position: relative;
+}
+
+/* When a button is hovered or active, it should be on top so its borders are fully visible */
+.shared-tab-item:focus-within,
+.shared-tab-item:hover,
+.shared-tab-item:has(.active) {
+  z-index: 10;
+}
+
+.shared-tab-btn {
+  display: inline-flex;
+  justify-content: center;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+  padding: 10px 16px;
+  background-color: #ffffff;
+  border: 1px solid #d1d5db;
+  color: #4b5563;
+  font-size: 14px;
+  font-family: inherit;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  outline: none;
+  white-space: nowrap;
+}
+
+.shared-tab-btn:hover {
+  background-color: #f0f9ff;
+  color: #1e40af;
+}
+
+/* Active: light blue bg + colored border + colored text */
+.shared-tab-btn.active {
+  background-color: #eff6ff;
+  color: #1e40af;
+  border-color: #1e40af;
+  border-width: 2px;
+  font-weight: 600;
+}
+
+.shared-tab-btn:focus-visible {
+  border-color: #1d4ed8;
+  box-shadow: inset 0 0 0 1px #1d4ed8;
+  z-index: 20;
+}
+
+/* Rounding corners for the first and last items */
+.shared-tabs-desktop .shared-tab-item:first-child .shared-tab-btn {
+  border-top-left-radius: 8px;
+  border-bottom-left-radius: 8px;
+}
+
+.shared-tabs-desktop .shared-tab-item:last-child .shared-tab-btn {
+  border-top-right-radius: 8px;
+  border-bottom-right-radius: 8px;
+}
+
+.shared-tab-btn .tab-icon {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+/* Variant styles for segmented-secondary */
+.shared-tabs-desktop.segmented-secondary .shared-tab-btn {
+  padding: 8px 14px;
+  font-size: 13px;
+}
+
+/* =====================================================
+ * ATTACHED-TOP (Tab c\u1ea5p 1): neo \u0111\u1ec9nh, active grow DOWN
+ * ===================================================== */
+.shared-tabs-wrapper.attached-top {
+  margin-top: -1px;
+}
+.shared-tabs-wrapper.attached-top .shared-tabs-desktop {
+  align-items: flex-start;
+}
+/* Tất cả button: xóa góc trên (dính sát header) */
+.shared-tabs-wrapper.attached-top .shared-tabs-desktop .shared-tab-item .shared-tab-btn {
+  border-top-left-radius: 0 !important;
+  border-top-right-radius: 0 !important;
+}
+/* Active: grow down — thêm padding phía dưới, phía trên giữ nguyên */
+.shared-tabs-wrapper.attached-top .shared-tabs-desktop .shared-tab-item .shared-tab-btn.active {
+  padding-bottom: 18px;
+  border-bottom-left-radius: 6px !important;
+  border-bottom-right-radius: 6px !important;
+  position: relative;
+  z-index: 5;
+}
+
+/* =====================================================
+ * ATTACHED-BOTTOM (Tab cấp 2): neo đáy, active grow UP
+ * Màu xanh trung (#2563eb) phân biệt với cấp 1
+ * ===================================================== */
+.shared-tabs-wrapper.attached-bottom {
+  margin-bottom: -1px;
+}
+.shared-tabs-wrapper.attached-bottom .shared-tabs-desktop {
+  align-items: flex-end;
+}
+/* Tất cả button: xóa góc dưới (dính sát content) */
+.shared-tabs-wrapper.attached-bottom .shared-tabs-desktop .shared-tab-item .shared-tab-btn {
+  border-bottom-left-radius: 0 !important;
+  border-bottom-right-radius: 0 !important;
+}
+/* Active: grow up — thêm padding phía trên, phía dưới giữ nguyên */
+.shared-tabs-wrapper.attached-bottom .shared-tabs-desktop .shared-tab-item .shared-tab-btn.active {
+  padding-top: 18px;
+  border-top-left-radius: 6px !important;
+  border-top-right-radius: 6px !important;
+  position: relative;
+  z-index: 5;
+  background-color: #eff6ff;
+  color: #2563eb;
+  border-color: #2563eb;
+  border-width: 2px;
+}
+
+/* Shared content panel for level-2 tabs. The tab sits outside this block and
+   attaches to the panel's top edge. */
+.tab-attached-panel {
+  background: #ffffff;
+  border: 1px solid #d1d5db;
+  border-radius: 0 0 14px 14px !important;
+  padding: 24px;
+  margin-top: 0 !important;
+  box-shadow: 0 1px 3px rgba(15, 23, 42, 0.03);
+}
+
+.tab-attached-panel--cards {
+  padding: 28px 30px;
+}
+
+.tab-attached-panel--compact {
+  padding: 20px;
+}
+
+.tab-attached-panel--flush {
+  padding: 0;
+  overflow: hidden;
+}
+
+/* Disabled Tabs */
+.shared-tab-btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+  background-color: #f8fafc;
+  color: #94a3b8;
+}

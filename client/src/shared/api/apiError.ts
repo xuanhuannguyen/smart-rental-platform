@@ -41,11 +41,19 @@ export class ApiClientError extends Error {
 }
 
 export function getApiErrorMessage(error: unknown, fallback = 'Đã xảy ra lỗi. Vui lòng thử lại.'): string {
+  // ApiClientError: message is already extracted by apiClient.ts from the raw response
+  if (error instanceof ApiClientError) {
+    // message on ApiClientError is the pre-extracted human-readable message
+    return error.message || error.response?.message || fallback;
+  }
+
+  // Raw ApiErrorResponse object (e.g. passed directly)
   if (error && typeof error === 'object' && 'errorCode' in error) {
     const apiError = error as ApiErrorResponse;
     return ERROR_MESSAGES[apiError.errorCode] || apiError.message || fallback;
   }
 
+  // Generic JS Error
   if (error instanceof Error) {
     return error.message || fallback;
   }

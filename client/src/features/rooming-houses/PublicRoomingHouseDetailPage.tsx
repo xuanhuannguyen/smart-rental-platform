@@ -4,12 +4,14 @@ import { getPublicRoomingHouseDetail } from './api';
 import TenantMapPreview from './components/TenantMapPreview';
 import HouseImageGallery from './components/HouseImageGallery';
 import RentalAiChatbot from './components/RentalAiChatbot';
+import FavoriteButton from './components/FavoriteButton';
 import type { RoomingHouseDetail } from './types';
 import { toAssetUrl } from '../../shared/api/assets';
 import { getApiErrorMessage } from '../../shared/api/apiError';
 import { HomeHeader } from '../../shared/components/layout/HomeHeader';
 import { ROUTE_PATHS } from '../../app/router/routePaths';
 import { saveRoomingHouseView } from './rentalBehaviorStorage';
+import { HouseReviewsList } from './components/HouseReviewsList';
 import './PublicRoomingHouseDetailPage.css';
 
 function formatCurrency(value: number) {
@@ -149,7 +151,10 @@ export default function PublicRoomingHouseDetailPage() {
 
         <section className="public-house-detail__hero">
           <HouseImageGallery images={houseImages} houseName={house.name} />
-          <div className="hero-details-card">
+          <div className="hero-details-card" style={{ position: 'relative' }}>
+            <div style={{ position: 'absolute', top: '24px', right: '24px', zIndex: 10 }}>
+              <FavoriteButton roomingHouseId={house.id} />
+            </div>
             <div className="house-status-badge">
               <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" strokeWidth="2.5">
                 <path d="m3 9 9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z" />
@@ -157,7 +162,9 @@ export default function PublicRoomingHouseDetailPage() {
               </svg>
               <span>Khu trọ đang còn phòng</span>
             </div>
-            <h1>{house.name}</h1>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: '16px' }}>
+              <h1 style={{ flex: 1, margin: 0, paddingRight: '48px' }}>{house.name}</h1>
+            </div>
             <TenantMapPreview
               address={house.addressDisplay}
               googleMapUrl={house.googleMapUrl}
@@ -348,6 +355,41 @@ export default function PublicRoomingHouseDetailPage() {
           </section>
         )}
 
+        {house.servicePrices && house.servicePrices.length > 0 && (
+          <section className="public-house-detail__section service-price-section">
+            <div className="section-title-with-icon">
+              <div className="section-title-icon-wrapper circle-blue">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                  <path d="M12 1v22M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6" />
+                </svg>
+              </div>
+              <h2>Bảng giá dịch vụ</h2>
+            </div>
+            
+            <div className="service-price-grid">
+              {house.servicePrices.map((service) => (
+                <div key={service.id} className="service-price-item">
+                  <div className="service-price-info">
+                    <span className="service-name">{service.serviceTypeName}</span>
+                    {service.note && <span className="service-note">{service.note}</span>}
+                  </div>
+                  <div className="service-price-value">
+                    <strong className="price-amount">{formatCurrency(service.unitPrice)}</strong>
+                    <span className="price-unit">/{(() => {
+                      if (service.pricingUnit === 'PerMonth') return 'tháng';
+                      if (service.pricingUnit === 'PerPersonPerMonth') return 'người/tháng';
+                      if (service.pricingUnit === 'MeterReading') {
+                        return service.meterUnitName || 'đơn vị';
+                      }
+                      return service.pricingUnit;
+                    })()}</span>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </section>
+        )}
+
         <section className="public-house-detail__section rooms-section">
           <div className="public-house-detail__section-heading">
             <div className="section-title-with-icon">
@@ -414,6 +456,27 @@ export default function PublicRoomingHouseDetailPage() {
           ) : (
             <p className="public-house-detail__muted">Hiện chưa có phòng trống.</p>
           )}
+        </section>
+
+        <section className="public-house-detail__section reviews-section">
+          <div className="section-title-with-icon">
+            <div className="section-title-icon-wrapper circle-blue">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                <path d="M21 11.5a8.38 8.38 0 0 1-.9 3.8 8.5 8.5 0 0 1-7.6 4.7 8.38 8.38 0 0 1-3.8-.9L3 21l1.9-5.7a8.38 8.38 0 0 1-.9-3.8 8.5 8.5 0 0 1 4.7-7.6 8.38 8.38 0 0 1 3.8-.9h.5a8.48 8.48 0 0 1 8 8v.5z"/>
+              </svg>
+            </div>
+            <h2>Đánh giá từ người thuê</h2>
+          </div>
+          
+          <HouseReviewsList 
+            roomingHouseId={house.id} 
+            landlordUserId={house.landlordUserId} 
+            roomingHouseName={house.name}
+            roomingHouseAvatarUrl={(() => {
+              const img = houseImages.find(i => i.isCover) || houseImages[0];
+              return img ? (img.imageUrl || img.objectKey) : undefined;
+            })()}
+          />
         </section>
       </main>
       <RentalAiChatbot context="detail" roomingHouseId={house.id} title={house.name} />
