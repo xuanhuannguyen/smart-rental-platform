@@ -41,6 +41,12 @@ public interface IAppDbContext {
 
     DbSet<PropertyImage> PropertyImages { get; }
 
+    DbSet<FavoriteRoomingHouse> FavoriteRoomingHouses { get; }
+
+    DbSet<RoomingHouseReview> RoomingHouseReviews { get; }
+
+    DbSet<ReviewReport> ReviewReports { get; }
+
     DbSet<RoomingHouseLegalDocument> RoomingHouseLegalDocuments { get; }
 
     DbSet<RoomingHouseAmenity> RoomingHouseAmenities { get; }
@@ -72,6 +78,8 @@ public interface IAppDbContext {
     DbSet<ContractFile> ContractFiles { get; }
 
     DbSet<ContractSignature> ContractSignatures { get; }
+    DbSet<ContractSigningEnvelope> ContractSigningEnvelopes { get; }
+    DbSet<ESignWebhookLog> ESignWebhookLogs { get; }
 
     DbSet<WalletAccount> WalletAccounts { get; }
 

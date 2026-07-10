@@ -14,11 +14,4 @@ public interface IEmailSender
         string otp,
         CancellationToken cancellationToken = default);
 
-    Task SendContractSignatureOtpAsync(
-        string email,
-        string displayName,
-        string contractNumber,
-        string signerRole,
-        string otp,
-        CancellationToken cancellationToken = default);
 }

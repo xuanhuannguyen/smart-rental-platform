@@ -70,34 +70,7 @@ public class EmailSender : IEmailSender
         return SendAsync(email, displayName, subject, textBody, htmlBody, cancellationToken);
     }
 
-    public Task SendContractSignatureOtpAsync(
-        string email,
-        string displayName,
-        string contractNumber,
-        string signerRole,
-        string otp,
-        CancellationToken cancellationToken = default)
-    {
-        var subject = "Mã OTP ký hợp đồng Smart Rental Platform";
-        var textBody = $"""
-            Xin chao {displayName},
 
-            Mã OTP ký hợp đồng {contractNumber} của bạn là: {otp}
-
-            Vai tro ky: {signerRole}
-
-            Nếu bạn không thực hiện yêu cầu ký hợp đồng này, vui lòng bỏ qua email.
-
-            Smart Rental Platform
-            """;
-        var htmlBody = BuildOtpHtml(
-            displayName,
-            otp,
-            "Ký hợp đồng",
-            $"Dùng mã OTP bên dưới để xác nhận ký hợp đồng {contractNumber} với vai trò {signerRole}.");
-
-        return SendAsync(email, displayName, subject, textBody, htmlBody, cancellationToken);
-    }
 
     private async Task SendAsync(
         string toEmail,

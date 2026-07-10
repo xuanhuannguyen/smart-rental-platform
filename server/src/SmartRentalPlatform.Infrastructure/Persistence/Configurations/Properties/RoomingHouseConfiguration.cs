@@ -1,4 +1,4 @@
-﻿using Microsoft.EntityFrameworkCore;
+using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Metadata.Builders;
 using SmartRentalPlatform.Domain.Entities.Properties;
 using SmartRentalPlatform.Domain.Enums;
@@ -29,6 +29,8 @@ namespace SmartRentalPlatform.Infrastructure.Persistence.Configurations.Properti
                 .HasConversion<string>().HasMaxLength(30).IsRequired();
             builder.Property(x => x.VisibilityStatus).HasColumnName("visibility_status")
                 .HasConversion<string>().HasMaxLength(30).IsRequired();
+            builder.Property(x => x.AverageRating).HasColumnName("average_rating").HasDefaultValue(0).IsRequired();
+            builder.Property(x => x.TotalReviews).HasColumnName("total_reviews").HasDefaultValue(0).IsRequired();
             builder.Property(x => x.RejectedReason).HasColumnName("rejected_reason").HasColumnType("text");
             builder.Property(x => x.ReviewedByAdminId).HasColumnName("reviewed_by_admin_id");
             builder.Property(x => x.ReviewedAt).HasColumnName("reviewed_at");
