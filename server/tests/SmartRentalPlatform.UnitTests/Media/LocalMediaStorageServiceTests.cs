@@ -53,10 +53,10 @@ public sealed class LocalMediaStorageServiceTests : IDisposable
     }
 
     [Fact]
-    public async Task GetDownloadUrlAsync_ForPublicObject_ShouldReturnUploadsPath()
+    public async Task GetDownloadUrlAsync_ForPublicObject_ShouldReturnPublicMediaApiPath()
     {
         var url = await _service.GetDownloadUrlAsync("public/room-images/2026/07/09/file.jpg", TimeSpan.FromMinutes(5));
-        Assert.Equal("/uploads/public/room-images/2026/07/09/file.jpg", url);
+        Assert.Equal("/api/media/public/public/room-images/2026/07/09/file.jpg", url);
     }
 
     public void Dispose()

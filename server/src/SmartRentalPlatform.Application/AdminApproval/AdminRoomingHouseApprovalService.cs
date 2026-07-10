@@ -1,6 +1,7 @@
 using Microsoft.EntityFrameworkCore;
 using SmartRentalPlatform.Contracts.Admin;
 using SmartRentalPlatform.Application.Common.Interfaces;
+using SmartRentalPlatform.Application.Common.Media;
 using SmartRentalPlatform.Application.Users;
 using SmartRentalPlatform.Contracts.Amenities;
 using SmartRentalPlatform.Contracts.LegalDocuments;
@@ -119,7 +120,7 @@ public class AdminRoomingHouseApprovalService : IAdminRoomingHouseApprovalServic
                 {
                     Id = x.Id,
                     ObjectKey = x.ObjectKey,
-                    ImageUrl = x.ImageUrl,
+                    ImageUrl = PublicMediaPathBuilder.Build(x.ObjectKey),
                     Caption = x.Caption,
                     IsCover = x.IsCover,
                     SortOrder = x.SortOrder,

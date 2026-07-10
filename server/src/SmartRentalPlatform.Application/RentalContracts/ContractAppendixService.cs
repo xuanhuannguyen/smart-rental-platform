@@ -4,11 +4,14 @@ using System.Text.Json;
 using Microsoft.EntityFrameworkCore;
 using SmartRentalPlatform.Application.Common.Exceptions;
 using SmartRentalPlatform.Application.Common.Interfaces;
+using SmartRentalPlatform.Application.Common.Interfaces.Media;
+using SmartRentalPlatform.Application.Common.Models.Media;
 using SmartRentalPlatform.Contracts.Common;
 using SmartRentalPlatform.Contracts.RentalContracts.Requests;
 using SmartRentalPlatform.Contracts.RentalContracts.Responses;
 using SmartRentalPlatform.Domain.Entities.RentalContracts;
 using SmartRentalPlatform.Domain.Enums.Kyc;
+using SmartRentalPlatform.Domain.Enums.Media;
 using SmartRentalPlatform.Domain.Enums.RentalContracts;
 
 namespace SmartRentalPlatform.Application.RentalContracts;
@@ -21,7 +24,9 @@ public class ContractAppendixService : IContractAppendixService
     private readonly IAppDbContext context;
     private readonly IContractSignatureOtpService contractSignatureOtpService;
     private readonly IContractPdfRenderer contractPdfRenderer;
-    private readonly IPrivateStorageService privateStorageService;
+    private readonly IMediaObjectKeyFactory mediaObjectKeyFactory;
+    private readonly IMediaStorageService mediaStorageService;
+    private readonly IMediaAssetService mediaAssetService;
     private readonly IHashService hashService;
     private readonly ISensitiveDataProtector sensitiveDataProtector;
 
@@ -29,14 +34,18 @@ public class ContractAppendixService : IContractAppendixService
         IAppDbContext context,
         IContractSignatureOtpService contractSignatureOtpService,
         IContractPdfRenderer contractPdfRenderer,
-        IPrivateStorageService privateStorageService,
+        IMediaObjectKeyFactory mediaObjectKeyFactory,
+        IMediaStorageService mediaStorageService,
+        IMediaAssetService mediaAssetService,
         IHashService hashService,
         ISensitiveDataProtector sensitiveDataProtector)
     {
         this.context = context;
         this.contractSignatureOtpService = contractSignatureOtpService;
         this.contractPdfRenderer = contractPdfRenderer;
-        this.privateStorageService = privateStorageService;
+        this.mediaObjectKeyFactory = mediaObjectKeyFactory;
+        this.mediaStorageService = mediaStorageService;
+        this.mediaAssetService = mediaAssetService;
         this.hashService = hashService;
         this.sensitiveDataProtector = sensitiveDataProtector;
     }
@@ -520,26 +529,69 @@ public class ContractAppendixService : IContractAppendixService
 
         var renderOptions = await BuildAppendixRenderOptionsAsync(appendix, fileVariant, cancellationToken);
         var pdfBytes = contractPdfRenderer.RenderSignedContractAppendix(appendix, renderOptions);
-        var objectKey = $"contracts/{appendix.RentalContractId:N}/appendices/{appendix.Id:N}/signed-appendix-{fileVariant.ToString().ToLowerInvariant()}-{now:yyyyMMddHHmmss}.pdf";
+        var originalFileName = BuildLegacyFileName(appendix, fileVariant, now);
+        var mediaObjectKey = mediaObjectKeyFactory.Create(MediaScope.ContractAppendixPdf, MediaVisibility.Private, originalFileName);
 
-        await using var stream = new MemoryStream(pdfBytes);
-        var storageObjectKey = await privateStorageService.UploadAsync(
-            stream,
-            PdfContentType,
-            objectKey,
-            cancellationToken);
+        MediaStoredObjectResult? storedObject = null;
 
-        var newFile = new ContractFile
+        try
         {
-            Id = Guid.NewGuid(),
-            RentalContractId = appendix.RentalContractId,
-            RentalContractAppendixId = appendix.Id,
-            StorageObjectKey = storageObjectKey,
-            FileVariant = fileVariant,
-            CreatedAt = now
-        };
-        appendix.Files.Add(newFile);
-        context.ContractFiles.Add(newFile);
+            await using var stream = new MemoryStream(pdfBytes);
+            storedObject = await mediaStorageService.UploadAsync(
+                new MediaUploadRequest
+                {
+                    Content = stream,
+                    OriginalFileName = originalFileName,
+                    ContentType = PdfContentType,
+                    FileSize = pdfBytes.Length,
+                    ObjectKey = mediaObjectKey.ObjectKey,
+                    Visibility = MediaVisibility.Private
+                },
+                cancellationToken);
+
+            var contractFileId = Guid.NewGuid();
+            var newFile = new ContractFile
+            {
+                Id = contractFileId,
+                RentalContractId = appendix.RentalContractId,
+                RentalContractAppendixId = appendix.Id,
+                StorageObjectKey = storedObject.ObjectKey,
+                FileVariant = fileVariant,
+                CreatedAt = now
+            };
+
+            var mediaAsset = await mediaAssetService.CreateAsync(
+                new CreateMediaAssetRequest
+                {
+                    OwnerUserId = appendix.CreatedByUserId,
+                    BucketName = storedObject.BucketName,
+                    ObjectKey = storedObject.ObjectKey,
+                    OriginalFileName = originalFileName,
+                    StoredFileName = storedObject.StoredFileName,
+                    ContentType = PdfContentType,
+                    FileSize = pdfBytes.Length,
+                    FileHash = ComputeSha256Hex(pdfBytes),
+                    Scope = MediaScope.ContractAppendixPdf,
+                    Visibility = MediaVisibility.Private,
+                    Status = MediaStatus.Linked,
+                    LinkedEntityType = nameof(ContractFile),
+                    LinkedEntityId = contractFileId
+                },
+                cancellationToken);
+
+            newFile.MediaAssetId = mediaAsset.Id;
+            appendix.Files.Add(newFile);
+            context.ContractFiles.Add(newFile);
+        }
+        catch
+        {
+            if (storedObject is not null)
+            {
+                await mediaStorageService.DeleteAsync(storedObject.ObjectKey, cancellationToken);
+            }
+
+            throw;
+        }
     }
 
     public async Task<bool> DeleteAsync(
@@ -2277,6 +2329,20 @@ public class ContractAppendixService : IContractAppendixService
         }
 
         return Math.Max(months, 1);
+    }
+
+    private static string BuildLegacyFileName(
+        ContractAppendix appendix,
+        ContractFileVariant fileVariant,
+        DateTimeOffset now)
+    {
+        return $"signed-appendix-{appendix.AppendixNumber}-{fileVariant.ToString().ToLowerInvariant()}-{now:yyyyMMddHHmmss}.pdf";
+    }
+
+    private static string ComputeSha256Hex(byte[] content)
+    {
+        var hash = SHA256.HashData(content);
+        return Convert.ToHexString(hash).ToLowerInvariant();
     }
 
     private static ContractAppendixResponse MapToResponse(ContractAppendix appendix)

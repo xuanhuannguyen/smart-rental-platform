@@ -2,6 +2,7 @@ using SmartRentalPlatform.Contracts.Amenities;
 using SmartRentalPlatform.Contracts.PropertyImages;
 using SmartRentalPlatform.Contracts.RoomPriceTiers;
 using SmartRentalPlatform.Contracts.Rooms;
+using SmartRentalPlatform.Application.Common.Media;
 using SmartRentalPlatform.Domain.Entities.Properties;
 
 namespace SmartRentalPlatform.Application.Rooms;
@@ -39,7 +40,7 @@ internal static class RoomReadModelMapper
                 {
                     Id = x.Id,
                     ObjectKey = x.ObjectKey,
-                    ImageUrl = x.ImageUrl,
+                    ImageUrl = BuildImageUrl(x.ObjectKey),
                     Caption = x.Caption,
                     IsCover = x.IsCover,
                     SortOrder = x.SortOrder,
@@ -60,6 +61,6 @@ internal static class RoomReadModelMapper
 
     public static string BuildImageUrl(string objectKey)
     {
-        return $"/uploads/{objectKey}";
+        return PublicMediaPathBuilder.Build(objectKey);
     }
 }

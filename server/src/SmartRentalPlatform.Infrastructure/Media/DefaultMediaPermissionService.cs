@@ -81,8 +81,7 @@ public class DefaultMediaPermissionService : IMediaPermissionService
                 .ThenInclude(x => x.Appendices)
                     .ThenInclude(x => x.Signatures)
             .FirstOrDefaultAsync(
-                x => x.Id == mediaAsset.LinkedEntityId.Value &&
-                     x.RentalContractAppendixId == null,
+                x => x.Id == mediaAsset.LinkedEntityId.Value,
                 cancellationToken);
 
         if (contractFile?.RentalContract is null)
@@ -112,14 +111,22 @@ public class DefaultMediaPermissionService : IMediaPermissionService
 
     private static bool CanViewContractFile(Guid userId, RentalContract contract, ContractFile file)
     {
-        if (file.RentalContractAppendixId is not null)
+        if (file.RentalContractAppendixId is null)
+        {
+            return file.FileVariant == ContractFileVariant.Raw
+                ? CanViewRawContractFile(userId, contract)
+                : CanViewMaskedContractFile(userId, contract);
+        }
+
+        var appendix = contract.Appendices.FirstOrDefault(x => x.Id == file.RentalContractAppendixId);
+        if (appendix is null)
         {
             return false;
         }
 
         return file.FileVariant == ContractFileVariant.Raw
-            ? CanViewRawContractFile(userId, contract)
-            : CanViewMaskedContractFile(userId, contract);
+            ? CanViewRawAppendixFile(userId, contract, appendix)
+            : CanViewMaskedAppendixFile(userId, contract, appendix);
     }
 
     private static bool CanViewRawContractFile(Guid userId, RentalContract contract)
@@ -132,6 +139,107 @@ public class DefaultMediaPermissionService : IMediaPermissionService
     {
         return !CanViewRawContractFile(userId, contract) &&
                contract.Occupants.Any(x => x.UserId == userId);
+    }
+
+    private static bool CanViewRawAppendixFile(Guid userId, RentalContract contract, ContractAppendix appendix)
+    {
+        if (contract.Room.RoomingHouse.LandlordUserId == userId)
+        {
+            return true;
+        }
+
+        if (GetCurrentMainTenantUserId(contract) == userId)
+        {
+            return true;
+        }
+
+        if (GetMainTenantUserIdBeforeAppendix(contract, appendix) == userId)
+        {
+            return true;
+        }
+
+        return IsMainTenantChangedToUser(appendix, userId);
+    }
+
+    private static bool CanViewMaskedAppendixFile(Guid userId, RentalContract contract, ContractAppendix appendix)
+    {
+        if (CanViewRawAppendixFile(userId, contract, appendix))
+        {
+            return false;
+        }
+
+        return contract.Occupants.Any(occupant =>
+            occupant.UserId == userId &&
+            (occupant.MoveOutDate is null || appendix.EffectiveDate <= occupant.MoveOutDate.Value));
+    }
+
+    private static Guid GetMainTenantUserIdBeforeAppendix(
+        RentalContract contract,
+        ContractAppendix targetAppendix)
+    {
+        var targetMainTenantChange = targetAppendix.Changes
+            .OrderBy(x => x.SortOrder)
+            .FirstOrDefault(IsMainTenantUserIdChange);
+        var oldMainTenantUserId = ExtractUserId(targetMainTenantChange?.OldValue);
+        if (oldMainTenantUserId.HasValue)
+        {
+            return oldMainTenantUserId.Value;
+        }
+
+        var tenantSignerUserId = targetAppendix.Signatures
+            .Where(x => x.SignerRole == ContractSignerRole.Tenant)
+            .OrderBy(x => x.SignedAt)
+            .Select(x => (Guid?)x.SignerUserId)
+            .FirstOrDefault();
+        if (tenantSignerUserId.HasValue)
+        {
+            return tenantSignerUserId.Value;
+        }
+
+        var currentMainTenantUserId = contract.MainTenantUserId;
+
+        foreach (var appendix in GetAppliedAppendicesBefore(contract, targetAppendix))
+        {
+            foreach (var change in appendix.Changes.OrderBy(x => x.SortOrder))
+            {
+                if (!IsMainTenantUserIdChange(change))
+                {
+                    continue;
+                }
+
+                var newMainTenantUserId = ExtractUserId(change.NewValue);
+                if (newMainTenantUserId.HasValue)
+                {
+                    currentMainTenantUserId = newMainTenantUserId.Value;
+                }
+            }
+        }
+
+        return currentMainTenantUserId;
+    }
+
+    private static Guid GetCurrentMainTenantUserId(RentalContract contract)
+    {
+        var currentMainTenantUserId = contract.MainTenantUserId;
+
+        foreach (var appendix in GetAppliedAppendicesInOrder(contract))
+        {
+            foreach (var change in appendix.Changes.OrderBy(x => x.SortOrder))
+            {
+                if (!IsMainTenantUserIdChange(change))
+                {
+                    continue;
+                }
+
+                var newMainTenantUserId = ExtractUserId(change.NewValue);
+                if (newMainTenantUserId.HasValue)
+                {
+                    currentMainTenantUserId = newMainTenantUserId.Value;
+                }
+            }
+        }
+
+        return currentMainTenantUserId;
     }
 
     private static IReadOnlyCollection<Guid> GetMainTenantUserIds(RentalContract contract)
@@ -170,6 +278,13 @@ public class DefaultMediaPermissionService : IMediaPermissionService
         return userIds;
     }
 
+    private static bool IsMainTenantChangedToUser(ContractAppendix appendix, Guid userId)
+    {
+        return appendix.Changes.Any(change =>
+            IsMainTenantUserIdChange(change) &&
+            ExtractUserId(change.NewValue) == userId);
+    }
+
     private static bool IsMainTenantUserIdChange(ContractAppendixChange change)
     {
         return change.TargetType == ContractAppendixTargetType.Contract &&
@@ -185,6 +300,14 @@ public class DefaultMediaPermissionService : IMediaPermissionService
                 x.Status is ContractAppendixStatus.Active or ContractAppendixStatus.Cancelled)
             .OrderBy(x => x.AppliedAt ?? x.ActivatedAt ?? x.UpdatedAt)
             .ThenBy(x => x.CreatedAt);
+    }
+
+    private static IEnumerable<ContractAppendix> GetAppliedAppendicesBefore(
+        RentalContract contract,
+        ContractAppendix targetAppendix)
+    {
+        return GetAppliedAppendicesInOrder(contract)
+            .Where(x => x.Id != targetAppendix.Id && x.CreatedAt <= targetAppendix.CreatedAt);
     }
 
     private static Guid? ExtractUserId(string? value)

@@ -1,5 +1,6 @@
 using Microsoft.AspNetCore.Hosting;
 using SmartRentalPlatform.Application.Common.Interfaces.Media;
+using SmartRentalPlatform.Application.Common.Media;
 using SmartRentalPlatform.Application.Common.Models.Media;
 
 namespace SmartRentalPlatform.Infrastructure.Storage;
@@ -43,7 +44,7 @@ public class LocalMediaStorageService : IMediaStorageService
             BucketName = LocalBucketName,
             ObjectKey = normalizedObjectKey,
             PublicUrl = normalizedObjectKey.StartsWith("public/", StringComparison.OrdinalIgnoreCase)
-                ? $"/uploads/{normalizedObjectKey}"
+                ? PublicMediaPathBuilder.Build(normalizedObjectKey)
                 : null,
             StoredFileName = Path.GetFileName(normalizedObjectKey)
         };
@@ -98,7 +99,7 @@ public class LocalMediaStorageService : IMediaStorageService
             throw new NotSupportedException("Private media download URLs are not supported by local media storage.");
         }
 
-        return Task.FromResult($"/uploads/{normalizedObjectKey}");
+        return Task.FromResult(PublicMediaPathBuilder.Build(normalizedObjectKey));
     }
 
     private string GetFullPath(string normalizedObjectKey)

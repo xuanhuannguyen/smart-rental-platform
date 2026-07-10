@@ -1,5 +1,6 @@
 using SmartRentalPlatform.Application.Common.Interfaces;
 using SmartRentalPlatform.Application.Common.Interfaces.Media;
+using SmartRentalPlatform.Application.Common.Media;
 using SmartRentalPlatform.Application.Common.Models;
 using SmartRentalPlatform.Application.Common.Models.Media;
 using SmartRentalPlatform.Contracts.Files;
@@ -127,7 +128,7 @@ public sealed class MediaBackedFileStorageService : IFileStorageService
         return new FileUploadResponse
         {
             ObjectKey = storedObject.ObjectKey,
-            Url = storedObject.PublicUrl ?? $"/uploads/{storedObject.ObjectKey}"
+            Url = storedObject.PublicUrl ?? PublicMediaPathBuilder.Build(storedObject.ObjectKey)
         };
     }
 

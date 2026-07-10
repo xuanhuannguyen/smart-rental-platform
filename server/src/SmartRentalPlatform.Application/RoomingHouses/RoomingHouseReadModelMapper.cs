@@ -3,6 +3,7 @@ using SmartRentalPlatform.Contracts.LegalDocuments;
 using SmartRentalPlatform.Contracts.PropertyImages;
 using SmartRentalPlatform.Contracts.RentalPolicies.Responses;
 using SmartRentalPlatform.Contracts.RoomingHouses;
+using SmartRentalPlatform.Application.Common.Media;
 using SmartRentalPlatform.Application.Rooms;
 using SmartRentalPlatform.Domain.Entities.Properties;
 
@@ -23,8 +24,7 @@ internal static class RoomingHouseReadModelMapper
             RejectedReason = house.RejectedReason,
             CreatedAt = house.CreatedAt,
             UpdatedAt = house.UpdatedAt,
-            CoverImageUrl = house.Images.OrderBy(x => x.SortOrder).FirstOrDefault(x => x.IsCover)?.ImageUrl 
-                ?? house.Images.OrderBy(x => x.SortOrder).FirstOrDefault()?.ImageUrl,
+            CoverImageUrl = BuildCoverImageUrl(house),
             TotalRooms = house.Rooms?.Count(x => x.DeletedAt == null) ?? 0,
             AvailableRooms = house.Rooms?.Count(x => x.Status == RoomStatus.Available && x.DeletedAt == null) ?? 0
         };
@@ -85,7 +85,7 @@ internal static class RoomingHouseReadModelMapper
                 {
                     Id = x.Id,
                     ObjectKey = x.ObjectKey,
-                    ImageUrl = x.ImageUrl,
+                    ImageUrl = PublicMediaPathBuilder.Build(x.ObjectKey),
                     Caption = x.Caption,
                     IsCover = x.IsCover,
                     SortOrder = x.SortOrder,
@@ -121,5 +121,17 @@ internal static class RoomingHouseReadModelMapper
         }
 
         return house.AddressDisplay;
+    }
+
+    private static string? BuildCoverImageUrl(RoomingHouse house)
+    {
+        var coverObjectKey = house.Images
+            .OrderBy(x => x.SortOrder)
+            .FirstOrDefault(x => x.IsCover)?.ObjectKey
+            ?? house.Images.OrderBy(x => x.SortOrder).FirstOrDefault()?.ObjectKey;
+
+        return string.IsNullOrWhiteSpace(coverObjectKey)
+            ? null
+            : PublicMediaPathBuilder.Build(coverObjectKey);
     }
 }

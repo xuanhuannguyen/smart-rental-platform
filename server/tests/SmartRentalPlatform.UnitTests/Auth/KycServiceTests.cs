@@ -6,10 +6,16 @@ using Microsoft.AspNetCore.Http;
 using Microsoft.EntityFrameworkCore;
 using SmartRentalPlatform.Application.Common.Exceptions;
 using SmartRentalPlatform.Application.Common.Interfaces;
+using SmartRentalPlatform.Application.Common.Interfaces.Media;
+using SmartRentalPlatform.Application.Common.Models.Media;
 using SmartRentalPlatform.Application.Kyc;
+using SmartRentalPlatform.Infrastructure.Media;
+using SmartRentalPlatform.Infrastructure.Persistence;
 using SmartRentalPlatform.Contracts.Kyc;
+using SmartRentalPlatform.Domain.Entities.Media;
 using SmartRentalPlatform.Domain.Entities.Users;
 using SmartRentalPlatform.Domain.Enums;
+using SmartRentalPlatform.Domain.Enums.Media;
 using SmartRentalPlatform.UnitTests.Common;
 using Xunit;
 
@@ -18,7 +24,9 @@ namespace SmartRentalPlatform.UnitTests.Auth;
 public class KycServiceTests : IClassFixture<TestDatabaseFixture>
 {
     private readonly TestDatabaseFixture _fixture;
-    private readonly FakePrivateStorageService _storage;
+    private readonly QueueMediaObjectKeyFactory _mediaObjectKeyFactory;
+    private readonly RecordingMediaStorageService _mediaStorageService;
+    private readonly MediaAssetService _mediaAssetService;
     private readonly FakeVnptEkycClient _vnptEkycClient;
     private readonly FakeHashService _hashService;
     private readonly FakeSensitiveDataProtector _sensitiveDataProtector;
@@ -27,7 +35,9 @@ public class KycServiceTests : IClassFixture<TestDatabaseFixture>
     {
         _fixture = fixture;
         _fixture.Reset();
-        _storage = new FakePrivateStorageService();
+        _mediaObjectKeyFactory = new QueueMediaObjectKeyFactory();
+        _mediaStorageService = new RecordingMediaStorageService();
+        _mediaAssetService = new MediaAssetService(_fixture.Context);
         _vnptEkycClient = new FakeVnptEkycClient();
         _hashService = new FakeHashService();
         _sensitiveDataProtector = new FakeSensitiveDataProtector();
@@ -43,7 +53,7 @@ public class KycServiceTests : IClassFixture<TestDatabaseFixture>
     {
         // Arrange
         var context = _fixture.Context;
-        var kycService = new KycService(context, _storage, _vnptEkycClient, _hashService, _sensitiveDataProtector);
+        var kycService = CreateService(context);
         var userId = Guid.NewGuid();
         var request = new SubmitKycRequest
         {
@@ -67,7 +77,7 @@ public class KycServiceTests : IClassFixture<TestDatabaseFixture>
         context.Users.Add(user);
         await context.SaveChangesAsync();
 
-        var kycService = new KycService(context, _storage, _vnptEkycClient, _hashService, _sensitiveDataProtector);
+        var kycService = CreateService(context);
         var request = new SubmitKycRequest
         {
             DocumentType = "CCCD",
@@ -77,7 +87,10 @@ public class KycServiceTests : IClassFixture<TestDatabaseFixture>
             SelfieImage = CreateMockFile()
         };
 
-        _storage.UploadAsyncFunc = (s, ct, ok) => Task.FromResult("storage_key_123");
+        _mediaObjectKeyFactory.Enqueue(
+            "private/kyc-documents/2026/07/10/front-file.jpg",
+            "private/kyc-documents/2026/07/10/back-file.jpg",
+            "private/kyc-documents/2026/07/10/selfie-file.jpg");
 
         var ekycResult = new VnptEkycClientResult
         {
@@ -111,6 +124,22 @@ public class KycServiceTests : IClassFixture<TestDatabaseFixture>
         var kycInDb = await context.KycVerifications.FirstOrDefaultAsync(k => k.UserId == user.Id);
         Assert.NotNull(kycInDb);
         Assert.Equal("sha256_hash_123", kycInDb!.CitizenIdHash);
+        Assert.NotNull(kycInDb.FrontMediaAssetId);
+        Assert.NotNull(kycInDb.BackMediaAssetId);
+        Assert.NotNull(kycInDb.SelfieMediaAssetId);
+
+        var mediaAssets = await context.MediaAssets
+            .Where(x => x.LinkedEntityType == nameof(KycVerification) && x.LinkedEntityId == kycInDb.Id)
+            .ToListAsync();
+        Assert.Equal(3, mediaAssets.Count);
+        Assert.Equal(3, _mediaStorageService.UploadRequests.Count);
+        Assert.All(mediaAssets, x =>
+        {
+            Assert.Equal(MediaScope.KycDocument, x.Scope);
+            Assert.Equal(MediaVisibility.Private, x.Visibility);
+            Assert.Equal(MediaStatus.Linked, x.Status);
+            Assert.Equal(user.Id, x.OwnerUserId);
+        });
 
         context.ChangeTracker.Clear();
     }
@@ -119,7 +148,7 @@ public class KycServiceTests : IClassFixture<TestDatabaseFixture>
     public async Task GetMyStatusAsync_ShouldReturnHasNoSubmission_WhenNoKycExists()
     {
         var context = _fixture.Context;
-        var kycService = new KycService(context, _storage, _vnptEkycClient, _hashService, _sensitiveDataProtector);
+        var kycService = CreateService(context);
 
         var result = await kycService.GetMyStatusAsync(Guid.NewGuid(), CancellationToken.None);
 
@@ -135,7 +164,7 @@ public class KycServiceTests : IClassFixture<TestDatabaseFixture>
         context.Users.Add(user);
         await context.SaveChangesAsync();
 
-        var kycService = new KycService(context, _storage, _vnptEkycClient, _hashService, _sensitiveDataProtector);
+        var kycService = CreateService(context);
         var request = new SubmitKycRequest
         {
             DocumentType = "NationalId",
@@ -177,7 +206,7 @@ public class KycServiceTests : IClassFixture<TestDatabaseFixture>
         context.KycVerifications.Add(approved);
         await context.SaveChangesAsync();
 
-        var kycService = new KycService(context, _storage, _vnptEkycClient, _hashService, _sensitiveDataProtector);
+        var kycService = CreateService(context);
         var request = new SubmitKycRequest
         {
             DocumentType = KycDocumentType.CCCD.ToString(),
@@ -187,6 +216,10 @@ public class KycServiceTests : IClassFixture<TestDatabaseFixture>
             SelfieImage = CreateMockFile()
         };
 
+        _mediaObjectKeyFactory.Enqueue(
+            "private/kyc-documents/2026/07/10/front-dup.jpg",
+            "private/kyc-documents/2026/07/10/back-dup.jpg",
+            "private/kyc-documents/2026/07/10/selfie-dup.jpg");
         _hashService.HashSha256HexFunc = _ => "duplicate_hash";
         _sensitiveDataProtector.EncryptFunc = _ => "encrypted";
         _vnptEkycClient.VerifyAsyncFunc = _ => Task.FromResult(new VnptEkycClientResult
@@ -200,6 +233,7 @@ public class KycServiceTests : IClassFixture<TestDatabaseFixture>
         });
 
         await Assert.ThrowsAsync<KycBusinessException>(() => kycService.SubmitAsync(user.Id, request, CancellationToken.None));
+        Assert.Equal(3, _mediaStorageService.DeletedObjectKeys.Count);
     }
 
     [Fact]
@@ -231,7 +265,7 @@ public class KycServiceTests : IClassFixture<TestDatabaseFixture>
         context.KycVerifications.Add(kyc);
         await context.SaveChangesAsync();
 
-        var kycService = new KycService(context, _storage, _vnptEkycClient, _hashService, _sensitiveDataProtector);
+        var kycService = CreateService(context);
 
         var result = await kycService.GetMyStatusAsync(user.Id, CancellationToken.None);
 
@@ -286,13 +320,25 @@ public class KycServiceTests : IClassFixture<TestDatabaseFixture>
         context.KycVerifications.AddRange(older, newer);
         await context.SaveChangesAsync();
 
-        var kycService = new KycService(context, _storage, _vnptEkycClient, _hashService, _sensitiveDataProtector);
+        var kycService = CreateService(context);
 
         var result = await kycService.GetMyHistoryAsync(user.Id, CancellationToken.None);
 
         Assert.Equal(2, result.TotalItems);
         Assert.Equal(newer.Id, result.Items[0].KycId);
         Assert.Equal(older.Id, result.Items[1].KycId);
+    }
+
+    private KycService CreateService(AppDbContext context)
+    {
+        return new KycService(
+            context,
+            _mediaObjectKeyFactory,
+            _mediaStorageService,
+            _mediaAssetService,
+            _vnptEkycClient,
+            _hashService,
+            _sensitiveDataProtector);
     }
 }
 
@@ -335,16 +381,65 @@ public class FakeFormFile : IFormFile
     }
 }
 
-public class FakePrivateStorageService : IPrivateStorageService
+public class QueueMediaObjectKeyFactory : IMediaObjectKeyFactory
 {
-    public Func<Stream, string, string, Task<string>> UploadAsyncFunc { get; set; } = (_, _, _) => Task.FromResult("key");
-    public Func<string, Task<Stream>> OpenReadAsyncFunc { get; set; } = _ => Task.FromResult<Stream>(new MemoryStream());
+    private readonly Queue<string> _objectKeys = new();
 
-    public Task<string> UploadAsync(Stream content, string contentType, string objectKey, CancellationToken cancellationToken = default)
-        => UploadAsyncFunc(content, contentType, objectKey);
+    public void Enqueue(params string[] objectKeys)
+    {
+        foreach (var objectKey in objectKeys)
+        {
+            _objectKeys.Enqueue(objectKey);
+        }
+    }
+
+    public MediaObjectKeyResult Create(MediaScope scope, MediaVisibility visibility, string originalFileName)
+    {
+        return new MediaObjectKeyResult
+        {
+            ObjectKey = _objectKeys.Count > 0
+                ? _objectKeys.Dequeue()
+                : $"private/kyc-documents/{Guid.NewGuid():N}{Path.GetExtension(originalFileName)}",
+            StoredFileName = originalFileName
+        };
+    }
+}
+
+public class RecordingMediaStorageService : IMediaStorageService
+{
+    public List<MediaUploadRequest> UploadRequests { get; } = new();
+    public List<string> DeletedObjectKeys { get; } = new();
+
+    public async Task<MediaStoredObjectResult> UploadAsync(MediaUploadRequest request, CancellationToken cancellationToken = default)
+    {
+        UploadRequests.Add(request);
+
+        await using var buffer = new MemoryStream();
+        await request.Content.CopyToAsync(buffer, cancellationToken);
+
+        return new MediaStoredObjectResult
+        {
+            BucketName = "test-media-bucket",
+            ObjectKey = request.ObjectKey,
+            PublicUrl = null,
+            StoredFileName = Path.GetFileName(request.ObjectKey)
+        };
+    }
 
     public Task<Stream> OpenReadAsync(string objectKey, CancellationToken cancellationToken = default)
-        => OpenReadAsyncFunc(objectKey);
+        => Task.FromResult<Stream>(new MemoryStream());
+
+    public Task<bool> ExistsAsync(string objectKey, CancellationToken cancellationToken = default)
+        => Task.FromResult(true);
+
+    public Task DeleteAsync(string objectKey, CancellationToken cancellationToken = default)
+    {
+        DeletedObjectKeys.Add(objectKey);
+        return Task.CompletedTask;
+    }
+
+    public Task<string> GetDownloadUrlAsync(string objectKey, TimeSpan ttl, CancellationToken cancellationToken = default)
+        => Task.FromResult($"/media/{objectKey}");
 }
 
 public class FakeVnptEkycClient : IVnptEkycClient

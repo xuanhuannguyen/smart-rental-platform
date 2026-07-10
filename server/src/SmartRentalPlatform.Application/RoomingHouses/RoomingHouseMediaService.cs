@@ -1,6 +1,7 @@
 using Microsoft.EntityFrameworkCore;
 using SmartRentalPlatform.Application.Common.Exceptions;
 using SmartRentalPlatform.Application.Common.Interfaces;
+using SmartRentalPlatform.Application.Common.Media;
 using SmartRentalPlatform.Contracts.Amenities;
 using SmartRentalPlatform.Contracts.Common;
 using SmartRentalPlatform.Contracts.LegalDocuments;
@@ -387,7 +388,7 @@ public class RoomingHouseMediaService : IRoomingHouseMediaService
 
     private static string BuildImageUrl(string objectKey)
     {
-        return $"/uploads/{objectKey}";
+        return PublicMediaPathBuilder.Build(objectKey);
     }
 
     private static string? NormalizeOptionalObjectKey(string? objectKey)

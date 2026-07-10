@@ -110,6 +110,9 @@ public class AdminUserService : IAdminUserService
                 response.KycInfo = new AdminKycInfo
                 {
                     KycId = approvedKyc.Id,
+                    FrontMediaAssetId = approvedKyc.FrontMediaAssetId,
+                    BackMediaAssetId = approvedKyc.BackMediaAssetId,
+                    SelfieMediaAssetId = approvedKyc.SelfieMediaAssetId,
                     FrontImageUrl = BuildPrivateMediaUrl(approvedKyc.FrontImageObjectKey),
                     BackImageUrl = BuildPrivateMediaUrl(approvedKyc.BackImageObjectKey),
                     SelfieImageUrl = BuildPrivateMediaUrl(approvedKyc.SelfieImageObjectKey),

@@ -1,4 +1,5 @@
 using SmartRentalPlatform.Domain.Enums;
+using SmartRentalPlatform.Domain.Entities.Media;
 
 namespace SmartRentalPlatform.Domain.Entities.Users;
 
@@ -9,6 +10,9 @@ public class KycVerification
     public KycDocumentType DocumentType { get; set; }
     public EkycProvider EkycProvider { get; set; } = EkycProvider.VNPT;
     public string? EkycSessionId { get; set; }
+    public Guid? FrontMediaAssetId { get; set; }
+    public Guid? BackMediaAssetId { get; set; }
+    public Guid? SelfieMediaAssetId { get; set; }
     public string FrontImageObjectKey { get; set; } = string.Empty;
     public string BackImageObjectKey { get; set; } = string.Empty;
     public string SelfieImageObjectKey { get; set; } = string.Empty;
@@ -39,4 +43,7 @@ public class KycVerification
 
     public User User { get; set; } = null!;
     public User? ReviewedByAdmin { get; set; }
+    public MediaAsset? FrontMediaAsset { get; set; }
+    public MediaAsset? BackMediaAsset { get; set; }
+    public MediaAsset? SelfieMediaAsset { get; set; }
 }

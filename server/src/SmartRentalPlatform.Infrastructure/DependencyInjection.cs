@@ -1,3 +1,4 @@
+using Amazon.S3;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.AspNetCore.DataProtection;
 using Microsoft.Extensions.Configuration;
@@ -46,7 +47,14 @@ public static class DependencyInjection
         services.AddScoped<ICurrentUserService, CurrentUserService>();
         services.AddScoped<IFileStorageService, MediaBackedFileStorageService>();
         services.AddSingleton<IMediaObjectKeyFactory, MediaObjectKeyFactory>();
-        services.AddScoped<IMediaStorageService, LocalMediaStorageService>();
+        services.Configure<S3StorageOptions>(configuration.GetSection(S3StorageOptions.SectionPath));
+        services.AddSingleton<IAmazonS3>(provider =>
+        {
+            var options = provider.GetRequiredService<IOptions<S3StorageOptions>>().Value;
+            return S3StorageService.CreateClient(options);
+        });
+        services.AddScoped<S3StorageService>();
+        services.AddScoped<IMediaStorageService>(provider => provider.GetRequiredService<S3StorageService>());
         services.AddScoped<IMediaAssetService, MediaAssetService>();
         services.AddScoped<IMediaAccessService, MediaAccessService>();
         services.AddScoped<IMediaPermissionService, DefaultMediaPermissionService>();
@@ -68,7 +76,7 @@ public static class DependencyInjection
         services.AddDataProtection();
         services.AddMemoryCache();
         services.AddScoped<IConversationCacheService, ConversationCacheService>();
-        services.AddScoped<IPrivateStorageService, LocalPrivateStorageService>();
+        services.AddScoped<IPrivateStorageService>(provider => provider.GetRequiredService<S3StorageService>());
         services.AddScoped<IHashService, Sha256HashService>();
         services.AddScoped<ISensitiveDataProtector, DataProtectionSensitiveDataProtector>();
         services.AddHostedService<RoomDepositExpirationWorker>();

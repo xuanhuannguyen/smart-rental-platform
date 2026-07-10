@@ -18,6 +18,9 @@ public class AdminKycDetailResponse : AdminKycListItemResponse
     public string EkycResult { get; set; } = string.Empty;
     public string? EkycErrorCode { get; set; }
     public string? EkycErrorMessage { get; set; }
+    public Guid? FrontMediaAssetId { get; set; }
+    public Guid? BackMediaAssetId { get; set; }
+    public Guid? SelfieMediaAssetId { get; set; }
     public string FrontImageUrl { get; set; } = string.Empty;
     public string BackImageUrl { get; set; } = string.Empty;
     public string SelfieImageUrl { get; set; } = string.Empty;

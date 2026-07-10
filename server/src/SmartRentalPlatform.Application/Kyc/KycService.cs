@@ -2,30 +2,40 @@ using Microsoft.AspNetCore.Http;
 using Microsoft.EntityFrameworkCore;
 using SmartRentalPlatform.Application.Common.Exceptions;
 using SmartRentalPlatform.Application.Common.Interfaces;
+using SmartRentalPlatform.Application.Common.Interfaces.Media;
+using SmartRentalPlatform.Application.Common.Models.Media;
 using SmartRentalPlatform.Contracts.Kyc;
 using SmartRentalPlatform.Contracts.Common;
+using SmartRentalPlatform.Domain.Entities.Media;
 using SmartRentalPlatform.Domain.Entities.Users;
 using SmartRentalPlatform.Domain.Enums;
+using SmartRentalPlatform.Domain.Enums.Media;
 
 namespace SmartRentalPlatform.Application.Kyc;
 
 public class KycService : IKycService
 {
     private readonly IAppDbContext _context;
-    private readonly IPrivateStorageService _storage;
+    private readonly IMediaObjectKeyFactory _mediaObjectKeyFactory;
+    private readonly IMediaStorageService _mediaStorageService;
+    private readonly IMediaAssetService _mediaAssetService;
     private readonly IVnptEkycClient _vnptEkycClient;
     private readonly IHashService _hashService;
     private readonly ISensitiveDataProtector _sensitiveDataProtector;
 
     public KycService(
         IAppDbContext context,
-        IPrivateStorageService storage,
+        IMediaObjectKeyFactory mediaObjectKeyFactory,
+        IMediaStorageService mediaStorageService,
+        IMediaAssetService mediaAssetService,
         IVnptEkycClient vnptEkycClient,
         IHashService hashService,
         ISensitiveDataProtector sensitiveDataProtector)
     {
         _context = context;
-        _storage = storage;
+        _mediaObjectKeyFactory = mediaObjectKeyFactory;
+        _mediaStorageService = mediaStorageService;
+        _mediaAssetService = mediaAssetService;
         _vnptEkycClient = vnptEkycClient;
         _hashService = hashService;
         _sensitiveDataProtector = sensitiveDataProtector;
@@ -74,122 +84,155 @@ public class KycService : IKycService
         if (!Enum.TryParse<SelfieCaptureMethod>(request.SelfieCaptureMethod, ignoreCase: false, out var selfieMethod))
             throw new KycBusinessException(ErrorCodes.SelfieRequired, "Invalid selfie capture method.", 400);
 
-        var frontKey = await UploadImageAsync(userId, "front", request.FrontImage, cancellationToken);
-        var backKey = await UploadImageAsync(userId, "back", request.BackImage, cancellationToken);
-        var selfieKey = await UploadImageAsync(userId, "selfie", request.SelfieImage, cancellationToken);
+        KycStoredUpload? frontUpload = null;
+        KycStoredUpload? backUpload = null;
+        KycStoredUpload? selfieUpload = null;
+        await using var transaction = await _context.BeginTransactionAsync(cancellationToken);
 
-        var ekyc = await _vnptEkycClient.VerifyAsync(new VnptEkycVerifyInput
+        try
         {
-            UserId = userId,
-            DocumentType = request.DocumentType,
-            FrontImageObjectKey = frontKey,
-            BackImageObjectKey = backKey,
-            SelfieImageObjectKey = selfieKey,
-            SelfieCaptureMethod = request.SelfieCaptureMethod
-        }, cancellationToken);
+            frontUpload = await UploadImageAsync(userId, request.FrontImage, cancellationToken);
+            backUpload = await UploadImageAsync(userId, request.BackImage, cancellationToken);
+            selfieUpload = await UploadImageAsync(userId, request.SelfieImage, cancellationToken);
 
-        var ekycResult = ParseEnum<EkycResult>(ekyc.EkycResult, EkycResult.ProviderError);
-        var documentCheck = ParseNullableEnum<DocumentCheckResult>(ekyc.DocumentCheckResult);
-        var faceMatch = ParseNullableEnum<FaceMatchResult>(ekyc.FaceMatchResult);
-        var liveness = ParseNullableEnum<LivenessResult>(ekyc.LivenessResult);
-        var riskLevel = CalculateRiskLevel(ekycResult, documentCheck, faceMatch, liveness, ekyc);
+            var ekyc = await _vnptEkycClient.VerifyAsync(new VnptEkycVerifyInput
+            {
+                UserId = userId,
+                DocumentType = request.DocumentType,
+                FrontImageObjectKey = frontUpload.StoredObject.ObjectKey,
+                BackImageObjectKey = backUpload.StoredObject.ObjectKey,
+                SelfieImageObjectKey = selfieUpload.StoredObject.ObjectKey,
+                SelfieCaptureMethod = request.SelfieCaptureMethod
+            }, cancellationToken);
 
-        string? ocrCitizenIdMasked = null;
-        string? citizenIdHash = null;
-        string? documentNumberEncrypted = null;
-        if (!string.IsNullOrWhiteSpace(ekyc.OcrCitizenId))
-        {
-            ocrCitizenIdMasked = MaskCitizenId(ekyc.OcrCitizenId);
-            citizenIdHash = _hashService.HashSha256Hex(ekyc.OcrCitizenId);
-            documentNumberEncrypted = _sensitiveDataProtector.Encrypt(ekyc.OcrCitizenId);
+            var ekycResult = ParseEnum<EkycResult>(ekyc.EkycResult, EkycResult.ProviderError);
+            var documentCheck = ParseNullableEnum<DocumentCheckResult>(ekyc.DocumentCheckResult);
+            var faceMatch = ParseNullableEnum<FaceMatchResult>(ekyc.FaceMatchResult);
+            var liveness = ParseNullableEnum<LivenessResult>(ekyc.LivenessResult);
+            var riskLevel = CalculateRiskLevel(ekycResult, documentCheck, faceMatch, liveness, ekyc);
 
-            var duplicate = await _context.KycVerifications
-                .AsNoTracking()
-                .AnyAsync(k =>
-                    k.CitizenIdHash == citizenIdHash &&
-                    k.UserId != userId &&
-                    k.Status == KycVerificationStatus.Approved,
-                    cancellationToken);
+            string? ocrCitizenIdMasked = null;
+            string? citizenIdHash = null;
+            string? documentNumberEncrypted = null;
+            if (!string.IsNullOrWhiteSpace(ekyc.OcrCitizenId))
+            {
+                ocrCitizenIdMasked = MaskCitizenId(ekyc.OcrCitizenId);
+                citizenIdHash = _hashService.HashSha256Hex(ekyc.OcrCitizenId);
+                documentNumberEncrypted = _sensitiveDataProtector.Encrypt(ekyc.OcrCitizenId);
 
-            if (duplicate)
-                throw new KycBusinessException(
-                    ErrorCodes.EkycDocumentFailed,
-                    "Citizen ID is already associated with another approved account.",
-                    400);
+                var duplicate = await _context.KycVerifications
+                    .AsNoTracking()
+                    .AnyAsync(k =>
+                        k.CitizenIdHash == citizenIdHash &&
+                        k.UserId != userId &&
+                        k.Status == KycVerificationStatus.Approved,
+                        cancellationToken);
+
+                if (duplicate)
+                    throw new KycBusinessException(
+                        ErrorCodes.EkycDocumentFailed,
+                        "Citizen ID is already associated with another approved account.",
+                        400);
+            }
+
+            var finalStatus = ekyc.IsProviderFailure || ekycResult == EkycResult.ProviderError || ekycResult == EkycResult.Failed
+                ? KycVerificationStatus.EkycFailed
+                : KycVerificationStatus.PendingAdminReview;
+
+            var now = DateTimeOffset.UtcNow;
+            var kyc = new KycVerification
+            {
+                Id = Guid.NewGuid(),
+                UserId = userId,
+                DocumentType = documentType,
+                EkycProvider = EkycProvider.VNPT,
+                EkycSessionId = ekyc.SessionId,
+                FrontImageObjectKey = frontUpload.StoredObject.ObjectKey,
+                BackImageObjectKey = backUpload.StoredObject.ObjectKey,
+                SelfieImageObjectKey = selfieUpload.StoredObject.ObjectKey,
+                SelfieCaptureMethod = selfieMethod,
+                OcrFullName = ekyc.OcrFullName,
+                OcrCitizenIdMasked = ocrCitizenIdMasked,
+                CitizenIdHash = citizenIdHash ?? string.Empty,
+                DocumentNumberEncrypted = documentNumberEncrypted,
+                OcrDateOfBirth = ekyc.OcrDateOfBirth.HasValue
+                    ? DateOnly.FromDateTime(ekyc.OcrDateOfBirth.Value)
+                    : null,
+                OcrGender = ekyc.OcrGender,
+                OcrAddress = ekyc.OcrAddress,
+                OcrConfidence = ekyc.OcrConfidence,
+                DocumentCheckResult = documentCheck,
+                FaceMatchScore = ekyc.FaceMatchScore,
+                FaceMatchResult = faceMatch,
+                LivenessResult = liveness,
+                EkycResult = ekycResult,
+                EkycErrorCode = ekyc.ErrorCode,
+                EkycErrorMessage = ekyc.ErrorMessage,
+                RiskLevel = riskLevel,
+                Status = finalStatus,
+                SubmittedAt = now,
+                CreatedAt = now,
+                UpdatedAt = now
+            };
+
+            _context.KycVerifications.Add(kyc);
+
+            kyc.FrontMediaAssetId = (await CreateMediaAssetAsync(
+                userId,
+                kyc.Id,
+                frontUpload,
+                cancellationToken)).Id;
+            kyc.BackMediaAssetId = (await CreateMediaAssetAsync(
+                userId,
+                kyc.Id,
+                backUpload,
+                cancellationToken)).Id;
+            kyc.SelfieMediaAssetId = (await CreateMediaAssetAsync(
+                userId,
+                kyc.Id,
+                selfieUpload,
+                cancellationToken)).Id;
+
+            if (finalStatus == KycVerificationStatus.PendingAdminReview)
+            {
+                user.OnboardingStatus = OnboardingStatus.KycPending;
+                user.UpdatedAt = now;
+            }
+
+            await _context.SaveChangesAsync(cancellationToken);
+            await transaction.CommitAsync(cancellationToken);
+
+            return new KycSubmissionResponse
+            {
+                KycId = kyc.Id,
+                Status = finalStatus.ToString(),
+                EkycResult = ekycResult.ToString(),
+                RiskLevel = riskLevel.ToString(),
+                DocumentType = documentType.ToString(),
+                OcrFullName = kyc.OcrFullName,
+                OcrCitizenIdMasked = ocrCitizenIdMasked,
+                OcrDateOfBirth = kyc.OcrDateOfBirth?.ToDateTime(TimeOnly.MinValue),
+                OcrGender = kyc.OcrGender,
+                OcrAddress = kyc.OcrAddress,
+                OcrConfidence = kyc.OcrConfidence,
+                DocumentCheckResult = documentCheck?.ToString(),
+                FaceMatchScore = kyc.FaceMatchScore,
+                FaceMatchResult = faceMatch?.ToString(),
+                LivenessResult = liveness?.ToString(),
+                EkycErrorCode = kyc.EkycErrorCode,
+                EkycErrorMessage = kyc.EkycErrorMessage,
+                SubmittedAt = now,
+                Message = BuildSubmissionMessage(finalStatus, ekyc)
+            };
         }
-
-        var finalStatus = ekyc.IsProviderFailure || ekycResult == EkycResult.ProviderError || ekycResult == EkycResult.Failed
-            ? KycVerificationStatus.EkycFailed
-            : KycVerificationStatus.PendingAdminReview;
-
-        var now = DateTimeOffset.UtcNow;
-        var kyc = new KycVerification
+        catch
         {
-            Id = Guid.NewGuid(),
-            UserId = userId,
-            DocumentType = documentType,
-            EkycProvider = EkycProvider.VNPT,
-            EkycSessionId = ekyc.SessionId,
-            FrontImageObjectKey = frontKey,
-            BackImageObjectKey = backKey,
-            SelfieImageObjectKey = selfieKey,
-            SelfieCaptureMethod = selfieMethod,
-            OcrFullName = ekyc.OcrFullName,
-            OcrCitizenIdMasked = ocrCitizenIdMasked,
-            CitizenIdHash = citizenIdHash ?? string.Empty,
-            DocumentNumberEncrypted = documentNumberEncrypted,
-            OcrDateOfBirth = ekyc.OcrDateOfBirth.HasValue
-                ? DateOnly.FromDateTime(ekyc.OcrDateOfBirth.Value)
-                : null,
-            OcrGender = ekyc.OcrGender,
-            OcrAddress = ekyc.OcrAddress,
-            OcrConfidence = ekyc.OcrConfidence,
-            DocumentCheckResult = documentCheck,
-            FaceMatchScore = ekyc.FaceMatchScore,
-            FaceMatchResult = faceMatch,
-            LivenessResult = liveness,
-            EkycResult = ekycResult,
-            EkycErrorCode = ekyc.ErrorCode,
-            EkycErrorMessage = ekyc.ErrorMessage,
-            RiskLevel = riskLevel,
-            Status = finalStatus,
-            SubmittedAt = now,
-            CreatedAt = now,
-            UpdatedAt = now
-        };
-
-        _context.KycVerifications.Add(kyc);
-
-        if (finalStatus == KycVerificationStatus.PendingAdminReview)
-        {
-            user.OnboardingStatus = OnboardingStatus.KycPending;
-            user.UpdatedAt = now;
+            await transaction.RollbackAsync(cancellationToken);
+            await CleanupUploadAsync(frontUpload, cancellationToken);
+            await CleanupUploadAsync(backUpload, cancellationToken);
+            await CleanupUploadAsync(selfieUpload, cancellationToken);
+            throw;
         }
-
-        await _context.SaveChangesAsync(cancellationToken);
-
-        return new KycSubmissionResponse
-        {
-            KycId = kyc.Id,
-            Status = finalStatus.ToString(),
-            EkycResult = ekycResult.ToString(),
-            RiskLevel = riskLevel.ToString(),
-            DocumentType = documentType.ToString(),
-            OcrFullName = kyc.OcrFullName,
-            OcrCitizenIdMasked = ocrCitizenIdMasked,
-            OcrDateOfBirth = kyc.OcrDateOfBirth?.ToDateTime(TimeOnly.MinValue),
-            OcrGender = kyc.OcrGender,
-            OcrAddress = kyc.OcrAddress,
-            OcrConfidence = kyc.OcrConfidence,
-            DocumentCheckResult = documentCheck?.ToString(),
-            FaceMatchScore = kyc.FaceMatchScore,
-            FaceMatchResult = faceMatch?.ToString(),
-            LivenessResult = liveness?.ToString(),
-            EkycErrorCode = kyc.EkycErrorCode,
-            EkycErrorMessage = kyc.EkycErrorMessage,
-            SubmittedAt = now,
-            Message = BuildSubmissionMessage(finalStatus, ekyc)
-        };
     }
 
     public async Task<KycStatusResponse> GetMyStatusAsync(
@@ -253,19 +296,72 @@ public class KycService : IKycService
             throw new KycBusinessException(ErrorCodes.SelfieRequired, "Selfie image is required.", 400);
     }
 
-    private async Task<string> UploadImageAsync(
+    private async Task<KycStoredUpload> UploadImageAsync(
         Guid userId,
-        string label,
         IFormFile file,
         CancellationToken cancellationToken)
     {
-        var extension = Path.GetExtension(file.FileName);
-        if (string.IsNullOrWhiteSpace(extension))
-            extension = ".jpg";
+        var mediaObjectKey = _mediaObjectKeyFactory.Create(
+            MediaScope.KycDocument,
+            MediaVisibility.Private,
+            file.FileName);
 
-        var objectKey = $"kyc/{userId:N}/{label}-{Guid.NewGuid():N}{extension}";
         await using var stream = file.OpenReadStream();
-        return await _storage.UploadAsync(stream, file.ContentType, objectKey, cancellationToken);
+        var storedObject = await _mediaStorageService.UploadAsync(
+            new MediaUploadRequest
+            {
+                Content = stream,
+                OriginalFileName = file.FileName,
+                ContentType = file.ContentType,
+                FileSize = file.Length,
+                ObjectKey = mediaObjectKey.ObjectKey,
+                Visibility = MediaVisibility.Private
+            },
+            cancellationToken);
+
+        return new KycStoredUpload(
+            userId,
+            file.FileName,
+            file.ContentType,
+            file.Length,
+            storedObject);
+    }
+
+    private async Task<MediaAsset> CreateMediaAssetAsync(
+        Guid userId,
+        Guid kycId,
+        KycStoredUpload upload,
+        CancellationToken cancellationToken)
+    {
+        return await _mediaAssetService.CreateAsync(
+            new CreateMediaAssetRequest
+            {
+                OwnerUserId = userId,
+                BucketName = upload.StoredObject.BucketName,
+                ObjectKey = upload.StoredObject.ObjectKey,
+                OriginalFileName = upload.OriginalFileName,
+                StoredFileName = upload.StoredObject.StoredFileName,
+                ContentType = upload.ContentType,
+                FileSize = upload.FileSize,
+                Scope = MediaScope.KycDocument,
+                Visibility = MediaVisibility.Private,
+                Status = MediaStatus.Linked,
+                LinkedEntityType = nameof(KycVerification),
+                LinkedEntityId = kycId
+            },
+            cancellationToken);
+    }
+
+    private async Task CleanupUploadAsync(
+        KycStoredUpload? upload,
+        CancellationToken cancellationToken)
+    {
+        if (upload is null)
+        {
+            return;
+        }
+
+        await _mediaStorageService.DeleteAsync(upload.StoredObject.ObjectKey, cancellationToken);
     }
 
     private static KycStatusResponse MapStatus(KycVerification k) =>
@@ -358,4 +454,11 @@ public class KycService : IKycService
         string.IsNullOrWhiteSpace(value) || !Enum.TryParse<T>(value, ignoreCase: false, out var parsed)
             ? null
             : parsed;
+
+    private sealed record KycStoredUpload(
+        Guid UserId,
+        string OriginalFileName,
+        string ContentType,
+        long FileSize,
+        MediaStoredObjectResult StoredObject);
 }

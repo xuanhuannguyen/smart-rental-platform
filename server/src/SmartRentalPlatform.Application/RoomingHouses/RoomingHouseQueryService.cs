@@ -138,7 +138,7 @@ public class RoomingHouseQueryService : IRoomingHouseQueryService
                     : x.AddressDisplay,
                 CoverImageUrl = x.Images
                     .OrderBy(i => i.SortOrder)
-                    .Select(i => i.ImageUrl)
+                    .Select(i => "/api/media/public/" + i.ObjectKey)
                     .FirstOrDefault(),
                 AvailableRooms = x.Rooms.Count(r => r.Status == RoomStatus.Available && r.DeletedAt == null),
                 MinMonthlyRent = x.Rooms
@@ -353,7 +353,7 @@ public class RoomingHouseQueryService : IRoomingHouseQueryService
                     Longitude = x.Longitude,
                     CoverImageUrl = x.Images
                         .OrderBy(i => i.SortOrder)
-                        .Select(i => i.ImageUrl)
+                        .Select(i => "/api/media/public/" + i.ObjectKey)
                         .FirstOrDefault(),
                     AvailableRooms = x.Rooms.Count(r => r.Status == RoomStatus.Available && r.DeletedAt == null),
                     TotalRooms = x.Rooms.Count(r => r.DeletedAt == null),
