@@ -60,4 +60,6 @@ public class RoomingHouseDetailResponse
     public int TotalRooms { get; set; }
 
     public int AvailableRooms { get; set; }
+
+    public List<RoomingHouseServicePriceResponse> ServicePrices { get; set; } = new();
 }
