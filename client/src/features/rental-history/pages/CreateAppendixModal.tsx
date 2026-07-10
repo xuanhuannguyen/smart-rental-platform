@@ -210,7 +210,7 @@ interface Props {
 export const CreateAppendixModal: React.FC<Props> = ({ contract, appendix, onClose, onCreated }) => {
   const today = new Date().toISOString().slice(0, 10);
   const activeOccupants = useMemo(
-    () => contract.occupants.filter((occupant) => occupant.status === 'Active'),
+    () => contract.occupants.filter((occupant) => occupant.status === 'Active' || occupant.status === 'PendingMoveIn'),
     [contract.occupants]
   );
 

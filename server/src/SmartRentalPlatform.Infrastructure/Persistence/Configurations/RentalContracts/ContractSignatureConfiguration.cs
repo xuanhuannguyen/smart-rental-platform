@@ -23,8 +23,20 @@ public class ContractSignatureConfiguration : IEntityTypeConfiguration<ContractS
         builder.Property(x => x.SignerUserId).HasColumnName("signer_user_id").IsRequired();
         builder.Property(x => x.SignerRole).HasColumnName("signer_role").HasConversion<string>().HasMaxLength(30).IsRequired();
         builder.Property(x => x.SignatureMethod).HasColumnName("signature_method").HasConversion<string>().HasMaxLength(50).IsRequired();
-        builder.Property(x => x.SignatureText).HasColumnName("signature_text").HasColumnType("text");
-        builder.Property(x => x.SignedAt).HasColumnName("signed_at").IsRequired();
+        builder.Property(x => x.Status).HasColumnName("status").HasConversion<string>().HasMaxLength(50).IsRequired();
+        builder.Property(x => x.SigningOrder).HasColumnName("signing_order").IsRequired();
+        builder.Property(x => x.ContractSigningEnvelopeId).HasColumnName("signing_envelope_id");
+        builder.Property(x => x.Provider).HasColumnName("provider").HasConversion<string>().HasMaxLength(50);
+        builder.Property(x => x.ProviderEnvelopeId).HasColumnName("provider_envelope_id").HasMaxLength(255);
+        builder.Property(x => x.ProviderParticipantId).HasColumnName("provider_participant_id").HasMaxLength(255);
+        builder.Property(x => x.SigningUrl).HasColumnName("signing_url").HasMaxLength(2000);
+        builder.Property(x => x.CertificateSerialNumber).HasColumnName("certificate_serial_number").HasMaxLength(255);
+        builder.Property(x => x.CertificateSubject).HasColumnName("certificate_subject").HasMaxLength(1000);
+        builder.Property(x => x.CertificateIssuer).HasColumnName("certificate_issuer").HasMaxLength(1000);
+        builder.Property(x => x.SignedFileSha256Hash).HasColumnName("signed_file_sha256_hash").HasMaxLength(64);
+        builder.Property(x => x.ProviderEvidenceJson).HasColumnName("provider_evidence_json").HasColumnType("jsonb");
+        builder.Property(x => x.NotifiedAt).HasColumnName("notified_at");
+        builder.Property(x => x.SignedAt).HasColumnName("signed_at");
         builder.Property(x => x.IpAddress).HasColumnName("ip_address").HasMaxLength(100);
         builder.Property(x => x.UserAgent).HasColumnName("user_agent").HasColumnType("text");
         builder.Property(x => x.CreatedAt).HasColumnName("created_at").IsRequired();
@@ -43,6 +55,11 @@ public class ContractSignatureConfiguration : IEntityTypeConfiguration<ContractS
             .WithMany()
             .HasForeignKey(x => x.SignerUserId)
             .OnDelete(DeleteBehavior.Restrict);
+
+        builder.HasOne(x => x.ContractSigningEnvelope)
+            .WithMany(x => x.Signatures)
+            .HasForeignKey(x => x.ContractSigningEnvelopeId)
+            .OnDelete(DeleteBehavior.SetNull);
 
         builder.HasIndex(x => x.RentalContractId);
         builder.HasIndex(x => x.RentalContractAppendixId);

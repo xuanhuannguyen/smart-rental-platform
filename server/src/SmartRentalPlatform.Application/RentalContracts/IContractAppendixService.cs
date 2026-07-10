@@ -36,20 +36,7 @@ public interface IContractAppendixService
         Guid appendixId,
         CancellationToken cancellationToken = default);
 
-    Task<RequestContractSignatureOtpResponse?> RequestSignOtpAsync(
-        Guid userId,
-        Guid contractId,
-        Guid appendixId,
-        CancellationToken cancellationToken = default);
 
-    Task<ContractAppendixResponse?> SignAsync(
-        Guid userId,
-        Guid contractId,
-        Guid appendixId,
-        SignContractRequest request,
-        string? ipAddress,
-        string? userAgent,
-        CancellationToken cancellationToken = default);
 
     Task<ContractAppendixResponse?> RejectAsync(
         Guid userId,

@@ -6,6 +6,7 @@ import type { ApiResponse } from '../../../shared/api/apiResponse.types';
 import { toAssetUrl } from '../../../shared/api/assets';
 import { ENDPOINTS } from '../../../shared/api/endpoints';
 import { Alert } from '../../../shared/components/ui/Alert';
+import { Toast } from '../../../shared/components/ui/Toast';
 import { Button } from '../../../shared/components/ui/Button';
 import { uploadImage } from '../../files/api';
 import { contractApi } from '../../contracts/api';
@@ -51,7 +52,7 @@ function toDateInput(value?: string | null) {
   return value.slice(0, 10);
 }
 
-function createMainTenantForm(email?: string | null): OccupantForm {
+function createMainTenantForm(email?: string | null, moveInDate?: string): OccupantForm {
   return {
     id: crypto.randomUUID(),
     isMainTenant: true,
@@ -64,7 +65,7 @@ function createMainTenantForm(email?: string | null): OccupantForm {
     phoneNumber: '',
     dateOfBirth: '',
     relationship: 'Chủ hợp đồng',
-    moveInDate: toDateInput(),
+    moveInDate: moveInDate ?? toDateInput(),
     documentType: 'CCCD',
     documentNumber: '',
     frontImageObjectKey: '',
@@ -136,7 +137,7 @@ function normalizeOccupantSlots(
 
   const targetCount = Math.max(expectedOccupantCount, 1);
   const moveInDate = toDateInput(contractStartDate);
-  const mainTenant = forms.find((item) => item.isMainTenant) ?? createMainTenantForm(currentUserEmail);
+  const mainTenant = forms.find((item) => item.isMainTenant) ?? createMainTenantForm(currentUserEmail, moveInDate);
   const coOccupants = forms.filter((item) => !item.isMainTenant).slice(0, targetCount - 1);
 
   while (coOccupants.length < targetCount - 1) {
@@ -171,7 +172,7 @@ export function ContractOccupantsSetupModal({
   const [loading, setLoading] = useState(true);
   const [submitting, setSubmitting] = useState(false);
   const [savingOccupantId, setSavingOccupantId] = useState<string | null>(null);
-  const [error, setError] = useState('');
+  const [toast, setToast] = useState<{ message: string; type: 'success' | 'error' | 'info' } | null>(null);
 
   useEffect(() => {
     let isMounted = true;
@@ -183,7 +184,7 @@ export function ContractOccupantsSetupModal({
 
       try {
         setLoading(true);
-        setError('');
+        setToast(null);
 
         const response = await contractApi.getContract(contractId);
         if (!isMounted) {
@@ -207,7 +208,7 @@ export function ContractOccupantsSetupModal({
         setOccupants(normalizeOccupantSlots(mappedOccupants, expectedOccupantCount, response.data.startDate, currentUser?.email));
       } catch (err) {
         if (isMounted) {
-          setError(getApiErrorMessage(err, 'Không thể tải thông tin hợp đồng.'));
+          setToast({ message: getApiErrorMessage(err, 'Không thể tải thông tin hợp đồng.'), type: 'error' });
           setOccupants(normalizeOccupantSlots([createMainTenantForm(currentUser?.email)], expectedOccupantCount, undefined, currentUser?.email));
         }
       } finally {
@@ -329,7 +330,7 @@ export function ContractOccupantsSetupModal({
       return;
     }
 
-    setError('');
+    setToast(null);
     setSavingOccupantId(id);
 
     try {
@@ -380,13 +381,13 @@ export function ContractOccupantsSetupModal({
 
     const uploadKey = `${occupantId}:${field}`;
     setUploadingField(uploadKey);
-    setError('');
+    setToast(null);
 
     try {
       const uploaded = await uploadImage(file, 'LegalDocument');
       updateOccupant(occupantId, field, uploaded.objectKey);
     } catch (err) {
-      setError(getApiErrorMessage(err, 'Không thể tải ảnh giấy tờ lên.'));
+      setToast({ message: getApiErrorMessage(err, 'Không thể tải ảnh giấy tờ lên.'), type: 'error' });
     } finally {
       setUploadingField(null);
     }
@@ -396,24 +397,24 @@ export function ContractOccupantsSetupModal({
     event.preventDefault();
 
     if (!contractId) {
-      setError('Không tìm thấy mã hợp đồng.');
+      setToast({ message: 'Không tìm thấy mã hợp đồng.', type: 'error' });
       return;
     }
 
     const invalidOccupant = occupants.find((occupant) => validateOccupant(occupant));
 
     if (invalidOccupant) {
-      setError(validateOccupant(invalidOccupant) ?? 'Vui lòng kiểm tra lại thông tin người ở.');
+      setToast({ message: validateOccupant(invalidOccupant) ?? 'Vui lòng kiểm tra lại thông tin người ở.', type: 'error' });
       return;
     }
 
     const unsavedOccupant = occupants.find((occupant) => !occupant.isMainTenant && !occupant.isSaved);
     if (unsavedOccupant) {
-      setError('Vui lòng bấm lưu từng người ở trước khi gửi danh sách cho chủ trọ.');
+      setToast({ message: 'Vui lòng bấm lưu từng người ở trước khi gửi danh sách cho chủ trọ.', type: 'error' });
       return;
     }
 
-    setError('');
+    setToast(null);
     setSubmitting(true);
 
     try {
@@ -439,7 +440,7 @@ export function ContractOccupantsSetupModal({
 
       onSuccess();
     } catch (err) {
-      setError(getApiErrorMessage(err, 'Không thể lưu thông tin. Vui lòng kiểm tra lại các trường bắt buộc.'));
+      setToast({ message: getApiErrorMessage(err, 'Không thể lưu thông tin. Vui lòng kiểm tra lại các trường bắt buộc.'), type: 'error' });
     } finally {
       setSubmitting(false);
     }
@@ -466,9 +467,7 @@ export function ContractOccupantsSetupModal({
           </Alert>
         )}
 
-        {error && (
-          <Alert type="error">{error}</Alert>
-        )}
+
 
         {loading ? (
           <p>Đang tải thông tin người ở...</p>
@@ -661,6 +660,7 @@ export function ContractOccupantsSetupModal({
         )}
         </div>
       </div>
+      {toast && <Toast message={toast.message} type={toast.type} onClose={() => setToast(null)} />}
     </div>
   );
 }

@@ -22,6 +22,7 @@ import LandlordAppointmentsPage from '../../features/viewing-appointments/pages/
 import NotificationsPage from '../../features/notifications/pages/NotificationsPage';
 import LandlordContractsPage from '../../features/contracts/pages/LandlordContractsPage';
 import LandlordContractDetailPage from '../../features/contracts/pages/LandlordContractDetailPage';
+import FavoriteRoomingHousesPage from '../../features/profile/pages/FavoriteRoomingHousesPage';
 import { AdminHomePage } from '../../features/admin/pages/AdminHomePage';
 import { OnboardingGuard } from './OnboardingGuard';
 import { ProtectedRoute } from './ProtectedRoute';
@@ -39,6 +40,7 @@ import { LandlordRentalRequestDetailPage } from '../../features/landlord/pages/L
 import { MyWalletPage } from '../../features/wallet/pages/MyWalletPage';
 import { TransactionHistoryPage } from '../../features/wallet/pages/TransactionHistoryPage';
 import { TopUpResultPage } from '../../features/wallet/pages/TopUpResultPage';
+import { ESignReturnPage } from '../../features/rental-contracts/pages/ESignReturnPage';
 
 export const router = createBrowserRouter([
     {
@@ -108,6 +110,10 @@ export const router = createBrowserRouter([
                                 element: <SecurityPage />
                             },
                             {
+                                path: ROUTE_PATHS.ACCOUNT.FAVORITES,
+                                element: <FavoriteRoomingHousesPage />
+                            },
+                            {
                                 path: ROUTE_PATHS.ACCOUNT.WALLET,
                                 element: <MyWalletPage />
                             },
@@ -147,6 +153,10 @@ export const router = createBrowserRouter([
                                 path: ROUTE_PATHS.ACCOUNT.VIEWING_APPOINTMENTS,
                                 element: <TenantAppointmentsPage />
                             },
+                            {
+                                path: ROUTE_PATHS.ACCOUNT.ESIGN_RETURN,
+                                element: <ESignReturnPage />
+                            }
                         ]
                     },
                     {
@@ -162,12 +172,12 @@ export const router = createBrowserRouter([
                         element: <NotificationsPage />
                     },
                     {
+                        path: ROUTE_PATHS.LANDLORD.REGISTER,
+                        element: <CreateRoomingHousePage />
+                    },
+                    {
                         element: <RoleGuard allowedRoles={['Landlord']} />,
                         children: [
-                            {
-                                path: ROUTE_PATHS.LANDLORD.REGISTER,
-                                element: <CreateRoomingHousePage />
-                            },
                             {
                                 element: <LandlordLayout />,
                                 children: [
@@ -223,6 +233,10 @@ export const router = createBrowserRouter([
                                     {
                                         path: '/landlord/contracts/:id',
                                         element: <LandlordContractDetailPage />
+                                    },
+                                    {
+                                        path: ROUTE_PATHS.LANDLORD.ESIGN_RETURN,
+                                        element: <ESignReturnPage />
                                     }
                                 ]
                             }

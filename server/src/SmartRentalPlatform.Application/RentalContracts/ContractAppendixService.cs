@@ -19,23 +19,24 @@ public class ContractAppendixService : IContractAppendixService
     private static readonly JsonSerializerOptions JsonOptions = new(JsonSerializerDefaults.Web);
 
     private readonly IAppDbContext context;
-    private readonly IContractSignatureOtpService contractSignatureOtpService;
     private readonly IContractPdfRenderer contractPdfRenderer;
+    private readonly IContractPreviewAttachmentService contractPreviewAttachmentService;
     private readonly IPrivateStorageService privateStorageService;
     private readonly IHashService hashService;
     private readonly ISensitiveDataProtector sensitiveDataProtector;
 
     public ContractAppendixService(
         IAppDbContext context,
-        IContractSignatureOtpService contractSignatureOtpService,
+
         IContractPdfRenderer contractPdfRenderer,
+        IContractPreviewAttachmentService contractPreviewAttachmentService,
         IPrivateStorageService privateStorageService,
         IHashService hashService,
         ISensitiveDataProtector sensitiveDataProtector)
     {
         this.context = context;
-        this.contractSignatureOtpService = contractSignatureOtpService;
         this.contractPdfRenderer = contractPdfRenderer;
+        this.contractPreviewAttachmentService = contractPreviewAttachmentService;
         this.privateStorageService = privateStorageService;
         this.hashService = hashService;
         this.sensitiveDataProtector = sensitiveDataProtector;
@@ -85,8 +86,8 @@ public class ContractAppendixService : IContractAppendixService
         for (var index = 0; index < appendixChangeRequests.Count; index++)
         {
             var change = appendixChangeRequests[index];
-            var changeType = ParseEnum<ContractAppendixChangeType>(change.ChangeType, "Loại thay đổi phụ lục không hợp lệ.");
-            var targetType = ParseEnum<ContractAppendixTargetType>(change.TargetType, "Đối tượng thay đổi phụ lục không hợp lệ.");
+            var changeType = ParseEnum<ContractAppendixChangeType>(change.ChangeType, "Loại thay đổi phụ lục không hợp lềE");
+            var targetType = ParseEnum<ContractAppendixTargetType>(change.TargetType, "Đối tượng thay đổi phụ lục không hợp lềE");
 
             appendix.Changes.Add(new ContractAppendixChange
             {
@@ -114,14 +115,8 @@ public class ContractAppendixService : IContractAppendixService
         Guid contractId,
         CancellationToken cancellationToken = default)
     {
-        var contract = await context.RentalContracts
+        var contract = await BaseContractQuery()
             .AsNoTracking()
-            .Include(x => x.Room)
-                .ThenInclude(x => x.RoomingHouse)
-            .Include(x => x.Appendices)
-                .ThenInclude(x => x.Changes)
-            .Include(x => x.Appendices)
-                .ThenInclude(x => x.Signatures)
             .FirstOrDefaultAsync(x => x.Id == contractId && x.DeletedAt == null, cancellationToken);
 
         if (contract is null)
@@ -139,7 +134,7 @@ public class ContractAppendixService : IContractAppendixService
 
         return appendices
             .Where(x => CanViewAppendix(userId, x))
-            .Select(MapToResponse)
+            .Select(x => MapToResponse(x, userId))
             .ToList();
     }
 
@@ -160,7 +155,7 @@ public class ContractAppendixService : IContractAppendixService
 
         EnsureAppendixCanPreview(appendix);
         EnsureCanViewAppendix(userId, appendix);
-        return MapToResponse(appendix);
+        return MapToResponse(appendix, userId);
     }
 
     public async Task<ContractAppendixResponse?> UpdateAsync(
@@ -220,8 +215,8 @@ public class ContractAppendixService : IContractAppendixService
             for (var index = 0; index < appendixChangeRequests.Count; index++)
             {
                 var change = appendixChangeRequests[index];
-                var changeType = ParseEnum<ContractAppendixChangeType>(change.ChangeType, "Loại thay đổi phụ lục không hợp lệ.");
-                var targetType = ParseEnum<ContractAppendixTargetType>(change.TargetType, "Đối tượng thay đổi phụ lục không hợp lệ.");
+                var changeType = ParseEnum<ContractAppendixChangeType>(change.ChangeType, "Loại thay đổi phụ lục không hợp lềE");
+                var targetType = ParseEnum<ContractAppendixTargetType>(change.TargetType, "Đối tượng thay đổi phụ lục không hợp lềE");
 
                 var newChange = new ContractAppendixChange
                 {
@@ -266,114 +261,25 @@ public class ContractAppendixService : IContractAppendixService
             return null;
         }
 
+        EnsureAppendixCanPreview(appendix);
         EnsureCanViewAppendix(userId, appendix);
 
-        var renderOptions = await BuildAppendixRenderOptionsAsync(appendix, ContractFileVariant.Raw, cancellationToken);
-        var pdfBytes = contractPdfRenderer.RenderSignedContractAppendix(appendix, renderOptions);
+        var audience = appendix.RentalContract.Room.RoomingHouse.LandlordUserId == userId
+            ? ContractPreviewAudience.LandlordReview
+            : ContractPreviewAudience.TenantReview;
+        var reviewAttachments = audience == ContractPreviewAudience.LandlordReview
+            ? await contractPreviewAttachmentService.LoadForAppendixAsync(userId, appendix, cancellationToken)
+            : Array.Empty<ContractReviewAttachment>();
+        var renderOptions = await BuildAppendixRenderOptionsAsync(
+            appendix,
+            ContractFilePurpose.Preview,
+            cancellationToken,
+            audience,
+            reviewAttachments);
+        var pdfBytes = contractPdfRenderer.RenderContractAppendixPreview(appendix, renderOptions);
         var fileName = $"appendix-preview-{appendix.AppendixNumber}.pdf";
 
         return new ContractPreviewPdfResult(pdfBytes, PdfContentType, fileName);
-    }
-
-    public async Task<RequestContractSignatureOtpResponse?> RequestSignOtpAsync(
-        Guid userId,
-        Guid contractId,
-        Guid appendixId,
-        CancellationToken cancellationToken = default)
-    {
-        var appendix = await BaseAppendixQuery()
-            .FirstOrDefaultAsync(x => x.Id == appendixId && x.RentalContractId == contractId, cancellationToken);
-
-        if (appendix is null)
-        {
-            return null;
-        }
-
-        EnsureContractActive(appendix.RentalContract);
-        EnsureAppendixPendingSignature(appendix);
-        EnsureAppendixEffectiveDateStillSignable(appendix, DateOnly.FromDateTime(DateTime.UtcNow));
-        var signerRole = GetSignerRole(userId, appendix.RentalContract);
-        return await contractSignatureOtpService.RequestAppendixOtpAsync(
-            userId,
-            contractId,
-            appendixId,
-            signerRole,
-            cancellationToken);
-    }
-
-    public async Task<ContractAppendixResponse?> SignAsync(
-        Guid userId,
-        Guid contractId,
-        Guid appendixId,
-        SignContractRequest request,
-        string? ipAddress,
-        string? userAgent,
-        CancellationToken cancellationToken = default)
-    {
-        var appendix = await BaseAppendixQuery()
-            .FirstOrDefaultAsync(x => x.Id == appendixId && x.RentalContractId == contractId, cancellationToken);
-
-        if (appendix is null)
-        {
-            return null;
-        }
-
-        EnsureContractActive(appendix.RentalContract);
-        EnsureAppendixPendingSignature(appendix);
-        var signerRole = GetSignerRole(userId, appendix.RentalContract);
-        EnsureAppendixNotSigned(appendix, signerRole);
-
-        var now = DateTimeOffset.UtcNow;
-        var today = DateOnly.FromDateTime(now.UtcDateTime);
-        EnsureAppendixEffectiveDateStillSignable(appendix, today);
-
-        await using var transaction = await context.BeginTransactionAsync(cancellationToken);
-        try
-        {
-            await contractSignatureOtpService.VerifyAndConsumeAppendixOtpAsync(
-                userId,
-                appendix.Id,
-                signerRole,
-                request.Otp,
-                cancellationToken);
-
-            var signature = new ContractSignature
-            {
-                Id = Guid.NewGuid(),
-                RentalContractAppendixId = appendix.Id,
-                SignerUserId = userId,
-                SignerRole = signerRole,
-                SignatureMethod = ContractSignatureMethod.EmailOtp,
-                SignatureText = NormalizeOptionalText(request.SignatureText),
-                IpAddress = NormalizeOptionalText(ipAddress),
-                UserAgent = NormalizeOptionalText(userAgent),
-                SignedAt = now,
-                CreatedAt = now
-            };
-            appendix.Signatures.Add(signature);
-            context.ContractSignatures.Add(signature);
-
-            appendix.UpdatedAt = now;
-
-            if (HasBothSignatures(appendix, signerRole))
-            {
-                appendix.Status = ContractAppendixStatus.Active;
-                appendix.ActivatedAt = now;
-                appendix.StatusReason = null;
-                await ApplyAppendixIfDueAsync(appendix, now, today, cancellationToken);
-                await GenerateAppendixFileAsync(appendix, now, cancellationToken);
-            }
-
-            await context.SaveChangesAsync(cancellationToken);
-            await transaction.CommitAsync(cancellationToken);
-
-            return await GetByIdAsync(userId, contractId, appendixId, cancellationToken);
-        }
-        catch
-        {
-            await transaction.RollbackAsync(cancellationToken);
-            throw;
-        }
     }
 
     public async Task<ContractAppendixResponse?> RejectAsync(
@@ -395,7 +301,7 @@ public class ContractAppendixService : IContractAppendixService
         EnsureAppendixPendingSignature(appendix);
         _ = GetSignerRole(userId, appendix.RentalContract);
 
-        var reason = NormalizeRequiredText(request.Reason, "Lý do từ chối không được để trống.");
+        var reason = NormalizeRequiredText(request.Reason, "Lý do từ chối không được đềEtrống.");
         var now = DateTimeOffset.UtcNow;
 
         appendix.Status = ContractAppendixStatus.Rejected;
@@ -425,7 +331,7 @@ public class ContractAppendixService : IContractAppendixService
         EnsureAppendixPendingSignature(appendix);
 
         var signerRole = GetSignerRole(userId, appendix.RentalContract);
-        var reason = NormalizeRequiredText(request.Reason, "Lý do yêu cầu sửa phụ lục không được để trống.");
+        var reason = NormalizeRequiredText(request.Reason, "Lý do yêu cầu sửa phụ lục không được đềEtrống.");
         var now = DateTimeOffset.UtcNow;
 
         appendix.Status = signerRole == ContractSignerRole.Landlord
@@ -460,6 +366,9 @@ public class ContractAppendixService : IContractAppendixService
                     .ThenInclude(x => x.RentalPolicy)
             .Include(x => x.Appendices)
                 .ThenInclude(x => x.Changes)
+            .Include(x => x.Appendices)
+                .ThenInclude(x => x.Signatures)
+            .Include(x => x.Signatures)
             .Include(x => x.Occupants)
                 .ThenInclude(x => x.Documents)
             .Include(x => x.Occupants)
@@ -491,6 +400,11 @@ public class ContractAppendixService : IContractAppendixService
             .Include(x => x.RentalContract)
                 .ThenInclude(x => x.Appendices)
                     .ThenInclude(x => x.Changes)
+            .Include(x => x.RentalContract)
+                .ThenInclude(x => x.Appendices)
+                    .ThenInclude(x => x.Signatures)
+            .Include(x => x.RentalContract)
+                .ThenInclude(x => x.Signatures)
             .Include(x => x.Changes)
             .Include(x => x.Signatures)
             .Include(x => x.Files);
@@ -501,26 +415,26 @@ public class ContractAppendixService : IContractAppendixService
         DateTimeOffset now,
         CancellationToken cancellationToken)
     {
-        await EnsureAppendixFileVariantAsync(appendix, ContractFileVariant.Raw, now, cancellationToken);
-        await EnsureAppendixFileVariantAsync(appendix, ContractFileVariant.Masked, now, cancellationToken);
+        await EnsureAppendixPurposeAsync(appendix, ContractFilePurpose.MaskedReference, now, cancellationToken);
     }
 
-    private async Task EnsureAppendixFileVariantAsync(
+    private async Task EnsureAppendixPurposeAsync(
         ContractAppendix appendix,
-        ContractFileVariant fileVariant,
+        ContractFilePurpose Purpose,
         DateTimeOffset now,
         CancellationToken cancellationToken)
     {
         if (appendix.Files.Any(x =>
-                x.FileVariant == fileVariant &&
+                x.Purpose == Purpose &&
                 x.StorageObjectKey.EndsWith(".pdf", StringComparison.OrdinalIgnoreCase)))
         {
             return;
         }
 
-        var renderOptions = await BuildAppendixRenderOptionsAsync(appendix, fileVariant, cancellationToken);
+        var renderOptions = await BuildAppendixRenderOptionsAsync(appendix, Purpose, cancellationToken);
         var pdfBytes = contractPdfRenderer.RenderSignedContractAppendix(appendix, renderOptions);
-        var objectKey = $"contracts/{appendix.RentalContractId:N}/appendices/{appendix.Id:N}/signed-appendix-{fileVariant.ToString().ToLowerInvariant()}-{now:yyyyMMddHHmmss}.pdf";
+        var sha256Hash = Convert.ToHexString(SHA256.HashData(pdfBytes)).ToLowerInvariant();
+        var objectKey = $"contracts/{appendix.RentalContractId:N}/appendices/{appendix.Id:N}/signed-appendix-{Purpose.ToString().ToLowerInvariant()}-{now:yyyyMMddHHmmss}.pdf";
 
         await using var stream = new MemoryStream(pdfBytes);
         var storageObjectKey = await privateStorageService.UploadAsync(
@@ -535,7 +449,10 @@ public class ContractAppendixService : IContractAppendixService
             RentalContractId = appendix.RentalContractId,
             RentalContractAppendixId = appendix.Id,
             StorageObjectKey = storageObjectKey,
-            FileVariant = fileVariant,
+            Purpose = Purpose,
+            ContentType = PdfContentType,
+            Sha256Hash = sha256Hash,
+            IsLegallySigned = false,
             CreatedAt = now
         };
         appendix.Files.Add(newFile);
@@ -572,7 +489,7 @@ public class ContractAppendixService : IContractAppendixService
         {
             throw new ConflictException(
                 ErrorCodes.ContractAppendixInvalidStatus,
-                "Chỉ có thể hủy phụ lục đang chờ ký.",
+                "ChềEcó thềEhủy phụ lục đang chềEký.",
                 new { appendix.Id, status = appendix.Status.ToString() });
         }
 
@@ -580,11 +497,11 @@ public class ContractAppendixService : IContractAppendixService
         {
             throw new ConflictException(
                 ErrorCodes.ContractAppendixInvalidStatus,
-                "Bạn không phải là người tạo phụ lục này, không thể hủy.",
+                "Bạn không phải là người tạo phụ lục này, không thềEhủy.",
                 new { appendix.Id });
         }
 
-        if (appendix.Signatures.Count > 0)
+        if (appendix.Signatures.Any(x => x.Status == ContractSignatureStatus.Signed))
         {
             throw new ConflictException(
                 ErrorCodes.ContractAppendixAlreadySigned,
@@ -703,7 +620,7 @@ public class ContractAppendixService : IContractAppendixService
                 {
                     throw new ConflictException(
                         ErrorCodes.RentalContractInvalidOccupant,
-                        "Người ở cần xóa không tồn tại hoặc không còn đang ở trong hợp đồng.",
+                        "Người ềEcần xóa không tồn tại hoặc không còn đang ềEtrong hợp đồng.",
                         new { change.TargetId });
                 }
 
@@ -745,7 +662,7 @@ public class ContractAppendixService : IContractAppendixService
                 {
                     throw new BadRequestException(
                         ErrorCodes.ValidationError,
-                        "Giá thuê mới trong phụ lục không hợp lệ.");
+                        "Giá thuê mới trong phụ lục không hợp lềE");
                 }
 
                 contract.MonthlyRent = monthlyRent;
@@ -758,7 +675,7 @@ public class ContractAppendixService : IContractAppendixService
                 {
                     throw new BadRequestException(
                         ErrorCodes.ValidationError,
-                        "Ngày thanh toán mới trong phụ lục không hợp lệ.");
+                        "Ngày thanh toán mới trong phụ lục không hợp lềE");
                 }
 
                 contract.PaymentDay = paymentDay;
@@ -769,7 +686,7 @@ public class ContractAppendixService : IContractAppendixService
                 {
                     throw new BadRequestException(
                         ErrorCodes.ValidationError,
-                        "Ngày kết thúc mới trong phụ lục không hợp lệ.");
+                        "Ngày kết thúc mới trong phụ lục không hợp lềE");
                 }
 
                 contract.EndDate = endDate;
@@ -781,7 +698,7 @@ public class ContractAppendixService : IContractAppendixService
                 {
                     throw new BadRequestException(
                         ErrorCodes.ValidationError,
-                        "Người thuê chính mới trong phụ lục không hợp lệ.");
+                        "Người thuê chính mới trong phụ lục không hợp lềE");
                 }
 
                 contract.MainTenantUserId = newMainTenantUserId.Value;
@@ -859,13 +776,18 @@ public class ContractAppendixService : IContractAppendixService
 
     private async Task<ContractRenderOptions> BuildAppendixRenderOptionsAsync(
         ContractAppendix appendix,
-        ContractFileVariant fileVariant,
-        CancellationToken cancellationToken)
+        ContractFilePurpose Purpose,
+        CancellationToken cancellationToken,
+        ContractPreviewAudience? previewAudience = null,
+        IReadOnlyList<ContractReviewAttachment>? reviewAttachments = null)
     {
-        var showFullDocumentNumbers = fileVariant == ContractFileVariant.Raw;
+        var showFullDocumentNumbers = Purpose is
+            ContractFilePurpose.Preview or
+            ContractFilePurpose.UnsignedForESign;
         return new ContractRenderOptions
         {
-            ViewerMode = fileVariant.ToString(),
+            PreviewAudience = previewAudience,
+            ViewerMode = Purpose.ToString(),
             ShowFullDocumentNumbers = showFullDocumentNumbers,
             VisibleOccupantIds = null,
             UserDocumentNumbersByUserId = showFullDocumentNumbers
@@ -873,7 +795,8 @@ public class ContractAppendixService : IContractAppendixService
                 : new Dictionary<Guid, string?>(),
             OccupantDocumentNumbersByDocumentId = showFullDocumentNumbers
                 ? GetDecryptedOccupantDocumentNumbers(appendix.RentalContract)
-                : new Dictionary<Guid, string?>()
+                : new Dictionary<Guid, string?>(),
+            ReviewAttachments = reviewAttachments ?? Array.Empty<ContractReviewAttachment>()
         };
     }
 
@@ -954,7 +877,7 @@ public class ContractAppendixService : IContractAppendixService
         {
             throw new BadRequestException(
                 ErrorCodes.ValidationError,
-                "Ngày hiệu lực phụ lục không hợp lệ.");
+                "Ngày hiệu lực phụ lục không hợp lềE");
         }
 
         if (request.Changes.Count == 0)
@@ -974,7 +897,7 @@ public class ContractAppendixService : IContractAppendixService
 
         throw new ConflictException(
             ErrorCodes.RentalContractInvalidStatus,
-            "Chỉ có thể lập phụ lục cho hợp đồng đang có hiệu lực.",
+            "ChềEcó thềElập phụ lục cho hợp đồng đang có hiệu lực.",
             new { contract.Id, currentStatus = contract.Status.ToString() });
     }
 
@@ -990,7 +913,7 @@ public class ContractAppendixService : IContractAppendixService
 
         throw new ConflictException(
             ErrorCodes.ContractAppendixInvalidStatus,
-            "Hợp đồng đang có phụ lục chờ ký, vui lòng hoàn tất hoặc từ chối phụ lục hiện tại trước khi tạo phụ lục mới.",
+            "Hợp đồng đang có phụ lục chềEký, vui lòng hoàn tất hoặc từ chối phụ lục hiện tại trước khi tạo phụ lục mới.",
             new { contract.Id });
     }
 
@@ -1022,7 +945,9 @@ public class ContractAppendixService : IContractAppendixService
 
     private static void EnsureAppendixCanPreview(ContractAppendix appendix)
     {
-        if (appendix.Status is not ContractAppendixStatus.Active)
+        if (appendix.Status is not (
+            ContractAppendixStatus.Active or
+            ContractAppendixStatus.Cancelled))
         {
             return;
         }
@@ -1059,8 +984,7 @@ public class ContractAppendixService : IContractAppendixService
 
     private static void EnsureCanAccess(Guid userId, RentalContract contract)
     {
-        if (contract.Room.RoomingHouse.LandlordUserId == userId ||
-            GetMainTenantUserIds(contract).Contains(userId))
+        if (ContractDocumentAccessPolicy.HasContractRelationship(userId, contract))
         {
             return;
         }
@@ -1087,17 +1011,33 @@ public class ContractAppendixService : IContractAppendixService
     private static bool CanViewAppendix(Guid userId, ContractAppendix appendix)
     {
         var contract = appendix.RentalContract;
-        if (contract.Room.RoomingHouse.LandlordUserId == userId)
+
+        if (appendix.Status is ContractAppendixStatus.Active or ContractAppendixStatus.Cancelled)
         {
-            return true;
+            return ContractDocumentAccessPolicy.CanViewFullAppendix(userId, appendix) ||
+                   ContractDocumentAccessPolicy.CanViewMaskedAppendix(userId, contract, appendix);
         }
 
-        if (GetMainTenantUserIdBeforeAppendix(contract, appendix) == userId)
+        if (appendix.Status == ContractAppendixStatus.PendingSignature)
         {
-            return true;
+            if (appendix.CreatedByUserId == userId)
+            {
+                return true;
+            }
+
+            var creatorSignature = appendix.Signatures.FirstOrDefault(x => x.SignerUserId == appendix.CreatedByUserId);
+            var hasCreatorSigned = creatorSignature != null && creatorSignature.Status == ContractSignatureStatus.Signed;
+
+            if (!hasCreatorSigned)
+            {
+                return false;
+            }
         }
 
-        return IsMainTenantChangedToUser(appendix, userId);
+        return appendix.CreatedByUserId == userId ||
+               contract.Room.RoomingHouse.LandlordUserId == userId ||
+               GetCurrentMainTenantUserId(contract) == userId ||
+               appendix.Signatures.Any(x => x.SignerUserId == userId);
     }
 
     private static ContractSignerRole GetSignerRole(Guid userId, RentalContract contract)
@@ -1279,14 +1219,14 @@ public class ContractAppendixService : IContractAppendixService
         return contract.Appendices
             .Where(x =>
                 x.AppliedAt.HasValue &&
-                x.Status is ContractAppendixStatus.Active or ContractAppendixStatus.Cancelled)
+                x.Status == ContractAppendixStatus.Active)
             .OrderBy(x => x.AppliedAt ?? x.ActivatedAt ?? x.UpdatedAt)
             .ThenBy(x => x.CreatedAt);
     }
 
     private static void EnsureAppendixNotSigned(ContractAppendix appendix, ContractSignerRole signerRole)
     {
-        if (!appendix.Signatures.Any(x => x.SignerRole == signerRole))
+        if (!appendix.Signatures.Any(x => x.SignerRole == signerRole && x.Status == ContractSignatureStatus.Signed))
         {
             return;
         }
@@ -1396,7 +1336,7 @@ public class ContractAppendixService : IContractAppendixService
         {
             throw new BadRequestException(
                 ErrorCodes.RentalContractInvalidOccupant,
-                "Thông tin người ở mới trong phụ lục không được để trống.");
+                "Thông tin người ềEmới trong phụ lục không được đềEtrống.");
         }
 
         var json = value.Trim();
@@ -1419,13 +1359,13 @@ public class ContractAppendixService : IContractAppendixService
             return JsonSerializer.Deserialize<ContractOccupantRequest>(json, JsonOptions)
                 ?? throw new BadRequestException(
                     ErrorCodes.RentalContractInvalidOccupant,
-                    "Thông tin người ở mới trong phụ lục không hợp lệ.");
+                    "Thông tin người ềEmới trong phụ lục không hợp lềE");
         }
         catch (JsonException exception)
         {
             throw new BadRequestException(
                 ErrorCodes.RentalContractInvalidOccupant,
-                "Thông tin người ở mới trong phụ lục phải là JSON hợp lệ.",
+                "Thông tin người ềEmới trong phụ lục phải là JSON hợp lềE",
                 new { exception.Message });
         }
     }
@@ -1484,7 +1424,7 @@ public class ContractAppendixService : IContractAppendixService
         {
             throw new BadRequestException(
                 ErrorCodes.RentalContractInvalidOccupant,
-                "Ngày chuyển vào của người ở không được để trống.");
+                "Ngày chuyển vào của người ềEkhông được đềEtrống.");
         }
 
         if (!string.IsNullOrWhiteSpace(occupant.Email))
@@ -1493,7 +1433,7 @@ public class ContractAppendixService : IContractAppendixService
             {
                 throw new BadRequestException(
                     ErrorCodes.RentalContractInvalidOccupant,
-                    "Người ở đã có tài khoản và KYC không được gửi giấy tờ trong phụ lục.");
+                    "Người ềEđã có tài khoản và KYC không được gửi giấy tềEtrong phụ lục.");
             }
 
             return;
@@ -1503,28 +1443,28 @@ public class ContractAppendixService : IContractAppendixService
         {
             throw new BadRequestException(
                 ErrorCodes.RentalContractInvalidOccupant,
-                "Người ở chưa có tài khoản phải có họ tên.");
+                "Người ềEchưa có tài khoản phải có hềEtên.");
         }
 
         if (string.IsNullOrWhiteSpace(occupant.PhoneNumber))
         {
             throw new BadRequestException(
                 ErrorCodes.RentalContractInvalidOccupant,
-                "Người ở chưa có tài khoản phải có số điện thoại.");
+                "Người ềEchưa có tài khoản phải có sềEđiện thoại.");
         }
 
         if (!occupant.DateOfBirth.HasValue || occupant.DateOfBirth.Value == default)
         {
             throw new BadRequestException(
                 ErrorCodes.RentalContractInvalidOccupant,
-                "Người ở chưa có tài khoản phải có ngày sinh.");
+                "Người ềEchưa có tài khoản phải có ngày sinh.");
         }
 
         if (occupant.Document is null)
         {
             throw new BadRequestException(
                 ErrorCodes.RentalContractInvalidOccupant,
-                "Người ở chưa có tài khoản phải có giấy tờ.");
+                "Người ềEchưa có tài khoản phải có giấy tềE");
         }
 
         if (string.IsNullOrWhiteSpace(occupant.Document.DocumentType) ||
@@ -1533,7 +1473,7 @@ public class ContractAppendixService : IContractAppendixService
         {
             throw new BadRequestException(
                 ErrorCodes.RentalContractInvalidOccupant,
-                "Giấy tờ người ở phải có loại giấy tờ, số giấy tờ và ảnh mặt trước.");
+                "Giấy tềEngười ềEphải có loại giấy tềE sềEgiấy tềEvà ảnh mặt trước.");
         }
     }
 
@@ -1550,7 +1490,7 @@ public class ContractAppendixService : IContractAppendixService
         {
             throw new BadRequestException(
                 ErrorCodes.RentalContractInvalidOccupant,
-                "Người ở có tài khoản không tồn tại.",
+                "Người ềEcó tài khoản không tồn tại.",
                 new { email });
         }
 
@@ -1564,7 +1504,7 @@ public class ContractAppendixService : IContractAppendixService
         {
             throw new BadRequestException(
                 ErrorCodes.KycRequired,
-                "Người ở có tài khoản phải hoàn tất KYC trước khi được thêm vào phụ lục.",
+                "Người ềEcó tài khoản phải hoàn tất KYC trước khi được thêm vào phụ lục.",
                 new { email });
         }
 
@@ -1577,7 +1517,7 @@ public class ContractAppendixService : IContractAppendixService
         {
             throw new BadRequestException(
                 ErrorCodes.KycRequired,
-                "Thông tin KYC đã duyệt của người ở chưa đủ họ tên hoặc ngày sinh.",
+                "Thông tin KYC đã duyệt của người ềEchưa đủ hềEtên hoặc ngày sinh.",
                 new { email });
         }
 
@@ -1615,18 +1555,18 @@ public class ContractAppendixService : IContractAppendixService
             {
                 throw new BadRequestException(
                     ErrorCodes.ValidationError,
-                    "Phụ lục thêm người ở mới không được gửi targetId.");
+                    "Phụ lục thêm người mới không được gửi targetId.");
             }
 
             if (change.TargetType == ContractAppendixTargetType.ContractOccupant &&
                 change.ChangeType == ContractAppendixChangeType.Remove &&
                 !contract.Occupants.Any(occupant =>
                     occupant.Id == change.Request.TargetId &&
-                    occupant.Status == ContractOccupantStatus.Active))
+                    (occupant.Status == ContractOccupantStatus.Active || occupant.Status == ContractOccupantStatus.PendingMoveIn)))
             {
                 throw new BadRequestException(
                     ErrorCodes.ValidationError,
-                    "Người ở cần xóa không tồn tại hoặc không còn đang ở trong hợp đồng.",
+                    "Người cần xóa không tồn tại hoặc không còn đang trong hợp đồng.",
                     new { change.Request.TargetId });
             }
 
@@ -1637,7 +1577,7 @@ public class ContractAppendixService : IContractAppendixService
 
             throw new BadRequestException(
                 ErrorCodes.ValidationError,
-                "Người thuê chỉ được tạo phụ lục để thêm/bớt người ở, chuyển người chịu trách nhiệm hợp đồng hoặc gia hạn hợp đồng.",
+                "Người thuê không được tạo phụ lục để thêm/bớt người chuyển người chịu trách nhiệm hợp đồng hoặc gia hạn hợp đồng.",
                 new
                 {
                     change.SortOrder,
@@ -1661,14 +1601,14 @@ public class ContractAppendixService : IContractAppendixService
         {
             throw new BadRequestException(
                 ErrorCodes.ValidationError,
-                "Mỗi phụ lục chỉ được chuyển người chịu trách nhiệm hợp đồng một lần.");
+                "Mỗi phụ lục không được chuyển người chịu trách nhiệm hợp đồng một lần.");
         }
 
         if (changes.Count(IsRenewalChange) > 1)
         {
             throw new BadRequestException(
                 ErrorCodes.ValidationError,
-                "Mỗi phụ lục chỉ được gia hạn hợp đồng một lần.");
+                "Mỗi phụ lục không được gia hạn hợp đồng một lần.");
         }
 
         if (removedMainTenant && !changesMainTenant)
@@ -1685,14 +1625,14 @@ public class ContractAppendixService : IContractAppendixService
         {
             throw new BadRequestException(
                 ErrorCodes.ValidationError,
-                "Mỗi phụ lục chỉ được thay đổi giá thuê một lần.");
+                "Mỗi phụ lục không được thay đổi giá thuê một lần.");
         }
 
         if (changes.Count(IsPaymentDayChange) > 1)
         {
             throw new BadRequestException(
                 ErrorCodes.ValidationError,
-                "Mỗi phụ lục chỉ được thay đổi ngày thanh toán một lần.");
+                "Mỗi phụ lục không được thay đổi ngày thanh toán một lần.");
         }
 
         foreach (var change in changes)
@@ -1711,7 +1651,7 @@ public class ContractAppendixService : IContractAppendixService
 
             throw new BadRequestException(
                 ErrorCodes.ValidationError,
-                "Chủ trọ chỉ được tạo phụ lục để thay đổi giá thuê hoặc ngày thanh toán hóa đơn.",
+                "Chủ trọ không được tạo phụ lục để thay đổi giá thuê hoặc ngày thanh toán hóa đơn.",
                 new
                 {
                     change.SortOrder,
@@ -1792,7 +1732,7 @@ public class ContractAppendixService : IContractAppendixService
 
         var remainsOrAlreadyOccupant = contract.Occupants.Any(occupant =>
             occupant.UserId == newMainTenantUserId.Value &&
-            occupant.Status == ContractOccupantStatus.Active &&
+            (occupant.Status == ContractOccupantStatus.Active || occupant.Status == ContractOccupantStatus.PendingMoveIn) &&
             !changes.Any(change =>
                 change.ChangeType == ContractAppendixChangeType.Remove &&
                 change.TargetType == ContractAppendixTargetType.ContractOccupant &&
@@ -1812,7 +1752,7 @@ public class ContractAppendixService : IContractAppendixService
 
         throw new BadRequestException(
             ErrorCodes.ValidationError,
-            "Người chịu trách nhiệm hợp đồng mới phải là người ở hiện tại hoặc được thêm vào trong cùng phụ lục.");
+            "Người chịu trách nhiệm hợp đồng mới phải là người hiện tại hoặc được thêm vào trong cùng phụ lục.");
     }
 
     private static void ValidateRenewalRules(
@@ -1833,7 +1773,7 @@ public class ContractAppendixService : IContractAppendixService
         {
             throw new BadRequestException(
                 ErrorCodes.ValidationError,
-                "Ngày kết thúc mới không hợp lệ.");
+                "Ngày kết thúc mới không hợp lệ");
         }
 
         var currentEndDate = GetCurrentContractEndDate(contract);
@@ -1858,7 +1798,7 @@ public class ContractAppendixService : IContractAppendixService
         {
             throw new BadRequestException(
                 ErrorCodes.ValidationError,
-                "Chỉ được gia hạn hợp đồng trong thời gian thông báo gia hạn theo chính sách thuê.",
+                "Không được gia hạn hợp đồng trong thời gian thông báo gia hạn theo chính sách thuê.",
                 new
                 {
                     currentEndDate,
@@ -1880,7 +1820,7 @@ public class ContractAppendixService : IContractAppendixService
 
         throw new BadRequestException(
             ErrorCodes.RentalRequestInvalidDuration,
-            "Thời gian gia hạn không phù hợp với chính sách thuê của khu trọ.",
+            "Thời gian gia hạn không phù hợp với chính sách thuê của khu trọ",
             new
             {
                 extensionMonths,
@@ -1901,7 +1841,7 @@ public class ContractAppendixService : IContractAppendixService
         var removedCount = changes.Count(x =>
             x.ChangeType == ContractAppendixChangeType.Remove &&
             x.TargetType == ContractAppendixTargetType.ContractOccupant &&
-            contract.Occupants.Any(o => o.Id == x.Request.TargetId && o.Status == ContractOccupantStatus.Active));
+            contract.Occupants.Any(o => o.Id == x.Request.TargetId && (o.Status == ContractOccupantStatus.Active || o.Status == ContractOccupantStatus.PendingMoveIn)));
 
         var finalCount = activeCount + addedCount - removedCount;
         var maxOccupants = GetSnapshotMaxOccupants(contract);
@@ -1912,7 +1852,7 @@ public class ContractAppendixService : IContractAppendixService
 
         throw new BadRequestException(
             ErrorCodes.RentalRequestOccupantLimitExceeded,
-            "Số người ở sau phụ lục vượt quá sức chứa tối đa của phòng.",
+            "Số người sau phụ lục vượt quá sức chứa tối đa của phòng.",
             new { finalCount, maxOccupants });
     }
 
@@ -1927,7 +1867,7 @@ public class ContractAppendixService : IContractAppendixService
         {
             throw new BadRequestException(
                 ErrorCodes.ValidationError,
-                "Sau phụ lục, hợp đồng phải còn ít nhất một người ở.");
+                "Sau phụ lục, hợp đồng phải còn ít nhất một người");
         }
 
         var maxOccupants = GetSnapshotMaxOccupants(contract);
@@ -1935,7 +1875,7 @@ public class ContractAppendixService : IContractAppendixService
         {
             throw new BadRequestException(
                 ErrorCodes.RentalRequestOccupantLimitExceeded,
-                "Số người ở sau phụ lục vượt quá sức chứa tối đa của phòng.",
+                "Số người sau phụ lục vượt quá sức chứa tối đa của phòng.",
                 new { finalCount, maxOccupants });
         }
 
@@ -1944,14 +1884,14 @@ public class ContractAppendixService : IContractAppendixService
         {
             throw new BadRequestException(
                 ErrorCodes.ValidationError,
-                "Nếu hợp đồng chỉ còn một người ở thì người đó phải là người thuê chính.");
+                "Nếu hợp đồng chỉ còn một người thì người đó phải là người thuê chính.");
         }
 
         if (!mainTenantStillOccupies)
         {
             throw new BadRequestException(
                 ErrorCodes.ValidationError,
-                "Người thuê chính sau phụ lục phải thuộc danh sách người ở còn lại.");
+                "Người thuê chính sau phụ lục phải thuộc danh sách người còn lại.");
         }
     }
 
@@ -1994,7 +1934,7 @@ public class ContractAppendixService : IContractAppendixService
         CancellationToken cancellationToken)
     {
         var projectedOccupants = contract.Occupants
-            .Where(x => x.Status == ContractOccupantStatus.Active)
+            .Where(x => x.Status == ContractOccupantStatus.Active || x.Status == ContractOccupantStatus.PendingMoveIn)
             .Select(x => new ProjectedOccupant(x.Id, x.UserId))
             .ToList();
         var initialCount = projectedOccupants.Count;
@@ -2051,7 +1991,7 @@ public class ContractAppendixService : IContractAppendixService
         {
             throw new ConflictException(
                 ErrorCodes.PriceTierInvalid,
-                "Phòng chưa có bảng giá phù hợp với số người ở sau phụ lục.",
+                "Phòng chưa có bảng giá phù hợp với số người sau phụ lục.",
                 new { contract.RoomId, occupantCount = priceTierOccupantCount });
         }
 
@@ -2060,7 +2000,7 @@ public class ContractAppendixService : IContractAppendixService
 
     private static int GetCurrentOccupantCount(RentalContract contract)
     {
-        return contract.Occupants.Count(x => x.Status == ContractOccupantStatus.Active);
+        return contract.Occupants.Count(x => x.Status == ContractOccupantStatus.Active || x.Status == ContractOccupantStatus.PendingMoveIn);
     }
 
     private static int GetSnapshotMaxOccupants(RentalContract contract)
@@ -2092,8 +2032,8 @@ public class ContractAppendixService : IContractAppendixService
     {
         return new ParsedAppendixChange(
             request,
-            ParseEnum<ContractAppendixChangeType>(request.ChangeType, "Loại thay đổi phụ lục không hợp lệ."),
-            ParseEnum<ContractAppendixTargetType>(request.TargetType, "Đối tượng thay đổi phụ lục không hợp lệ."),
+            ParseEnum<ContractAppendixChangeType>(request.ChangeType, "Loại thay đổi phụ lục không hợp lềE"),
+            ParseEnum<ContractAppendixTargetType>(request.TargetType, "Đối tượng thay đổi phụ lục không hợp lềE"),
             sortOrder);
     }
 
@@ -2279,8 +2219,14 @@ public class ContractAppendixService : IContractAppendixService
         return Math.Max(months, 1);
     }
 
-    private static ContractAppendixResponse MapToResponse(ContractAppendix appendix)
+    private static ContractAppendixResponse MapToResponse(ContractAppendix appendix, Guid userId)
     {
+        var canViewFull = ContractDocumentAccessPolicy.CanViewFullAppendix(userId, appendix);
+        var canViewMasked = ContractDocumentAccessPolicy.CanViewMaskedAppendix(
+            userId,
+            appendix.RentalContract,
+            appendix);
+
         return new ContractAppendixResponse
         {
             Id = appendix.Id,
@@ -2301,6 +2247,13 @@ public class ContractAppendixService : IContractAppendixService
                 .Select(MapSignatureToResponse)
                 .ToList(),
             Files = appendix.Files
+                .Where(x => x.Purpose is not (
+                    ContractFilePurpose.Preview or
+                    ContractFilePurpose.UnsignedForESign or
+                    ContractFilePurpose.ProviderEvidence))
+                .Where(x => x.Purpose == ContractFilePurpose.MaskedReference
+                    ? canViewMasked
+                    : canViewFull)
                 .OrderByDescending(x => x.CreatedAt)
                 .Select(MapFileToResponse)
                 .ToList(),
@@ -2345,6 +2298,7 @@ public class ContractAppendixService : IContractAppendixService
             RentalContractId = file.RentalContractId,
             RentalContractAppendixId = file.RentalContractAppendixId,
             StorageObjectKey = file.StorageObjectKey,
+            Purpose = file.Purpose.ToString(),
             FileUrl = file.FileUrl,
             CreatedAt = file.CreatedAt
         };

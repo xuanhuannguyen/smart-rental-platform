@@ -20,13 +20,15 @@ export const ROUTE_PATHS = {
         TRANSACTIONS: '/account/transactions',
         TOPUP_RESULT: '/account/wallet/topup-result',
         VIEWING_APPOINTMENTS: '/account/viewing-appointments',
+        FAVORITES: '/account/favorites',
         NOTIFICATIONS: '/notifications',
         RENTAL_REQUESTS: '/account/rental-requests',
         RENTAL_REQUEST_DETAIL: (id: string) => `/account/rental-requests/${id}`,
         RENTAL_HISTORY: '/account/rental-history',
         RENTAL_HISTORY_DETAIL: (id: string) => `/account/rental-history/${id}`,
         INVOICES: '/account/invoices',
-        INVOICE_DETAIL: (id: string) => `/account/invoices/${id}`
+        INVOICE_DETAIL: (id: string) => `/account/invoices/${id}`,
+        ESIGN_RETURN: '/account/esign/return'
     },
     LANDLORD: {
         REGISTER: '/landlord/register',
@@ -42,7 +44,8 @@ export const ROUTE_PATHS = {
         INVOICES: '/landlord/invoices',
         INVOICE_DETAIL: (id: string) => `/landlord/invoices/${id}`,
         CONTRACTS: '/landlord/contracts',
-        CONTRACT_DETAIL: (id: string) => `/landlord/contracts/${id}`
+        CONTRACT_DETAIL: (id: string) => `/landlord/contracts/${id}`,
+        ESIGN_RETURN: '/landlord/esign/return'
     },
     ADMIN: {
         ROOT: '/admin',

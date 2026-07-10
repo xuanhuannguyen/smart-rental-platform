@@ -11,6 +11,7 @@ using SmartRentalPlatform.Application.RentalContracts;
 using SmartRentalPlatform.Application.RentalRequests;
 using SmartRentalPlatform.Application.RoomingHouses;
 using SmartRentalPlatform.Application.RoomingHouses.Search;
+using SmartRentalPlatform.Application.ReviewReports;
 using SmartRentalPlatform.Application.RoomDeposits;
 using SmartRentalPlatform.Application.Rooms;
 using SmartRentalPlatform.Application.Users;
@@ -33,8 +34,9 @@ public static class DependencyInjection
         services.AddScoped<IKycService, KycService>();
         services.AddScoped<IRentalRequestService, RentalRequestService>();
         services.AddScoped<IContractPdfRenderer, ContractPdfRenderer>();
+        services.AddScoped<IContractDocumentModelFactory, ContractDocumentModelFactory>();
+        services.AddScoped<IContractPreviewAttachmentService, ContractPreviewAttachmentService>();
         services.AddScoped<IContractFileService, ContractFileService>();
-        services.AddScoped<IContractSignatureOtpService, ContractSignatureOtpService>();
         services.AddScoped<IContractAppendixService, ContractAppendixService>();
         services.AddScoped<IRentalContractService, RentalContractService>();
         services.AddScoped<IRoomDepositService, RoomDepositService>();
@@ -50,6 +52,9 @@ public static class DependencyInjection
         services.AddScoped<IRoomingHouseDraftService, RoomingHouseDraftService>();
         services.AddScoped<IRoomingHouseMediaService, RoomingHouseMediaService>();
         services.AddScoped<IRoomingHouseSubmissionService, RoomingHouseSubmissionService>();
+        services.AddScoped<IFavoriteRoomingHouseService, FavoriteRoomingHouseService>();
+        services.AddScoped<IRoomingHouseReviewService, RoomingHouseReviewService>();
+        services.AddScoped<IReviewReportService, ReviewReportService>();
         services.AddScoped<RoomAccessService>();
         services.AddScoped<IRoomQueryService, RoomQueryService>();
         services.AddScoped<IRoomCommandService, RoomCommandService>();
@@ -70,6 +75,7 @@ public static class DependencyInjection
         services.AddScoped<IBillingService, BillingService>();
         services.AddScoped<INotificationService, NotificationService>();
         services.AddScoped<IViewingAppointmentService, ViewingAppointmentService>();
+        services.AddScoped<IContractESignService, ContractESignService>();
         return services;
     }
 }
