@@ -20,9 +20,7 @@ import type {
   AdminRoomingHouseDetail,
   AdminRoomingHouseListItem,
   AdminUserListItem,
-  AdminUserDetail,
-  AdminReviewReportListItem,
-  AdminReviewReportDetail
+  AdminUserDetail
 } from '../types/adminApproval.types';
 import './AdminHomePage.css';
 
@@ -187,11 +185,6 @@ export function AdminHomePage() {
   const [housesPending, setHousesPending] = useState<AdminRoomingHouseListItem[]>([]);
   const [housePendingTotal, setHousePendingTotal] = useState(0);
   const [selectedHouse, setSelectedHouse] = useState<AdminRoomingHouseDetail | null>(null);
-
-  const [reports, setReports] = useState<AdminReviewReportListItem[]>([]);
-  const [reportTotal, setReportTotal] = useState(0);
-  const [selectedReport, setSelectedReport] = useState<AdminReviewReportDetail | null>(null);
-
   const [reason, setReason] = useState('');
   const [isLoading, setIsLoading] = useState(true);
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -239,14 +232,6 @@ export function AdminHomePage() {
     setSelectedKyc(null);
   }
 
-  async function fetchReportDetail(id: string) {
-    const response = await adminApprovalApi.getReviewReportDetail(id);
-    setSelectedReport(response.data);
-    setSelectedKyc(null);
-    setSelectedHouse(null);
-    setSelectedUser(null);
-  }
-
   async function loadData() {
     setIsLoading(true);
     setError('');
@@ -258,14 +243,11 @@ export function AdminHomePage() {
           await fetchKycDetail(selectedId);
         } else if (activeMenu === 'houses' && (activeTab === 'pending' || activeTab === 'public')) {
           await fetchHouseDetail(selectedId);
-        } else if (activeMenu === 'reports') {
-          await fetchReportDetail(selectedId);
         }
       } else {
         setSelectedUser(null);
         setSelectedKyc(null);
         setSelectedHouse(null);
-        setSelectedReport(null);
         setKycHistory([]);
 
         if (activeMenu === 'users') {
@@ -288,11 +270,6 @@ export function AdminHomePage() {
             setHousesPending(response.data.items);
             setHousePendingTotal(response.data.totalItems);
           }
-        } else if (activeMenu === 'reports') {
-          const status = activeTab === 'pending' ? 'Pending' : 'Processed';
-          const response = await adminApprovalApi.getReviewReports(pageParam, 20, status);
-          setReports(response.data.items);
-          setReportTotal(response.data.totalItems);
         }
       }
     } catch (err) {
@@ -333,13 +310,6 @@ export function AdminHomePage() {
   }
 
   function openHouse(id: string) {
-    setError('');
-    setToast(null);
-    setReason('');
-    setSearchParams({ menu: activeMenu, tab: activeTab, page: pageParam.toString(), id });
-  }
-
-  function openReport(id: string) {
     setError('');
     setToast(null);
     setReason('');
@@ -388,27 +358,6 @@ export function AdminHomePage() {
       setReason('');
     } catch (err) {
       setToast({ message: getApiErrorMessage(err, 'Không thể từ chối hồ sơ.'), type: 'error' });
-    } finally {
-      setIsSubmitting(false);
-    }
-  }
-
-  async function handleProcessReport(action: 'Dismiss' | 'DeleteReview') {
-    if (!selectedReport) return;
-    if (action === 'DeleteReview' && !reason.trim()) {
-      setToast({ message: 'Vui lòng nhập lý do (Admin notes) khi ẩn đánh giá.', type: 'error' });
-      return;
-    }
-    setIsSubmitting(true);
-    setError('');
-    setToast(null);
-    try {
-      const response = await adminApprovalApi.processReviewReport(selectedReport.id, action, reason);
-      setToast({ message: 'Đã xử lý báo cáo thành công.', type: 'success' });
-      setSearchParams({ menu: activeMenu, tab: activeTab, page: pageParam.toString() });
-      setReason('');
-    } catch (err) {
-      setToast({ message: getApiErrorMessage(err, 'Không thể xử lý báo cáo.'), type: 'error' });
     } finally {
       setIsSubmitting(false);
     }
