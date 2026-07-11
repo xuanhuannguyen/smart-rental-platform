@@ -115,7 +115,14 @@ export const ENDPOINTS = {
     APPENDIX_SIGN_OTP: (id: string, appendixId: string) => `/api/contracts/${id}/appendices/${appendixId}/sign/otp`,
     APPENDIX_SIGN: (id: string, appendixId: string) => `/api/contracts/${id}/appendices/${appendixId}/sign`,
     APPENDIX_REJECT: (id: string, appendixId: string) => `/api/contracts/${id}/appendices/${appendixId}/reject`,
-    APPENDIX_REVISION_REQUEST: (id: string, appendixId: string) => `/api/contracts/${id}/appendices/${appendixId}/revision-request`
+    APPENDIX_REVISION_REQUEST: (id: string, appendixId: string) => `/api/contracts/${id}/appendices/${appendixId}/revision-request`,
+    ESIGN_ENVELOPE: (id: string) => `/api/contracts/${id}/esign-envelope`,
+    ESIGN_REQUEST_OTP: (id: string) => `/api/contracts/${id}/esign-envelope/request-otp`,
+    ESIGN_SUBMIT_OTP: (id: string) => `/api/contracts/${id}/esign-envelope/submit-otp`,
+    ESIGN_ENVELOPE_STATUS: (id: string, envelopeId: string) => `/api/contracts/${id}/esign-envelopes/${envelopeId}/status`,
+    APPENDIX_ESIGN_ENVELOPE: (id: string, appendixId: string) => `/api/contracts/${id}/appendices/${appendixId}/esign-envelope`,
+    APPENDIX_ESIGN_REQUEST_OTP: (id: string, appendixId: string) => `/api/contracts/${id}/appendices/${appendixId}/esign-envelope/request-otp`,
+    APPENDIX_ESIGN_SUBMIT_OTP: (id: string, appendixId: string) => `/api/contracts/${id}/appendices/${appendixId}/esign-envelope/submit-otp`
   },
   ADMIN: {
     KYC_PENDING: '/api/admin/kyc/pending',
@@ -129,7 +136,11 @@ export const ENDPOINTS = {
     ROOMING_HOUSE_APPROVE: (id: string) => `/api/admin/rooming-houses/${id}/approve`,
     ROOMING_HOUSE_REJECT: (id: string) => `/api/admin/rooming-houses/${id}/reject`,
     USERS: '/api/admin/users',
-    USER_DETAIL: (id: string) => `/api/admin/users/${id}`
+    USER_DETAIL: (id: string) => `/api/admin/users/${id}`,
+    REVIEW_REPORTS: '/api/admin/review-reports',
+    REVIEW_REPORT_DETAIL: (id: string) => `/api/admin/review-reports/${id}`,
+    REVIEW_REPORT_PROCESS: (id: string) => `/api/admin/review-reports/${id}/resolve`,
+    REVIEW_DELETE: (id: string) => `/api/admin/reviews/${id}`
   },
   VIEWING_APPOINTMENTS: {
     CREATE: '/api/viewing-appointments',

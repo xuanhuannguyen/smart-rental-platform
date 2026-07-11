@@ -19,6 +19,8 @@ internal static class RoomingHouseServiceRegistration
         services.AddScoped<IRoomingHouseDraftService, RoomingHouseDraftService>();
         services.AddScoped<IRoomingHouseMediaService, RoomingHouseMediaService>();
         services.AddScoped<IRoomingHouseSubmissionService, RoomingHouseSubmissionService>();
+        services.AddScoped<IFavoriteRoomingHouseService, FavoriteRoomingHouseService>();
+        services.AddScoped<IRoomingHouseReviewService, RoomingHouseReviewService>();
 
         return services;
     }

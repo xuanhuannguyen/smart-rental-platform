@@ -9,6 +9,7 @@ using SmartRentalPlatform.Infrastructure.Caching;
 using SmartRentalPlatform.Infrastructure.BackgroundServices;
 using SmartRentalPlatform.Infrastructure.ExternalServices.Ekyc;
 using SmartRentalPlatform.Infrastructure.ExternalServices.Email;
+using SmartRentalPlatform.Infrastructure.ExternalServices.ESign;
 using SmartRentalPlatform.Infrastructure.ExternalServices.Gemini;
 using SmartRentalPlatform.Infrastructure.ExternalServices.Google;
 using SmartRentalPlatform.Infrastructure.ExternalServices.PayOS;
@@ -30,9 +31,9 @@ public static class DependencyInjection
         var connectionString = configuration.GetConnectionString("DefaultConnection");
 
         services.AddDbContext<AppDbContext>(options =>
-        {
-            options.UseNpgsql(connectionString);
-        });
+            options.UseNpgsql(
+                configuration.GetConnectionString("DefaultConnection"),
+                b => b.MigrationsAssembly(typeof(AppDbContext).Assembly.FullName)));
 
         services.AddScoped<IAppDbContext>(provider =>
               provider.GetRequiredService<AppDbContext>());
@@ -70,6 +71,7 @@ public static class DependencyInjection
         services.AddHostedService<RentalContractExpirationWorker>();
         services.AddHostedService<RentalContractMoveInActivationWorker>();
         services.AddHostedService<ContractAppendixApplicationWorker>();
+        services.AddHostedService<ESignEnvelopeExpirationWorker>();
         services.Configure<PayOSOptions>(configuration.GetSection(PayOSOptions.SectionName));
         services.AddHttpClient(PayOSClient.HttpClientName, (provider, client) =>
         {
@@ -99,6 +101,22 @@ public static class DependencyInjection
         {
             services.AddScoped<IVnptEkycClient, RealVnptEkycClient>();
         }
+
+        services.Configure<ESignOptions>(configuration.GetSection(ESignOptions.SectionName));
+        services.AddHttpClient(ESignProviderClient.HttpClientName, (provider, client) =>
+        {
+            var options = provider.GetRequiredService<IOptions<ESignOptions>>().Value;
+            var baseUrl = options.BaseUrl; // or ProductionBaseUrl based on environment if needed, for now just BaseUrl
+            if (!string.IsNullOrEmpty(baseUrl))
+            {
+                client.BaseAddress = new Uri(baseUrl.TrimEnd('/') + "/");
+            }
+            client.Timeout = TimeSpan.FromSeconds(options.TimeoutSeconds);
+        });
+
+        services.AddScoped<IESignProviderClient, ESignProviderClient>();
+
+        services.AddScoped<IESignWebhookVerifier, ESignWebhookVerifier>();
 
         return services;
     }

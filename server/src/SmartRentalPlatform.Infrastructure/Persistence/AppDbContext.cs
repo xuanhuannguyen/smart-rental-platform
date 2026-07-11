@@ -42,6 +42,9 @@ public class AppDbContext : DbContext, IAppDbContext
     public DbSet<RoomingHouseAmenity> RoomingHouseAmenities => Set<RoomingHouseAmenity>();
     public DbSet<RoomAmenity> RoomAmenities => Set<RoomAmenity>();
     public DbSet<PropertyImage> PropertyImages => Set<PropertyImage>();
+    public DbSet<FavoriteRoomingHouse> FavoriteRoomingHouses => Set<FavoriteRoomingHouse>();
+    public DbSet<RoomingHouseReview> RoomingHouseReviews => Set<RoomingHouseReview>();
+    public DbSet<ReviewReport> ReviewReports => Set<ReviewReport>();
     public DbSet<RoomingHouseLegalDocument> RoomingHouseLegalDocuments => Set<RoomingHouseLegalDocument>();
     public DbSet<RoomingHouseRule> RoomingHouseRules => Set<RoomingHouseRule>();
     public DbSet<RentalPolicy> RentalPolicies => Set<RentalPolicy>();
@@ -77,6 +80,8 @@ public class AppDbContext : DbContext, IAppDbContext
     public DbSet<ContractAppendixChange> ContractAppendixChanges => Set<ContractAppendixChange>();
     public DbSet<ContractFile> ContractFiles => Set<ContractFile>();
     public DbSet<ContractSignature> ContractSignatures => Set<ContractSignature>();
+    public DbSet<ContractSigningEnvelope> ContractSigningEnvelopes => Set<ContractSigningEnvelope>();
+    public DbSet<ESignWebhookLog> ESignWebhookLogs => Set<ESignWebhookLog>();
 
 
     public async Task<IAppDbContextTransaction> BeginTransactionAsync(CancellationToken cancellationToken = default)

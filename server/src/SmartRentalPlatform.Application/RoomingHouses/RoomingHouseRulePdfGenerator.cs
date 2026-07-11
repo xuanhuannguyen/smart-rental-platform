@@ -48,15 +48,15 @@ internal static class RoomingHouseRulePdfGenerator
                     {
                         text.Justify();
 
-                        text.Span("Nhằm đảm bảo an ninh, trật tự và môi trường sống văn minh, an toàn, tất cả các thành viên khi thuê trọ tại khu trọ ", TextStyle.Default.Italic());
+                        text.Span("Nhằm đảm bảo an ninh, trật tự và môi trường sống văn minh, an toàn, tất cả các thành viên khi thuê trọ tại khu trọ ").Style(TextStyle.Default.Italic());
 
-                        text.Span(house.Name, TextStyle.Default.Bold().Italic());
+                        text.Span(house.Name).Style(TextStyle.Default.Bold().Italic());
 
-                        text.Span(" cần nghiêm túc ", TextStyle.Default.Italic());
+                        text.Span(" cần nghiêm túc ").Style(TextStyle.Default.Italic());
 
-                        text.Span("tuân thủ", TextStyle.Default.Bold().Italic());
+                        text.Span("tuân thủ").Style(TextStyle.Default.Bold().Italic());
 
-                        text.Span(" các quy định sau:", TextStyle.Default.Italic());
+                        text.Span(" các quy định sau:").Style(TextStyle.Default.Italic());
                     });
 
                     int index = 1;
@@ -82,11 +82,11 @@ internal static class RoomingHouseRulePdfGenerator
                     // Concluding paragraph
                     column.Item().PaddingTop(10).Text(text =>
                     {
-                        text.Span("Rất mong các bạn hợp tác và tuân thủ nội quy để cùng xây dựng khu trọ ", TextStyle.Default.Italic());
+                        text.Span("Rất mong các bạn hợp tác và tuân thủ nội quy để cùng xây dựng khu trọ ").Style(TextStyle.Default.Italic());
 
-                        text.Span(house.Name, TextStyle.Default.Bold().Italic());
+                        text.Span(house.Name).Style(TextStyle.Default.Bold().Italic());
 
-                        text.Span(" trở thành nơi an toàn – văn minh – thân thiện.", TextStyle.Default.Italic());
+                        text.Span(" trở thành nơi an toàn – văn minh – thân thiện.").Style(TextStyle.Default.Italic());
                     });
 
                     column.Item().Text("Xin cảm ơn!").Bold().Italic();

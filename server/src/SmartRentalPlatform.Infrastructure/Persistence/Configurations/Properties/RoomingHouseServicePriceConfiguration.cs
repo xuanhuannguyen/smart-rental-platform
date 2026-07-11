@@ -33,7 +33,7 @@ public class RoomingHouseServicePriceConfiguration : IEntityTypeConfiguration<Ro
         builder.HasIndex(x => new { x.RoomingHouseId, x.ServiceTypeId, x.IsActive });
 
         builder.HasOne(x => x.RoomingHouse)
-            .WithMany()
+            .WithMany(x => x.ServicePrices)
             .HasForeignKey(x => x.RoomingHouseId)
             .OnDelete(DeleteBehavior.Restrict);
 

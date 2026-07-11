@@ -1,0 +1,73 @@
+.landlord-contract-filters {
+  align-items: flex-end;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.landlord-contract-filter-group {
+  background: #ffffff;
+  border: 1px solid #e2e8f0;
+  border-radius: 10px;
+  box-shadow: 0 1px 3px rgba(15, 23, 42, 0.08);
+  display: flex;
+  gap: 16px;
+  padding: 12px;
+}
+
+.landlord-contract-filter-label {
+  color: #64748b;
+  display: block;
+  font-size: 13px;
+  font-weight: 700;
+  margin-bottom: 4px;
+}
+
+.landlord-contract-filter-select {
+  background: #ffffff;
+  border: 1px solid #cbd5e1;
+  border-radius: 8px;
+  color: #0f172a;
+  font: inherit;
+  font-size: 14px;
+  min-width: 150px;
+  outline: none;
+  padding: 8px 10px;
+}
+
+.landlord-contract-filter-select:disabled {
+  background: #f1f5f9;
+  color: #94a3b8;
+}
+
+.landlord-contract-list {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  width: 100%;
+}
+
+.landlord-contract-price {
+  color: #047857;
+}
+
+.landlord-contract-notice {
+  background: #fff7ed;
+  border: 1px solid #fed7aa;
+  border-radius: 10px;
+  color: #c2410c;
+  font-size: 13px;
+  font-weight: 700;
+  grid-column: 1 / -1;
+  padding: 10px 12px;
+}
+
+@media (max-width: 720px) {
+  .landlord-contract-filter-group {
+    flex-direction: column;
+    width: 100%;
+  }
+
+  .landlord-contract-filter-select {
+    width: 100%;
+  }
+}

@@ -148,16 +148,6 @@
   z-index: 1;
 }
 
-.rental-modal-error {
-  background: #fef2f2;
-  border: 1px solid #fca5a5;
-  color: #b91c1c;
-  border-radius: 8px;
-  padding: 10px 14px;
-  font-size: 13px;
-  font-weight: 600;
-}
-
 /* Row for Dates */
 .rental-modal-row {
   display: flex;

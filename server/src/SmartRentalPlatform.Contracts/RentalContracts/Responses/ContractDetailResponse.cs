@@ -32,6 +32,8 @@ public class ContractDetailResponse
 
     public int PaymentDay { get; set; }
 
+    public int MaxOccupants { get; set; }
+
     public string Status { get; set; } = string.Empty;
 
     public string? RoomSnapshot { get; set; }

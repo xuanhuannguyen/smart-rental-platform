@@ -10,5 +10,5 @@ public class ContractSignatureResponse
 
     public string SignatureMethod { get; set; } = string.Empty;
 
-    public DateTimeOffset SignedAt { get; set; }
+    public DateTimeOffset? SignedAt { get; set; }
 }

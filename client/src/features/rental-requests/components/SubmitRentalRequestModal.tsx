@@ -1,6 +1,8 @@
+import { Alert } from '../../../shared/components/ui/Alert';
 import { useState } from 'react';
 import { rentalRequestApi } from '../api';
 import { getApiErrorMessage } from '../../../shared/api/apiError';
+import { Toast } from '../../../shared/components/ui/Toast';
 import './SubmitRentalRequestModal.css';
 
 interface SubmitRentalRequestModalProps {
@@ -39,6 +41,7 @@ export default function SubmitRentalRequestModal({
   
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
+  const [toast, setToast] = useState<{ message: string; type: 'success' | 'error' | 'info' } | null>(null);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -70,7 +73,7 @@ export default function SubmitRentalRequestModal({
       onSuccess('Gửi yêu cầu thuê thành công! Vui lòng chờ chủ trọ xác nhận.');
       onClose();
     } catch (err) {
-      setError(getApiErrorMessage(err, 'Không thể gửi yêu cầu thuê. Vui lòng thử lại.'));
+      setToast({ message: getApiErrorMessage(err, 'Không thể gửi yêu cầu thuê. Vui lòng thử lại.'), type: 'error' });
     } finally {
       setLoading(false);
     }
@@ -131,7 +134,7 @@ export default function SubmitRentalRequestModal({
             </svg>
           </div>
 
-          {error && <div className="rental-modal-error">{error}</div>}
+          {error && <Alert type="error">{error}</Alert>}
 
           <div className="rental-modal-row">
             <div className="rental-modal-field">
@@ -232,6 +235,7 @@ export default function SubmitRentalRequestModal({
           </footer>
         </form>
       </div>
+      {toast && <Toast message={toast.message} type={toast.type} onClose={() => setToast(null)} />}
     </div>
   );
 }

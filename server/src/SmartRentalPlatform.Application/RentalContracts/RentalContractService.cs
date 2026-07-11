@@ -52,7 +52,9 @@ public class RentalContractService : IRentalContractService
 
 	private readonly IPaymentRowLockService rowLockService;
 
-	public RentalContractService(IAppDbContext context, IContractPdfRenderer contractPdfRenderer, IContractSignatureOtpService contractSignatureOtpService, IContractFileService contractFileService, RentalContractPreviewBuilder previewBuilder, RentalContractOccupantValidator occupantValidator, RentalContractDocumentHelper documentHelper, RentalContractFinalInvoiceStatusResolver finalInvoiceStatusResolver, IBillingService billingService, IWalletService walletService, IPaymentRowLockService rowLockService)
+	private readonly IContractDocumentModelFactory contractDocumentModelFactory;
+
+	public RentalContractService(IAppDbContext context, IContractPdfRenderer contractPdfRenderer, IContractSignatureOtpService contractSignatureOtpService, IContractFileService contractFileService, RentalContractPreviewBuilder previewBuilder, RentalContractOccupantValidator occupantValidator, RentalContractDocumentHelper documentHelper, RentalContractFinalInvoiceStatusResolver finalInvoiceStatusResolver, IBillingService billingService, IWalletService walletService, IPaymentRowLockService rowLockService, IContractDocumentModelFactory contractDocumentModelFactory)
 	{
 		this.context = context;
 		this.contractPdfRenderer = contractPdfRenderer;
@@ -65,6 +67,7 @@ public class RentalContractService : IRentalContractService
 		this.billingService = billingService;
 		this.walletService = walletService;
 		this.rowLockService = rowLockService;
+		this.contractDocumentModelFactory = contractDocumentModelFactory;
 	}
 
 	public async Task<ContractDetailResponse?> GetByIdAsync(Guid userId, Guid contractId, CancellationToken cancellationToken = default(CancellationToken))
@@ -147,7 +150,12 @@ public class RentalContractService : IRentalContractService
 			throw new ForbiddenException("RENTAL_CONTRACT_FORBIDDEN", "Bạn không có quyền xem bản xem trước hợp đồng này.", new { contract.Id });
 		}
 		ContractRenderOptions renderOptions = await previewBuilder.BuildAsync(contract, viewerAccess, cancellationToken);
-		byte[] pdfBytes = contractPdfRenderer.RenderSignedRentalContract(contract, renderOptions);
+		ContractDocumentModel documentModel = await contractDocumentModelFactory.BuildAsync(
+			contract,
+			ContractDocumentBuildMode.ExistingSnapshotOrLive,
+			null,
+			cancellationToken);
+		byte[] pdfBytes = contractPdfRenderer.RenderSignedRentalContract(documentModel, renderOptions);
 		string fileName = "contract-preview-" + contract.ContractNumber + ".pdf";
 		return new ContractPreviewPdfResult(pdfBytes, "application/pdf", fileName);
 	}
@@ -161,7 +169,8 @@ public class RentalContractService : IRentalContractService
 		}
 		RentalContractStateGuard.EnsureMainTenant(tenantUserId, contract, RentalContractResponseMapper.GetCurrentMainTenantUserId(contract));
 		RentalContractStateGuard.EnsureCanSubmitOccupants(contract);
-		RentalContractOccupantValidator.ValidateOccupantsRequest(contract.MainTenantUser.Email, request, RentalContractResponseMapper.GetSnapshotMaxOccupants(contract));
+		var (resolvedStartDate, resolvedEndDate) = RentalContractResponseMapper.ResolveCurrentContractTermValues(contract);
+		RentalContractOccupantValidator.ValidateOccupantsRequest(contract.MainTenantUser.Email, request, RentalContractResponseMapper.GetSnapshotMaxOccupants(contract), resolvedStartDate, resolvedEndDate);
 		Dictionary<string, VerifiedOccupantAccount> verifiedAccounts = await occupantValidator.ValidateOccupantAccountsAsync(request, cancellationToken);
 		ContractDetailResponse result;
 		await using (IAppDbContextTransaction transaction = await context.BeginTransactionAsync(cancellationToken))

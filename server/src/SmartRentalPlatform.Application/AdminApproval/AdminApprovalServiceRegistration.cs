@@ -1,4 +1,5 @@
 using Microsoft.Extensions.DependencyInjection;
+using SmartRentalPlatform.Application.ReviewReports;
 
 namespace SmartRentalPlatform.Application.AdminApproval;
 
@@ -10,6 +11,7 @@ internal static class AdminApprovalServiceRegistration
         services.AddScoped<IAdminRoomingHouseApprovalService, AdminRoomingHouseApprovalService>();
         services.AddScoped<IApprovalAuditService, ApprovalAuditService>();
         services.AddScoped<IAdminUserService, AdminUserService>();
+        services.AddScoped<IReviewReportService, ReviewReportService>();
 
         return services;
     }

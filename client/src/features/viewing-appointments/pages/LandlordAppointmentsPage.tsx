@@ -10,20 +10,95 @@ import {
 } from '../api';
 import type { ViewingAppointment, ViewingAppointmentStatus, ConflictCheckResponse } from '../types';
 import { Alert } from '../../../shared/components/ui/Alert';
+import { Tabs } from '../../../shared/components/ui/Tabs';
+import { PageHeader } from '../../../shared/components/ui/PageHeader';
+import { Toast } from '../../../shared/components/ui/Toast';
+import { Card, CardMetaRow, type CardAction, type CardStatusTone } from '../../../shared/components/ui/Card';
 import { getApiErrorMessage } from '../../../shared/api/apiError';
 import { formatDateTimeVi } from '../../../shared/utils/format';
 import '../../landlord/pages/LandlordDashboardPage.css';
 import './LandlordAppointmentsPage.css';
 import '../components/ViewingAppointmentModal.css';
 
+type AppointmentTab = 'all' | 'pending' | 'confirmed' | 'history';
+
+function getAppointmentTabIcon(tab: AppointmentTab) {
+  const props = {
+    width: 15,
+    height: 15,
+    viewBox: '0 0 24 24',
+    fill: 'none',
+    stroke: 'currentColor',
+    strokeWidth: 2.2,
+    strokeLinecap: 'round' as const,
+    strokeLinejoin: 'round' as const,
+  };
+
+  switch (tab) {
+    case 'pending':
+      return (
+        <svg {...props}>
+          <circle cx="12" cy="12" r="10" />
+          <polyline points="12 6 12 12 16 14" />
+        </svg>
+      );
+    case 'confirmed':
+      return (
+        <svg {...props}>
+          <path d="M22 11.08V12a10 10 0 1 1-5.93-9.14" />
+          <polyline points="22 4 12 14.01 9 11.01" />
+        </svg>
+      );
+    case 'history':
+      return (
+        <svg {...props}>
+          <polyline points="1 4 1 10 7 10" />
+          <path d="M3.51 15a9 9 0 1 0 .49-4.95" />
+        </svg>
+      );
+    default:
+      return (
+        <svg {...props}>
+          <line x1="8" y1="6" x2="21" y2="6" />
+          <line x1="8" y1="12" x2="21" y2="12" />
+          <line x1="8" y1="18" x2="21" y2="18" />
+          <line x1="3" y1="6" x2="3.01" y2="6" />
+          <line x1="3" y1="12" x2="3.01" y2="12" />
+          <line x1="3" y1="18" x2="3.01" y2="18" />
+        </svg>
+      );
+  }
+}
+
+function getAppointmentStatusTone(statusKey: string): CardStatusTone {
+  switch (statusKey) {
+    case 'confirmed':
+      return 'success';
+    case 'pending':
+      return 'warning';
+    case 'rejected':
+      return 'danger';
+    case 'proposal':
+      return 'info';
+    case 'completed':
+      return 'reserved';
+    case 'expired':
+    case 'cancelledbylandlord':
+    case 'cancelledbytenant':
+      return 'neutral';
+    default:
+      return 'neutral';
+  }
+}
+
 export default function LandlordAppointmentsPage() {
   const navigate = useNavigate();
   const [appointments, setAppointments] = useState<ViewingAppointment[]>([]);
   const [conflictMap, setConflictMap] = useState<Record<string, ConflictCheckResponse>>({});
-  const [activeTab, setActiveTab] = useState<'all' | 'pending' | 'confirmed' | 'history'>('pending');
+  const [activeTab, setActiveTab] = useState<AppointmentTab>('pending');
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
-  const [success, setSuccess] = useState('');
+  const [toast, setToast] = useState<{ message: string; type: 'success' | 'error' | 'info' } | null>(null);
 
   // Dialog action states
   const [confirmingAppointment, setConfirmingAppointment] = useState<ViewingAppointment | null>(null);
@@ -112,12 +187,11 @@ export default function LandlordAppointmentsPage() {
         confirmDespiteConflict: !!hasConflict && confirmDespiteConflict,
         landlordNote: landlordNote.trim() || null,
       });
-      setSuccess('Xác nhận lịch hẹn thành công.');
+      setToast({ message: 'Xác nhận lịch hẹn thành công.', type: 'success' });
       setConfirmingAppointment(null);
       void loadData();
-      setTimeout(() => setSuccess(''), 5000);
     } catch (err) {
-      setModalError(getApiErrorMessage(err, 'Không thể xác nhận lịch hẹn.'));
+      setToast({ message: getApiErrorMessage(err, 'Không thể xác nhận lịch hẹn.'), type: 'error' });
     } finally {
       setActionLoading(false);
     }
@@ -151,12 +225,11 @@ export default function LandlordAppointmentsPage() {
         proposedScheduledAt,
         proposedDurationMinutes,
       });
-      setSuccess('Đã từ chối lịch hẹn xem phòng.');
+      setToast({ message: 'Đã từ chối lịch hẹn xem phòng.', type: 'success' });
       setRejectingId(null);
       void loadData();
-      setTimeout(() => setSuccess(''), 5000);
     } catch (err) {
-      setModalError(getApiErrorMessage(err, 'Không thể từ chối lịch hẹn.'));
+      setToast({ message: getApiErrorMessage(err, 'Không thể từ chối lịch hẹn.'), type: 'error' });
     } finally {
       setActionLoading(false);
     }
@@ -178,12 +251,11 @@ export default function LandlordAppointmentsPage() {
       await cancelViewingAppointmentByLandlord(cancellingId, {
         cancelReason: cancelReason.trim(),
       });
-      setSuccess('Hủy lịch hẹn thành công.');
+      setToast({ message: 'Hủy lịch hẹn thành công.', type: 'success' });
       setCancellingId(null);
       void loadData();
-      setTimeout(() => setSuccess(''), 5000);
     } catch (err) {
-      setModalError(getApiErrorMessage(err, 'Không thể hủy lịch hẹn.'));
+      setToast({ message: getApiErrorMessage(err, 'Không thể hủy lịch hẹn.'), type: 'error' });
     } finally {
       setActionLoading(false);
     }
@@ -202,12 +274,11 @@ export default function LandlordAppointmentsPage() {
     setModalError('');
     try {
       await completeViewingAppointment(completingId);
-      setSuccess('Đánh dấu hoàn thành buổi xem phòng thành công.');
+      setToast({ message: 'Đánh dấu hoàn thành buổi xem phòng thành công.', type: 'success' });
       setCompletingId(null);
       void loadData();
-      setTimeout(() => setSuccess(''), 5000);
     } catch (err) {
-      setModalError(getApiErrorMessage(err, 'Không thể đánh dấu hoàn thành.'));
+      setToast({ message: getApiErrorMessage(err, 'Không thể đánh dấu hoàn thành.'), type: 'error' });
     } finally {
       setActionLoading(false);
     }
@@ -255,240 +326,127 @@ export default function LandlordAppointmentsPage() {
     <div className="landlord-dashboard-page landlord-appointments-page" style={{ display: 'contents' }}>
       <main className="dashboard-main">
         {/* === PAGE HEADER === */}
-        <section className="appt-page-header">
-          <div className="appt-page-header__left">
-            <p className="appt-eyebrow">QUẢN LÝ</p>
-            <h2 className="appt-page-title">Lịch hẹn xem phòng</h2>
-            <p className="appt-page-subtitle">Duyệt và kiểm tra lịch hẹn từ khách thuê</p>
-          </div>
-          <div className="appt-page-header__icon">
-            <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="#246bfe" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+        <PageHeader
+          icon={
+            <svg viewBox="0 0 24 24" width="24" height="24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
               <rect x="3" y="4" width="18" height="18" rx="2" ry="2" />
               <line x1="16" y1="2" x2="16" y2="6" />
               <line x1="8" y1="2" x2="8" y2="6" />
               <line x1="3" y1="10" x2="21" y2="10" />
             </svg>
-          </div>
-        </section>
+          }
+          eyebrow="QUẢN LÝ"
+          title="Lịch hẹn xem phòng"
+          description="Duyệt và kiểm tra lịch hẹn từ khách thuê"
+        />
 
-        {error && <Alert type="error">{error}</Alert>}
-        {success && <Alert type="success">{success}</Alert>}
+        <div className="dashboard-content">
+          {error && <div className="mb-4"><Alert type="error">{error}</Alert></div>}
 
-        {/* === TABS === */}
-        <div className="appt-tabs">
-          <button
-            id="appt-tab-pending"
-            className={`appt-tab ${activeTab === 'pending' ? 'appt-tab--active' : ''}`}
-            onClick={() => setActiveTab('pending')}
-          >
-            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
-              <circle cx="12" cy="12" r="10" />
-              <polyline points="12 6 12 12 16 14" />
-            </svg>
-            Chờ xử lý ({pendingCount})
-          </button>
-          <button
-            id="appt-tab-confirmed"
-            className={`appt-tab ${activeTab === 'confirmed' ? 'appt-tab--active' : ''}`}
-            onClick={() => setActiveTab('confirmed')}
-          >
-            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
-              <path d="M22 11.08V12a10 10 0 1 1-5.93-9.14" />
-              <polyline points="22 4 12 14.01 9 11.01" />
-            </svg>
-            Đã xác nhận ({appointments.filter(a => a.status === 'Confirmed').length})
-          </button>
-          <button
-            id="appt-tab-all"
-            className={`appt-tab ${activeTab === 'all' ? 'appt-tab--active' : ''}`}
-            onClick={() => setActiveTab('all')}
-          >
-            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
-              <line x1="8" y1="6" x2="21" y2="6" />
-              <line x1="8" y1="12" x2="21" y2="12" />
-              <line x1="8" y1="18" x2="21" y2="18" />
-              <line x1="3" y1="6" x2="3.01" y2="6" />
-              <line x1="3" y1="12" x2="3.01" y2="12" />
-              <line x1="3" y1="18" x2="3.01" y2="18" />
-            </svg>
-            Tất cả
-          </button>
-          <button
-            id="appt-tab-history"
-            className={`appt-tab ${activeTab === 'history' ? 'appt-tab--active' : ''}`}
-            onClick={() => setActiveTab('history')}
-          >
-            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
-              <polyline points="1 4 1 10 7 10" />
-              <path d="M3.51 15a9 9 0 1 0 .49-4.95" />
-            </svg>
-            Lịch sử duyệt
-          </button>
-        </div>
+          {/* === TABS === */}
+          <Tabs
+            className="attached-bottom"
+            variant="segmented-secondary"
+            activeId={activeTab}
+            onChange={(tab) => setActiveTab(tab as AppointmentTab)}
+            items={[
+              { id: 'all', label: 'Tất cả', icon: getAppointmentTabIcon('all') },
+              { id: 'pending', label: `Chờ xử lý (${pendingCount})`, icon: getAppointmentTabIcon('pending') },
+              { id: 'confirmed', label: `Đã xác nhận (${appointments.filter(a => a.status === 'Confirmed').length})`, icon: getAppointmentTabIcon('confirmed') },
+              { id: 'history', label: 'Lịch sử duyệt', icon: getAppointmentTabIcon('history') },
+            ]}
+          />
 
-        {loading ? (
-          <div className="appt-state-box">
-            <svg width="36" height="36" viewBox="0 0 24 24" fill="none" stroke="#94a3b8" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" style={{ animation: 'spin 1s linear infinite' }}>
-              <line x1="12" y1="2" x2="12" y2="6" /><line x1="12" y1="18" x2="12" y2="22" />
-              <line x1="4.93" y1="4.93" x2="7.76" y2="7.76" /><line x1="16.24" y1="16.24" x2="19.07" y2="19.07" />
-              <line x1="2" y1="12" x2="6" y2="12" /><line x1="18" y1="12" x2="22" y2="12" />
-              <line x1="4.93" y1="19.07" x2="7.76" y2="16.24" /><line x1="16.24" y1="7.76" x2="19.07" y2="4.93" />
-            </svg>
-            <p>Đang tải lịch hẹn...</p>
-          </div>
-        ) : filteredAppointments.length === 0 ? (
-          <div className="appt-state-box appt-state-box--empty">
-            <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="#cbd5e1" strokeWidth="1.2" strokeLinecap="round" strokeLinejoin="round">
-              <rect x="3" y="4" width="18" height="18" rx="2" ry="2" />
-              <line x1="16" y1="2" x2="16" y2="6" />
-              <line x1="8" y1="2" x2="8" y2="6" />
-              <line x1="3" y1="10" x2="21" y2="10" />
-            </svg>
-            <p>Không có lịch hẹn nào trong danh mục này.</p>
-          </div>
-        ) : (
-          <div className="appt-list">
-            {filteredAppointments.map((item) => {
-              const houseName = item.roomingHouseName ?? 'Khu trọ';
-              const roomNumber = item.roomNumber ?? 'phòng';
-              const tenantName = item.tenantDisplayName ?? `Khách ${item.tenantUserId.substring(0, 8)}`;
-              const conflict = conflictMap[item.id];
-              const isPast = isAppointmentInPast(item.scheduledAt);
-              const statusKey = hasProposal(item) ? 'proposal' : item.status.toLowerCase();
+          <section className="tab-attached-panel tab-attached-panel--cards">
+            {loading ? (
+              <div className="appt-state-box">
+                <svg width="36" height="36" viewBox="0 0 24 24" fill="none" stroke="#94a3b8" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" style={{ animation: 'spin 1s linear infinite' }}>
+                  <line x1="12" y1="2" x2="12" y2="6" /><line x1="12" y1="18" x2="12" y2="22" />
+                  <line x1="4.93" y1="4.93" x2="7.76" y2="7.76" /><line x1="16.24" y1="16.24" x2="19.07" y2="19.07" />
+                  <line x1="2" y1="12" x2="6" y2="12" /><line x1="18" y1="12" x2="22" y2="12" />
+                  <line x1="4.93" y1="19.07" x2="7.76" y2="16.24" /><line x1="16.24" y1="7.76" x2="19.07" y2="4.93" />
+                </svg>
+                <p>Đang tải lịch hẹn...</p>
+              </div>
+            ) : filteredAppointments.length === 0 ? (
+              <div className="appt-state-box appt-state-box--empty">
+                <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="#cbd5e1" strokeWidth="1.2" strokeLinecap="round" strokeLinejoin="round">
+                  <rect x="3" y="4" width="18" height="18" rx="2" ry="2" />
+                  <line x1="16" y1="2" x2="16" y2="6" />
+                  <line x1="8" y1="2" x2="8" y2="6" />
+                  <line x1="3" y1="10" x2="21" y2="10" />
+                </svg>
+                <p>Không có lịch hẹn nào trong danh mục này.</p>
+              </div>
+            ) : (
+              <div className="appt-list">
+                {filteredAppointments.map((item) => {
+                  const houseName = item.roomingHouseName ?? 'Khu trọ';
+                  const roomNumber = item.roomNumber ?? 'phòng';
+                  const tenantName = item.tenantDisplayName ?? `Khách ${item.tenantUserId.substring(0, 8)}`;
+                  const conflict = conflictMap[item.id];
+                  const isPast = isAppointmentInPast(item.scheduledAt);
+                  const statusKey = hasProposal(item) ? 'proposal' : item.status.toLowerCase();
+                  const statusTone = getAppointmentStatusTone(statusKey);
+                  const actionItems: CardAction[] = [];
 
-              return (
-                <div key={item.id} className={`appt-card appt-card--${statusKey}`}>
-                  {/* Card Header */}
-                  <div className="appt-card__header">
-                    <div className="appt-card__title-row">
-                      <div className="appt-card__house-icon">
-                        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                          <rect x="2" y="7" width="20" height="15" rx="2" />
-                          <path d="M16 21V7a2 2 0 0 0-2-2h-4a2 2 0 0 0-2 2v14" />
-                          <path d="M9 21V7" /><path d="M15 21V7" />
-                        </svg>
-                      </div>
-                      <h3 className="appt-card__room-name">{houseName} - Phòng {roomNumber}</h3>
-                    </div>
-                    <span className={`appt-status-badge appt-status-badge--${statusKey}`}>
-                      {hasProposal(item) ? 'Chờ phản hồi' : getStatusText(item.status).toUpperCase()}
-                    </span>
-                  </div>
-
-                  {/* Card Meta */}
-                  <div className="appt-card__meta">
-                    <div className="appt-meta-row">
-                      <span className="appt-meta-icon">
-                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                          <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2" />
-                          <circle cx="12" cy="7" r="4" />
-                        </svg>
-                      </span>
-                      <span className="appt-meta-label">Khách hẹn:</span>
-                      <span className="appt-meta-value">{tenantName}</span>
-                    </div>
-                    <div className="appt-meta-row">
-                      <span className="appt-meta-icon">
-                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                          <rect x="3" y="4" width="18" height="18" rx="2" ry="2" />
-                          <line x1="16" y1="2" x2="16" y2="6" />
-                          <line x1="8" y1="2" x2="8" y2="6" />
-                          <line x1="3" y1="10" x2="21" y2="10" />
-                        </svg>
-                      </span>
-                      <span className="appt-meta-label">Thời gian hẹn:</span>
-                      <span className="appt-meta-value">{formatDateTimeVi(item.scheduledAt)} ({item.durationMinutes} phút)</span>
-                    </div>
-
-                    {item.tenantNote && (
-                      <div className="appt-note-box appt-note-box--tenant">
-                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                          <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z" />
-                        </svg>
-                        <span><strong>Lời nhắn khách thuê:</strong> "{item.tenantNote}"</span>
-                      </div>
-                    )}
-                    {item.landlordNote && (
-                      <div className="appt-note-box appt-note-box--landlord">
-                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                          <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z" />
-                        </svg>
-                        <span><strong>Ghi chú phản hồi:</strong> "{item.landlordNote}"</span>
-                      </div>
-                    )}
-                    {item.cancelReason && (
-                      <div className="appt-note-box appt-note-box--cancel">
-                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                          <circle cx="12" cy="12" r="10" />
-                          <line x1="15" y1="9" x2="9" y2="15" /><line x1="9" y1="9" x2="15" y2="15" />
-                        </svg>
-                        <span><strong>Lý do hủy/từ chối:</strong> "{item.cancelReason}"</span>
-                      </div>
-                    )}
-
-                    {/* Proposal banner */}
-                    {item.status === 'Rejected' && item.proposedScheduledAt && (
-                      <div className="appt-proposal-banner">
-                        <div className="appt-proposal-banner__title">
-                          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
-                            <circle cx="12" cy="12" r="10" />
-                            <polyline points="12 6 12 12 16 14" />
-                          </svg>
-                          Đã đề xuất giờ mới — đang chờ khách phản hồi
-                        </div>
-                        <p><strong>Giờ đề xuất:</strong> {formatDateTimeVi(item.proposedScheduledAt)} ({item.proposedDurationMinutes ?? item.durationMinutes} phút)</p>
-                      </div>
-                    )}
-
-                    {/* Conflict warning */}
-                    {item.status === 'Pending' && conflict?.hasConflict && (
-                      <div className="appt-conflict-banner">
-                        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
-                          <path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z" />
-                          <line x1="12" y1="9" x2="12" y2="13" />
-                          <line x1="12" y1="17" x2="12.01" y2="17" />
-                        </svg>
-                        <div>
-                          <strong>Cảnh báo trùng giờ hẹn!</strong>
-                          <ul>
-                            {conflict.conflictingAppointments.map((c) => (
-                              <li key={c.id}>Trùng với lịch đã xác nhận ở <strong>{c.roomingHouseName} - Phòng {c.roomNumber}</strong> ({formatDateTimeVi(c.scheduledAt)})</li>
-                            ))}
-                          </ul>
-                        </div>
-                      </div>
-                    )}
-                  </div>
-
-                  {/* Card Footer Actions */}
-                  <div className="appt-card__footer">
-                    {item.status === 'Pending' && (
-                      <div className="appt-action-group">
-                        <button className="appt-btn appt-btn--confirm" onClick={() => handleConfirmClick(item)}>
-                          <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
-                            <polyline points="20 6 9 17 4 12" />
-                          </svg>
-                          Xác nhận
-                        </button>
-                        <button className="appt-btn appt-btn--reject" onClick={() => handleRejectClick(item.id)}>
+                  if (item.status === 'Pending') {
+                    actionItems.push(
+                      {
+                        label: 'Từ chối',
+                        variant: 'danger',
+                        onClick: () => handleRejectClick(item.id),
+                        icon: (
                           <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
                             <line x1="18" y1="6" x2="6" y2="18" />
                             <line x1="6" y1="6" x2="18" y2="18" />
                           </svg>
-                          Từ chối
-                        </button>
-                      </div>
-                    )}
-                    {item.status === 'Confirmed' && (
-                      <div className="appt-action-group">
-                        {isPast ? (
-                          <button className="appt-btn appt-btn--complete" onClick={() => handleCompleteClick(item.id)}>
-                            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
-                              <polyline points="20 6 9 17 4 12" />
-                            </svg>
-                            Hoàn tất xem phòng
-                          </button>
-                        ) : (
+                        ),
+                      },
+                      {
+                        label: 'Xác nhận',
+                        variant: 'success',
+                        onClick: () => handleConfirmClick(item),
+                        icon: (
+                          <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                            <polyline points="20 6 9 17 4 12" />
+                          </svg>
+                        ),
+                      }
+                    );
+                  }
+
+                  if (item.status === 'Confirmed') {
+                    if (isPast) {
+                      actionItems.push({
+                        label: 'Hoàn tất xem phòng',
+                        variant: 'primary',
+                        onClick: () => handleCompleteClick(item.id),
+                        icon: (
+                          <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                            <polyline points="20 6 9 17 4 12" />
+                          </svg>
+                        ),
+                      });
+                    }
+
+                    actionItems.push({
+                      label: 'Hủy lịch',
+                      variant: 'secondary',
+                      onClick: () => handleCancelClick(item.id),
+                    });
+                  }
+
+                  return (
+                    <Card
+                      key={item.id}
+                      title={`${houseName} - Phòng ${roomNumber}`}
+                      status={hasProposal(item) ? 'Chờ phản hồi' : getStatusText(item.status)}
+                      statusTone={statusTone}
+                      bodyColumns={2}
+                      actionItems={actionItems}
+                      actions={
+                        item.status === 'Confirmed' && !isPast ? (
                           <span className="appt-waiting-info">
                             <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                               <circle cx="12" cy="12" r="10" />
@@ -496,18 +454,97 @@ export default function LandlordAppointmentsPage() {
                             </svg>
                             Chờ thời gian hẹn diễn ra để hoàn tất
                           </span>
+                        ) : null
+                      }
+                    >
+                      <CardMetaRow
+                        label="Khách hẹn:"
+                        value={tenantName}
+                        icon={
+                          <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                            <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2" />
+                            <circle cx="12" cy="7" r="4" />
+                          </svg>
+                        }
+                      />
+                      <CardMetaRow
+                        label="Thời gian hẹn:"
+                        value={`${formatDateTimeVi(item.scheduledAt)} (${item.durationMinutes} phút)`}
+                        icon={
+                          <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                            <rect x="3" y="4" width="18" height="18" rx="2" ry="2" />
+                            <line x1="16" y1="2" x2="16" y2="6" />
+                            <line x1="8" y1="2" x2="8" y2="6" />
+                            <line x1="3" y1="10" x2="21" y2="10" />
+                          </svg>
+                        }
+                      />
+
+                        {item.tenantNote && (
+                          <div className="appt-note-box appt-note-box--tenant appt-card-span-full">
+                            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                              <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z" />
+                            </svg>
+                            <span><strong>Lời nhắn khách thuê:</strong> "{item.tenantNote}"</span>
+                          </div>
                         )}
-                        <button className="appt-btn appt-btn--cancel" onClick={() => handleCancelClick(item.id)}>
-                          Hủy lịch
-                        </button>
-                      </div>
-                    )}
-                  </div>
-                </div>
-              );
-            })}
-          </div>
-        )}
+                        {item.landlordNote && (
+                          <div className="appt-note-box appt-note-box--landlord appt-card-span-full">
+                            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                              <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z" />
+                            </svg>
+                            <span><strong>Ghi chú phản hồi:</strong> "{item.landlordNote}"</span>
+                          </div>
+                        )}
+                        {item.cancelReason && (
+                          <div className="appt-note-box appt-note-box--cancel appt-card-span-full">
+                            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                              <circle cx="12" cy="12" r="10" />
+                              <line x1="15" y1="9" x2="9" y2="15" /><line x1="9" y1="9" x2="15" y2="15" />
+                            </svg>
+                            <span><strong>Lý do hủy/từ chối:</strong> "{item.cancelReason}"</span>
+                          </div>
+                        )}
+
+                        {/* Proposal banner */}
+                        {item.status === 'Rejected' && item.proposedScheduledAt && (
+                          <div className="appt-proposal-banner appt-card-span-full">
+                            <div className="appt-proposal-banner__title">
+                              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
+                                <circle cx="12" cy="12" r="10" />
+                                <polyline points="12 6 12 12 16 14" />
+                              </svg>
+                              Đã đề xuất giờ mới — đang chờ khách phản hồi
+                            </div>
+                            <p><strong>Giờ đề xuất:</strong> {formatDateTimeVi(item.proposedScheduledAt)} ({item.proposedDurationMinutes ?? item.durationMinutes} phút)</p>
+                          </div>
+                        )}
+
+                        {/* Conflict warning */}
+                        {item.status === 'Pending' && conflict?.hasConflict && (
+                          <div className="appt-conflict-banner appt-card-span-full">
+                            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                              <path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z" />
+                              <line x1="12" y1="9" x2="12" y2="13" />
+                              <line x1="12" y1="17" x2="12.01" y2="17" />
+                            </svg>
+                            <div>
+                              <strong>Cảnh báo trùng giờ hẹn!</strong>
+                              <ul>
+                                {conflict.conflictingAppointments.map((c) => (
+                                  <li key={c.id}>Trùng với lịch đã xác nhận ở <strong>{c.roomingHouseName} - Phòng {c.roomNumber}</strong> ({formatDateTimeVi(c.scheduledAt)})</li>
+                                ))}
+                              </ul>
+                            </div>
+                          </div>
+                        )}
+                    </Card>
+                  );
+                })}
+              </div>
+            )}
+          </section>
+        </div>
       </main>
 
       {/* Confirm Modal */}
@@ -521,7 +558,7 @@ export default function LandlordAppointmentsPage() {
               </button>
             </header>
             <form onSubmit={handleConfirmSubmit} className="viewing-modal-form">
-              {modalError && <div className="viewing-modal-error">{modalError}</div>}
+              {modalError && <Alert type="error">{modalError}</Alert>}
 
               {modalConflictLoading ? (
                 <div className="modal-conflict-loading">Đang kiểm tra lịch trùng giờ...</div>
@@ -609,7 +646,7 @@ export default function LandlordAppointmentsPage() {
                 Vui lòng cung cấp lý do từ chối và tùy chọn đề xuất khung giờ khác cho người thuê.
               </p>
 
-              {modalError && <div className="viewing-modal-error">{modalError}</div>}
+              {modalError && <Alert type="error">{modalError}</Alert>}
 
               {/* Reject reason textarea */}
               <div className="viewing-modal-field">
@@ -799,7 +836,7 @@ export default function LandlordAppointmentsPage() {
               </button>
             </header>
             <form onSubmit={handleCancelSubmit} className="viewing-modal-form">
-              {modalError && <div className="viewing-modal-error">{modalError}</div>}
+              {modalError && <Alert type="error">{modalError}</Alert>}
 
               <div className="viewing-modal-field">
                 <label htmlFor="cancelReasonInput">Lý do hủy lịch <span className="required">*</span></label>
@@ -847,7 +884,7 @@ export default function LandlordAppointmentsPage() {
               </button>
             </header>
             <form onSubmit={handleCompleteSubmit} className="viewing-modal-form">
-              {modalError && <div className="viewing-modal-error">{modalError}</div>}
+              {modalError && <Alert type="error">{modalError}</Alert>}
               <div className="viewing-modal-field">
                 <p>Đánh dấu buổi xem phòng trọ đã diễn ra thành công?</p>
               </div>
@@ -872,6 +909,8 @@ export default function LandlordAppointmentsPage() {
           </div>
         </div>
       )}
+
+      {toast && <Toast message={toast.message} type={toast.type} onClose={() => setToast(null)} />}
     </div>
   );
 }

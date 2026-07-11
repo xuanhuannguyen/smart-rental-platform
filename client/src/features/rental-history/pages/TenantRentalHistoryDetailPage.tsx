@@ -1,8 +1,11 @@
+import { PageHeader } from '../../../shared/components/ui/PageHeader';
+import { Alert } from '../../../shared/components/ui/Alert';
 import React, { useCallback, useEffect, useState, useMemo } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { ROUTE_PATHS } from '../../../app/router/routePaths';
 import { getApiErrorMessage } from '../../../shared/api/apiError';
 import { Button } from '../../../shared/components/ui/Button';
+import { Tabs } from '../../../shared/components/ui/Tabs';
 import { useAuth } from '../../../app/providers/AuthProvider';
 import { contractApi } from '../../contracts/api';
 import type {
@@ -21,6 +24,7 @@ import {
   findAccessibleAppendixFile,
   loadAccessibleContractFiles,
 } from '../../contracts/appendixFiles';
+import { findAccessibleContractFile } from '../../contracts/contractFiles';
 import { AppendixFileActions } from '../../contracts/components/AppendixFileActions';
 import { billingApi } from '../../billing/api';
 import type { Invoice } from '../../billing/types';
@@ -28,9 +32,112 @@ import './TenantRentalHistoryDetailPage.css';
 import { CreateAppendixModal } from './CreateAppendixModal';
 import { TerminateContractModal } from './TerminateContractModal';
 import { AppendixPreviewModal } from '../components/AppendixPreviewModal';
+import { checkReviewEligibility } from '../../rooming-houses/api';
+import type { ReviewEligibilityResponse } from '../../rooming-houses/types';
 
-type Tab = 'occupants' | 'contract' | 'invoices' | 'issues' | 'appendices';
+type Tab = 'occupants' | 'contract' | 'invoices';
+type OccupantFilter = 'all' | 'active' | 'pending' | 'left';
 const invoiceStatusTabs = ['', 'Issued', 'Paid', 'Overdue', 'Cancelled'];
+
+function getContractTabIcon(tab: Tab) {
+  const props = { width: 16, height: 16, viewBox: '0 0 24 24', fill: 'none', stroke: 'currentColor', strokeWidth: 2, strokeLinecap: 'round' as const, strokeLinejoin: 'round' as const };
+
+  if (tab === 'occupants') {
+    return (
+      <svg {...props}>
+        <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2" />
+        <circle cx="9" cy="7" r="4" />
+        <path d="M23 21v-2a4 4 0 0 0-3-3.87" />
+        <path d="M16 3.13a4 4 0 0 1 0 7.75" />
+      </svg>
+    );
+  }
+
+  if (tab === 'invoices') {
+    return (
+      <svg {...props}>
+        <path d="M4 2h14l2 2v18l-3-2-3 2-3-2-3 2-4-2V2z" />
+        <line x1="8" y1="8" x2="16" y2="8" />
+        <line x1="8" y1="12" x2="16" y2="12" />
+        <line x1="8" y1="16" x2="13" y2="16" />
+      </svg>
+    );
+  }
+
+  return (
+    <svg {...props}>
+      <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" />
+      <polyline points="14 2 14 8 20 8" />
+      <line x1="16" y1="13" x2="8" y2="13" />
+      <line x1="16" y1="17" x2="8" y2="17" />
+    </svg>
+  );
+}
+
+function getInvoiceStatusTabIcon(status: string) {
+  const props = { width: 16, height: 16, viewBox: '0 0 24 24', fill: 'none', stroke: 'currentColor', strokeWidth: 2, strokeLinecap: 'round' as const, strokeLinejoin: 'round' as const };
+
+  switch (status) {
+    case 'Issued':
+      return <svg {...props}><circle cx="12" cy="12" r="10" /><polyline points="12 6 12 12 16 14" /></svg>;
+    case 'Paid':
+      return <svg {...props}><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14" /><polyline points="22 4 12 14.01 9 11.01" /></svg>;
+    case 'Overdue':
+      return <svg {...props}><path d="M10.29 3.86 1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z" /><line x1="12" y1="9" x2="12" y2="13" /><line x1="12" y1="17" x2="12.01" y2="17" /></svg>;
+    case 'Cancelled':
+      return <svg {...props}><circle cx="12" cy="12" r="10" /><line x1="15" y1="9" x2="9" y2="15" /><line x1="9" y1="9" x2="15" y2="15" /></svg>;
+    default:
+      return <svg {...props}><line x1="8" y1="6" x2="21" y2="6" /><line x1="8" y1="12" x2="21" y2="12" /><line x1="8" y1="18" x2="21" y2="18" /><line x1="3" y1="6" x2="3.01" y2="6" /><line x1="3" y1="12" x2="3.01" y2="12" /><line x1="3" y1="18" x2="3.01" y2="18" /></svg>;
+  }
+}
+
+function getOccupantFilterTabIcon(filter: OccupantFilter) {
+  const props = {
+    width: 15,
+    height: 15,
+    viewBox: '0 0 24 24',
+    fill: 'none',
+    stroke: 'currentColor',
+    strokeWidth: 2.2,
+    strokeLinecap: 'round' as const,
+    strokeLinejoin: 'round' as const,
+  };
+
+  switch (filter) {
+    case 'active':
+      return (
+        <svg {...props}>
+          <path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2" />
+          <circle cx="9" cy="7" r="4" />
+          <polyline points="16 11 18 13 22 9" />
+        </svg>
+      );
+    case 'pending':
+      return (
+        <svg {...props}>
+          <circle cx="12" cy="12" r="10" />
+          <polyline points="12 6 12 12 16 14" />
+        </svg>
+      );
+    case 'left':
+      return (
+        <svg {...props}>
+          <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4" />
+          <polyline points="16 17 21 12 16 7" />
+          <line x1="21" y1="12" x2="9" y2="12" />
+        </svg>
+      );
+    default:
+      return (
+        <svg {...props}>
+          <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2" />
+          <circle cx="9" cy="7" r="4" />
+          <path d="M23 21v-2a4 4 0 0 0-3-3.87" />
+          <path d="M16 3.13a4 4 0 0 1 0 7.75" />
+        </svg>
+      );
+  }
+}
 
 export const TenantRentalHistoryDetailPage: React.FC = () => {
   const { id } = useParams();
@@ -42,7 +149,7 @@ export const TenantRentalHistoryDetailPage: React.FC = () => {
   const [accessibleContractFiles, setAccessibleContractFiles] = useState<ContractFileResponse[]>([]);
   const [appendixFilesError, setAppendixFilesError] = useState<string | null>(null);
   const [activeTab, setActiveTab] = useState<Tab>('contract');
-  const [occupantFilter, setOccupantFilter] = useState<'all' | 'active' | 'left'>('all');
+  const [occupantFilter, setOccupantFilter] = useState<OccupantFilter>('all');
   const [isAppendixModalOpen, setIsAppendixModalOpen] = useState(false);
   const [editingAppendix, setEditingAppendix] = useState<ContractAppendixResponse | null>(null);
   const [isTerminateModalOpen, setIsTerminateModalOpen] = useState(false);
@@ -58,10 +165,41 @@ export const TenantRentalHistoryDetailPage: React.FC = () => {
   const [invoiceError, setInvoiceError] = useState<string | null>(null);
   const [invoiceMessage, setInvoiceMessage] = useState<string | null>(null);
 
+  const [reviewEligibility, setReviewEligibility] = useState<ReviewEligibilityResponse | null>(null);
+
   const visibleAppendices = useMemo(() => {
     if (!appendices || !currentUser) return null;
     return appendices.filter((appendix) => shouldShowAppendixToCurrentUser(appendix, currentUser.userId));
   }, [appendices, currentUser]);
+
+  const pendingChangesAlertInfo = useMemo(() => {
+    if (!visibleAppendices) return null;
+    const dueAppendices = visibleAppendices.filter((a) => a.status === 'Active' && !a.appliedAt);
+    if (dueAppendices.length === 0) return null;
+
+    let hasPendingOccupantChanges = false;
+    let hasPendingContractChanges = false;
+    let earliestPendingDate: string | null = null;
+
+    for (const appendix of dueAppendices) {
+      if (!earliestPendingDate || new Date(appendix.effectiveDate) < new Date(earliestPendingDate)) {
+        earliestPendingDate = appendix.effectiveDate;
+      }
+      for (const change of appendix.changes) {
+        if (change.targetType === 'ContractOccupant' || change.fieldName === 'MainTenantUserId') {
+          hasPendingOccupantChanges = true;
+        } else if (change.targetType === 'Contract') {
+          hasPendingContractChanges = true;
+        }
+      }
+    }
+
+    return {
+      hasPendingOccupantChanges,
+      hasPendingContractChanges,
+      earliestPendingDate,
+    };
+  }, [visibleAppendices]);
 
   const loadContract = useCallback(async () => {
     if (!id) {
@@ -106,7 +244,16 @@ export const TenantRentalHistoryDetailPage: React.FC = () => {
       setAccessibleContractFiles([]);
       setAppendixFilesError(getApiErrorMessage(err, 'Không thể tải danh sách file phụ lục đã ký.'));
     }
-  }, [id]);
+
+    // Check review eligibility
+    try {
+      const eligibility = await checkReviewEligibility(foundContract.id);
+      setReviewEligibility(eligibility);
+
+    } catch (err) {
+      console.error('Failed to check review eligibility', err);
+    }
+  }, [id, currentUser]);
 
   useEffect(() => {
     let isMounted = true;
@@ -167,7 +314,8 @@ export const TenantRentalHistoryDetailPage: React.FC = () => {
 
   const filteredOccupants = occupants.filter((occupant) => {
     if (occupantFilter === 'active') return occupant.status === 'Active';
-    if (occupantFilter === 'left') return occupant.status !== 'Active' || occupant.moveOutDate !== null;
+    if (occupantFilter === 'pending') return occupant.status === 'PendingMoveIn';
+    if (occupantFilter === 'left') return occupant.status === 'MoveOut' || occupant.status === 'Voided';
     return true;
   });
 
@@ -195,7 +343,7 @@ export const TenantRentalHistoryDetailPage: React.FC = () => {
 
       const link = document.createElement('a');
       link.href = url;
-      link.download = `${contract.contractNumber}-${file.fileVariant.toLowerCase()}.pdf`;
+      link.download = `${contract.contractNumber}-${file.purpose.toLowerCase()}.pdf`;
       document.body.appendChild(link);
       link.click();
       link.remove();
@@ -224,81 +372,82 @@ export const TenantRentalHistoryDetailPage: React.FC = () => {
 
   return (
     <div className="history-detail-page">
-      <div className="invoice-overview-band">
-        <div className="overview-header-title-area">
-          <button
-            type="button"
-            className="back-icon-btn"
-            onClick={() => navigate(ROUTE_PATHS.ACCOUNT.RENTAL_HISTORY)}
-            title="Quay về danh sách lịch sử thuê"
-          >
-            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
-              <line x1="19" y1="12" x2="5" y2="12" />
-              <polyline points="12 19 5 12 12 5" />
-            </svg>
-          </button>
-          <div className="overview-left">
-            <p className="eyebrow">{contract.roomingHouseName}</p>
-            <h2>Phòng {contract.roomNumber}</h2>
-            <p className="overview-description">
-              Vai trò của bạn: <strong>{formatRelation(contract)}</strong>
-            </p>
-            {contract.snapshotAtDate && (
-              <p className="overview-description">
-                Dữ liệu hiển thị tại thời điểm: <strong>{formatDate(contract.snapshotAtDate)}</strong>
-              </p>
-            )}
-          </div>
-        </div>
-
-        <div className="overview-right">
-          <span className={`status-badge ${getStatusClass(contract.status)}`} style={{ fontSize: '1rem', padding: '8px 16px' }}>
-            {formatStatus(contract.status)}
-          </span>
-        </div>
-      </div>
-
-      <div className="history-detail-tabs">
-        <button className={`history-detail-tab ${activeTab === 'contract' ? 'active' : ''}`} onClick={() => setActiveTab('contract')}>
-          Thông tin hợp đồng
-        </button>
-        <button className={`history-detail-tab ${activeTab === 'appendices' ? 'active' : ''}`} onClick={() => setActiveTab('appendices')}>
-          Phụ lục hợp đồng
-        </button>
-        <button className={`history-detail-tab ${activeTab === 'occupants' ? 'active' : ''}`} onClick={() => setActiveTab('occupants')}>
-          Thông tin người ở
-        </button>
-        <button className={`history-detail-tab ${activeTab === 'invoices' ? 'active' : ''}`} onClick={() => setActiveTab('invoices')}>
-          Hóa đơn hằng tháng
-        </button>
-        <button className={`history-detail-tab ${activeTab === 'issues' ? 'active' : ''}`} onClick={() => setActiveTab('issues')}>
-          Thông tin sự cố
-        </button>
-      </div>
-
-      <div className="history-detail-content">
-        {activeTab === 'occupants' && (
-          <div>
-            <div className="occupants-filter">
-              <button
-                className={`occupant-filter-btn ${occupantFilter === 'all' ? 'active' : ''}`}
-                onClick={() => setOccupantFilter('all')}
-              >
-                Tất cả ({occupants.length})
-              </button>
-              <button
-                className={`occupant-filter-btn ${occupantFilter === 'active' ? 'active' : ''}`}
-                onClick={() => setOccupantFilter('active')}
-              >
-                Đang ở ({occupants.filter((occupant) => occupant.status === 'Active').length})
-              </button>
-              <button
-                className={`occupant-filter-btn ${occupantFilter === 'left' ? 'active' : ''}`}
-                onClick={() => setOccupantFilter('left')}
-              >
-                Đã rời đi ({occupants.filter((occupant) => occupant.status !== 'Active' || occupant.moveOutDate).length})
-              </button>
+          <div className="contract-header-wrapper">
+        <PageHeader
+          onBack={() => navigate(ROUTE_PATHS.ACCOUNT.RENTAL_HISTORY)}
+          icon={
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+              <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#2563eb" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
+                <circle cx="12" cy="12" r="10"></circle>
+                <polyline points="12 6 12 12 16 14"></polyline>
+              </svg>
             </div>
+          }
+          eyebrow={contract.roomingHouseName}
+          title={`Phòng ${contract.roomNumber}`}
+          description={
+            <>
+              <span style={{ display: 'block', marginBottom: '4px' }}>Vai trò của bạn: <strong>{formatRelation(contract)}</strong></span>
+              {contract.snapshotAtDate && (
+                <span style={{ display: 'block' }}>Dữ liệu hiển thị tại thời điểm: <strong>{formatDate(contract.snapshotAtDate)}</strong></span>
+              )}
+            </>
+          }
+          className="page-header-band--flat-bottom"
+          rightContent={
+            <span className={`status-badge ${getStatusClass(contract.status)}`} style={{ fontSize: '1rem', padding: '8px 16px' }}>
+              {formatStatus(contract.status)}
+            </span>
+          }
+        />
+
+        <Tabs
+          className="attached-top"
+          variant="segmented-primary"
+          activeId={activeTab}
+          onChange={(tab) => setActiveTab(tab as Tab)}
+          items={[
+            { id: 'contract', label: 'Thông tin hợp đồng', icon: getContractTabIcon('contract') },
+            { id: 'occupants', label: 'Thông tin người ở', icon: getContractTabIcon('occupants') },
+            { id: 'invoices', label: 'Hóa đơn hằng tháng', icon: getContractTabIcon('invoices') },
+          ]}
+        />
+      </div>
+
+      {activeTab === 'occupants' && (
+        <div className="history-detail-secondary-section">
+            <div className="contract-invoices-header history-detail-section-heading">
+              <div>
+                <h2>Thông tin người ở</h2>
+                <p>Danh sách người ở của hợp đồng này.</p>
+              </div>
+            </div>
+            {pendingChangesAlertInfo?.hasPendingOccupantChanges && (
+              <div style={{ backgroundColor: '#fffbeb', border: '1px solid #fde68a', color: '#b45309', padding: '12px 16px', borderRadius: '8px', marginBottom: '16px', display: 'flex', alignItems: 'flex-start', gap: '8px' }}>
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ flexShrink: 0, marginTop: '2px' }}>
+                  <circle cx="12" cy="12" r="10"></circle>
+                  <line x1="12" y1="8" x2="12" y2="12"></line>
+                  <line x1="12" y1="16" x2="12.01" y2="16"></line>
+                </svg>
+                <div>
+                  <strong>Thay đổi chờ áp dụng:</strong> Đang có phụ lục thay đổi thông tin người ở đã có hiệu lực nhưng chưa được hệ thống cập nhật. Hệ thống sẽ tự động cập nhật trong ít phút tới.
+                </div>
+              </div>
+            )}
+            <Tabs
+              className="attached-bottom"
+              variant="segmented-secondary"
+              activeId={occupantFilter}
+              onChange={(filter) => setOccupantFilter(filter as OccupantFilter)}
+              items={[
+                { id: 'all', label: `Tất cả (${occupants.length})`, icon: getOccupantFilterTabIcon('all') },
+                { id: 'active', label: `Đang ở (${occupants.filter((occupant) => occupant.status === 'Active').length})`, icon: getOccupantFilterTabIcon('active') },
+                { id: 'pending', label: `Chờ dọn vào (${occupants.filter((occupant) => occupant.status === 'PendingMoveIn').length})`, icon: getOccupantFilterTabIcon('pending') },
+                { id: 'left', label: `Đã rời đi / Đã hủy (${occupants.filter((occupant) => occupant.status === 'MoveOut' || occupant.status === 'Voided').length})`, icon: getOccupantFilterTabIcon('left') },
+              ]}
+            />
+
+            <div className="history-detail-content tab-attached-panel tab-attached-panel--compact">
 
             <div className="occupant-list">
               {filteredOccupants.map((occupant) => (
@@ -315,8 +464,8 @@ export const TenantRentalHistoryDetailPage: React.FC = () => {
                   </div>
                   <div className="occupant-dates">
                     <div style={{ marginBottom: '6px' }}>
-                      <span className={`status-badge ${occupant.status === 'Active' ? 'active' : 'terminated'}`} style={{ padding: '2px 8px', fontSize: '0.75rem' }}>
-                        {occupant.status === 'Active' ? 'Đang ở' : 'Đã rời đi'}
+                      <span className={`status-badge ${occupant.status === 'Active' ? 'active' : occupant.status === 'PendingMoveIn' ? 'warning' : 'terminated'}`} style={{ padding: '2px 8px', fontSize: '0.75rem' }}>
+                        {occupant.status === 'Active' ? 'Đang ở' : occupant.status === 'PendingMoveIn' ? 'Chờ dọn vào' : occupant.status === 'Voided' ? 'Đã hủy' : 'Đã rời đi'}
                       </span>
                     </div>
                     <div><strong>Vào:</strong> {formatDate(occupant.moveInDate)}</div>
@@ -330,11 +479,25 @@ export const TenantRentalHistoryDetailPage: React.FC = () => {
                 <div style={{ textAlign: 'center', padding: '20px', color: '#64748b' }}>Không có người ở nào khớp với bộ lọc.</div>
               )}
             </div>
+            </div>
           </div>
         )}
 
         {activeTab === 'contract' && (
-          <div>
+          <>
+            <div className="history-detail-content" style={{ marginTop: '20px' }}>
+            {pendingChangesAlertInfo?.hasPendingContractChanges && (
+              <div style={{ backgroundColor: '#fffbeb', border: '1px solid #fde68a', color: '#b45309', padding: '12px 16px', borderRadius: '8px', marginBottom: '16px', display: 'flex', alignItems: 'flex-start', gap: '8px' }}>
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ flexShrink: 0, marginTop: '2px' }}>
+                  <circle cx="12" cy="12" r="10"></circle>
+                  <line x1="12" y1="8" x2="12" y2="12"></line>
+                  <line x1="12" y1="16" x2="12.01" y2="16"></line>
+                </svg>
+                <div>
+                  <strong>Thay đổi chờ áp dụng:</strong> Đang có phụ lục thay đổi thông tin hợp đồng đã có hiệu lực nhưng chưa được hệ thống cập nhật. Hệ thống sẽ tự động cập nhật trong ít phút tới.
+                </div>
+              </div>
+            )}
             <div className="contract-info-grid">
               <div className="contract-info-block">
                 <h3>Thông tin cơ bản</h3>
@@ -381,126 +544,140 @@ export const TenantRentalHistoryDetailPage: React.FC = () => {
               )}
 
               {!contract.canViewRawContract && contract.canViewMaskedContract && (
-                <Button variant="outline" onClick={handleViewContract} disabled={isFileActionLoading}>
-                  Xem hợp đồng (bản che thông tin)
-                </Button>
+                <>
+                  <Button variant="outline" onClick={handleDownloadContract} disabled={isFileActionLoading}>
+                    Tải hợp đồng (bản che thông tin)
+                  </Button>
+                  <Button variant="outline" onClick={handleViewContract} disabled={isFileActionLoading}>
+                    Xem hợp đồng (bản che thông tin)
+                  </Button>
+                </>
               )}
 
               {contract.canTerminateContract && (
                 <Button variant="danger" onClick={() => setIsTerminateModalOpen(true)}>Chấm dứt hợp đồng</Button>
               )}
+
+              {reviewEligibility?.isEligible && (
+                <Button onClick={() => navigate(`/rooming-houses/${contract.roomingHouseId}#review-section`)}>Viết đánh giá khu trọ</Button>
+              )}
             </div>
+
+            {reviewEligibility && !reviewEligibility.isEligible && reviewEligibility.reason !== 'Bạn đã đánh giá hợp đồng này rồi.' && (
+              <div style={{ marginTop: '12px', color: '#64748b', fontSize: '0.9rem' }}>
+                <span title={reviewEligibility.reason ?? ''}>ⓘ Không thể đánh giá khu trọ ({reviewEligibility.reason})</span>
+              </div>
+            )}
 
             {actionError && (
               <div style={{ color: '#b91c1c', marginTop: '12px' }}>
                 {actionError}
               </div>
             )}
-          </div>
-        )}
+            </div>
 
-        {activeTab === 'appendices' && (
-          <div>
-            <div className="appendices-header">
-              <h3>Danh sách phụ lục hợp đồng</h3>
-              {contract.canCreateAppendix && (
-                  <Button 
+            <div className="history-detail-content" style={{ marginTop: '20px' }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px' }}>
+                <h2 style={{ margin: 0, fontSize: '1.25rem' }}>Danh sách phụ lục</h2>
+                {contract.canCreateAppendix && (
+                  <Button
                     style={{ whiteSpace: 'nowrap' }}
                     onClick={() => setIsAppendixModalOpen(true)}
                     disabled={appendices?.some(isBlockingAppendix)}
                     title={appendices?.some(isBlockingAppendix) ? 'Không thể tạo phụ lục mới khi đang có phụ lục chờ ký hoặc đang yêu cầu sửa.' : ''}
                   >
-                  Tạo phụ lục
-                </Button>
+                    Tạo phụ lục
+                  </Button>
+                )}
+              </div>
+              {appendicesError && (
+                <div style={{ color: '#b91c1c', marginBottom: '16px', padding: '12px', background: '#fef2f2', borderRadius: '8px' }}>
+                  {appendicesError}
+                </div>
               )}
-            </div>
-            {appendicesError && (
-              <div style={{ color: '#b91c1c', marginBottom: '16px', padding: '12px', background: '#fef2f2', borderRadius: '8px' }}>
-                {appendicesError}
-              </div>
-            )}
-            {appendixFilesError && (
-              <div style={{ color: '#b91c1c', marginBottom: '16px', padding: '12px', background: '#fef2f2', borderRadius: '8px' }}>
-                {appendixFilesError}
-              </div>
-            )}
-            <div className="appendices-list">
-              {visibleAppendices === null ? (
-                <div style={{ padding: '20px', color: '#64748b' }}>Đang tải danh sách phụ lục...</div>
-              ) : visibleAppendices.length === 0 ? (
-                <div style={{ textAlign: 'center', padding: '20px', color: '#64748b', background: '#f8fafc', borderRadius: '8px' }}>Hợp đồng này chưa có phụ lục nào.</div>
-              ) : (
-                visibleAppendices.map((appendix) => (
-                  <div key={appendix.id} className="appendix-item">
-                    <div className="appendix-info">
-                      <h4>Phụ lục số {appendix.appendixNumber}</h4>
-                      <div className="appendix-dates" style={{ textAlign: 'left', marginTop: '4px' }}>
-                        <div><strong>Ngày hiệu lực:</strong> {formatDate(appendix.effectiveDate)}</div>
-                      </div>
-                      {(appendix.status === 'LandlordRevisionRequested' || canTenantOpenAppendixForSigning(appendix)) && (
-                        <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap', marginTop: '8px' }}>
-                          {appendix.status === 'LandlordRevisionRequested' && (
-                            <Button
-                              variant="outline"
-                              style={{ padding: '6px 12px', fontSize: '0.85rem' }}
-                              onClick={() => setEditingAppendix(appendix)}
-                            >
-                              Sửa phụ lục
-                            </Button>
-                          )}
-                          <Button 
-                            style={{ padding: '6px 12px', fontSize: '0.85rem' }} 
-                            onClick={() => setSigningAppendixId(appendix.id)}
-                            disabled={!canTenantOpenAppendixForSigning(appendix)}
-                            title={!canTenantOpenAppendixForSigning(appendix) ? 'Vui lòng sửa và lưu phụ lục trước khi ký.' : ''}
-                          >
-                            Xem và ký phụ lục
-                          </Button>
+              {appendixFilesError && (
+                <div style={{ color: '#b91c1c', marginBottom: '16px', padding: '12px', background: '#fef2f2', borderRadius: '8px' }}>
+                  {appendixFilesError}
+                </div>
+              )}
+              <div className="appendices-list">
+                {visibleAppendices === null ? (
+                  <div style={{ padding: '20px', color: '#64748b' }}>Đang tải danh sách phụ lục...</div>
+                ) : visibleAppendices.length === 0 ? (
+                  <div style={{ textAlign: 'center', padding: '20px', color: '#64748b', background: '#f8fafc', borderRadius: '8px' }}>Hợp đồng này chưa có phụ lục nào.</div>
+                ) : (
+                  visibleAppendices.map((appendix) => (
+                    <div key={appendix.id} className="appendix-item">
+                      <div className="appendix-info">
+                        <h4>Phụ lục số {appendix.appendixNumber}</h4>
+                        <div className="appendix-dates" style={{ textAlign: 'left', marginTop: '4px' }}>
+                          <div><strong>Ngày hiệu lực:</strong> {formatDate(appendix.effectiveDate)}</div>
                         </div>
-                      )}
-                      <AppendixFileActions
-                        contractId={contract.id}
-                        contractNumber={contract.contractNumber}
-                        appendix={appendix}
-                        file={findAccessibleAppendixFile(accessibleContractFiles, appendix.id)}
-                      />
+                        {(appendix.status === 'LandlordRevisionRequested' || canTenantOpenAppendixForSigning(appendix)) && (
+                          <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap', marginTop: '8px' }}>
+                            {appendix.status === 'LandlordRevisionRequested' && (
+                              <Button
+                                variant="outline"
+                                style={{ padding: '6px 12px', fontSize: '0.85rem' }}
+                                onClick={() => setEditingAppendix(appendix)}
+                              >
+                                Sửa phụ lục
+                              </Button>
+                            )}
+                            <Button
+                              style={{ padding: '6px 12px', fontSize: '0.85rem' }}
+                              onClick={() => setSigningAppendixId(appendix.id)}
+                              disabled={!canTenantOpenAppendixForSigning(appendix)}
+                              title={!canTenantOpenAppendixForSigning(appendix) ? 'Vui lòng sửa và lưu phụ lục trước khi ký.' : ''}
+                            >
+                              Xem và ký phụ lục
+                            </Button>
+                          </div>
+                        )}
+                        <AppendixFileActions
+                          contractId={contract.id}
+                          contractNumber={contract.contractNumber}
+                          appendix={appendix}
+                          file={findAccessibleAppendixFile(accessibleContractFiles, appendix.id)}
+                        />
+                      </div>
+                      <div className="appendix-status-badge" style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: '8px' }}>
+                        <span className={`status-badge ${getAppendixStatusClass(appendix.status)}`} style={{ padding: '6px 16px', fontSize: '0.85rem' }}>
+                          {formatAppendixStatus(appendix, 'Tenant')}
+                        </span>
+                      </div>
                     </div>
-                    <div className="appendix-status-badge" style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: '8px' }}>
-                      <span className={`status-badge ${getAppendixStatusClass(appendix.status)}`} style={{ padding: '6px 16px', fontSize: '0.85rem' }}>
-                        {formatAppendixStatus(appendix, 'Tenant')}
-                      </span>
-                    </div>
-                  </div>
-                ))
-              )}
+                  ))
+                )}
+              </div>
             </div>
-          </div>
+          </>
         )}
 
         {activeTab === 'invoices' && (
-          <div className="contract-invoices-section">
-            <div className="contract-invoices-header">
+          <div className="history-detail-secondary-section">
+            <div className="contract-invoices-header history-detail-section-heading">
               <div>
                 <h2>Hóa đơn hằng tháng</h2>
                 <p>Danh sách hóa đơn thuộc hợp đồng này trong thời gian bạn ở phòng.</p>
               </div>
             </div>
 
-            <div className="invoice-status-tabs">
-              {invoiceStatusTabs.map((status) => (
-                <button
-                  key={status || 'all'}
-                  type="button"
-                  className={invoiceStatusFilter === status ? 'active' : ''}
-                  onClick={() => setInvoiceStatusFilter(status)}
-                >
-                  {status ? getInvoiceStatusLabel(status) : 'Tất cả'}
-                </button>
-              ))}
-            </div>
+            <Tabs
+              className="attached-bottom"
+              variant="segmented-secondary"
+              activeId={invoiceStatusFilter || 'all'}
+              onChange={(status) => setInvoiceStatusFilter(status === 'all' ? '' : status)}
+              items={invoiceStatusTabs.map((status) => ({
+                id: status || 'all',
+                label: status ? getInvoiceStatusLabel(status) : 'Tất cả',
+                icon: getInvoiceStatusTabIcon(status),
+              }))}
+            />
 
+            <div className="history-detail-content tab-attached-panel tab-attached-panel--compact">
             {invoiceMessage && <div className="invoice-inline-message success">{invoiceMessage}</div>}
-            {invoiceError && <div className="invoice-inline-message error">{invoiceError}</div>}
+            {invoiceError && <Alert type="error">{invoiceError}</Alert>}
 
             {invoicesLoading ? (
               <div className="coming-soon-placeholder">
@@ -550,16 +727,11 @@ export const TenantRentalHistoryDetailPage: React.FC = () => {
                 })}
               </div>
             )}
+            </div>
           </div>
         )}
 
-        {activeTab === 'issues' && (
-          <div className="coming-soon-placeholder">
-            <h2>Thông tin sự cố</h2>
-            <p>Tính năng đang được phát triển.</p>
-          </div>
-        )}
-      </div>
+
 
       {isAppendixModalOpen && (
         <CreateAppendixModal
@@ -619,14 +791,12 @@ export const TenantRentalHistoryDetailPage: React.FC = () => {
 };
 
 async function resolveVisibleContractFile(contract: ContractHistoryItemResponse): Promise<ContractFileResponse> {
-  const preferredVariant = contract.canViewRawContract ? 'Raw' : 'Masked';
   const response = await contractApi.getContractFiles(contract.id);
-  let file = findContractFile(response.data ?? [], preferredVariant);
-
+  let file = findAccessibleContractFile(response.data ?? []);
   if (!file && contract.canCreateAppendix) {
     await contractApi.generateContractFile(contract.id);
     const refreshedResponse = await contractApi.getContractFiles(contract.id);
-    file = findContractFile(refreshedResponse.data ?? [], preferredVariant);
+    file = findAccessibleContractFile(refreshedResponse.data ?? []);
   }
 
   if (!file) {
@@ -634,12 +804,6 @@ async function resolveVisibleContractFile(contract: ContractHistoryItemResponse)
   }
 
   return file;
-}
-
-function findContractFile(files: ContractFileResponse[], fileVariant: string) {
-  return files
-    .filter((file) => !file.rentalContractAppendixId && file.fileVariant === fileVariant)
-    .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime())[0];
 }
 
 function formatOccupantRole(isMainTenant: boolean) {
@@ -711,7 +875,7 @@ function getAppendixStatusClass(status: ContractAppendixStatus) {
     case 'Active': return 'active';
     case 'PendingSignature':
     case 'LandlordRevisionRequested':
-    case 'TenantRevisionRequested': return 'completed';
+    case 'TenantRevisionRequested': return 'pending';
     case 'Rejected':
     case 'Cancelled': return 'terminated';
     default: return '';
@@ -745,3 +909,5 @@ function formatDate(value?: string | null) {
 function formatCurrency(value: number) {
   return new Intl.NumberFormat('vi-VN').format(value);
 }
+
+export default TenantRentalHistoryDetailPage;

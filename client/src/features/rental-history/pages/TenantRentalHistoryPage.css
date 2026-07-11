@@ -64,9 +64,14 @@
 }
 
 .history-grid {
-  display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(350px, 1fr));
-  gap: 24px;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  width: 100%;
+}
+
+.tenant-history-price {
+  color: #047857;
 }
 
 .history-card {

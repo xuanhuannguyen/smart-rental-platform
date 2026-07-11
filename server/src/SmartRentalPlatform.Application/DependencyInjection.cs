@@ -12,6 +12,8 @@ using SmartRentalPlatform.Application.Payments;
 using SmartRentalPlatform.Application.RentalContracts;
 using SmartRentalPlatform.Application.RentalRequests;
 using SmartRentalPlatform.Application.RoomingHouses;
+using SmartRentalPlatform.Application.RoomingHouses.Search;
+using SmartRentalPlatform.Application.ReviewReports;
 using SmartRentalPlatform.Application.RoomDeposits;
 using SmartRentalPlatform.Application.Rooms;
 using SmartRentalPlatform.Application.Users;

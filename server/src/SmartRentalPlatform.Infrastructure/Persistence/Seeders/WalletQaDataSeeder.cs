@@ -95,7 +95,7 @@ public static class WalletQaDataSeeder
             context,
             tenant.Id,
             TenantWalletId,
-            500_000m,
+            50_000_000m,
             TenantTopUpTransactionId,
             TenantAdjustmentTransactionId,
             cancellationToken);
@@ -104,7 +104,7 @@ public static class WalletQaDataSeeder
             context,
             landlord.Id,
             LandlordWalletId,
-            100_000m,
+            50_000_000m,
             LandlordTopUpTransactionId,
             LandlordAdjustmentTransactionId,
             cancellationToken);

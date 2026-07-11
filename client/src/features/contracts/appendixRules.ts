@@ -95,5 +95,5 @@ function hasRoleSigned(
   appendix: ContractAppendixResponse,
   signerRole: ContractSignerRole,
 ): boolean {
-  return appendix.signatures.some((signature) => signature.signerRole === signerRole);
+  return appendix.signatures.some((signature) => signature.signerRole === signerRole && signature.signedAt != null);
 }

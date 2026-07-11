@@ -130,24 +130,6 @@
   line-height: 1.5;
 }
 
-.billing-alert {
-  border-radius: 8px;
-  padding: 12px 14px;
-  font-weight: 700;
-}
-
-.billing-alert.success {
-  background: #e8f7ee;
-  color: #17683c;
-  border: 1px solid #bbe6cc;
-}
-
-.billing-alert.error {
-  background: #fff0ed;
-  color: #a33124;
-  border: 1px solid #f4c1b8;
-}
-
 .billing-alert.info {
   background: #eef4ff;
   color: #254f91;
@@ -1761,5 +1743,4 @@
     max-width: 100%;
   }
 }
-
 

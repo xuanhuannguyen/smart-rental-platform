@@ -86,14 +86,6 @@
   align-items: center;
 }
 
-.loading-preview {
-  display: flex;
-  justify-content: center;
-  align-items: center;
-  height: 100%;
-  color: #64748b;
-}
-
 .agreement-section {
   display: flex;
   align-items: center;

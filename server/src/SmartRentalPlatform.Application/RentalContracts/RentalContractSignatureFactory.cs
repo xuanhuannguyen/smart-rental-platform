@@ -22,7 +22,6 @@ internal static class RentalContractSignatureFactory
             SignerUserId = signerUserId,
             SignerRole = signerRole,
             SignatureMethod = ContractSignatureMethod.EmailOtp,
-            SignatureText = RentalContractTextHelper.NormalizeOptionalText(request.SignatureText),
             IpAddress = RentalContractTextHelper.NormalizeOptionalText(ipAddress),
             UserAgent = RentalContractTextHelper.NormalizeOptionalText(userAgent),
             SignedAt = now,

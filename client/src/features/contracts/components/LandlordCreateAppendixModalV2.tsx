@@ -290,7 +290,7 @@ function parseAppendixScalarValue(value?: string | null) {
 
   try {
     const parsed = JSON.parse(value);
-    return typeof parsed === 'string' ? parsed : '';
+    return parsed !== null && parsed !== undefined ? String(parsed) : '';
   } catch {
     return value;
   }

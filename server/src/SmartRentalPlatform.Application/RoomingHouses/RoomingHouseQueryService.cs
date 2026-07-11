@@ -141,6 +141,8 @@ public class RoomingHouseQueryService : IRoomingHouseQueryService
                     .Select(i => i.ImageUrl)
                     .FirstOrDefault(),
                 AvailableRooms = x.Rooms.Count(r => r.Status == RoomStatus.Available && r.DeletedAt == null),
+                AverageRating = x.AverageRating,
+                TotalReviews = x.TotalReviews,
                 MinMonthlyRent = x.Rooms
                     .Where(r => r.Status == RoomStatus.Available && r.DeletedAt == null)
                     .SelectMany(r => r.PriceTiers)
@@ -357,6 +359,8 @@ public class RoomingHouseQueryService : IRoomingHouseQueryService
                         .FirstOrDefault(),
                     AvailableRooms = x.Rooms.Count(r => r.Status == RoomStatus.Available && r.DeletedAt == null),
                     TotalRooms = x.Rooms.Count(r => r.DeletedAt == null),
+                    AverageRating = x.AverageRating,
+                    TotalReviews = x.TotalReviews,
                     MinMonthlyRent = x.Rooms
                         .Where(r => r.Status == RoomStatus.Available && r.DeletedAt == null)
                         .SelectMany(r => r.PriceTiers)
@@ -1372,6 +1376,8 @@ public class RoomingHouseQueryService : IRoomingHouseQueryService
             .Include(x => x.RentalPolicy)
             .Include(x => x.HouseRule)
             .Include(x => x.Images)
+            .Include(x => x.ServicePrices)
+                .ThenInclude(x => x.ServiceType)
             .Include(x => x.Rooms)
                 .ThenInclude(x => x.PriceTiers)
             .Include(x => x.Rooms)

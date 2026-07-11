@@ -83,30 +83,18 @@ public static class DevelopmentDataSeed
         IPasswordService passwordService,
         CancellationToken cancellationToken = default)
     {
-        var normalizedEmail = AdminEmail.ToUpperInvariant();
-        var admin = await context.Users
-            .Include(x => x.UserRoles)
-            .FirstOrDefaultAsync(x => x.NormalizedEmail == normalizedEmail, cancellationToken);
-
-        if (admin is null)
-        {
-            admin = CreateUser(AdminUserId, AdminEmail, "Admin Demo", passwordService);
-            context.Users.Add(admin);
-        }
+        var admin = await EnsureSeedUserAsync(
+            context,
+            passwordService,
+            AdminUserId,
+            AdminEmail,
+            "Admin Demo",
+            RoleSeed.AdminRoleId,
+            cancellationToken);
 
         if (!await context.UserProfiles.AnyAsync(x => x.UserId == admin.Id, cancellationToken))
         {
             context.UserProfiles.Add(CreateProfile(admin.Id, "Admin Demo"));
-        }
-
-        if (admin.UserRoles.All(x => x.RoleId != RoleSeed.AdminRoleId))
-        {
-            context.UserRoles.Add(new UserRole
-            {
-                UserId = admin.Id,
-                RoleId = RoleSeed.AdminRoleId,
-                CreatedAt = SeededAt
-            });
         }
 
         if (!admin.EmailConfirmed || admin.OnboardingStatus != OnboardingStatus.Completed)
@@ -128,16 +116,14 @@ public static class DevelopmentDataSeed
         Guid reviewedByAdminId,
         CancellationToken cancellationToken)
     {
-        var normalizedEmail = TenantEmail.ToUpperInvariant();
-        var tenant = await context.Users
-            .Include(x => x.UserRoles)
-            .FirstOrDefaultAsync(x => x.NormalizedEmail == normalizedEmail, cancellationToken);
-
-        if (tenant is null)
-        {
-            tenant = CreateUser(TenantUserId, TenantEmail, "Nguyen Tenant Demo", passwordService);
-            context.Users.Add(tenant);
-        }
+        var tenant = await EnsureSeedUserAsync(
+            context,
+            passwordService,
+            TenantUserId,
+            TenantEmail,
+            "Nguyen Tenant Demo",
+            RoleSeed.TenantRoleId,
+            cancellationToken);
 
         tenant.Status = UserStatus.Active;
         tenant.OnboardingStatus = OnboardingStatus.Completed;
@@ -159,16 +145,6 @@ public static class DevelopmentDataSeed
         profile.AddressLine = "123 Test Street, Ho Chi Minh City";
         profile.VerifiedCitizenIdMasked = "079********001";
         profile.UpdatedAt = DateTimeOffset.UtcNow;
-
-        if (tenant.UserRoles.All(x => x.RoleId != RoleSeed.TenantRoleId))
-        {
-            context.UserRoles.Add(new UserRole
-            {
-                UserId = tenant.Id,
-                RoleId = RoleSeed.TenantRoleId,
-                CreatedAt = SeededAt
-            });
-        }
 
         if (!await context.KycVerifications.AnyAsync(
             x => x.UserId == tenant.Id && x.Status == KycVerificationStatus.Approved,
@@ -213,7 +189,9 @@ public static class DevelopmentDataSeed
         IPasswordService passwordService,
         CancellationToken cancellationToken)
     {
-        if (!await context.Users.AnyAsync(x => x.NormalizedEmail == CoTenantEmail.ToUpperInvariant(), cancellationToken))
+        if (!await context.Users.AnyAsync(
+            x => x.Id == CoTenantUserId || x.NormalizedEmail == CoTenantEmail.ToUpperInvariant(),
+            cancellationToken))
         {
             context.Users.Add(CreateUser(CoTenantUserId, CoTenantEmail, "Lê CoTenant Demo", passwordService));
             context.UserProfiles.Add(CreateProfile(CoTenantUserId, "Lê CoTenant Demo"));
@@ -225,7 +203,9 @@ public static class DevelopmentDataSeed
             });
         }
 
-        if (!await context.Users.AnyAsync(x => x.NormalizedEmail == TenantEmail.ToUpperInvariant(), cancellationToken))
+        if (!await context.Users.AnyAsync(
+            x => x.Id == TenantUserId || x.NormalizedEmail == TenantEmail.ToUpperInvariant(),
+            cancellationToken))
         {
             context.Users.Add(CreateUser(TenantUserId, TenantEmail, "Nguyễn Tenant Demo", passwordService));
             context.UserProfiles.Add(CreateProfile(TenantUserId, "Nguyễn Tenant Demo"));
@@ -237,7 +217,9 @@ public static class DevelopmentDataSeed
             });
         }
 
-        if (!await context.Users.AnyAsync(x => x.NormalizedEmail == LandlordEmail.ToUpperInvariant(), cancellationToken))
+        if (!await context.Users.AnyAsync(
+            x => x.Id == LandlordUserId || x.NormalizedEmail == LandlordEmail.ToUpperInvariant(),
+            cancellationToken))
         {
             context.Users.Add(CreateUser(LandlordUserId, LandlordEmail, "Trần Landlord Demo", passwordService));
             context.UserProfiles.Add(CreateProfile(LandlordUserId, "Trần Landlord Demo"));
@@ -752,6 +734,63 @@ public static class DevelopmentDataSeed
         {
             await context.SaveChangesAsync(cancellationToken);
         }
+    }
+
+    private static async Task<User> EnsureSeedUserAsync(
+        AppDbContext context,
+        IPasswordService passwordService,
+        Guid seedUserId,
+        string email,
+        string displayName,
+        int roleId,
+        CancellationToken cancellationToken)
+    {
+        var normalizedEmail = email.ToUpperInvariant();
+        var matchingUsers = await context.Users
+            .Include(x => x.UserRoles)
+            .Where(x => x.Id == seedUserId || x.NormalizedEmail == normalizedEmail)
+            .ToListAsync(cancellationToken);
+
+        var user = matchingUsers.FirstOrDefault(x => x.Id == seedUserId)
+            ?? matchingUsers.FirstOrDefault(x => x.NormalizedEmail == normalizedEmail);
+
+        if (user is null)
+        {
+            user = CreateUser(seedUserId, email, displayName, passwordService);
+            context.Users.Add(user);
+        }
+        else
+        {
+            var hasEmailConflict = matchingUsers.Any(x => x.Id != user.Id && x.NormalizedEmail == normalizedEmail);
+            if (!hasEmailConflict)
+            {
+                user.Email = email;
+                user.NormalizedEmail = normalizedEmail;
+            }
+
+            user.DisplayName = displayName;
+            user.Status = UserStatus.Active;
+            user.OnboardingStatus = OnboardingStatus.Completed;
+            user.EmailConfirmed = true;
+            user.UpdatedAt = DateTimeOffset.UtcNow;
+
+            if (string.IsNullOrWhiteSpace(user.PasswordHash))
+            {
+                user.PasswordHash = passwordService.HashPassword(DemoPassword);
+            }
+        }
+
+        if (user.UserRoles.All(x => x.RoleId != roleId))
+        {
+            context.UserRoles.Add(new UserRole
+            {
+                UserId = user.Id,
+                RoleId = roleId,
+                CreatedAt = SeededAt
+            });
+        }
+
+        return user;
     }
 
     private static User CreateUser(

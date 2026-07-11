@@ -1,0 +1,35 @@
+.signature-draw-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.signature-draw-clear {
+  min-height: 32px;
+  padding: 6px 12px;
+  font-size: 0.875rem;
+}
+
+.signature-draw-canvas {
+  box-sizing: border-box;
+  width: 100%;
+  aspect-ratio: 3 / 1;
+  border: 1px solid #cbd5e1;
+  border-radius: 8px;
+  background: #ffffff;
+  cursor: crosshair;
+  touch-action: none;
+}
+
+.signature-draw-canvas:focus {
+  border-color: #2563eb;
+  outline: 3px solid rgba(37, 99, 235, 0.14);
+}
+
+.signature-input-hint {
+  margin: -2px 0 0;
+  color: #64748b;
+  font-size: 0.8125rem;
+  line-height: 1.45;
+}

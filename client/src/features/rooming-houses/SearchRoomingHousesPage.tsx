@@ -1,3 +1,4 @@
+import { Alert } from '../../shared/components/ui/Alert';
 import { useEffect, useMemo, useState, useRef, type CSSProperties, type FormEvent } from 'react';
 import { useLocation, useNavigate, useSearchParams } from 'react-router-dom';
 import L from 'leaflet';
@@ -15,6 +16,8 @@ import { env } from '../../config/env';
 import SearchSuggestionBox from './components/SearchSuggestionBox';
 import { LocationFilterPanel } from './components/LocationFilterPanel';
 import RentalAiChatbot from './components/RentalAiChatbot';
+import TenantMapPreview from './components/TenantMapPreview';
+import FavoriteButton from './components/FavoriteButton';
 import { saveRecentSearch } from './searchRecentStorage';
 import './SearchRoomingHousesPage.css';
 
@@ -1301,7 +1304,7 @@ export default function SearchRoomingHousesPage() {
           {loading ? (
             <div className="search-page__state">Đang tải kết quả...</div>
           ) : error ? (
-            <div className="search-page__state search-page__state--error">{error}</div>
+            <Alert type="error">{error}</Alert>
           ) : !result || result.items.length === 0 ? (
             <div className="search-page__state">Không tìm thấy khu trọ nào phù hợp với bộ lọc của bạn.</div>
           ) : (
@@ -1324,6 +1327,10 @@ export default function SearchRoomingHousesPage() {
                       ) : (
                         <div className="search-result-card__placeholder">Chưa có ảnh</div>
                       )}
+                      
+                      <div className="search-result-card__favorite-wrapper" style={{ position: 'absolute', top: '12px', right: '12px' }}>
+                        <FavoriteButton roomingHouseId={item.id} />
+                      </div>
                       {item.distanceKm != null && (
                         <span className="distance-badge">
                           Cách {(item.distanceKm).toFixed(1)} km

@@ -152,7 +152,10 @@ export function HomeHeader({ centerContent }: HomeHeaderProps) {
                   Quản lý bảo mật
                 </button>
                 <button className="dropdown-item" onClick={() => { setShowDropdown(false); navigate(ROUTE_PATHS.ACCOUNT.VIEWING_APPOINTMENTS); }}>
-                  Lịch hẹn xem phòng
+                  Lịch xem phòng
+                </button>
+                <button className="dropdown-item" onClick={() => { setShowDropdown(false); navigate(ROUTE_PATHS.ACCOUNT.FAVORITES); }}>
+                  Khu trọ yêu thích
                 </button>
                 <button className="dropdown-item" onClick={() => { setShowDropdown(false); navigate(ROUTE_PATHS.ACCOUNT.RENTAL_REQUESTS); }}>
                   Yêu cầu thuê phòng

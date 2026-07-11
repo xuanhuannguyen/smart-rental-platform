@@ -19,7 +19,9 @@ public sealed class RentalContractOccupantValidator
     public static void ValidateOccupantsRequest(
         string tenantEmail,
         SubmitContractOccupantsRequest request,
-        int maxOccupants)
+        int maxOccupants,
+        DateOnly startDate,
+        DateOnly endDate)
     {
         if (request.Occupants.Count == 0)
         {
@@ -42,6 +44,10 @@ public sealed class RentalContractOccupantValidator
 
         foreach (var occupant in request.Occupants)
         {
+            if (occupant.MoveInDate < startDate || occupant.MoveInDate > endDate)
+            {
+                throw new BadRequestException("RENTAL_CONTRACT_INVALID_OCCUPANT_DATE", "Ngày chuyển vào phải nằm trong khoảng thời gian có hiệu lực của hợp đồng.");
+            }
             ValidateOccupantRequest(occupant);
         }
     }
