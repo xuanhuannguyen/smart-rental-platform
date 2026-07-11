@@ -145,12 +145,33 @@ public sealed class MeterReadingInputResolver
                     $"Chỉ số cuối kỳ phải lớn hơn hoặc bằng chỉ số đầu kỳ cho dịch vụ {serviceType.Name}.");
             }
 
+            if (!string.IsNullOrWhiteSpace(input.ProofImageObjectKey) &&
+                !input.ProofImageObjectKey.StartsWith("meter-readings/", StringComparison.OrdinalIgnoreCase))
+            {
+                throw new BadRequestException(
+                    ErrorCodes.MeterReadingInvalid,
+                    "Ảnh minh chứng chỉ số điện nước phải thuộc phạm vi meter-readings.");
+            }
+
+            if (input.AiReading.HasValue && input.AiReading.Value < 0)
+            {
+                throw new BadRequestException(
+                    ErrorCodes.MeterReadingInvalid,
+                    "Chỉ số đọc được từ AI không được âm.");
+            }
+
+            var resolvedAiRawText = string.IsNullOrWhiteSpace(input.AiRawText)
+                ? null
+                : input.AiRawText.Trim()[..Math.Min(input.AiRawText.Trim().Length, 4000)];
+
             meteredInputs.Add(new ResolvedMeterReadingInput(
                 serviceType,
                 price,
                 previousReading.Value,
                 input.CurrentReading,
-                input.ProofImageObjectKey));
+                input.ProofImageObjectKey?.Trim(),
+                input.AiReading,
+                resolvedAiRawText));
         }
 
         return meteredInputs;

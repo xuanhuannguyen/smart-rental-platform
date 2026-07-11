@@ -63,6 +63,8 @@ export const ENDPOINTS = {
     CREATE_TERMINATION_INVOICE: (contractId: string) => `/api/landlord/contracts/${contractId}/termination-invoices`,
     LANDLORD_INVOICES: '/api/landlord/invoices',
     GENERATE_WITH_READINGS: '/api/landlord/invoices/generate-with-readings',
+    GENERATE_BULK: '/api/landlord/invoices/generate-bulk',
+    METER_READING_AI: '/api/landlord/meter-readings/ai',
     LANDLORD_INVOICE: (id: string) => `/api/landlord/invoices/${id}`,
     ISSUE_INVOICE: (id: string) => `/api/landlord/invoices/${id}/issue`,
     CANCEL_INVOICE: (id: string) => `/api/landlord/invoices/${id}/cancel`,

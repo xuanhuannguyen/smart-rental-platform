@@ -4,6 +4,7 @@ import type { Dispatch, FormEvent, ReactNode, SetStateAction } from 'react';
 import { useLocation, useNavigate, useParams } from 'react-router-dom';
 import { ROUTE_PATHS } from '../../../app/router/routePaths';
 import { getApiErrorMessage } from '../../../shared/api/apiError';
+import { toAssetUrl } from '../../../shared/api/assets';
 import { Toast } from '../../../shared/components/ui/Toast';
 import { Tabs } from '../../../shared/components/ui/Tabs';
 import { PageHeader } from '../../../shared/components/ui/PageHeader';
@@ -12,6 +13,7 @@ import { billingApi } from '../api';
 import type { ContractAppendixResponse, ContractHistoryItemResponse } from '../../contracts/types';
 import type {
   BillingServiceType,
+  BulkInvoiceResult,
   CreateServicePriceRequest,
   FixedServicePreview,
   Invoice,
@@ -684,8 +686,35 @@ type ActiveInvoiceContract = Pick<
 
 type ReadingDraft = {
   previousReading: number;
+  hasPreviousReading: boolean;
   currentReading: number;
+  hasCurrentReading: boolean;
   proofImageObjectKey: string;
+  proofImageUrl: string;
+  aiReading: number | null;
+  aiRawText: string;
+};
+
+const emptyReadingDraft: ReadingDraft = {
+  previousReading: 0,
+  hasPreviousReading: false,
+  currentReading: 0,
+  hasCurrentReading: false,
+  proofImageObjectKey: '',
+  proofImageUrl: '',
+  aiReading: null,
+  aiRawText: ''
+};
+
+type BulkRoomDraft = {
+  contract: ActiveInvoiceContract;
+  preview: RoomInvoicePreview | null;
+  selected: boolean;
+  expanded: boolean;
+  loadError: string;
+  readings: Record<string, ReadingDraft>;
+  discountAmount: number;
+  note: string;
 };
 
 function CentralCreateInvoiceModal({
@@ -697,470 +726,545 @@ function CentralCreateInvoiceModal({
 }) {
   const [contracts, setContracts] = useState<ActiveInvoiceContract[]>([]);
   const [selectedHouseId, setSelectedHouseId] = useState('');
-  const [selectedContractId, setSelectedContractId] = useState('');
   const [billingMonth, setBillingMonth] = useState('');
-  const [prices, setPrices] = useState<ServicePrice[]>([]);
-  const [preview, setPreview] = useState<RoomInvoicePreview | null>(null);
-  const [appendices, setAppendices] = useState<ContractAppendixResponse[]>([]);
-  const [latestReadingByServiceType, setLatestReadingByServiceType] = useState<Record<string, LatestMeterReading>>({});
-  const [readings, setReadings] = useState<Record<string, ReadingDraft>>({});
-  const [discountAmount, setDiscountAmount] = useState(0);
-  const [note, setNote] = useState('');
+  const [rooms, setRooms] = useState<Record<string, BulkRoomDraft>>({});
   const [loadingContracts, setLoadingContracts] = useState(true);
-  const [loadingDetails, setLoadingDetails] = useState(false);
+  const [loadingRooms, setLoadingRooms] = useState(false);
   const [submitting, setSubmitting] = useState(false);
+  const [uploadingKey, setUploadingKey] = useState('');
   const [error, setError] = useState('');
-  const [toast, setToast] = useState<{ message: string; type: 'success' | 'error' | 'info' } | null>(null);
+  const [result, setResult] = useState<BulkInvoiceResult | null>(null);
+  const [publishInvoiceIds, setPublishInvoiceIds] = useState<Set<string>>(new Set());
+  const [publishing, setPublishing] = useState(false);
+  const [hiddenRoomCount, setHiddenRoomCount] = useState(0);
 
   const houses = useMemo(() => {
     const map = new Map<string, string>();
-    contracts.forEach((contract) => {
-      map.set(contract.roomingHouseId, contract.roomingHouseName);
-    });
-    return Array.from(map.entries()).map(([id, name]) => ({ id, name }));
+    contracts.forEach((contract) => map.set(contract.roomingHouseId, contract.roomingHouseName));
+    return Array.from(map, ([id, name]) => ({ id, name }));
   }, [contracts]);
-  const rooms = useMemo(
+  const houseContracts = useMemo(
     () => contracts.filter((contract) => contract.roomingHouseId === selectedHouseId),
     [contracts, selectedHouseId]
   );
-  const selectedContract = useMemo(
-    () => contracts.find((contract) => contract.id === selectedContractId) ?? null,
-    [contracts, selectedContractId]
-  );
+  const roomList = useMemo(() => Object.values(rooms), [rooms]);
+  const selectedRooms = roomList.filter((room) => room.selected);
+  const readyRooms = selectedRooms.filter(isBulkRoomReady);
 
   useEffect(() => {
     let cancelled = false;
-
     async function loadContracts() {
       setLoadingContracts(true);
-      setError('');
       try {
         const response = await contractApi.getLandlordContracts();
-        if (cancelled) return;
-        setContracts((response.data ?? []).filter((contract) => contract.status === 'Active'));
+        if (!cancelled) {
+          setContracts((response.data ?? []).filter((contract) => contract.status === 'Active'));
+        }
       } catch (err) {
-        if (!cancelled) {
-          setError(getApiErrorMessage(err, 'Không thể tải danh sách phòng đang có hợp đồng active.'));
-        }
+        if (!cancelled) setError(getApiErrorMessage(err, 'Không thể tải danh sách hợp đồng Active.'));
       } finally {
-        if (!cancelled) {
-          setLoadingContracts(false);
-        }
+        if (!cancelled) setLoadingContracts(false);
       }
     }
-
     void loadContracts();
-
-    return () => {
-      cancelled = true;
-    };
+    return () => { cancelled = true; };
   }, []);
 
   useEffect(() => {
-    setSelectedContractId('');
-  }, [selectedHouseId]);
+    setRooms({});
+    setHiddenRoomCount(0);
+    setResult(null);
+    setPublishInvoiceIds(new Set());
+    setError('');
+  }, [selectedHouseId, billingMonth]);
 
-  useEffect(() => {
-    if (!selectedContract) {
-      setBillingMonth('');
-      setPrices([]);
-      setPreview(null);
-      setAppendices([]);
-      setLatestReadingByServiceType({});
-      setReadings({});
+  async function loadHouseRooms() {
+    if (!selectedHouseId) {
+      setError('Vui lòng chọn khu trọ.');
+      return;
+    }
+    if (!billingMonth) {
+      setError('Vui lòng chọn kỳ hóa đơn.');
+      return;
+    }
+    if (houseContracts.length === 0) {
+      setError('Khu trọ không có phòng đang thuê với hợp đồng Active.');
       return;
     }
 
-    setBillingMonth(getCentralDefaultInvoiceMonth(selectedContract));
-  }, [selectedContract]);
+    setLoadingRooms(true);
+    setError('');
+    const monthStart = `${billingMonth}-01`;
+    const [year, month] = billingMonth.split('-').map(Number);
+    const monthEnd = `${billingMonth}-${String(new Date(year, month, 0).getDate()).padStart(2, '0')}`;
 
-  useEffect(() => {
-    if (!selectedContract) return;
+    const contractsInPeriod = houseContracts.filter((contract) =>
+      Boolean(resolveCentralInvoicePeriodForContract(billingMonth, contract))
+    );
 
-    let cancelled = false;
+    let existingInvoices: Invoice[] = [];
+    try {
+      const response = await billingApi.getLandlordInvoices();
+      existingInvoices = response.data ?? [];
+    } catch {
+      // Preview validation remains the safety net if existing invoices cannot be loaded.
+    }
 
-    async function loadInvoiceContext(contract: ActiveInvoiceContract) {
-      setLoadingDetails(true);
-      setError('');
+    const visibleContracts = contractsInPeriod.filter((contract) => {
+      const period = resolveCentralInvoicePeriodForContract(billingMonth, contract);
+      if (!period) return false;
+      return !existingInvoices.some((invoice) =>
+        invoice.contractId === contract.id &&
+        invoice.status.toLowerCase() !== 'cancelled' &&
+        invoice.billingPeriodStart === period.start &&
+        invoice.billingPeriodEnd === period.end
+      );
+    });
+
+    setHiddenRoomCount(houseContracts.length - visibleContracts.length);
+
+    const loaded = await Promise.all(visibleContracts.map(async (contract) => {
+      const period = resolveCentralInvoicePeriodForContract(billingMonth, contract);
+      if (!period) return null;
       try {
-        const [priceResponse, appendixResponse, contextResponse] = await Promise.all([
-          billingApi.getServicePrices(contract.roomingHouseId),
-          contractApi.getAppendices(contract.id),
-          billingApi.getRoomBillingContext(contract.roomId)
-        ]);
-        if (cancelled) return;
-
-        setPrices(priceResponse.data);
-        setAppendices(appendixResponse.data ?? []);
-        const latestReadings = contextResponse.data.latestReadingByServiceType ?? {};
-        setLatestReadingByServiceType(latestReadings);
-
-        const nextReadings: Record<string, ReadingDraft> = {};
-        priceResponse.data
-          .filter((price) => price.isActive && isCentralMeteredServicePrice(price))
-          .forEach((price) => {
-            const latestReading = latestReadings[price.serviceTypeId];
-            nextReadings[price.serviceTypeId] = {
-              previousReading: latestReading?.currentReading ?? 0,
-              currentReading: latestReading?.currentReading ?? 0,
-              proofImageObjectKey: ''
-            };
-          });
-        setReadings(nextReadings);
-      } catch (err) {
-        if (!cancelled) {
-          setError(getApiErrorMessage(err, 'Không thể tải thông tin tạo hóa đơn cho phòng đã chọn.'));
-        }
-      } finally {
-        if (!cancelled) {
-          setLoadingDetails(false);
-        }
-      }
-    }
-
-    void loadInvoiceContext(selectedContract);
-
-    return () => {
-      cancelled = true;
-    };
-  }, [selectedContract]);
-
-  const period = useMemo(
-    () => selectedContract && billingMonth ? resolveCentralInvoicePeriodForContract(billingMonth, selectedContract) : null,
-    [billingMonth, selectedContract]
-  );
-  const fixedPrices = useMemo(
-    () => preview?.fixedServices ?? [],
-    [preview]
-  );
-  const meteredPrices = useMemo(
-    () => preview?.meteredServices ?? [],
-    [preview]
-  );
-  const periodValidationMessage = !selectedContract
-    ? ''
-    : !period
-      ? 'Tháng hóa đơn không nằm trong thời hạn hợp đồng.'
-      : '';
-  const previewBlockReason = preview && !preview.canGenerate
-    ? preview.blockReason || 'Chưa thể tạo hóa đơn cho kỳ này.'
-    : '';
-  useEffect(() => {
-    if (!selectedContract || !period) {
-      setPreview(null);
-      return;
-    }
-
-    let cancelled = false;
-
-    async function loadPreview() {
-      setLoadingDetails(true);
-      setError('');
-      try {
-        const response = await billingApi.getRoomInvoicePreview(selectedContract!.roomId, {
-          billingPeriodStart: period!.start,
-          billingPeriodEnd: period!.end
+        const response = await billingApi.getRoomInvoicePreview(contract.roomId, {
+          billingPeriodStart: period.start || monthStart,
+          billingPeriodEnd: period.end || monthEnd
         });
-        if (cancelled) return;
-
-        setPreview(response.data);
-        const latestReadings: Record<string, LatestMeterReading> = {};
-        const nextReadings: Record<string, ReadingDraft> = {};
-        response.data.meteredServices.forEach((service) => {
-          if (service.latestReading) {
-            latestReadings[service.serviceTypeId] = service.latestReading;
-          }
-          nextReadings[service.serviceTypeId] = {
-            previousReading: service.latestReading?.currentReading ?? 0,
-            currentReading: service.latestReading?.currentReading ?? 0,
-            proofImageObjectKey: ''
-          };
-        });
-        setLatestReadingByServiceType(latestReadings);
-        setReadings(nextReadings);
+        return [contract.id, buildBulkRoomDraft(contract, response.data, '')] as const;
       } catch (err) {
-        if (!cancelled) {
-          setPreview(null);
-          setError(getApiErrorMessage(err, 'Không thể tải thông tin xem trước hóa đơn.'));
-        }
-      } finally {
-        if (!cancelled) {
-          setLoadingDetails(false);
-        }
-      }
-    }
-
-    void loadPreview();
-
-    return () => {
-      cancelled = true;
-    };
-  }, [selectedContract, period?.start, period?.end]);
-
-  const resolvedMonthlyRent = selectedContract && period
-    ? preview?.monthlyRent ?? resolveCentralMonthlyRentFromAppendices(selectedContract.monthlyRent, appendices, period.start)
-    : selectedContract?.monthlyRent ?? 0;
-  const occupantCount = fixedPrices[0]?.occupantCount ?? (selectedContract && period
-    ? getCentralActiveOccupantCount(selectedContract, period)
-    : 1);
-  const rentPreview = preview?.rentAmount ?? (selectedContract && period ? calculateCentralPeriodAmount(resolvedMonthlyRent, period) : 0);
-  const fixedTotal = preview?.fixedServiceAmount ?? 0;
-  const utilityPreview = meteredPrices.reduce((sum, price) => {
-    const draft = readings[price.serviceTypeId];
-    if (!draft) return sum;
-    const latestReading = price.latestReading;
-    const previousReading = latestReading?.currentReading ?? Number(draft.previousReading);
-    const consumption = Math.max(0, Number(draft.currentReading) - previousReading);
-    return sum + consumption * price.unitPrice;
-  }, 0);
-  const previewTotal = Math.max(0, rentPreview + fixedTotal + utilityPreview - discountAmount);
-
-  function updateReading(serviceTypeId: string, patch: Partial<ReadingDraft>) {
-    setReadings((current) => ({
-      ...current,
-      [serviceTypeId]: {
-        ...(current[serviceTypeId] ?? { previousReading: 0, currentReading: 0, proofImageObjectKey: '' }),
-        ...patch
+        return [contract.id, buildBulkRoomDraft(contract, null, getApiErrorMessage(err, 'Không thể tải dữ liệu phòng.'))] as const;
       }
     }));
+
+    setRooms(Object.fromEntries(loaded.filter((entry): entry is readonly [string, BulkRoomDraft] => entry !== null)));
+    setLoadingRooms(false);
+  }
+
+  function patchRoom(contractId: string, patch: Partial<BulkRoomDraft>) {
+    setRooms((current) => ({
+      ...current,
+      [contractId]: { ...current[contractId], ...patch }
+    }));
+  }
+
+  function patchReading(contractId: string, serviceTypeId: string, patch: Partial<ReadingDraft>) {
+    setRooms((current) => {
+      const room = current[contractId];
+      return {
+        ...current,
+        [contractId]: {
+          ...room,
+          readings: {
+            ...room.readings,
+            [serviceTypeId]: { ...(room.readings[serviceTypeId] ?? emptyReadingDraft), ...patch }
+          }
+        }
+      };
+    });
+  }
+
+  async function uploadMeterImage(room: BulkRoomDraft, serviceTypeId: string, file?: File) {
+    if (!file || !room.preview) return;
+    if (!['image/jpeg', 'image/png'].includes(file.type)) {
+      setError('Chỉ hỗ trợ ảnh JPG hoặc PNG.');
+      return;
+    }
+    if (file.size > 5 * 1024 * 1024) {
+      setError('Ảnh đồng hồ không được vượt quá 5MB.');
+      return;
+    }
+    const key = `${room.contract.id}:${serviceTypeId}`;
+    setUploadingKey(key);
+    setError('');
+    try {
+      const response = await billingApi.readMeterImage({
+        contractId: room.contract.id,
+        serviceTypeId,
+        billingPeriodStart: room.preview.billingPeriodStart,
+        file
+      });
+      patchReading(room.contract.id, serviceTypeId, {
+        currentReading: response.data.reading,
+        hasCurrentReading: true,
+        aiReading: response.data.reading,
+        aiRawText: response.data.rawText,
+        proofImageObjectKey: response.data.proofImageObjectKey,
+        proofImageUrl: response.data.proofImageUrl
+      });
+    } catch (err) {
+      setError(getApiErrorMessage(err, 'Không thể đọc chỉ số từ ảnh.'));
+    } finally {
+      setUploadingKey('');
+    }
   }
 
   async function handleSubmit(event: FormEvent) {
     event.preventDefault();
     setError('');
-
-    if (!selectedContract) {
-      setToast({ message: 'Vui lòng chọn phòng cần tạo hóa đơn.', type: 'error' });
+    if (!selectedHouseId || !billingMonth) {
+      setError('Vui lòng chọn đầy đủ khu trọ và kỳ hóa đơn.');
+      return;
+    }
+    if (selectedRooms.length === 0) {
+      setError('Vui lòng chọn ít nhất một phòng; các phòng không chọn sẽ được bỏ qua.');
+      return;
+    }
+    if (readyRooms.length !== selectedRooms.length) {
+      setError('Một hoặc nhiều phòng đang thiếu dữ liệu. Hãy hoàn tất chỉ số hoặc bỏ chọn phòng đó.');
       return;
     }
 
-    if (!period) {
-      setToast({ message: periodValidationMessage || 'Kỳ hóa đơn không hợp lệ.', type: 'error' });
-      return;
-    }
-
-    if (previewBlockReason) {
-      setToast({ message: previewBlockReason, type: 'error' });
-      return;
-    }
-
-    const meterReadings: MeterReadingInput[] = meteredPrices.map((price) => {
-      const draft = readings[price.serviceTypeId] ?? { previousReading: 0, currentReading: 0, proofImageObjectKey: '' };
-      const latestReading = latestReadingByServiceType[price.serviceTypeId];
-      return {
-        serviceTypeId: price.serviceTypeId,
-        previousReading: latestReading ? null : Number(draft.previousReading),
-        currentReading: Number(draft.currentReading),
-        proofImageObjectKey: draft.proofImageObjectKey.trim() || null
-      };
-    });
-
-    for (const reading of meterReadings) {
-      const latestReading = latestReadingByServiceType[reading.serviceTypeId];
-      const previousReading = latestReading?.currentReading ?? reading.previousReading;
-      if (previousReading !== null && previousReading !== undefined && reading.currentReading < previousReading) {
-        setToast({ message: 'Chỉ số mới không được nhỏ hơn chỉ số cũ.', type: 'error' });
-        return;
-      }
-    }
-
+    const [year, month] = billingMonth.split('-').map(Number);
+    const billingPeriodStart = `${billingMonth}-01`;
+    const billingPeriodEnd = `${billingMonth}-${String(new Date(year, month, 0).getDate()).padStart(2, '0')}`;
     setSubmitting(true);
     try {
-      const response = await billingApi.generateWithReadings({
-        contractId: selectedContract.id,
-        billingPeriodStart: period.start,
-        billingPeriodEnd: period.end,
-        discountAmount: Number(discountAmount) || 0,
-        note: note.trim() || null,
-        meterReadings
+      const response = await billingApi.generateBulk({
+        roomingHouseId: selectedHouseId,
+        billingPeriodStart,
+        billingPeriodEnd,
+        rooms: selectedRooms.map((room) => ({
+          contractId: room.contract.id,
+          discountAmount: Number(room.discountAmount) || 0,
+          note: room.note.trim() || null,
+          meterReadings: (room.preview?.meteredServices ?? []).map((service) => {
+            const draft = room.readings[service.serviceTypeId] ?? emptyReadingDraft;
+            return {
+              serviceTypeId: service.serviceTypeId,
+              previousReading: service.latestReading ? null : draft.previousReading,
+              currentReading: Number(draft.currentReading),
+              proofImageObjectKey: draft.proofImageObjectKey || null,
+              aiReading: draft.aiReading,
+              aiRawText: draft.aiRawText || null
+            };
+          })
+        }))
       });
-      onCreated(response.data);
+      setResult(response.data);
+      setPublishInvoiceIds(new Set(
+        response.data.rooms
+          .filter((room) => room.status === 'Created' && room.invoice)
+          .map((room) => room.invoice!.id)
+      ));
     } catch (err) {
-      setToast({ message: getApiErrorMessage(err, 'Không thể tạo hóa đơn.'), type: 'error' });
+      setError(getApiErrorMessage(err, 'Không thể tạo hóa đơn hàng loạt.'));
     } finally {
       setSubmitting(false);
     }
   }
 
+  function finish() {
+    const invoice = result?.rooms.find((room) => room.invoice)?.invoice;
+    if (invoice) onCreated(invoice);
+    else onClose();
+  }
+
+  function togglePublishInvoice(invoiceId: string) {
+    setPublishInvoiceIds((current) => {
+      const next = new Set(current);
+      if (next.has(invoiceId)) next.delete(invoiceId);
+      else next.add(invoiceId);
+      return next;
+    });
+  }
+
+  async function publishSelectedInvoices() {
+    if (!result || publishInvoiceIds.size === 0) {
+      finish();
+      return;
+    }
+
+    setPublishing(true);
+    setError('');
+    const ids = Array.from(publishInvoiceIds);
+    const responses = await Promise.allSettled(ids.map((id) => billingApi.issueInvoice(id)));
+    const issuedById = new Map<string, Invoice>();
+    const failedIds: string[] = [];
+    responses.forEach((response, index) => {
+      if (response.status === 'fulfilled') issuedById.set(ids[index], response.value.data);
+      else failedIds.push(ids[index]);
+    });
+
+    setResult((current) => current ? {
+      ...current,
+      rooms: current.rooms.map((room) => room.invoice && issuedById.has(room.invoice.id)
+        ? { ...room, invoice: issuedById.get(room.invoice.id), message: 'Đã phát hành hóa đơn.' }
+        : room)
+    } : current);
+    setPublishInvoiceIds(new Set(failedIds));
+    setPublishing(false);
+
+    if (failedIds.length > 0) {
+      setError(`${failedIds.length} hóa đơn chưa phát hành được. Các hóa đơn còn lại đã phát hành thành công.`);
+      return;
+    }
+    finish();
+  }
+
   return (
     <div className="history-modal-overlay">
-      <div className="history-modal-content invoice-create-modal">
-        <div className="history-modal-header">
-          <h2>Tạo hóa đơn</h2>
-          <button className="history-modal-close" onClick={onClose} type="button">&times;</button>
-        </div>
+      <div className="history-modal-content bulk-invoice-modal">
+        <header className="history-modal-header bulk-invoice-header">
+          <div><span className="bulk-kicker">Lập hóa đơn theo khu trọ</span><h2>Tạo hóa đơn nhanh</h2></div>
+          <button className="history-modal-close" onClick={onClose} type="button" aria-label="Đóng">&times;</button>
+        </header>
 
         <form onSubmit={handleSubmit}>
-          <div className="history-modal-body">
-            {toast && <Toast message={toast.message} type={toast.type} onClose={() => setToast(null)} />}
-            {error && <Alert type="error">{error}</Alert>}
+          <div className="history-modal-body bulk-invoice-body">
+            <ol className="bulk-stepper" aria-label="Quy trình tạo hóa đơn">
+              {['Chọn kỳ', 'Nhập chỉ số', 'Xác nhận', 'Kiểm tra nháp', 'Phát hành'].map((label, index) => (
+                <li key={label} className={result ? (index < 4 ? 'done' : '') : roomList.length ? (index < 2 ? 'active' : '') : (index === 0 ? 'active' : '')}>
+                  <span>{index + 1}</span><small>{label}</small>
+                </li>
+              ))}
+            </ol>
 
-            <div className="invoice-create-selector">
-              <label className="invoice-create-field">
-                <span className="label">Khu trọ</span>
-                <select
-                  value={selectedHouseId}
-                  onChange={(event) => setSelectedHouseId(event.target.value)}
-                  disabled={loadingContracts}
-                >
-                  <option value="">Chọn khu trọ</option>
-                  {houses.map((house) => (
-                    <option key={house.id} value={house.id}>{house.name}</option>
-                  ))}
-                </select>
-              </label>
-              <label className="invoice-create-field">
-                <span className="label">Phòng</span>
-                <select
-                  value={selectedContractId}
-                  onChange={(event) => setSelectedContractId(event.target.value)}
-                  disabled={!selectedHouseId || loadingContracts}
-                >
-                  <option value="">Chọn phòng đang có hợp đồng active</option>
-                  {rooms.map((contract) => (
-                    <option key={contract.id} value={contract.id}>
-                      Phòng {contract.roomNumber} - {contract.mainTenantName}
-                    </option>
-                  ))}
-                </select>
-              </label>
-            </div>
+            {error && <div className="billing-alert error bulk-alert">{error}</div>}
 
-            {loadingContracts ? (
-              <p>Đang tải danh sách phòng...</p>
-            ) : contracts.length === 0 ? (
-              <p>Chưa có phòng nào đang có hợp đồng active.</p>
-            ) : !selectedContract ? (
-              <div className="invoice-create-placeholder">Chọn khu trọ và phòng để xem thông tin tạo hóa đơn.</div>
-            ) : loadingDetails ? (
-              <p>Đang tải dữ liệu hóa đơn...</p>
-            ) : (
-              <div className="invoice-create-stack">
-                {periodValidationMessage && <Alert type="error">{periodValidationMessage}</Alert>}
-                {previewBlockReason && <Alert type="error">{previewBlockReason}</Alert>}
-                <div className="invoice-create-grid">
-                  <div className="invoice-create-field">
-                    <span className="label">Phòng</span>
-                    <span className="value">{selectedContract.roomNumber}</span>
-                  </div>
-                  <div className="invoice-create-field">
-                    <span className="label">Người thuê</span>
-                    <span className="value">{selectedContract.mainTenantName}</span>
-                  </div>
-                  <div className="invoice-create-field">
-                    <span className="label">Tiền phòng</span>
-                    <span className="value">{formatMoney(resolvedMonthlyRent)}</span>
-                  </div>
-                  <label className="invoice-create-field">
-                    <span className="label">Kỳ hóa đơn</span>
-                    <input type="month" value={billingMonth} onChange={(event) => setBillingMonth(event.target.value)} />
-                  </label>
-                  <div className="invoice-create-field">
-                    <span className="label">Kỳ thực tế</span>
-                    <span className="value">{period ? `${period.start} - ${period.end}` : '--'}</span>
-                  </div>
-                  <div className="invoice-create-field">
-                    <span className="label">Tiền phòng kỳ này</span>
-                    <span className="value">{formatMoney(rentPreview)}</span>
-                  </div>
+            {result ? (
+              <section className="bulk-result-panel">
+                <div className="bulk-draft-heading">
+                  <div><strong>Kiểm tra hóa đơn nháp</strong><span>Hóa đơn được tick sẽ phát hành ngay. Bỏ tick để giữ lại bản nháp.</span></div>
+                  <button type="button" onClick={() => setPublishInvoiceIds(new Set(
+                    result.rooms.flatMap((room) => room.invoice?.status === 'Draft' ? [room.invoice.id] : [])
+                  ))}>Chọn tất cả bản nháp</button>
                 </div>
-
-                <section className="invoice-create-section">
-                  <h3>Dịch vụ cố định</h3>
-                  {fixedPrices.length === 0 ? (
-                    <p className="invoice-create-empty">Chưa có dịch vụ cố định được cấu hình.</p>
-                  ) : (
-                    <div className="invoice-create-stack">
-                      {fixedPrices.map((price) => (
-                        <div key={price.serviceTypeId} className="invoice-create-line">
-                          <span>{price.serviceName} / {price.displayUnitName}</span>
-                          <strong>{formatCentralFixedPreviewLine(price)}</strong>
+                <div className="bulk-result-list bulk-draft-list">
+                  {result.rooms.map((room) => room.invoice ? (
+                    <article key={room.contractId} className={`bulk-draft-card${publishInvoiceIds.has(room.invoice.id) ? ' selected' : ''}`}>
+                      <label className="bulk-draft-select">
+                        <input type="checkbox" checked={publishInvoiceIds.has(room.invoice.id)} disabled={room.invoice.status !== 'Draft' || publishing} onChange={() => togglePublishInvoice(room.invoice!.id)} />
+                        <span aria-hidden="true" />
+                      </label>
+                      <div className="bulk-draft-identity"><strong>Phòng {room.roomNumber}</strong><span>{room.invoice.tenantName} · {formatCentralDate(room.invoice.billingPeriodStart)} – {formatCentralDate(room.invoice.billingPeriodEnd)}</span></div>
+                      <em className={`invoice-status ${room.invoice.status.toLowerCase()}`}>{room.invoice.status === 'Draft' ? 'Bản nháp' : 'Đã phát hành'}</em>
+                      <div className="bulk-draft-money">
+                        <span><small>Tiền phòng</small><strong>{formatMoney(room.invoice.rentAmount)}</strong></span>
+                        <span><small>Điện nước</small><strong>{formatMoney(room.invoice.utilityAmount)}</strong></span>
+                        <span><small>Dịch vụ khác</small><strong>{formatMoney(room.invoice.serviceAmount)}</strong></span>
+                        <span><small>Giảm trừ</small><strong>− {formatMoney(room.invoice.discountAmount)}</strong></span>
+                        <span className="total"><small>Tổng thanh toán</small><strong>{formatMoney(room.invoice.totalAmount)}</strong></span>
+                      </div>
+                      {room.invoice.items.length > 0 && (
+                        <div className="bulk-draft-items">
+                          {room.invoice.items.map((item) => (
+                            <span key={item.id}><span><strong>{item.serviceName || item.description}</strong><small>{item.quantity} × {formatMoney(item.unitPrice)}</small></span><strong>{formatMoney(item.amount)}</strong></span>
+                          ))}
                         </div>
-                      ))}
-                    </div>
-                  )}
-                </section>
-
-                <section className="invoice-create-section">
-                  <h3>Chỉ số điện nước</h3>
-                  {meteredPrices.length === 0 ? (
-                    <p className="invoice-create-empty">Không có dịch vụ điện/nước nào đang cấu hình theo chỉ số.</p>
-                  ) : (
-                    <div className="invoice-create-meter-list">
-                      {meteredPrices.map((price) => {
-                        const draft = readings[price.serviceTypeId] ?? { previousReading: 0, currentReading: 0, proofImageObjectKey: '' };
-                        const latestReading = latestReadingByServiceType[price.serviceTypeId];
-                        const previousReading = latestReading?.currentReading ?? Number(draft.previousReading);
-                        const consumption = Math.max(0, Number(draft.currentReading) - previousReading);
-                        const amount = Math.round(consumption * price.unitPrice);
-                        return (
-                          <div key={price.serviceTypeId} className="invoice-create-meter-card">
-                            <strong>{price.serviceName} ({formatMoney(price.unitPrice)} / {price.meterUnitName})</strong>
-                            <div className="invoice-create-grid">
-                              {latestReading ? (
-                                <div className="invoice-create-field">
-                                  <span className="label">Chỉ số cũ</span>
-                                  <strong>{latestReading.currentReading}</strong>
-                                </div>
-                              ) : (
-                                <label className="invoice-create-field">
-                                  <span className="label">Chỉ số cũ</span>
-                                  <input
-                                    type="number"
-                                    min="0"
-                                    value={draft.previousReading}
-                                    onChange={(event) => updateReading(price.serviceTypeId, { previousReading: Number(event.target.value) })}
-                                  />
-                                </label>
-                              )}
-                              <label className="invoice-create-field">
-                                <span className="label">Chỉ số mới</span>
-                                <input
-                                  type="number"
-                                  min="0"
-                                  value={draft.currentReading}
-                                  onChange={(event) => updateReading(price.serviceTypeId, { currentReading: Number(event.target.value) })}
-                                />
-                              </label>
-                              <div className="invoice-create-field invoice-create-total">
-                                <span className="label">Tạm tính</span>
-                                <strong>{formatNumber(consumption)} x {formatMoney(price.unitPrice)} = {formatMoney(amount)}</strong>
-                              </div>
-                            </div>
-                          </div>
-                        );
-                      })}
-                    </div>
-                  )}
-                </section>
-
-                <div className="invoice-create-summary">
-                  <label className="invoice-create-field">
-                    <span className="label">Giảm trừ</span>
-                    <input type="number" min="0" value={discountAmount} onChange={(event) => setDiscountAmount(Number(event.target.value))} />
-                  </label>
-                  <label className="invoice-create-field">
-                    <span className="label">Ghi chú</span>
-                    <input value={note} onChange={(event) => setNote(event.target.value)} />
-                  </label>
-                  <div className="invoice-create-field invoice-create-total">
-                    <span className="label">Tạm tính</span>
-                    <span className="value">{formatMoney(previewTotal)}</span>
-                  </div>
+                      )}
+                    </article>
+                  ) : null)}
                 </div>
-              </div>
+                <p className="bulk-next-step"><strong>{publishInvoiceIds.size} hóa đơn sẽ phát hành ngay.</strong> Các hóa đơn không được chọn vẫn nằm trong danh sách nháp để bạn kiểm tra và phát hành sau.</p>
+              </section>
+            ) : (
+              <>
+                <section className="bulk-controls">
+                  <label><span>Khu trọ</span><select value={selectedHouseId} onChange={(event) => setSelectedHouseId(event.target.value)} disabled={loadingContracts}><option value="">Chọn khu trọ</option>{houses.map((house) => <option key={house.id} value={house.id}>{house.name}</option>)}</select></label>
+                  <label><span>Tháng / năm</span><input type="month" value={billingMonth} onChange={(event) => setBillingMonth(event.target.value)} /></label>
+                  <button type="button" className="billing-button" onClick={() => void loadHouseRooms()} disabled={!selectedHouseId || !billingMonth || loadingRooms}>{loadingRooms ? 'Đang kiểm tra...' : 'Kiểm tra các phòng'}</button>
+                </section>
+
+                {loadingContracts ? <div className="bulk-empty">Đang tải danh sách hợp đồng...</div> : roomList.length === 0 ? (
+                  <div className="bulk-empty">
+                    <strong>{hiddenRoomCount > 0 ? 'Không có phòng cần tạo hóa đơn' : 'Chọn khu trọ và kỳ hóa đơn'}</strong>
+                    <span>{hiddenRoomCount > 0 ? `${hiddenRoomCount} phòng đã được ẩn vì kỳ này đã có hóa đơn hoặc nằm ngoài thời hạn hợp đồng.` : 'Hệ thống sẽ tìm tất cả hợp đồng Active, giá dịch vụ và tình trạng hóa đơn của từng phòng.'}</span>
+                  </div>
+                ) : (
+                  <section className="bulk-room-section">
+                    <div className="bulk-room-toolbar">
+                      <div><strong>{selectedRooms.length}/{roomList.length} phòng được chọn</strong><span>{readyRooms.length} phòng đã đủ dữ liệu{hiddenRoomCount > 0 ? ` · Đã ẩn ${hiddenRoomCount} phòng không thuộc kỳ này` : ''}</span></div>
+                      <div><button type="button" onClick={() => setRooms((current) => Object.fromEntries(Object.entries(current).map(([id, room]) => [id, { ...room, selected: Boolean(room.preview?.canGenerate) && !room.loadError }]))) }>Chọn phòng hợp lệ</button><button type="button" onClick={() => setRooms((current) => Object.fromEntries(Object.entries(current).map(([id, room]) => [id, { ...room, selected: false }]))) }>Bỏ chọn tất cả</button></div>
+                    </div>
+                    <div className="bulk-room-list">
+                      {roomList.map((room) => <BulkInvoiceRoomCard key={room.contract.id} room={room} uploadingKey={uploadingKey} onPatch={(patch) => patchRoom(room.contract.id, patch)} onPatchReading={(serviceId, patch) => patchReading(room.contract.id, serviceId, patch)} onUpload={(serviceId, file) => void uploadMeterImage(room, serviceId, file)} />)}
+                    </div>
+                  </section>
+                )}
+              </>
             )}
           </div>
 
-          <div className="history-modal-footer">
-            <button type="button" className="billing-button secondary" onClick={onClose} disabled={submitting}>Đóng</button>
-            <button type="submit" className="billing-button" disabled={loadingContracts || loadingDetails || submitting || !selectedContract || !period || !preview || Boolean(previewBlockReason)}>
-              {submitting ? 'Đang tạo...' : 'Tạo hóa đơn nháp'}
-            </button>
-          </div>
+          <footer className="history-modal-footer bulk-invoice-footer">
+            {result ? <><button type="button" className="billing-button secondary" onClick={finish} disabled={publishing}>Để tất cả ở bản nháp</button><button type="button" className="billing-button" onClick={() => void publishSelectedInvoices()} disabled={publishing}>{publishing ? 'Đang phát hành...' : publishInvoiceIds.size > 0 ? `Phát hành ${publishInvoiceIds.size} hóa đơn` : 'Hoàn tất và giữ bản nháp'}</button></> : <><button type="button" className="billing-button secondary" onClick={onClose}>Đóng</button><button type="submit" className="billing-button" disabled={submitting || loadingRooms || selectedRooms.length === 0}>{submitting ? 'Đang tạo...' : `Tạo ${selectedRooms.length} hóa đơn nháp`}</button></>}
+          </footer>
         </form>
       </div>
     </div>
+  );
+}
+
+function buildBulkRoomDraft(contract: ActiveInvoiceContract, preview: RoomInvoicePreview | null, loadError: string): BulkRoomDraft {
+  const readings: Record<string, ReadingDraft> = {};
+  preview?.meteredServices.forEach((service) => {
+    readings[service.serviceTypeId] = {
+      ...emptyReadingDraft,
+      previousReading: service.latestReading?.currentReading ?? 0,
+      hasPreviousReading: Boolean(service.latestReading),
+      currentReading: service.latestReading?.currentReading ?? 0,
+      hasCurrentReading: false
+    };
+  });
+  return {
+    contract,
+    preview,
+    selected: Boolean(preview?.canGenerate) && !loadError,
+    expanded: Boolean(preview?.canGenerate) && !loadError,
+    loadError,
+    readings,
+    discountAmount: 0,
+    note: ''
+  };
+}
+
+function getBulkRoomIssue(room: BulkRoomDraft): string {
+  if (room.loadError) return room.loadError;
+  if (!room.preview) return 'Chưa tải được dữ liệu hóa đơn.';
+  if (!room.preview.canGenerate) return room.preview.blockReason || 'Phòng chưa đủ điều kiện tạo hóa đơn.';
+  for (const service of room.preview.meteredServices) {
+    const draft = room.readings[service.serviceTypeId] ?? emptyReadingDraft;
+    const previous = service.latestReading?.currentReading ?? draft.previousReading;
+    if (service.requiresPreviousReading && !draft.hasPreviousReading) {
+      return `Vui lòng nhập chỉ số đầu kỳ ${service.serviceName}.`;
+    }
+    if (!draft.hasCurrentReading) {
+      return `Chưa nhập chỉ số ${service.serviceName}.`;
+    }
+    if (Number(draft.currentReading) < previous) {
+      return `Chỉ số ${service.serviceName} thấp hơn kỳ trước.`;
+    }
+  }
+  return '';
+}
+
+function isBulkRoomReady(room: BulkRoomDraft): boolean {
+  return !getBulkRoomIssue(room);
+}
+
+function BulkInvoiceRoomCard({
+  room,
+  uploadingKey,
+  onPatch,
+  onPatchReading,
+  onUpload
+}: {
+  room: BulkRoomDraft;
+  uploadingKey: string;
+  onPatch: (patch: Partial<BulkRoomDraft>) => void;
+  onPatchReading: (serviceTypeId: string, patch: Partial<ReadingDraft>) => void;
+  onUpload: (serviceTypeId: string, file?: File) => void;
+}) {
+  const [meterImagePreview, setMeterImagePreview] = useState<{ src: string; alt: string } | null>(null);
+  const issue = getBulkRoomIssue(room);
+  const ready = !issue;
+  const preview = room.preview;
+  const utilityAmount = (preview?.meteredServices ?? []).reduce((sum, service) => {
+    const draft = room.readings[service.serviceTypeId] ?? emptyReadingDraft;
+    const previous = service.latestReading?.currentReading ?? draft.previousReading;
+    return sum + Math.max(0, Number(draft.currentReading) - previous) * service.unitPrice;
+  }, 0);
+  const total = Math.max(0, (preview?.rentAmount ?? 0) + (preview?.fixedServiceAmount ?? 0) + utilityAmount - room.discountAmount);
+
+  return (
+    <article className={`bulk-room-card${room.selected ? ' selected' : ''}${issue ? ' has-issue' : ' ready'}`}>
+      <div className="bulk-room-card-head">
+        <label className="bulk-room-check">
+          <input type="checkbox" checked={room.selected} onChange={(event) => onPatch({ selected: event.target.checked })} />
+          <span aria-hidden="true" />
+        </label>
+        <button type="button" className="bulk-room-identity" onClick={() => onPatch({ expanded: !room.expanded })}>
+          <strong>Phòng {room.contract.roomNumber}</strong>
+          <span>{room.contract.mainTenantName} · {room.contract.occupants.length || 1} người ở</span>
+        </button>
+        <div className="bulk-room-money"><small>Tạm tính</small><strong>{formatMoney(total)}</strong></div>
+        <span className={`bulk-status ${ready ? 'ready' : 'issue'}`}>{ready ? 'Đủ dữ liệu' : room.preview?.canGenerate ? 'Cần nhập chỉ số' : 'Không thể tạo'}</span>
+        <button type="button" className="bulk-expand" onClick={() => onPatch({ expanded: !room.expanded })} aria-label={room.expanded ? 'Thu gọn' : 'Mở chi tiết'}>{room.expanded ? '−' : '+'}</button>
+      </div>
+
+      {issue && <div className="bulk-room-issue">{issue} {!room.selected && <span>Phòng này sẽ được bỏ qua.</span>}</div>}
+
+      {room.expanded && preview && (
+        <div className="bulk-room-detail">
+          <div className="bulk-room-breakdown">
+            <span><small>Tiền phòng</small><strong>{formatMoney(preview.rentAmount)}</strong></span>
+            <span><small>Dịch vụ khác</small><strong>{formatMoney(preview.fixedServiceAmount)}</strong></span>
+            <span><small>Điện nước</small><strong>{formatMoney(utilityAmount)}</strong></span>
+            <label><small>Giảm trừ</small><input type="number" min="0" value={room.discountAmount} onChange={(event) => onPatch({ discountAmount: Number(event.target.value) })} /></label>
+          </div>
+
+          {preview.fixedServices.length > 0 && (
+            <div className="bulk-service-detail">
+              <div><strong>Dịch vụ theo hợp đồng</strong><span>Đã tự động tính vào hóa đơn</span></div>
+              <ul>
+                {preview.fixedServices.map((service) => (
+                  <li key={service.serviceTypeId}>
+                    <span><strong>{service.serviceName}</strong><small>{service.quantity} × {formatMoney(service.unitPrice)} / {service.displayUnitName}</small></span>
+                    <strong>{formatMoney(service.amount)}</strong>
+                  </li>
+                ))}
+              </ul>
+            </div>
+          )}
+
+          {preview.meteredServices.length > 0 && (
+            <div className="bulk-meter-grid">
+              {preview.meteredServices.map((service) => {
+                const draft = room.readings[service.serviceTypeId] ?? emptyReadingDraft;
+                const previous = service.latestReading?.currentReading ?? draft.previousReading;
+                const lower = draft.hasCurrentReading && draft.currentReading < previous;
+                const uploadKey = `${room.contract.id}:${service.serviceTypeId}`;
+                return (
+                  <section key={service.serviceTypeId} className={`bulk-meter-item${lower ? ' invalid' : ''}`}>
+                    <div className="bulk-meter-title"><strong>{service.serviceName}</strong><span>{formatMoney(service.unitPrice)} / {service.meterUnitName}</span></div>
+                    <div className="bulk-meter-values">
+                      {service.requiresPreviousReading ? (
+                        <label className="bulk-first-reading"><small>Chỉ số đầu kỳ <em>Nhập lần đầu</em></small><input type="number" min="0" value={draft.hasPreviousReading ? draft.previousReading : ''} placeholder="Nhập chỉ số khi bắt đầu ở" onChange={(event) => onPatchReading(service.serviceTypeId, { previousReading: Number(event.target.value), hasPreviousReading: event.target.value !== '' })} /></label>
+                      ) : (
+                        <span><small>Chỉ số cũ <em>Từ kỳ trước</em></small><strong>{previous}</strong></span>
+                      )}
+                      <span><small>AI đọc <em>Tùy chọn</em></small><strong>{draft.aiReading ?? '--'}</strong></span>
+                      <label><small>Chỉ số mới</small><input type="number" min="0" value={draft.hasCurrentReading ? draft.currentReading : ''} placeholder={`Từ ${previous}`} aria-invalid={lower} onChange={(event) => onPatchReading(service.serviceTypeId, { currentReading: Number(event.target.value), hasCurrentReading: event.target.value !== '' })} /></label>
+                    </div>
+                    <div className="bulk-meter-proof">
+                      {draft.proofImageUrl && (
+                        <button
+                          type="button"
+                          className="bulk-meter-thumbnail"
+                          onClick={() => setMeterImagePreview({
+                            src: toAssetUrl(draft.proofImageUrl),
+                            alt: `Đồng hồ ${service.serviceName} phòng ${room.contract.roomNumber}`
+                          })}
+                          aria-label={`Xem ảnh đồng hồ ${service.serviceName} kích thước lớn`}
+                        >
+                          <img src={toAssetUrl(draft.proofImageUrl)} alt={`Đồng hồ ${service.serviceName} phòng ${room.contract.roomNumber}`} />
+                          <span>Xem ảnh</span>
+                        </button>
+                      )}
+                      <div className="bulk-meter-upload-copy"><strong>Ảnh đồng hồ <em>Không bắt buộc</em></strong><span>Tải ảnh để AI đọc tự động, hoặc nhập chỉ số trực tiếp ở trên.</span></div>
+                      <label>{uploadingKey === uploadKey ? 'AI đang đọc...' : draft.proofImageUrl ? 'Thay ảnh' : 'Chọn ảnh'}<input type="file" accept="image/jpeg,image/png" disabled={Boolean(uploadingKey)} onChange={(event) => { onUpload(service.serviceTypeId, event.target.files?.[0]); event.currentTarget.value = ''; }} /></label>
+                    </div>
+                    {lower && <small className="bulk-meter-error">Chỉ số mới phải từ {previous} {service.meterUnitName} trở lên. Ảnh vẫn được giữ để sửa.</small>}
+                  </section>
+                );
+              })}
+            </div>
+          )}
+
+          <label className="bulk-room-note"><span>Ghi chú riêng cho phòng</span><input value={room.note} onChange={(event) => onPatch({ note: event.target.value })} placeholder="Ví dụ: giảm tiền do sửa chữa..." /></label>
+        </div>
+      )}
+
+      {meterImagePreview && (
+        <div className="meter-image-lightbox" role="dialog" aria-modal="true" aria-label="Xem ảnh đồng hồ" onClick={() => setMeterImagePreview(null)}>
+          <div className="meter-image-lightbox-content" onClick={(event) => event.stopPropagation()}>
+            <div><strong>Ảnh đồng hồ</strong><span>Phòng {room.contract.roomNumber}</span></div>
+            <button type="button" onClick={() => setMeterImagePreview(null)} aria-label="Đóng ảnh">×</button>
+            <img src={meterImagePreview.src} alt={meterImagePreview.alt} />
+          </div>
+        </div>
+      )}
+    </article>
   );
 }
 
@@ -1762,4 +1866,9 @@ function getInvoiceItemTypeLabel(itemType: string) {
   };
 
   return labels[itemType] ?? itemType;
+}
+
+function formatCentralDate(value: string) {
+  const [year, month, day] = value.slice(0, 10).split('-');
+  return `${day}/${month}/${year}`;
 }

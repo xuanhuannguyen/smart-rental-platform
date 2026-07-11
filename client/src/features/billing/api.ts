@@ -6,7 +6,10 @@ import type {
   CreateTerminationInvoiceRequest,
   CreateServicePriceRequest,
   GenerateInvoiceWithReadingsRequest,
+  GenerateBulkInvoicesRequest,
+  BulkInvoiceResult,
   Invoice,
+  MeterAiResponse,
   RoomBillingContext,
   RoomInvoicePreview,
   ServicePrice
@@ -80,6 +83,33 @@ export const billingApi = {
       method: 'POST',
       auth: true,
       body: payload
+    });
+  },
+
+  generateBulk(payload: GenerateBulkInvoicesRequest) {
+    return apiClient<ApiResponse<BulkInvoiceResult>>(ENDPOINTS.BILLING.GENERATE_BULK, {
+      method: 'POST',
+      auth: true,
+      body: payload
+    });
+  },
+
+  async readMeterImage(payload: {
+    contractId: string;
+    serviceTypeId: string;
+    billingPeriodStart: string;
+    file: File;
+  }) {
+    const uploadFile = await prepareMeterImageForUpload(payload.file);
+    const form = new FormData();
+    form.append('contractId', payload.contractId);
+    form.append('serviceTypeId', payload.serviceTypeId);
+    form.append('billingPeriodStart', payload.billingPeriodStart);
+    form.append('file', uploadFile);
+    return apiClient<ApiResponse<MeterAiResponse>>(ENDPOINTS.BILLING.METER_READING_AI, {
+      method: 'POST',
+      auth: true,
+      body: form
     });
   },
 
@@ -159,4 +189,56 @@ function normalizeServicePrice(price: ServicePrice): ServicePrice {
     ...price,
     unitName: price.unitName ?? price.displayUnitName
   };
+}
+
+const AI_UPLOAD_LIMIT_BYTES = 1_400_000;
+const AI_MAX_IMAGE_DIMENSION = 2200;
+
+async function prepareMeterImageForUpload(file: File): Promise<File> {
+  if (file.size <= AI_UPLOAD_LIMIT_BYTES) {
+    return file;
+  }
+
+  const bitmap = await createImageBitmap(file);
+  try {
+    const initialScale = Math.min(1, AI_MAX_IMAGE_DIMENSION / Math.max(bitmap.width, bitmap.height));
+    let width = Math.max(1, Math.round(bitmap.width * initialScale));
+    let height = Math.max(1, Math.round(bitmap.height * initialScale));
+    let quality = 0.88;
+
+    for (let attempt = 0; attempt < 7; attempt += 1) {
+      const canvas = document.createElement('canvas');
+      canvas.width = width;
+      canvas.height = height;
+      const context = canvas.getContext('2d');
+      if (!context) {
+        throw new Error('Trình duyệt không hỗ trợ xử lý ảnh đồng hồ.');
+      }
+
+      context.drawImage(bitmap, 0, 0, width, height);
+      const blob = await new Promise<Blob>((resolve, reject) => {
+        canvas.toBlob(
+          (value) => value ? resolve(value) : reject(new Error('Không thể nén ảnh đồng hồ.')),
+          'image/jpeg',
+          quality
+        );
+      });
+
+      if (blob.size <= AI_UPLOAD_LIMIT_BYTES || attempt === 6) {
+        const baseName = file.name.replace(/\.[^.]+$/, '') || 'meter-reading';
+        return new File([blob], `${baseName}-ai.jpg`, {
+          type: 'image/jpeg',
+          lastModified: file.lastModified
+        });
+      }
+
+      quality = Math.max(0.58, quality - 0.08);
+      width = Math.max(1, Math.round(width * 0.88));
+      height = Math.max(1, Math.round(height * 0.88));
+    }
+
+    return file;
+  } finally {
+    bitmap.close();
+  }
 }

@@ -7,5 +7,6 @@ public enum FileUploadScope
     LegalDocument = 3,
     Avatar = 4,
     HouseRule = 5,
-    ChatImage = 6
+    ChatImage = 6,
+    MeterReading = 7
 }

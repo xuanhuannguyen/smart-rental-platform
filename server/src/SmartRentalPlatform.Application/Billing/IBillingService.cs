@@ -51,6 +51,11 @@ public interface IBillingService
         GenerateInvoiceWithReadingsRequest request,
         CancellationToken cancellationToken = default);
 
+    Task<BulkInvoiceResultResponse> GenerateBulkInvoicesAsync(
+        Guid landlordUserId,
+        GenerateBulkInvoicesRequest request,
+        CancellationToken cancellationToken = default);
+
     Task<InvoiceResponse> CreateFinalInvoiceForTerminationAsync(
         Guid landlordUserId,
         Guid contractId,

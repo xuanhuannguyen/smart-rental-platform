@@ -1,5 +1,6 @@
 using System.Net.Http.Json;
 using System.Text.Json;
+using Google.Apis.Auth.OAuth2;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using SmartRentalPlatform.Application.Common.Interfaces;
@@ -36,7 +37,7 @@ public sealed class GeminiStructuredOutputService : IAiStructuredOutputService
         object input,
         CancellationToken cancellationToken = default)
     {
-        if (!options.Enabled || string.IsNullOrWhiteSpace(options.ApiKey))
+        if (!options.Enabled || (string.IsNullOrWhiteSpace(options.ApiKey) && string.IsNullOrWhiteSpace(options.ServiceAccountJson)))
         {
             return default;
         }
@@ -47,6 +48,7 @@ public sealed class GeminiStructuredOutputService : IAiStructuredOutputService
             {
                 new
                 {
+                    role = "user",
                     parts = new[]
                     {
                         new
@@ -91,10 +93,28 @@ public sealed class GeminiStructuredOutputService : IAiStructuredOutputService
 
         for (var attempt = 1; attempt <= maxAttempts; attempt++)
         {
-            using var request = new HttpRequestMessage(
-                HttpMethod.Post,
-                $"models/{Uri.EscapeDataString(options.Model)}:generateContent");
-            request.Headers.Add("x-goog-api-key", options.ApiKey);
+            string requestUrl;
+            if (options.UseVertexAi && !string.IsNullOrWhiteSpace(options.ProjectId))
+            {
+                requestUrl = $"https://{options.Region}-aiplatform.googleapis.com/v1/projects/{options.ProjectId}/locations/{options.Region}/publishers/google/models/{options.Model}:generateContent";
+            }
+            else
+            {
+                requestUrl = $"https://generativelanguage.googleapis.com/v1beta/models/{options.Model}:generateContent";
+            }
+
+            using var request = new HttpRequestMessage(HttpMethod.Post, requestUrl);
+            
+            if (options.UseVertexAi && !string.IsNullOrWhiteSpace(options.ServiceAccountJson))
+            {
+                var token = await GetAccessTokenAsync(cancellationToken);
+                request.Headers.Authorization = new System.Net.Http.Headers.AuthenticationHeaderValue("Bearer", token);
+            }
+            else
+            {
+                request.Headers.Add("x-goog-api-key", options.ApiKey);
+            }
+
             request.Content = JsonContent.Create(payload, options: JsonOptions);
 
             var response = await httpClient.SendAsync(request, cancellationToken);
@@ -124,6 +144,34 @@ public sealed class GeminiStructuredOutputService : IAiStructuredOutputService
         }
 
         return null;
+    }
+
+    private static string? _cachedToken;
+    private static DateTime _tokenExpiresAt = DateTime.MinValue;
+    private static readonly object TokenLock = new();
+
+    private async Task<string> GetAccessTokenAsync(CancellationToken cancellationToken)
+    {
+        lock (TokenLock)
+        {
+            if (!string.IsNullOrEmpty(_cachedToken) && _tokenExpiresAt > DateTime.UtcNow.AddMinutes(5))
+            {
+                return _cachedToken;
+            }
+        }
+
+        var credential = GoogleCredential.FromJson(options.ServiceAccountJson)
+            .CreateScoped("https://www.googleapis.com/auth/cloud-platform");
+
+        var token = await credential.UnderlyingCredential.GetAccessTokenForRequestAsync(cancellationToken: cancellationToken);
+
+        lock (TokenLock)
+        {
+            _cachedToken = token;
+            _tokenExpiresAt = DateTime.UtcNow.AddHours(1);
+        }
+
+        return token;
     }
 
     private static string BuildPrompt(string schemaName, string instructions, object input)

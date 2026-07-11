@@ -15,6 +15,7 @@ internal static class BillingServiceRegistration
         services.AddScoped<MeterReadingInputResolver>();
         services.AddScoped<BillingWorkflowGuard>();
         services.AddScoped<IBillingService, BillingService>();
+        services.AddScoped<IMeterReadingAiService, MeterReadingAiService>();
 
         return services;
     }

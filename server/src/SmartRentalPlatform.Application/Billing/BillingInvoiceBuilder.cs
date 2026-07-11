@@ -118,6 +118,9 @@ public sealed class BillingInvoiceBuilder
                 CurrentReading = input.CurrentReading,
                 Consumption = consumption,
                 ProofImageObjectKey = input.ProofImageObjectKey,
+                AiReading = input.AiReading,
+                AiRawText = input.AiRawText,
+                WasManuallyCorrected = input.AiReading.HasValue && input.AiReading.Value != input.CurrentReading,
                 RecordedByLandlordUserId = landlordUserId,
                 ReadingAt = now,
                 CreatedAt = now,
@@ -228,4 +231,6 @@ internal sealed record ResolvedMeterReadingInput(
     RoomingHouseServicePrice Price,
     decimal PreviousReading,
     decimal CurrentReading,
-    string? ProofImageObjectKey);
+    string? ProofImageObjectKey,
+    decimal? AiReading = null,
+    string? AiRawText = null);
