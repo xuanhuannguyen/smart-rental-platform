@@ -9,6 +9,7 @@ import { SignatureInput } from '../../contracts/components/SignatureInput';
 import { getApiErrorMessage } from '../../../shared/api/apiError';
 import { Toast } from '../../../shared/components/ui/Toast';
 import { Button } from '../../../shared/components/ui/Button';
+import { ROUTE_PATHS } from '../../../app/router/routePaths';
 import '../../../shared/components/ui/ESignOtpDialog.css';
 import './AppendixPreviewModal.css';
 
@@ -91,8 +92,12 @@ export function AppendixPreviewModal({ contractId, appendixId, isCreator, hasNoS
       setSubmitting(true);
       setToast(null);
 
+      const isLandlord = window.location.pathname.includes('/landlord');
       const response = await contractApi.startAppendixESignEnvelope(contractId, appendixId, {
-        agreedToTerms: true
+        agreedToTerms: true,
+        returnUrl: isLandlord
+          ? window.location.origin + ROUTE_PATHS.LANDLORD.ESIGN_RETURN
+          : window.location.origin + ROUTE_PATHS.ACCOUNT.ESIGN_RETURN
       });
 
       if (response.data.requiresOtp) {

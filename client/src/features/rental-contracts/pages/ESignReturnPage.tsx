@@ -20,6 +20,9 @@ export function ESignReturnPage() {
     }
   }, [searchParams]);
 
+  const isLandlord = window.location.pathname.includes('/landlord');
+  const targetPath = isLandlord ? '/landlord/contracts' : '/account/rental-history';
+
   return (
     <div style={{ maxWidth: '600px', margin: '40px auto', textAlign: 'center', padding: '20px' }}>
       {status === 'loading' && <h2>Đang xác nhận kết quả ký số...</h2>}
@@ -31,7 +34,7 @@ export function ESignReturnPage() {
           <p style={{ color: '#6b7280', marginBottom: '24px' }}>
             Cảm ơn bạn đã hoàn tất việc ký hợp đồng/phụ lục. Hệ thống đang cập nhật trạng thái mới nhất.
           </p>
-          <Button onClick={() => navigate('/tenant/contracts')}>Về danh sách hợp đồng</Button>
+          <Button onClick={() => navigate(targetPath)}>Về danh sách hợp đồng</Button>
         </>
       )}
 
