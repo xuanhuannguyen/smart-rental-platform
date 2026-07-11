@@ -7,6 +7,7 @@ import { env } from '../../config/env';
 import type {
   ContractDetailResponse,
   ContractFileResponse,
+  ContractFileViewUrlResponse,
   ContractHistoryItemResponse,
   ContractPreviewResponse,
   RejectContractRequest,
@@ -93,6 +94,12 @@ export const contractApi = {
 
   getContractFiles: (id: string) =>
     apiClient<ApiResponse<ContractFileResponse[]>>(ENDPOINTS.CONTRACTS.FILES(id), {
+      method: 'GET',
+      auth: true
+    }),
+
+  getContractFileViewUrl: (id: string, fileId: string) =>
+    apiClient<ApiResponse<ContractFileViewUrlResponse>>(ENDPOINTS.CONTRACTS.VIEW_FILE_URL(id, fileId), {
       method: 'GET',
       auth: true
     }),

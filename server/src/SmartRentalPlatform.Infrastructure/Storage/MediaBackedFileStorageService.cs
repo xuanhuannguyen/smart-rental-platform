@@ -146,6 +146,7 @@ public sealed class MediaBackedFileStorageService : IFileStorageService
             FileUploadScope.Avatar => MediaScope.Avatar,
             FileUploadScope.HouseRule => MediaScope.RoomingHouseRulePdf,
             FileUploadScope.MeterReading => MediaScope.MeterReadingImage,
+            FileUploadScope.ChatAttachment => MediaScope.ChatAttachment,
             _ => throw new ArgumentOutOfRangeException(nameof(scope), scope, "Unsupported file upload scope.")
         };
     }
@@ -156,6 +157,7 @@ public sealed class MediaBackedFileStorageService : IFileStorageService
         {
             FileUploadScope.LegalDocument => MediaVisibility.Private,
             FileUploadScope.MeterReading => MediaVisibility.Private,
+            FileUploadScope.ChatAttachment => MediaVisibility.Private,
             _ => MediaVisibility.Public
         };
     }

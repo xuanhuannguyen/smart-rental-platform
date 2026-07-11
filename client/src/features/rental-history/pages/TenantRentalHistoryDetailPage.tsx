@@ -22,6 +22,7 @@ import {
   loadAccessibleContractFiles,
 } from '../../contracts/appendixFiles';
 import { AppendixFileActions } from '../../contracts/components/AppendixFileActions';
+import { openContractFileForView } from '../../contracts/fileAccess';
 import { billingApi } from '../../billing/api';
 import type { Invoice } from '../../billing/types';
 import './TenantRentalHistoryDetailPage.css';
@@ -184,15 +185,14 @@ export const TenantRentalHistoryDetailPage: React.FC = () => {
       setActionError(null);
       setIsFileActionLoading(true);
       const file = await resolveVisibleContractFile(contract);
-      const blob = await contractApi.downloadContractFile(contract.id, file.id);
-      const url = URL.createObjectURL(blob);
 
       if (mode === 'view') {
-        window.open(url, '_blank', 'noopener,noreferrer');
-        window.setTimeout(() => URL.revokeObjectURL(url), 60_000);
+        await openContractFileForView(contract.id, file);
         return;
       }
 
+      const blob = await contractApi.downloadContractFile(contract.id, file.id);
+      const url = URL.createObjectURL(blob);
       const link = document.createElement('a');
       link.href = url;
       link.download = `${contract.contractNumber}-${file.fileVariant.toLowerCase()}.pdf`;

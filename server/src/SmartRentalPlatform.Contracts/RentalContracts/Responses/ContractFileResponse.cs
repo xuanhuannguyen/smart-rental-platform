@@ -16,5 +16,7 @@ public class ContractFileResponse
 
     public string? FileUrl { get; set; }
 
+    public string? ViewUrl { get; set; }
+
     public DateTimeOffset CreatedAt { get; set; }
 }

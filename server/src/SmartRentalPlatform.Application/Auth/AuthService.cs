@@ -2,6 +2,7 @@ using Microsoft.AspNetCore.Http;
 using Microsoft.EntityFrameworkCore;
 using SmartRentalPlatform.Application.Common.Exceptions;
 using SmartRentalPlatform.Application.Common.Interfaces;
+using SmartRentalPlatform.Application.Common.Media;
 using SmartRentalPlatform.Contracts.Auth;
 using SmartRentalPlatform.Contracts.Common;
 using SmartRentalPlatform.Domain.Entities.Users;
@@ -396,13 +397,18 @@ public class AuthService : IAuthService
     });
 
     await _dbContext.SaveChangesAsync(cancellationToken);
+    var avatarUrl = await AvatarMediaUrlResolver.ResolveAsync(
+        _dbContext,
+        user.AvatarUrl,
+        user.AvatarMediaAssetId,
+        cancellationToken);
 
     return new LoginResponse
     {
         UserId = user.Id,
         Email = user.Email,
         DisplayName = user.DisplayName,
-        AvatarUrl = user.AvatarUrl,
+        AvatarUrl = avatarUrl,
         AvatarMediaAssetId = user.AvatarMediaAssetId,
         IsGoogleUser = string.IsNullOrEmpty(user.PasswordHash),
         EmailConfirmed = user.EmailConfirmed,

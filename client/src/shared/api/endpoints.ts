@@ -43,6 +43,11 @@ export const ENDPOINTS = {
   FILES: {
     IMAGES: '/api/files/images'
   },
+  MEDIA: {
+    PRIVATE_BY_ID: (mediaAssetId: string) => `/api/media/private/${mediaAssetId}`,
+    PRIVATE_DOWNLOAD: (mediaAssetId: string) => `/api/media/private/${mediaAssetId}/download`,
+    PRIVATE_DOWNLOAD_URL: (mediaAssetId: string) => `/api/media/private/${mediaAssetId}/download-url`
+  },
   ROOMING_HOUSES: {
     ROOT: '/api/rooming-houses',
     MY_ONBOARDING: '/api/rooming-houses/my/onboarding',
@@ -106,6 +111,7 @@ export const ENDPOINTS = {
     FILES: (id: string) => `/api/contracts/${id}/files`,
     GENERATE_FILE: (id: string) => `/api/contracts/${id}/files/generate`,
     DOWNLOAD_FILE: (id: string, fileId: string) => `/api/contracts/${id}/files/${fileId}/download`,
+    VIEW_FILE_URL: (id: string, fileId: string) => `/api/contracts/${id}/files/${fileId}/view-url`,
     REVISION_REQUEST: (id: string) => `/api/contracts/${id}/revision-request`,
     REJECT: (id: string) => `/api/contracts/${id}/reject`,
     TERMINATE: (id: string) => `/api/contracts/${id}/terminate`,

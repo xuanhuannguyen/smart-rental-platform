@@ -3,6 +3,7 @@ import { useParams, useNavigate, useLocation } from 'react-router-dom';
 import { useAuth } from '../../../app/providers/AuthProvider';
 import { ROUTE_PATHS } from '../../../app/router/routePaths';
 import { getApiErrorMessage } from '../../../shared/api/apiError';
+import { toAssetUrl } from '../../../shared/api/assets';
 import { Button } from '../../../shared/components/ui/Button';
 import { formatStatus, getStatusToneClass } from '../../../shared/utils/status';
 import { contractApi } from '../../contracts/api';
@@ -40,6 +41,7 @@ import {
   loadAccessibleContractFiles,
 } from '../../contracts/appendixFiles';
 import { AppendixFileActions } from '../../contracts/components/AppendixFileActions';
+import { openContractFileForView } from '../../contracts/fileAccess';
 import { LandlordCreateAppendixModalV2 } from '../../contracts/components/LandlordCreateAppendixModalV2';
 import type { Amenity, PropertyImageRequest } from '../../rooming-houses/types';
 import { getAmenities } from '../../rooming-houses/api';
@@ -49,6 +51,7 @@ import { formatDateVi, formatMoneyString, parseMoneyString } from '../../../shar
 import { TerminateContractModal } from '../../rental-history/pages/TerminateContractModal';
 import { AppendixPreviewModal } from '../../rental-history/components/AppendixPreviewModal';
 import { billingApi } from '../../billing/api';
+import { uploadImage } from '../../files/api';
 import type {
   FixedServicePreview,
   Invoice,
@@ -402,15 +405,14 @@ export default function RoomDetailPage() {
       setIsFileActionLoading(true);
 
       const file = await resolveRawContractFile(activeContract.id);
-      const blob = await contractApi.downloadContractFile(activeContract.id, file.id);
-      const url = URL.createObjectURL(blob);
 
       if (mode === 'view') {
-        window.open(url, '_blank', 'noopener,noreferrer');
-        window.setTimeout(() => URL.revokeObjectURL(url), 60_000);
+        await openContractFileForView(activeContract.id, file);
         return;
       }
 
+      const blob = await contractApi.downloadContractFile(activeContract.id, file.id);
+      const url = URL.createObjectURL(blob);
       const link = document.createElement('a');
       link.href = url;
       link.download = `${activeContract.contractNumber}-${file.fileVariant.toLowerCase()}.pdf`;
@@ -1199,6 +1201,8 @@ type ReadingDraft = {
   previousReading: number;
   currentReading: number;
   proofImageObjectKey: string;
+  proofMediaAssetId?: string | null;
+  proofImageUrl?: string | null;
 };
 
 function CreateInvoiceWithReadingsModal({
@@ -1221,6 +1225,7 @@ function CreateInvoiceWithReadingsModal({
   const [note, setNote] = useState('');
   const [loading, setLoading] = useState(true);
   const [submitting, setSubmitting] = useState(false);
+  const [uploadingProofServiceId, setUploadingProofServiceId] = useState<string | null>(null);
   const [error, setError] = useState('');
   const latestReadingByServiceType = Object.fromEntries(
     (preview?.meteredServices ?? []).map((service) => [service.serviceTypeId, service.latestReading ?? null])
@@ -1293,6 +1298,8 @@ function CreateInvoiceWithReadingsModal({
             previousReading: latestReading?.currentReading ?? 0,
             currentReading: latestReading?.currentReading ?? 0,
             proofImageObjectKey: '',
+            proofMediaAssetId: null,
+            proofImageUrl: null,
           };
         });
         setReadings(nextReadings);
@@ -1335,10 +1342,27 @@ function CreateInvoiceWithReadingsModal({
     setReadings((current) => ({
       ...current,
       [serviceTypeId]: {
-        ...(current[serviceTypeId] ?? { previousReading: 0, currentReading: 0, proofImageObjectKey: '' }),
+        ...(current[serviceTypeId] ?? { previousReading: 0, currentReading: 0, proofImageObjectKey: '', proofMediaAssetId: null, proofImageUrl: null }),
         ...patch,
       },
     }));
+  }
+
+  async function handleProofUpload(serviceTypeId: string, file: File) {
+    setUploadingProofServiceId(serviceTypeId);
+    setError('');
+    try {
+      const uploaded = await uploadImage(file, 'MeterReading');
+      updateReading(serviceTypeId, {
+        proofImageObjectKey: uploaded.objectKey,
+        proofMediaAssetId: uploaded.mediaAssetId || null,
+        proofImageUrl: uploaded.url || null,
+      });
+    } catch (err) {
+      setError(getApiErrorMessage(err, 'Không thể tải ảnh công tơ lên.'));
+    } finally {
+      setUploadingProofServiceId(null);
+    }
   }
 
   async function handleSubmit(event: FormEvent) {
@@ -1356,13 +1380,14 @@ function CreateInvoiceWithReadingsModal({
     }
 
     const meterReadings: MeterReadingInput[] = meteredPrices.map((price) => {
-      const draft = readings[price.serviceTypeId] ?? { previousReading: 0, currentReading: 0, proofImageObjectKey: '' };
+      const draft = readings[price.serviceTypeId] ?? { previousReading: 0, currentReading: 0, proofImageObjectKey: '', proofMediaAssetId: null, proofImageUrl: null };
       const latestReading = latestReadingByServiceType[price.serviceTypeId];
       return {
         serviceTypeId: price.serviceTypeId,
         previousReading: latestReading ? null : Number(draft.previousReading),
         currentReading: Number(draft.currentReading),
         proofImageObjectKey: draft.proofImageObjectKey.trim() || null,
+        proofMediaAssetId: draft.proofMediaAssetId || null,
       };
     });
 
@@ -1464,11 +1489,13 @@ function CreateInvoiceWithReadingsModal({
                   ) : (
                     <div className="invoice-create-meter-list">
                       {meteredPrices.map((price) => {
-                        const draft = readings[price.serviceTypeId] ?? { previousReading: 0, currentReading: 0, proofImageObjectKey: '' };
+                        const draft = readings[price.serviceTypeId] ?? { previousReading: 0, currentReading: 0, proofImageObjectKey: '', proofMediaAssetId: null, proofImageUrl: null };
                         const latestReading = latestReadingByServiceType[price.serviceTypeId];
                         const previousReading = latestReading?.currentReading ?? Number(draft.previousReading);
                         const consumption = Math.max(0, Number(draft.currentReading) - previousReading);
                         const amount = Math.round(consumption * price.unitPrice);
+                        const uploadedProofUrl = resolveMeterProofUrl(draft.proofImageUrl, draft.proofImageObjectKey);
+                        const latestProofUrl = resolveMeterProofUrl(latestReading?.proofImageUrl, null);
                         return (
                           <div key={price.serviceTypeId} className="invoice-create-meter-card">
                             <strong>{price.serviceName} ({formatMoneyString(price.unitPrice)} đ / {price.meterUnitName})</strong>
@@ -1502,6 +1529,39 @@ function CreateInvoiceWithReadingsModal({
                                 <span className="label">Tạm tính</span>
                                 <strong>{formatMoneyString(consumption)} x {formatMoneyString(price.unitPrice)} = {formatMoneyString(amount)} đ</strong>
                               </div>
+                            </div>
+                            <div className="invoice-create-grid" style={{ marginTop: '12px' }}>
+                              <label className="invoice-create-field" style={{ gridColumn: '1 / -1' }}>
+                                <span className="label">Ảnh công tơ kỳ này</span>
+                                <input
+                                  type="file"
+                                  accept="image/png,image/jpeg,image/webp"
+                                  onChange={(event) => {
+                                    const file = event.target.files?.[0];
+                                    if (file) {
+                                      void handleProofUpload(price.serviceTypeId, file);
+                                      event.target.value = '';
+                                    }
+                                  }}
+                                  disabled={uploadingProofServiceId === price.serviceTypeId}
+                                />
+                              </label>
+                              {uploadedProofUrl && (
+                                <div className="invoice-create-field" style={{ gridColumn: '1 / -1' }}>
+                                  <span className="label">Ảnh đã chọn</span>
+                                  <a href={uploadedProofUrl} target="_blank" rel="noreferrer">
+                                    Xem ảnh công tơ vừa tải lên
+                                  </a>
+                                </div>
+                              )}
+                              {latestProofUrl && (
+                                <div className="invoice-create-field" style={{ gridColumn: '1 / -1' }}>
+                                  <span className="label">Ảnh công tơ kỳ trước</span>
+                                  <a href={latestProofUrl} target="_blank" rel="noreferrer">
+                                    Xem ảnh công tơ gần nhất
+                                  </a>
+                                </div>
+                              )}
                             </div>
                           </div>
                         );
@@ -1807,6 +1867,18 @@ function getInvoiceStatusClass(status: string) {
 
 function isRoomEditLocked(room: Room | null) {
   return room?.status === 'Reserved' || room?.status === 'Occupied';
+}
+
+function resolveMeterProofUrl(imageUrl?: string | null, objectKey?: string | null) {
+  if (imageUrl?.trim()) {
+    return toAssetUrl(imageUrl);
+  }
+
+  if (objectKey?.trim()) {
+    return toAssetUrl(objectKey);
+  }
+
+  return '';
 }
 
 

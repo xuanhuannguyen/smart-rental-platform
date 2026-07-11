@@ -154,7 +154,7 @@ export function ProfileInfoPage() {
       let finalAvatarUrl = profileForm.avatarUrl;
       let finalAvatarMediaAssetId = profileForm.avatarMediaAssetId;
       if (selectedFile || isCropChanged) {
-        const srcToCrop = previewUrl || toAvatarImageUrl(profileForm.avatarUrl);
+        const srcToCrop = previewUrl || toAvatarImageUrl(profileForm);
         const croppedFile = await cropAvatar(srcToCrop, cropParams.zoom, cropParams.position);
         const uploadResult = await uploadImage(croppedFile, 'Avatar');
         finalAvatarUrl = uploadResult.url;
@@ -233,7 +233,7 @@ export function ProfileInfoPage() {
                       {previewUrl || isCropChanged ? (
                         <div className="profile-avatar-preview-wrapper">
                           <img
-                            src={previewUrl || toAvatarImageUrl(profileForm.avatarUrl)}
+                            src={previewUrl || toAvatarImageUrl(profileForm)}
                             alt="Avatar"
                             className="profile-avatar-preview-img"
                             style={{
@@ -243,7 +243,7 @@ export function ProfileInfoPage() {
                         </div>
                       ) : (
                         <img
-                          src={toAvatarImageUrl(profileForm.avatarUrl)}
+                          src={toAvatarImageUrl(profileForm)}
                           alt="Avatar"
                           className="profile-avatar-preview"
                         />
@@ -253,7 +253,7 @@ export function ProfileInfoPage() {
                         className="profile-avatar-edit-overlay"
                         title="Chỉnh sửa khung ảnh"
                         onClick={() => {
-                          const currentSrc = previewUrl || toAvatarImageUrl(profileForm.avatarUrl);
+                          const currentSrc = previewUrl || toAvatarImageUrl(profileForm);
                           if (currentSrc) {
                             const finalSrc = currentSrc.startsWith('blob:') 
                               ? currentSrc 
@@ -305,7 +305,7 @@ export function ProfileInfoPage() {
                 <div className="profile-avatar-container">
                   {profileForm.avatarUrl && profileForm.avatarUrl.trim() !== '' ? (
                     <img
-                      src={toAvatarImageUrl(profileForm.avatarUrl)}
+                      src={toAvatarImageUrl(profileForm)}
                       alt="Avatar"
                       className="profile-avatar-preview"
                     />

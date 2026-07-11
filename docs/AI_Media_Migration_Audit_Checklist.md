@@ -40,8 +40,15 @@ Mỗi phase sau phải cập nhật tiếp vào file này, không tạo lại ch
 - `[x]` Phase 11 hoàn thành cho backend meter-reading proof media migration
 - `[x]` Phase 12 hoàn thành một phần theo hướng safe cleanup cho shared frontend public image helpers
 - `[x]` Phase 13 hoàn thành cho avatar media linkage theo hướng compatibility
+- `[x]` Phase 14 hoàn thành ở mức design stub/docs cho chat attachment boundary
+- `[x]` Phase A hoàn thành cho frontend legal/private media read-path cleanup ở admin + landlord
+- `[x]` Phase B hoàn thành cho billing proof frontend materialization theo hướng compatibility
+- `[x]` Phase C hoàn thành cho private download semantics unification ở backend media routes
+- `[x]` Phase D hoàn thành cho contract/private consumer cleanup theo hướng media-first view path
+- `[x]` Phase E hoàn thành cho avatar polish theo hướng backend-resolved display URL
+- `[x]` Phase F hoàn thành cho chat attachment upload/private-media readiness ở mức pre-conversation integration
 - `[x]` Runtime code chính hiện bind `IMediaStorageService` và `IPrivateStorageService` sang `S3StorageService`
-- `[~]` Open risk hiện tập trung ở private module còn lại, admin access/audit, legal/property/billing migration và cleanup phase sau
+- `[~]` Open risk hiện tập trung ở conversation persistence/participant permission cho chat attachment, cùng cleanup phase sau
 
 ---
 
@@ -83,6 +90,17 @@ Mỗi phase sau phải cập nhật tiếp vào file này, không tạo lại ch
 - `[x]` D022: `User` avatar dùng thêm `AvatarMediaAssetId` nhưng vẫn giữ `AvatarUrl` để compatibility
 - `[x]` D023: Google/external avatar tiếp tục đi qua `AvatarUrl`, không ép phải có `MediaAssetId`
 - `[x]` D024: Phase 13 chỉ làm `avatar`, không gộp `house rule PDF` vào cùng phase mặc định
+- `[x]` D025: Phase 14 chưa implement chat attachment; chỉ chốt docs và implementation gate
+- `[x]` D026: Không dùng `conversationId` hiện tại của AI chat làm FK hoặc ownership root cho media attachment
+- `[x]` D027: Nút đính kèm trong `RentalAiChatbot` hiện chỉ được coi là UI placeholder, chưa là contract sản phẩm để build storage flow thật
+- `[x]` D028: `Phase A` chỉ dọn legal/private **read-path** ở frontend; legal-document save/update contract vẫn giữ `ObjectKey` để compatibility
+- `[x]` D029: Admin/landlord legal-document UI phải ưu tiên `Front/Back/ExtraImageUrl`, chỉ fallback về `ObjectKey` cho legacy data
+- `[x]` D030: `Phase B` upload meter proof ở frontend phải gửi song song `proofMediaAssetId` và `proofImageObjectKey`
+- `[x]` D031: Billing proof viewer ở landlord/tenant invoice detail ưu tiên `meterReadingProofImageUrl`; không dựng lại `/uploads/...` ở sub-phase này
+- `[x]` D032: `Phase C` chuẩn hóa semantics private media theo hướng `view`/`download`/`download-url`, trong đó `download-url` được phép fallback về backend download route nếu storage hiện tại không hỗ trợ private presign
+- `[x]` D033: `Phase D` dùng contract-specific `view-url` endpoint để cho phép contract/appendix viewer ưu tiên signed/private view path nhưng vẫn fallback về blob download route cho legacy/local capability
+- `[x]` D034: `Phase E` giữ `AvatarUrl` như compatibility/display field nhưng backend phải tự backfill display URL từ `AvatarMediaAssetId` cho response nếu dữ liệu lưu chuyển tiếp chưa có URL sẵn
+- `[x]` D035: `Phase F` cho phép upload `ChatAttachment` như private media và expose generic private-media client helper, nhưng chưa mở participant access cho người còn lại trong conversation khi chưa có conversation/message persistence thật
 
 ---
 
@@ -91,6 +109,8 @@ Mỗi phase sau phải cập nhật tiếp vào file này, không tạo lại ch
 - `[x]` Có phase plan tổng tại `docs/AI_Media_Migration_Phase_Plan.md`
 - `[x]` Có phase-specific plan cho contract file tại `docs/AI_Media_Migration_Phase4_ContractFile_Plan.md`
 - `[x]` Có phase-specific plan cho avatar tại `docs/AI_Media_Migration_Phase13_Avatar_Plan.md`
+- `[~]` Phase 14 chat attachment boundary hiện được lưu trong phase plan tổng và audit, chưa có phase-specific file riêng được materialize
+- `[x]` Có phase-specific plan cho chat attachment readiness tại `docs/AI_Media_Migration_PhaseF_ChatAttachment_Readiness.md`
 - `[x]` Có context guardrail tại `docs/AI_Context_Continuity_Guardrails.md`
 - `[x]` Có audit checklist sống tại `docs/AI_Media_Migration_Audit_Checklist.md`
 - `[~]` Chưa có inventory doc riêng cho Phase 0 được materialize thành artifact độc lập
@@ -865,6 +885,359 @@ Mỗi phase sau phải cập nhật tiếp vào file này, không tạo lại ch
 - `[!]` Avatar hiện đang ở trạng thái hybrid: vừa có `AvatarMediaAssetId`, vừa giữ `AvatarUrl`
 - `[!]` Nếu phase sau muốn chuẩn hóa avatar hoàn toàn vào media core, phải quyết định rõ chiến lược cho Google/external avatar
 - `[!]` Snapshot Phase 11 từng có mismatch navigation ở `MeterReading.ProofMediaAsset`; đã sửa đồng bộ trong snapshot/designer để EF migration phase sau chạy ổn
+
+---
+
+## Phase 14 Audit
+
+### Mục tiêu phase
+
+- `[x]` Chốt boundary cho chat attachment mà không implement sai vào AI chatbot cache flow
+- `[x]` Đồng bộ docs để phase sau hiểu rõ prerequisite trước khi code chat attachment thật
+
+### Đã làm
+
+- `[x]` Rà lại `RentalAiChatbot` và xác nhận session hiện lưu ở `localStorage`
+- `[x]` Rà lại `RoomingHouseAiChatRequest` / `RoomingHouseAiChatResponse` và xác nhận chưa có attachment contract
+- `[x]` Rà lại `IConversationCacheService` và xác nhận đây là short-term cache, không phải durable persistence
+- `[x]` Tạo phase-specific plan `docs/AI_Media_Migration_Phase14_ChatAttachment_Plan.md`
+- `[x]` Cập nhật phase plan tổng để chốt `Phase 14 = design stub`
+
+### Chưa hoàn chỉnh
+
+- `[~]` Chưa có `Conversation` entity persisted
+- `[~]` Chưa có `ConversationMessage` entity persisted
+- `[~]` Chưa có ownership/participant matrix cho chat attachment
+- `[~]` Chưa có upload/download API chat attachment production-ready
+
+### Không làm trong phase này
+
+- `[x]` Không sửa `RentalAiChatbot.tsx`
+- `[x]` Không sửa `RoomingHouseAiChatService`
+- `[x]` Không thêm migration mới
+- `[x]` Không thêm endpoint upload attachment cho chat
+- `[x]` Không thêm permission logic chat attachment vào `DefaultMediaPermissionService`
+
+### Tests / Verify
+
+- `[x]` Verify bằng code inspection rằng chat hiện tại là cache/local-session flow, chưa phải DB-backed conversation module
+- `[x]` `git diff` của Phase 14 chỉ nằm trong `docs`
+
+### Findings / risk mở
+
+- `[!]` Nếu implement attachment trực tiếp trên `conversationId : string` hiện tại, rất dễ khóa chặt media vào một cache key tạm thời
+- `[!]` Nút kẹp giấy trong `RentalAiChatbot` có thể gây hiểu nhầm là feature đã sẵn sàng, nhưng hiện chưa có backend contract tương ứng
+- `[!]` Phase chat attachment thật chỉ nên bắt đầu sau khi có conversation/message persistence rõ ràng
+
+---
+
+## Phase A Audit
+
+### Mục tiêu phase
+
+- `[x]` Dọn frontend legal/private media read-path để khớp current backend contract
+- `[x]` Giảm phụ thuộc render trực tiếp từ `/uploads/...` ở admin + landlord legal-document viewer
+- `[x]` Giữ nguyên legal-document edit/save compatibility flow dựa trên `ObjectKey`
+
+### Đã làm
+
+- `[x]` `client/src/shared/types/property.ts` đã thêm:
+  - `frontMediaAssetId`
+  - `backMediaAssetId`
+  - `extraMediaAssetId`
+  - `frontImageUrl`
+  - `backImageUrl`
+  - `extraImageUrl`
+- `[x]` `client/src/shared/types/property.ts` đã đồng bộ `FileUploadResponse.mediaAssetId`
+- `[x]` `client/src/features/admin/types/adminApproval.types.ts` đã hiểu legal document field mới:
+  - `Front/Back/ExtraMediaAssetId`
+  - `Front/Back/ExtraImageUrl`
+- `[x]` `client/src/features/admin/pages/AdminHomePage.tsx` đã ưu tiên render legal document từ `Front/Back/ExtraImageUrl`
+- `[x]` `client/src/features/admin/pages/AdminHomePage.tsx` chỉ fallback về `/uploads/{objectKey}` khi dữ liệu legacy chưa có `ImageUrl`
+- `[x]` `client/src/features/landlord/pages/RoomingHouseDetailPage.tsx` đã ưu tiên render legal document từ `Front/Back/ExtraImageUrl`
+- `[x]` `client/src/features/landlord/pages/RoomingHouseDetailPage.tsx` chỉ fallback về `ObjectKey` khi cần compatibility
+
+### Chưa hoàn chỉnh
+
+- `[~]` `RoomingHouseEditor` và legal-document save contract vẫn object-key based có chủ đích
+- `[~]` Chưa dọn billing proof frontend
+- `[~]` Chưa dọn private helper semantics tổng quát cho download/open
+
+### Không làm trong phase này
+
+- `[x]` Không sửa backend legal-document contract
+- `[x]` Không sửa `RoomingHouseEditor` upload/save compatibility flow
+- `[x]` Không bỏ `Front/Back/ExtraImageObjectKey`
+- `[x]` Không dọn billing meter-proof UI
+- `[x]` Không đổi sang signed-download semantics ở frontend
+
+### Tests / Verify
+
+- `[x]` Verify bằng code inspection rằng admin + landlord legal-document viewer không còn lấy read-path chính từ legacy object key
+- `[~]` Chưa dùng frontend build tổng làm gate mạnh vì repo đang có known unrelated risk ở `react-pdf` modules
+
+### Findings / risk mở
+
+- `[!]` Legal-document read-path ở UI đã theo contract mới, nhưng write-path vẫn còn object-key based; đây là trạng thái compatibility có chủ đích
+- `[!]` Nếu phase sau đụng vào legal-document editor/save flow, phải phân biệt rõ read-path đã migrate và write-path chưa migrate hoàn toàn
+- `[!]` Các docs phase sau không được mô tả legal-document frontend là “đã cleanup hoàn toàn”; hiện mới cleanup phần viewer/read-path
+
+---
+
+## Phase B Audit
+
+### Mục tiêu phase
+
+- `[x]` Materialize meter-proof image ở frontend billing theo contract mới
+- `[x]` Giữ compatibility cho request payload cũ dựa trên `proofImageObjectKey`
+- `[x]` Cho landlord/tenant xem proof image từ invoice item contract mới
+
+### Đã làm
+
+- `[x]` `ReadingDraft` ở `LandlordBillingPage` đã hiểu thêm:
+  - `proofMediaAssetId`
+  - `proofImageUrl`
+- `[x]` `ReadingDraft` ở `RoomDetailPage` modal tạo hóa đơn đã hiểu thêm:
+  - `proofMediaAssetId`
+  - `proofImageUrl`
+- `[x]` `LandlordBillingPage` modal tạo hóa đơn đã upload ảnh công tơ qua `uploadImage(file, 'MeterReading')`
+- `[x]` `RoomDetailPage` modal tạo hóa đơn đã upload ảnh công tơ qua `uploadImage(file, 'MeterReading')`
+- `[x]` Payload tạo hóa đơn ở cả 2 modal hiện gửi:
+  - `proofMediaAssetId`
+  - `proofImageObjectKey`
+- `[x]` UI tạo hóa đơn ở cả 2 modal đã có:
+  - input chọn ảnh công tơ
+  - link xem ảnh vừa tải lên
+  - link xem ảnh công tơ gần nhất nếu có
+- `[x]` `LandlordBillingPage` invoice detail đã hiển thị link `meterReadingProofImageUrl`
+- `[x]` `TenantInvoicesPage` invoice detail đã hiển thị link `meterReadingProofImageUrl`
+
+### Chưa hoàn chỉnh
+
+- `[~]` Meter-proof UI hiện mới ở mức upload + open link, chưa có thumbnail/viewer chuyên biệt
+- `[~]` `proofImageObjectKey` vẫn còn phải giữ trong state và request contract để compatibility
+- `[~]` Chưa tách helper private download/open semantics riêng cho meter proof
+
+### Không làm trong phase này
+
+- `[x]` Không sửa backend billing/media contract
+- `[x]` Không bỏ `proofImageObjectKey`
+- `[x]` Không thêm enforcement rule chỉnh sửa proof sau `Paid`
+- `[x]` Không chuyển sang signed-download abstraction riêng ở frontend
+
+### Tests / Verify
+
+- `[x]` Verify bằng code inspection rằng create-invoice frontend đã gửi được `proofMediaAssetId`
+- `[x]` Verify bằng code inspection rằng landlord/tenant invoice detail đã dùng `meterReadingProofImageUrl`
+- `[~]` Chưa dùng frontend build tổng làm gate mạnh vì repo đang có known unrelated risk ở `react-pdf` modules
+
+### Findings / risk mở
+
+- `[!]` Meter-proof frontend hiện ở trạng thái compatibility-aware: contract mới đã được dùng, nhưng contract cũ vẫn còn song song
+- `[!]` Nếu phase sau dọn legacy sâu hơn, cần xác nhận backend không còn consumer nào phụ thuộc `proofImageObjectKey`
+- `[!]` Viewer hiện dùng private URL/backend stream path trực tiếp; signed-download semantics vẫn là phase sau
+
+---
+
+## Phase C Audit
+
+### Mục tiêu phase
+
+- `[x]` Chuẩn hóa semantics `view` vs `download` vs `download-url` cho private media
+- `[x]` Lấp khoảng trống giữa media path builder, controller routes và storage capability hiện tại
+- `[x]` Giữ compatibility cho local/private flow không có presigned URL
+
+### Đã làm
+
+- `[x]` `MediaController` đã bổ sung route:
+  - `GET /api/media/private/{mediaAssetId}/download`
+  - `GET /api/media/private/{mediaAssetId}/download-url`
+- `[x]` `AdminMediaController` đã bổ sung route:
+  - `GET /api/admin/media/private/{mediaAssetId}/download-url`
+- `[x]` Private `download` route thường hiện trả attachment stream và ghi audit action `Download`
+- `[x]` Private `download-url` route hiện gọi `IMediaAccessService.GetDownloadUrlAsync` với TTL ngắn hạn
+- `[x]` Response `PrivateMediaDownloadUrlResponse` đã materialize rõ:
+  - `url`
+  - `expiresAtUtc`
+  - `deliveryMode`
+- `[x]` Nếu storage hiện tại không hỗ trợ private presigned URL, `download-url` sẽ fallback về backend download route thay vì fail toàn bộ flow
+
+### Chưa hoàn chỉnh
+
+- `[~]` Frontend private consumer hiện chưa được refactor hàng loạt sang dùng `download-url`
+- `[~]` Contract PDF/download flow riêng của module rental contract vẫn còn abstraction riêng, chưa gộp về media route chung
+- `[~]` Audit action naming hiện đã nhất quán hơn ở media route chung, nhưng toàn hệ thống vẫn còn module private cũ chưa đi qua semantics mới này
+
+### Không làm trong phase này
+
+- `[x]` Không đổi upload API
+- `[x]` Không refactor hàng loạt frontend private viewer/downloader
+- `[x]` Không bỏ fallback stream route hiện có
+- `[x]` Không ép local storage phải sinh private presigned URL
+
+### Tests / Verify
+
+- `[x]` Verify bằng code inspection rằng `PrivateMediaPathBuilder.Build(..., true)` bây giờ đã có route backend tương ứng
+- `[x]` Verify bằng code inspection rằng `download-url` route dùng `IMediaAccessService.GetDownloadUrlAsync` và có fallback an toàn cho local/private capability gap
+- `[~]` Chưa có test riêng cho `download-url` fallback path ở phase này
+
+### Findings / risk mở
+
+- `[!]` Phase C mới chuẩn hóa backend semantics; consumer layer vẫn còn cần phase sau nếu muốn dùng `download-url` nhất quán hơn
+- `[!]` `LocalMediaStorageService` vẫn cố ý không hỗ trợ private presigned URL; behavior đúng hiện tại là fallback về route nội bộ, không phải bug
+- `[!]` Nếu phase sau muốn audit tách bạch hơn giữa “generate temporary URL” và “actual file download completed”, cần chốt naming/policy trước khi mở rộng
+
+---
+
+## Phase D Audit
+
+### Mục tiêu phase
+
+- `[x]` Giảm phụ thuộc consumer contract/appendix vào custom blob-open flow cũ
+- `[x]` Dọn thêm contract response để media-backed file rõ ràng hơn với consumer mới
+- `[x]` Giữ compatibility cho contract legacy/private fallback path
+
+### Đã làm
+
+- `[x]` `RentalContractsController` đã bổ sung `GET /api/contracts/{id}/files/{fileId}/view-url`
+- `[x]` `ContractFileService` đã có `GetFileViewUrlAsync(...)`
+- `[x]` Nếu `ContractFile` có `MediaAssetId`, `view-url` sẽ ưu tiên gọi `IMediaAccessService.GetDownloadUrlAsync(...)`
+- `[x]` Nếu storage/file hiện tại chưa hỗ trợ signed private view path, `view-url` sẽ trả `deliveryMode = backend-route`
+- `[x]` `ContractFileResponse` đã có thêm `ViewUrl`
+- `[x]` `ContractAppendixService.MapFileToResponse` đã map lại `FileVariant` cho appendix file response
+- `[x]` Frontend contract/appendix viewer đã ưu tiên dùng `view-url` qua helper chung:
+  - `LandlordContractDetailPage`
+  - `TenantRentalHistoryDetailPage`
+  - `RoomDetailPage`
+  - `AppendixFileActions`
+
+### Chưa hoàn chỉnh
+
+- `[~]` `StorageObjectKey` vẫn còn trong response/entity để compatibility
+- `[~]` Nút tải PDF vẫn còn đi qua blob download route cũ thay vì contract-specific signed download path
+- `[~]` `ViewUrl` trong response hiện mới là metadata/current-state hint; consumer chính dùng route `view-url` để xử lý signed-vs-fallback an toàn hơn
+
+### Không làm trong phase này
+
+- `[x]` Không xóa `StorageObjectKey`
+- `[x]` Không bỏ endpoint `GET /api/contracts/{id}/files/{fileId}/download`
+- `[x]` Không ép signed URL thành download path mặc định khi storage chưa hỗ trợ force-download semantics rõ ràng
+- `[x]` Không backfill/xóa dữ liệu legacy contract file cũ
+
+### Tests / Verify
+
+- `[x]` Verify bằng code inspection rằng contract/appendix view action không còn luôn phụ thuộc vào blob-open flow nếu backend có thể trả signed URL
+- `[x]` Verify bằng code inspection rằng appendix `ContractFileResponse` đã có `FileVariant`
+- `[x]` `dotnet build server/src/SmartRentalPlatform.Api/SmartRentalPlatform.Api.csproj --no-restore` pass
+- `[~]` Chưa có unit/integration test riêng cho `GetFileViewUrlAsync(...)` ở phase này
+
+### Findings / risk mở
+
+- `[!]` Signed URL của storage hiện vẫn là GET presign thường; Phase D chỉ dùng nó cho view/open path, chưa khẳng định force-download semantics
+- `[!]` Download path của contract/appendix vẫn còn cần phase sau nếu muốn thu gọn hoàn toàn về media abstraction
+- `[!]` Vì auth hiện đi qua bearer token, frontend không thể chỉ `window.open` route nội bộ có bảo vệ; route `view-url` là cầu nối compatibility quan trọng trong trạng thái hiện tại
+
+---
+
+## Phase E Audit
+
+### Mục tiêu phase
+
+- `[x]` Làm sạch avatar flow ở mức low-risk mà không phá external/Google avatar
+- `[x]` Giảm rủi ro response trả `AvatarMediaAssetId` nhưng UI vẫn thiếu `avatarUrl`
+- `[x]` Giữ helper/avatar consumer bám contract mới rõ hơn
+
+### Đã làm
+
+- `[x]` Thêm `AvatarMediaUrlResolver` ở application common/media
+- `[x]` `UserService.GetCurrentUserAsync` đã resolve `AvatarUrl` từ `AvatarMediaAssetId` nếu cần
+- `[x]` `UserService.GetUserProfileAsync` đã resolve `AvatarUrl` từ `AvatarMediaAssetId` nếu cần
+- `[x]` `UserService.UpdateUserProfileAsync` response đã resolve `AvatarUrl` từ `AvatarMediaAssetId` nếu cần
+- `[x]` `AuthService.LoginAsync` response đã resolve `AvatarUrl` từ `AvatarMediaAssetId` nếu cần
+- `[x]` `GoogleLoginService.GoogleLoginAsync` response đã resolve `AvatarUrl` từ `AvatarMediaAssetId` nếu cần
+- `[x]` `toAvatarImageUrl` ở frontend đã nhận được avatar source object thay vì chỉ string
+- `[x]` Các callsite avatar chính đã chuyển sang truyền object user/form source:
+  - `HomeHeader`
+  - `AccountLayout`
+  - `MePage`
+  - `TenantInvoicesPage`
+  - `ProfileInfoPage`
+
+### Chưa hoàn chỉnh
+
+- `[~]` `AvatarUrl` vẫn còn là display/compatibility field song song với `AvatarMediaAssetId`
+- `[~]` Chưa có backfill dữ liệu legacy để mọi user-uploaded avatar cũ đều có `AvatarMediaAssetId`
+- `[~]` Google/external avatar vẫn không được import vào media core
+
+### Không làm trong phase này
+
+- `[x]` Không xóa `AvatarUrl`
+- `[x]` Không đổi Google avatar sync semantics
+- `[x]` Không thêm migration/backfill mới cho avatar legacy
+- `[x]` Không gộp `house rule PDF` vào phase này
+
+### Tests / Verify
+
+- `[x]` `dotnet build server/src/SmartRentalPlatform.Api/SmartRentalPlatform.Api.csproj --no-restore` pass
+- `[x]` Verify bằng code inspection rằng auth/profile responses hiện không còn phụ thuộc hoàn toàn vào `user.AvatarUrl` raw
+- `[x]` Verify bằng code inspection rằng các avatar callsite chính không còn truyền trực tiếp chỉ `currentUser.avatarUrl` vào helper
+
+### Findings / risk mở
+
+- `[!]` Phase E làm avatar flow bền hơn ở response/display layer, nhưng chưa đổi source-of-truth cuối cùng khỏi mô hình hybrid
+- `[!]` Nếu phase sau muốn chuẩn hóa avatar hoàn toàn vào media core, cần quyết định rõ chiến lược cho Google/external avatar trước khi xóa hoặc hạ vai trò `AvatarUrl`
+
+---
+
+## Phase F Audit
+
+### Mục tiêu phase
+
+- `[x]` Mở readiness path cho chat attachment trên media core mà không giả lập conversation persistence
+- `[x]` Tách rõ upload/private-media helper khỏi participant permission của conversation
+- `[x]` Cập nhật docs để phase sau không hiểu nhầm attachment đã hoàn thành end-to-end
+
+### Đã làm
+
+- `[x]` Thêm `FileUploadScope.ChatAttachment`
+- `[x]` `FilesController` hiện cho phép upload PDF với scope `ChatAttachment`
+- `[x]` `MediaBackedFileStorageService` map `ChatAttachment -> MediaScope.ChatAttachment`
+- `[x]` `MediaBackedFileStorageService` map `ChatAttachment -> MediaVisibility.Private`
+- `[x]` `LocalFileStorageService` đã có folder mapping `chat-attachments` để giữ compile-time compatibility
+- `[x]` Frontend `uploadImage` / `uploadPdf` hiện nhận được scope `ChatAttachment`
+- `[x]` Thêm helper client generic cho private media:
+  - `buildPrivateMediaViewUrl`
+  - `buildPrivateMediaDownloadRoute`
+  - `getPrivateMediaDownloadUrl`
+- `[x]` Thêm endpoint constants `MEDIA.PRIVATE_*` để team chat cắm dùng sau
+- `[x]` Thêm unit test xác nhận upload `ChatAttachment` tạo private media asset đúng scope/visibility
+
+### Chưa hoàn chỉnh
+
+- `[~]` Chưa có `Conversation` / `ConversationMessage` persisted trong DB để link ownership thật
+- `[~]` `DefaultMediaPermissionService` hiện chưa cho participant còn lại trong conversation xem attachment; hiện tại private chat attachment chỉ an toàn ở mức owner/admin/default media rule
+- `[~]` Chưa có business entity hoặc request/response contract cho message attachment thật ở module chat
+- `[~]` Chưa có UI chat dùng helper private media mới
+
+### Không làm trong phase này
+
+- `[x]` Không dùng `conversationId` cache hiện tại của AI chat làm foreign key cho media
+- `[x]` Không sửa `RoomingHouseAiChatService` để giả lập message attachment
+- `[x]` Không thêm conversation/message schema giả hoặc permission heuristic tạm thời
+- `[x]` Không tuyên bố chat attachment đã complete end-to-end
+
+### Tests / Verify
+
+- `[x]` `dotnet build server/src/SmartRentalPlatform.Api/SmartRentalPlatform.Api.csproj --no-restore` pass
+- `[x]` `dotnet test server/tests/SmartRentalPlatform.UnitTests/SmartRentalPlatform.UnitTests.csproj --filter MediaBackedFileStorageServiceTests` pass
+- `[x]` Verify bằng code inspection rằng `ChatAttachment` upload hiện tạo private media URL thay vì public URL
+- `[x]` Verify bằng code inspection rằng helper client private media không couple vào contract module
+
+### Findings / risk mở
+
+- `[!]` Phase F mới chỉ làm được `upload + mediaAssetId + private access helper`; business sharing rule theo conversation vẫn phụ thuộc vào Người 5 mở persisted conversation model đúng chuẩn
+- `[!]` Vì chưa có linked entity cho chat message, attachment private hiện chưa thể xem như “đã chia sẻ” cho participant còn lại
+- `[!]` Nếu phase sau cố nối thẳng attachment vào AI chatbot cache hiện tại, sẽ vi phạm decision boundary của Phase 14
 
 ---
 

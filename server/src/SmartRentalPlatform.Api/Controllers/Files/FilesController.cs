@@ -135,7 +135,7 @@ public class FilesController : ControllerBase
 
     private static ApiErrorResponse? ValidatePdf(IFormFile file, FileUploadScope scope)
     {
-        if (scope != FileUploadScope.HouseRule)
+        if (scope is not (FileUploadScope.HouseRule or FileUploadScope.ChatAttachment))
         {
             return ValidationError("Phạm vi tải PDF không hợp lệ.", new { field = "scope" });
         }

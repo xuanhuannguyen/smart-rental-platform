@@ -123,7 +123,7 @@ export function HomeHeader({ centerContent }: HomeHeaderProps) {
             <div className="avatar-wrapper" ref={dropdownRef}>
             <button className="avatar-btn" onClick={() => setShowDropdown(!showDropdown)}>
               {currentUser.avatarUrl && currentUser.avatarUrl.trim() !== '' ? (
-                <img src={toAvatarImageUrl(currentUser.avatarUrl)} alt="Avatar" className="avatar-image" />
+                <img src={toAvatarImageUrl(currentUser)} alt="Avatar" className="avatar-image" />
               ) : (
                 <span className="avatar-initials">{avatarInitials}</span>
               )}

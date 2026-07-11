@@ -2,6 +2,7 @@ using Microsoft.AspNetCore.Http;
 using Microsoft.EntityFrameworkCore;
 using SmartRentalPlatform.Application.Common.Exceptions;
 using SmartRentalPlatform.Application.Common.Interfaces;
+using SmartRentalPlatform.Application.Common.Media;
 using SmartRentalPlatform.Contracts.Common;
 using SmartRentalPlatform.Contracts.Users;
 using SmartRentalPlatform.Domain.Entities.Media;
@@ -51,12 +52,18 @@ public class UserService : IUserService
                 "Token không còn hợp lệ.");
         }
 
+        var avatarUrl = await AvatarMediaUrlResolver.ResolveAsync(
+            _dbContext,
+            user.AvatarUrl,
+            user.AvatarMediaAssetId,
+            cancellationToken);
+
         return new CurrentUserResponse
         {
             UserId = user.Id,
             Email = user.Email,
             DisplayName = user.DisplayName,
-            AvatarUrl = user.AvatarUrl,
+            AvatarUrl = avatarUrl,
             AvatarMediaAssetId = user.AvatarMediaAssetId,
             IsGoogleUser = string.IsNullOrEmpty(user.PasswordHash),
             EmailConfirmed = user.EmailConfirmed,
@@ -109,6 +116,11 @@ public class UserService : IUserService
             !string.IsNullOrWhiteSpace(profile?.FullName) &&
             profile?.DateOfBirth != null &&
             !string.IsNullOrWhiteSpace(profile?.AddressLine);
+        var avatarUrl = await AvatarMediaUrlResolver.ResolveAsync(
+            _dbContext,
+            user.AvatarUrl,
+            user.AvatarMediaAssetId,
+            cancellationToken);
 
         return new UserProfileResponse
         {
@@ -126,7 +138,7 @@ public class UserService : IUserService
             KycReviewedAt = approvedKyc?.ReviewedAt,
             IdentityVerified = approvedKyc is not null,
             ProfileCompleted = profileCompleted,
-            AvatarUrl = user.AvatarUrl,
+            AvatarUrl = avatarUrl,
             AvatarMediaAssetId = user.AvatarMediaAssetId,
             IsGoogleUser = string.IsNullOrEmpty(user.PasswordHash)
         };
@@ -248,6 +260,11 @@ public class UserService : IUserService
             !string.IsNullOrWhiteSpace(profile.FullName) &&
             profile.DateOfBirth != null &&
             !string.IsNullOrWhiteSpace(profile.AddressLine);
+        var avatarUrl = await AvatarMediaUrlResolver.ResolveAsync(
+            _dbContext,
+            user.AvatarUrl,
+            user.AvatarMediaAssetId,
+            cancellationToken);
 
         return new UserProfileResponse
         {
@@ -265,7 +282,7 @@ public class UserService : IUserService
             KycReviewedAt = approvedKyc?.ReviewedAt,
             IdentityVerified = identityVerified,
             ProfileCompleted = profileCompleted,
-            AvatarUrl = user.AvatarUrl,
+            AvatarUrl = avatarUrl,
             AvatarMediaAssetId = user.AvatarMediaAssetId,
             IsGoogleUser = string.IsNullOrEmpty(user.PasswordHash)
         };

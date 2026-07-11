@@ -30,9 +30,9 @@ export function AccountLayout() {
         </div>
 
         <div className="sidebar-profile-card" onClick={() => navigate(ROUTE_PATHS.ACCOUNT.PROFILE)}>
-          <div className="sidebar-profile-avatar-wrapper">
-            {currentUser.avatarUrl && currentUser.avatarUrl.trim() !== '' ? (
-              <img src={toAvatarImageUrl(currentUser.avatarUrl)} alt="Avatar" className="sidebar-profile-avatar" />
+        <div className="sidebar-profile-avatar-wrapper">
+          {currentUser.avatarUrl && currentUser.avatarUrl.trim() !== '' ? (
+              <img src={toAvatarImageUrl(currentUser)} alt="Avatar" className="sidebar-profile-avatar" />
             ) : (
               <div className="sidebar-profile-avatar-placeholder">
                 {currentUser.displayName ? currentUser.displayName.charAt(0).toUpperCase() : 'H'}

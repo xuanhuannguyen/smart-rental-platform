@@ -60,10 +60,17 @@ export interface ContractFileResponse {
   id: string;
   rentalContractId: string;
   rentalContractAppendixId?: string | null;
+  mediaAssetId?: string | null;
   storageObjectKey: string;
   fileVariant: ContractFileVariant;
   fileUrl?: string | null;
+  viewUrl?: string | null;
   createdAt: string;
+}
+
+export interface ContractFileViewUrlResponse {
+  url: string;
+  deliveryMode: 'signed-url' | 'backend-route' | string;
 }
 
 export interface RequestContractRevisionRequest {

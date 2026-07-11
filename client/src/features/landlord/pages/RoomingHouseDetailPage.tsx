@@ -45,6 +45,18 @@ import './RoomingHouseDetailPage.css';
 
 type MainTab = 'basic' | 'images' | 'amenities' | 'legal' | 'house-rule' | 'rental-policy' | 'service-prices' | 'rooms' | 'create-room';
 
+function resolveLegalDocumentImageUrl(imageUrl?: string | null, objectKey?: string | null) {
+  if (imageUrl?.trim()) {
+    return toAssetUrl(imageUrl);
+  }
+
+  if (objectKey?.trim()) {
+    return toAssetUrl(objectKey);
+  }
+
+  return '';
+}
+
 function getLocalDateString(year: number, month: number, day: number): string {
   return `${year}-${String(month).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
 }
@@ -915,9 +927,12 @@ export default function RoomingHouseDetailPage() {
               <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(240px, 1fr))', gap: '20px' }}>
                 <div>
                   <h4 style={{ fontSize: '14px', fontWeight: 600, color: '#334155', marginBottom: '10px' }}>Mặt trước giấy tờ</h4>
-                  {house.legalDocument?.frontImageObjectKey ? (
+                  {(house.legalDocument?.frontImageUrl || house.legalDocument?.frontImageObjectKey) ? (
                     <img
-                      src={toAssetUrl(house.legalDocument.frontImageObjectKey)}
+                      src={resolveLegalDocumentImageUrl(
+                        house.legalDocument.frontImageUrl,
+                        house.legalDocument.frontImageObjectKey
+                      )}
                       alt="Front"
                       style={{ width: '100%', maxHeight: '240px', objectFit: 'contain', border: '1px solid #e2e8f0', borderRadius: '12px', background: '#f8fafc', padding: '6px' }}
                     />
@@ -928,9 +943,12 @@ export default function RoomingHouseDetailPage() {
 
                 <div>
                   <h4 style={{ fontSize: '14px', fontWeight: 600, color: '#334155', marginBottom: '10px' }}>Mặt sau giấy tờ</h4>
-                  {house.legalDocument?.backImageObjectKey ? (
+                  {(house.legalDocument?.backImageUrl || house.legalDocument?.backImageObjectKey) ? (
                     <img
-                      src={toAssetUrl(house.legalDocument.backImageObjectKey)}
+                      src={resolveLegalDocumentImageUrl(
+                        house.legalDocument.backImageUrl,
+                        house.legalDocument.backImageObjectKey
+                      )}
                       alt="Back"
                       style={{ width: '100%', maxHeight: '240px', objectFit: 'contain', border: '1px solid #e2e8f0', borderRadius: '12px', background: '#f8fafc', padding: '6px' }}
                     />
@@ -939,11 +957,14 @@ export default function RoomingHouseDetailPage() {
                   )}
                 </div>
 
-                {house.legalDocument?.extraImageObjectKey && (
+                {(house.legalDocument?.extraImageUrl || house.legalDocument?.extraImageObjectKey) && (
                   <div>
                     <h4 style={{ fontSize: '14px', fontWeight: 600, color: '#334155', marginBottom: '10px' }}>Ảnh bổ sung</h4>
                     <img
-                      src={toAssetUrl(house.legalDocument.extraImageObjectKey)}
+                      src={resolveLegalDocumentImageUrl(
+                        house.legalDocument.extraImageUrl,
+                        house.legalDocument.extraImageObjectKey
+                      )}
                       alt="Extra"
                       style={{ width: '100%', maxHeight: '240px', objectFit: 'contain', border: '1px solid #e2e8f0', borderRadius: '12px', background: '#f8fafc', padding: '6px' }}
                     />

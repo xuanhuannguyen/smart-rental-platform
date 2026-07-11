@@ -5,6 +5,11 @@ export type PublicPropertyImageSource = {
   objectKey?: string | null;
 };
 
+export type AvatarImageSource = {
+  avatarUrl?: string | null;
+  avatarMediaAssetId?: string | null;
+};
+
 // Generic asset helper for legacy/object-key-based flows and explicit API paths.
 export function toAssetUrl(objectKeyOrUrl: string): string {
   if (!objectKeyOrUrl) return '';
@@ -52,8 +57,11 @@ export function toPublicPropertyImageUrl(image: PublicPropertyImageSource | null
   return toPublicAssetUrl(image.imageUrl, image.objectKey);
 }
 
-export function toAvatarImageUrl(avatarUrl?: string | null): string {
-  const safeAvatarUrl = normalizeOptionalValue(avatarUrl);
+export function toAvatarImageUrl(avatar?: string | null | AvatarImageSource): string {
+  const safeAvatarUrl = typeof avatar === 'string'
+    ? normalizeOptionalValue(avatar)
+    : normalizeOptionalValue(avatar?.avatarUrl);
+
   return safeAvatarUrl ? toAssetUrl(safeAvatarUrl) : '';
 }
 

@@ -3,7 +3,7 @@ import { useNavigate, useParams } from 'react-router-dom';
 import { useAuth } from '../../../app/providers/AuthProvider';
 import { ROUTE_PATHS } from '../../../app/router/routePaths';
 import { getApiErrorMessage } from '../../../shared/api/apiError';
-import { toAvatarImageUrl } from '../../../shared/api/assets';
+import { toAssetUrl, toAvatarImageUrl } from '../../../shared/api/assets';
 import { Button } from '../../../shared/components/ui/Button';
 import { billingApi } from '../api';
 import type { Invoice } from '../types';
@@ -240,7 +240,17 @@ export function TenantInvoicesPanel({ invoiceId: controlledInvoiceId, onOpenInvo
                           {getInvoiceItemTypeLabel(item.itemType)}
                         </span>
                       </span>
-                      <span className="col-desc" data-label="Mô tả">{item.description}</span>
+                      <span className="col-desc" data-label="Mô tả">
+                        {item.description}
+                        {item.meterReadingProofImageUrl && (
+                          <>
+                            <br />
+                            <a href={toAssetUrl(item.meterReadingProofImageUrl)} target="_blank" rel="noreferrer">
+                              Xem ảnh công tơ
+                            </a>
+                          </>
+                        )}
+                      </span>
                       <span className="col-qty" data-label="Số lượng">{item.quantity}</span>
                       <span className="col-price" data-label="Đơn giá">{formatMoney(item.unitPrice)}</span>
                       <strong className="col-amount" data-label="Thành tiền">{formatMoney(item.amount)}</strong>
@@ -347,7 +357,7 @@ export default function TenantInvoicesPage() {
           <div className="avatar-wrapper" ref={dropdownRef}>
             <button className="avatar-btn" onClick={() => setShowDropdown(!showDropdown)}>
               {currentUser.avatarUrl && currentUser.avatarUrl.trim() !== '' ? (
-                <img src={toAvatarImageUrl(currentUser.avatarUrl)} alt="Avatar" className="avatar-image" />
+                <img src={toAvatarImageUrl(currentUser)} alt="Avatar" className="avatar-image" />
               ) : (
                 <span className="avatar-initials">{avatarInitials}</span>
               )}

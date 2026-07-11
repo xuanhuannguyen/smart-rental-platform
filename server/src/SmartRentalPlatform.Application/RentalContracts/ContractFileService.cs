@@ -2,6 +2,7 @@ using Microsoft.EntityFrameworkCore;
 using SmartRentalPlatform.Application.Common.Exceptions;
 using SmartRentalPlatform.Application.Common.Interfaces;
 using SmartRentalPlatform.Application.Common.Interfaces.Media;
+using SmartRentalPlatform.Application.Common.Media;
 using SmartRentalPlatform.Application.Common.Models.Media;
 using SmartRentalPlatform.Contracts.Common;
 using SmartRentalPlatform.Contracts.RentalContracts.Responses;
@@ -16,6 +17,7 @@ namespace SmartRentalPlatform.Application.RentalContracts;
 public class ContractFileService : IContractFileService
 {
     private const string PdfContentType = "application/pdf";
+    private static readonly TimeSpan ContractFileViewUrlTtl = TimeSpan.FromMinutes(5);
 
     private readonly IAppDbContext context;
     private readonly IContractPdfRenderer contractPdfRenderer;
@@ -157,6 +159,61 @@ public class ContractFileService : IContractFileService
 
         var stream = await privateStorageService.OpenReadAsync(file.StorageObjectKey, cancellationToken);
         return (stream, GuessContentType(file.StorageObjectKey), Path.GetFileName(file.StorageObjectKey));
+    }
+
+    public async Task<ContractFileViewUrlResponse?> GetFileViewUrlAsync(
+        Guid userId,
+        Guid contractId,
+        Guid fileId,
+        CancellationToken cancellationToken = default)
+    {
+        var contract = await context.RentalContracts
+            .AsNoTracking()
+            .Include(x => x.Room)
+                .ThenInclude(x => x.RoomingHouse)
+            .Include(x => x.Occupants)
+            .Include(x => x.Appendices)
+                .ThenInclude(x => x.Changes)
+            .Include(x => x.Appendices)
+                .ThenInclude(x => x.Signatures)
+            .Include(x => x.Files)
+            .FirstOrDefaultAsync(x => x.Id == contractId && x.DeletedAt == null, cancellationToken);
+
+        if (contract is null)
+        {
+            return null;
+        }
+
+        EnsureCanAccess(userId, contract);
+
+        var file = contract.Files.FirstOrDefault(x => x.Id == fileId);
+        if (file is null)
+        {
+            return null;
+        }
+
+        EnsureCanViewFile(userId, contract, file);
+
+        if (file.MediaAssetId.HasValue)
+        {
+            try
+            {
+                var url = await mediaAccessService.GetDownloadUrlAsync(
+                    file.MediaAssetId.Value,
+                    ContractFileViewUrlTtl,
+                    userId,
+                    cancellationToken,
+                    BuildAuditContext(contract.Id, file.Id, "GenerateViewUrl"));
+
+                return new ContractFileViewUrlResponse(url, "signed-url");
+            }
+            catch (NotSupportedException)
+            {
+                // Fall back to the authenticated contract file route when presigned access is unavailable.
+            }
+        }
+
+        return new ContractFileViewUrlResponse(BuildLegacyDownloadRoute(contract.Id, file.Id), "backend-route");
     }
 
     private IQueryable<RentalContract> BaseContractQuery()
@@ -685,7 +742,29 @@ public class ContractFileService : IContractFileService
             StorageObjectKey = file.StorageObjectKey,
             FileVariant = file.FileVariant.ToString(),
             FileUrl = file.FileUrl,
+            ViewUrl = file.MediaAssetId.HasValue
+                ? PrivateMediaPathBuilder.Build(file.MediaAssetId.Value)
+                : null,
             CreatedAt = file.CreatedAt
+        };
+    }
+
+    private static string BuildLegacyDownloadRoute(Guid contractId, Guid fileId)
+    {
+        return $"/api/contracts/{contractId:D}/files/{fileId:D}/download";
+    }
+
+    private static MediaAuditContext BuildAuditContext(Guid contractId, Guid fileId, string action)
+    {
+        return new MediaAuditContext
+        {
+            Action = action,
+            MetadataJson = JsonSerializer.Serialize(new
+            {
+                contractId,
+                fileId,
+                source = nameof(ContractFileService)
+            })
         };
     }
 

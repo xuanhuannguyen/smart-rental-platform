@@ -3,7 +3,9 @@ import type { Dispatch, FormEvent, ReactNode, SetStateAction } from 'react';
 import { useLocation, useNavigate, useParams } from 'react-router-dom';
 import { ROUTE_PATHS } from '../../../app/router/routePaths';
 import { getApiErrorMessage } from '../../../shared/api/apiError';
+import { toAssetUrl } from '../../../shared/api/assets';
 import { contractApi } from '../../contracts/api';
+import { uploadImage } from '../../files/api';
 import { billingApi } from '../api';
 import type { ContractAppendixResponse, ContractHistoryItemResponse } from '../../contracts/types';
 import type {
@@ -663,6 +665,8 @@ type ReadingDraft = {
   previousReading: number;
   currentReading: number;
   proofImageObjectKey: string;
+  proofMediaAssetId?: string | null;
+  proofImageUrl?: string | null;
 };
 
 function CentralCreateInvoiceModal({
@@ -686,6 +690,7 @@ function CentralCreateInvoiceModal({
   const [loadingContracts, setLoadingContracts] = useState(true);
   const [loadingDetails, setLoadingDetails] = useState(false);
   const [submitting, setSubmitting] = useState(false);
+  const [uploadingProofServiceId, setUploadingProofServiceId] = useState<string | null>(null);
   const [error, setError] = useState('');
 
   const houses = useMemo(() => {
@@ -779,7 +784,9 @@ function CentralCreateInvoiceModal({
             nextReadings[price.serviceTypeId] = {
               previousReading: latestReading?.currentReading ?? 0,
               currentReading: latestReading?.currentReading ?? 0,
-              proofImageObjectKey: ''
+              proofImageObjectKey: '',
+              proofMediaAssetId: null,
+              proofImageUrl: null
             };
           });
         setReadings(nextReadings);
@@ -849,7 +856,9 @@ function CentralCreateInvoiceModal({
           nextReadings[service.serviceTypeId] = {
             previousReading: service.latestReading?.currentReading ?? 0,
             currentReading: service.latestReading?.currentReading ?? 0,
-            proofImageObjectKey: ''
+            proofImageObjectKey: '',
+            proofMediaAssetId: null,
+            proofImageUrl: null
           };
         });
         setLatestReadingByServiceType(latestReadings);
@@ -895,10 +904,27 @@ function CentralCreateInvoiceModal({
     setReadings((current) => ({
       ...current,
       [serviceTypeId]: {
-        ...(current[serviceTypeId] ?? { previousReading: 0, currentReading: 0, proofImageObjectKey: '' }),
+        ...(current[serviceTypeId] ?? { previousReading: 0, currentReading: 0, proofImageObjectKey: '', proofMediaAssetId: null, proofImageUrl: null }),
         ...patch
       }
     }));
+  }
+
+  async function handleProofUpload(serviceTypeId: string, file: File) {
+    setUploadingProofServiceId(serviceTypeId);
+    setError('');
+    try {
+      const uploaded = await uploadImage(file, 'MeterReading');
+      updateReading(serviceTypeId, {
+        proofImageObjectKey: uploaded.objectKey,
+        proofMediaAssetId: uploaded.mediaAssetId || null,
+        proofImageUrl: uploaded.url || null
+      });
+    } catch (err) {
+      setError(getApiErrorMessage(err, 'Không thể tải ảnh công tơ lên.'));
+    } finally {
+      setUploadingProofServiceId(null);
+    }
   }
 
   async function handleSubmit(event: FormEvent) {
@@ -921,13 +947,14 @@ function CentralCreateInvoiceModal({
     }
 
     const meterReadings: MeterReadingInput[] = meteredPrices.map((price) => {
-      const draft = readings[price.serviceTypeId] ?? { previousReading: 0, currentReading: 0, proofImageObjectKey: '' };
+      const draft = readings[price.serviceTypeId] ?? { previousReading: 0, currentReading: 0, proofImageObjectKey: '', proofMediaAssetId: null, proofImageUrl: null };
       const latestReading = latestReadingByServiceType[price.serviceTypeId];
       return {
         serviceTypeId: price.serviceTypeId,
         previousReading: latestReading ? null : Number(draft.previousReading),
         currentReading: Number(draft.currentReading),
-        proofImageObjectKey: draft.proofImageObjectKey.trim() || null
+        proofImageObjectKey: draft.proofImageObjectKey.trim() || null,
+        proofMediaAssetId: draft.proofMediaAssetId || null
       };
     });
 
@@ -1063,11 +1090,13 @@ function CentralCreateInvoiceModal({
                   ) : (
                     <div className="invoice-create-meter-list">
                       {meteredPrices.map((price) => {
-                        const draft = readings[price.serviceTypeId] ?? { previousReading: 0, currentReading: 0, proofImageObjectKey: '' };
+                        const draft = readings[price.serviceTypeId] ?? { previousReading: 0, currentReading: 0, proofImageObjectKey: '', proofMediaAssetId: null, proofImageUrl: null };
                         const latestReading = latestReadingByServiceType[price.serviceTypeId];
                         const previousReading = latestReading?.currentReading ?? Number(draft.previousReading);
                         const consumption = Math.max(0, Number(draft.currentReading) - previousReading);
                         const amount = Math.round(consumption * price.unitPrice);
+                        const uploadedProofUrl = resolveMeterProofUrl(draft.proofImageUrl, draft.proofImageObjectKey);
+                        const latestProofUrl = resolveMeterProofUrl(latestReading?.proofImageUrl, null);
                         return (
                           <div key={price.serviceTypeId} className="invoice-create-meter-card">
                             <strong>{price.serviceName} ({formatMoney(price.unitPrice)} / {price.meterUnitName})</strong>
@@ -1101,6 +1130,39 @@ function CentralCreateInvoiceModal({
                                 <span className="label">Tạm tính</span>
                                 <strong>{formatNumber(consumption)} x {formatMoney(price.unitPrice)} = {formatMoney(amount)}</strong>
                               </div>
+                            </div>
+                            <div className="invoice-create-grid" style={{ marginTop: '12px' }}>
+                              <label className="invoice-create-field" style={{ gridColumn: '1 / -1' }}>
+                                <span className="label">Ảnh công tơ kỳ này</span>
+                                <input
+                                  type="file"
+                                  accept="image/png,image/jpeg,image/webp"
+                                  onChange={(event) => {
+                                    const file = event.target.files?.[0];
+                                    if (file) {
+                                      void handleProofUpload(price.serviceTypeId, file);
+                                      event.target.value = '';
+                                    }
+                                  }}
+                                  disabled={uploadingProofServiceId === price.serviceTypeId}
+                                />
+                              </label>
+                              {uploadedProofUrl && (
+                                <div className="invoice-create-field" style={{ gridColumn: '1 / -1' }}>
+                                  <span className="label">Ảnh đã chọn</span>
+                                  <a href={uploadedProofUrl} target="_blank" rel="noreferrer">
+                                    Xem ảnh công tơ vừa tải lên
+                                  </a>
+                                </div>
+                              )}
+                              {latestProofUrl && (
+                                <div className="invoice-create-field" style={{ gridColumn: '1 / -1' }}>
+                                  <span className="label">Ảnh công tơ kỳ trước</span>
+                                  <a href={latestProofUrl} target="_blank" rel="noreferrer">
+                                    Xem ảnh công tơ gần nhất
+                                  </a>
+                                </div>
+                              )}
                             </div>
                           </div>
                         );
@@ -1321,7 +1383,17 @@ function InvoiceDetailSection({
         {invoice.items.map((item) => (
           <div key={item.id} className="table-row item-table-row">
             <span>{getInvoiceItemTypeLabel(item.itemType)}</span>
-            <span>{item.description}</span>
+            <span>
+              {item.description}
+              {item.meterReadingProofImageUrl && (
+                <>
+                  <br />
+                  <a href={toAssetUrl(item.meterReadingProofImageUrl)} target="_blank" rel="noreferrer">
+                    Xem ảnh công tơ
+                  </a>
+                </>
+              )}
+            </span>
             <span>{item.quantity}</span>
             <span>{formatMoney(item.unitPrice)}</span>
             <strong>{formatMoney(item.amount)}</strong>
@@ -1763,4 +1835,16 @@ function getInvoiceItemTypeLabel(itemType: string) {
   };
 
   return labels[itemType] ?? itemType;
+}
+
+function resolveMeterProofUrl(imageUrl?: string | null, objectKey?: string | null) {
+  if (imageUrl?.trim()) {
+    return toAssetUrl(imageUrl);
+  }
+
+  if (objectKey?.trim()) {
+    return toAssetUrl(objectKey);
+  }
+
+  return '';
 }

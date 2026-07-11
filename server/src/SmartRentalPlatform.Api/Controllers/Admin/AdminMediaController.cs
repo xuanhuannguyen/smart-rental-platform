@@ -3,7 +3,9 @@ using Microsoft.AspNetCore.Mvc;
 using SmartRentalPlatform.Api.Extensions;
 using SmartRentalPlatform.Application.Common.Interfaces;
 using SmartRentalPlatform.Application.Common.Interfaces.Media;
+using SmartRentalPlatform.Application.Common.Media;
 using SmartRentalPlatform.Application.Common.Models.Media;
+using SmartRentalPlatform.Contracts.Media.Responses;
 using System.Text.Json;
 
 namespace SmartRentalPlatform.Api.Controllers.Admin;
@@ -15,6 +17,7 @@ public class AdminMediaController : ControllerBase
 {
     private const string AdminViewAction = "View";
     private const string AdminDownloadAction = "Download";
+    private static readonly TimeSpan PrivateDownloadUrlTtl = TimeSpan.FromMinutes(5);
 
     private readonly ICurrentUserService _currentUserService;
     private readonly IMediaAccessService _mediaAccessService;
@@ -58,6 +61,32 @@ public class AdminMediaController : ControllerBase
             BuildAuditContext(AdminDownloadAction, "attachment"));
 
         return File(result.Stream, result.ContentType, result.DownloadFileName, enableRangeProcessing: true);
+    }
+
+    [HttpGet("private/{mediaAssetId:guid}/download-url")]
+    public async Task<ActionResult<PrivateMediaDownloadUrlResponse>> GetPrivateDownloadUrl(
+        Guid mediaAssetId,
+        CancellationToken cancellationToken)
+    {
+        var adminId = _currentUserService.GetRequiredUserId("Bạn cần đăng nhập bằng tài khoản admin để tải tệp riêng tư.");
+        var expiresAtUtc = DateTimeOffset.UtcNow.Add(PrivateDownloadUrlTtl);
+
+        try
+        {
+            var url = await _mediaAccessService.GetDownloadUrlAsync(
+                mediaAssetId,
+                PrivateDownloadUrlTtl,
+                adminId,
+                cancellationToken,
+                BuildAuditContext("GenerateDownloadUrl", "attachment"));
+
+            return Ok(new PrivateMediaDownloadUrlResponse(url, expiresAtUtc, "signed-url"));
+        }
+        catch (NotSupportedException)
+        {
+            var fallbackUrl = AdminPrivateMediaPathBuilder.Build(mediaAssetId, forceDownload: true);
+            return Ok(new PrivateMediaDownloadUrlResponse(fallbackUrl, expiresAtUtc, "backend-route"));
+        }
     }
 
     [HttpGet("private")]

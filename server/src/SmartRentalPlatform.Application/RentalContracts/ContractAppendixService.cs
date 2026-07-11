@@ -5,6 +5,7 @@ using Microsoft.EntityFrameworkCore;
 using SmartRentalPlatform.Application.Common.Exceptions;
 using SmartRentalPlatform.Application.Common.Interfaces;
 using SmartRentalPlatform.Application.Common.Interfaces.Media;
+using SmartRentalPlatform.Application.Common.Media;
 using SmartRentalPlatform.Application.Common.Models.Media;
 using SmartRentalPlatform.Contracts.Common;
 using SmartRentalPlatform.Contracts.RentalContracts.Requests;
@@ -2412,7 +2413,11 @@ public class ContractAppendixService : IContractAppendixService
             RentalContractAppendixId = file.RentalContractAppendixId,
             MediaAssetId = file.MediaAssetId,
             StorageObjectKey = file.StorageObjectKey,
+            FileVariant = file.FileVariant.ToString(),
             FileUrl = file.FileUrl,
+            ViewUrl = file.MediaAssetId.HasValue
+                ? PrivateMediaPathBuilder.Build(file.MediaAssetId.Value)
+                : null,
             CreatedAt = file.CreatedAt
         };
     }

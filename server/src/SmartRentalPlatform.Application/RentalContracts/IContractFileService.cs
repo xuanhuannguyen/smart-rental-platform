@@ -19,4 +19,10 @@ public interface IContractFileService
         Guid contractId,
         Guid fileId,
         CancellationToken cancellationToken = default);
+
+    Task<ContractFileViewUrlResponse?> GetFileViewUrlAsync(
+        Guid userId,
+        Guid contractId,
+        Guid fileId,
+        CancellationToken cancellationToken = default);
 }
