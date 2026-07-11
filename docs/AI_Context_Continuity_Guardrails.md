@@ -229,59 +229,6 @@ Sau khi hoàn thành Phase 6, thêm các finding carry forward sau:
 - admin KYC read model đã expose `MediaAssetId`, nhưng admin viewer thật vẫn còn object-key based
 - KYC legacy backfill đang dùng `file_size = 0` và content-type suy luận theo extension
 
-Sau khi hoàn thành `Phase A - Frontend private media cleanup`, thêm các finding carry forward sau:
-
-- admin house detail/pending-detail đã ưu tiên `Front/Back/ExtraImageUrl` cho legal document private media
-- landlord `RoomingHouseDetailPage` đã ưu tiên `Front/Back/ExtraImageUrl` cho legal document private media
-- shared client type `LegalDocument` đã hiểu thêm `Front/Back/ExtraMediaAssetId` và `Front/Back/ExtraImageUrl`
-- legal document `ObjectKey` vẫn còn phải giữ cho edit/save compatibility flow; không được xóa trong sub-phase này
-- `RoomingHouseEditor` và các update contract legal-document hiện vẫn object-key based có chủ đích, vì sub-phase này chỉ dọn read-path
-
-Sau khi hoàn thành `Phase B - Billing proof frontend materialization`, thêm các finding carry forward sau:
-
-- landlord invoice-create modals đã upload meter proof qua `FileUploadScope.MeterReading`
-- payload tạo hóa đơn hiện gửi song song `proofMediaAssetId` và `proofImageObjectKey` để compatibility
-- landlord invoice-create modals đã ưu tiên preview/view bằng `proofImageUrl`
-- landlord invoice detail và tenant invoice detail đã hiển thị link `meterReadingProofImageUrl`
-- `proofImageObjectKey` vẫn còn phải giữ trong draft state và request contract; không được xóa ở sub-phase này
-- signed-download semantics cho meter proof vẫn chưa được tách abstraction riêng; hiện UI chỉ mở private URL/backend stream path trực tiếp
-
-Sau khi hoàn thành `Phase C - Private download semantics unification`, thêm các finding carry forward sau:
-
-- `MediaController` hiện đã có đủ 3 đường cho private media thường:
-  - `GET /api/media/private/{mediaAssetId}`
-  - `GET /api/media/private/{mediaAssetId}/download`
-  - `GET /api/media/private/{mediaAssetId}/download-url`
-- `AdminMediaController` hiện đã có thêm `GET /api/admin/media/private/{mediaAssetId}/download-url`
-- signed/private download semantics đã được chốt theo hướng:
-  - `view` = backend stream inline
-  - `download` = backend stream attachment
-  - `download-url` = ưu tiên signed URL, fallback về backend download route nếu storage local/private không hỗ trợ presign
-- `LocalMediaStorageService` vẫn không hỗ trợ private presigned URL có chủ đích; fallback backend-route là một phần của design hiện tại
-- phase sau không được giả định mọi private consumer đã chuyển sang `download-url`; Phase C mới chỉ chuẩn hóa contract và backend semantics
-
-Sau khi hoàn thành `Phase D - Contract/private legacy cleanup`, thêm các finding carry forward sau:
-
-- contract/appendix private viewer ở frontend hiện đã ưu tiên `view-url` resolve từ backend thay vì luôn tải blob qua contract download endpoint
-- `ContractFileResponse` hiện đã expose thêm `ViewUrl` và client type đã hiểu `mediaAssetId`
-- `ContractAppendixService.MapFileToResponse` đã đồng bộ lại `FileVariant`; phase sau không được giả định appendix file response còn thiếu variant
-- contract file download trực tiếp qua blob endpoint vẫn còn được giữ có chủ đích cho compatibility và cho trường hợp storage/backend chỉ trả `backend-route`
-- `StorageObjectKey` vẫn chưa được xóa khỏi contract response/entity; Phase D chỉ giảm phụ thuộc ở consumer path, chưa cleanup field cuối cùng
-
-Sau khi hoàn thành `Phase E - Avatar and low-risk polish`, thêm các finding carry forward sau:
-
-- backend auth/profile responses hiện đã tự resolve avatar display URL từ `AvatarMediaAssetId` nếu `AvatarUrl` trống
-- `AvatarMediaUrlResolver` chỉ dùng để dựng display URL cho avatar media nội bộ; Google/external avatar vẫn tiếp tục đi qua `AvatarUrl`
-- helper `toAvatarImageUrl` ở frontend hiện nhận được cả object source thay vì chỉ chuỗi URL, giúp callsite bám contract avatar mới gọn hơn
-- `AvatarUrl` vẫn còn là compatibility field cần giữ; Phase E chưa chuyển source of truth hoàn toàn sang `AvatarMediaAssetId`
-
-Sau khi hoàn thành `Phase F - Chat attachment implementation readiness`, thêm các finding carry forward sau:
-
-- `ChatAttachment` hiện đã là compatibility upload scope tạo ra private `MediaAsset`
-- helper private media ở frontend phải được dùng lại theo hướng generic, không gắn cứng vào contract flow
-- phase này chưa mở participant permission cho conversation; attachment mới chỉ sẵn sàng ở mức `upload + mediaAssetId + private helper`
-- tuyệt đối không dùng `conversationId` cache của AI chat hiện tại làm khóa ownership cho media attachment
-
 ---
 
 ## 10. Khi nào phải dừng và mở chat mới
@@ -327,15 +274,17 @@ Yêu cầu:
 - không tự mở rộng scope
 ```
 
-Nếu tiếp tục ngay từ trạng thái code hiện tại, phase kế tiếp mặc định nên là một trong 2 hướng:
+Nếu tiếp tục ngay từ trạng thái code hiện tại, phase kế tiếp mặc định nên là:
 
-- `handoff/dependency wait` nếu conversation persistence của chat chưa có
-- `Phase G / cleanup-handoff` nếu team quyết định defer chat attachment end-to-end sang người phụ trách chat
+- `Phase 11 - Billing proof image migration`
 
-Khi đó phạm vi mặc định nên là:
-- không mở rộng thêm business module private mới nếu chưa có capsule rõ ràng
-- không xóa fallback field cũ trước khi toàn bộ read-path đã chuyển xong
-- nếu đụng chat attachment, chỉ được làm tiếp khi đã có `Conversation` / `ConversationMessage` persisted và participant rule rõ ràng
+Phase 10 vừa hoàn thành với các điểm chốt:
+- frontend đã có helper `toPublicAssetUrl(imageUrl, objectKey)` cho public property image
+- `HouseImageGallery`, `PropertyImageEditor`, `PublicRoomingHouseDetailPage` đã ưu tiên helper public riêng
+- client `PropertyImage` và `PropertyImageRequest` đã giữ được `mediaAssetId`
+- upload response client type đã hiểu `mediaAssetId`
+- helper generic `toAssetUrl` vẫn còn giữ để compatibility cho avatar/legal/pdf/private flows
+- rủi ro còn lại: frontend build full repo hiện đang fail ở module `react-pdf` cũ, không phải do Phase 10
 
 trừ khi audit checklist đã được cập nhật rõ ràng sang hướng khác.
 
