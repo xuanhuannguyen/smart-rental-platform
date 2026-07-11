@@ -179,7 +179,8 @@ public class RentalContractService : IRentalContractService
 		}
 		EnsureMainTenant(tenantUserId, contract);
 		EnsureCanSubmitOccupants(contract);
-		ValidateOccupantsRequest(contract.MainTenantUser.Email, request, GetSnapshotMaxOccupants(contract));
+		var (resolvedStartDate, resolvedEndDate) = ResolveCurrentContractTermValues(contract);
+		ValidateOccupantsRequest(contract.MainTenantUser.Email, request, GetSnapshotMaxOccupants(contract), resolvedStartDate, resolvedEndDate);
 		Dictionary<string, VerifiedOccupantAccount> verifiedAccounts = await ValidateOccupantAccountsAsync(request, cancellationToken);
 		ContractDetailResponse? result;
 		await using (IAppDbContextTransaction transaction = await context.BeginTransactionAsync(cancellationToken))
@@ -1185,7 +1186,7 @@ public class RentalContractService : IRentalContractService
 		ResolveContractTerms(contract, null);
 	}
 
-	private static (DateOnly StartDate, DateOnly EndDate) ResolveCurrentContractTermValues(RentalContract contract)
+	internal static (DateOnly StartDate, DateOnly EndDate) ResolveCurrentContractTermValues(RentalContract contract)
 	{
 		var startDate = contract.StartDate;
 		var endDate = contract.EndDate;
@@ -1345,7 +1346,7 @@ public class RentalContractService : IRentalContractService
 		};
 	}
 
-	private static void ValidateOccupantsRequest(string tenantEmail, SubmitContractOccupantsRequest request, int maxOccupants)
+	private static void ValidateOccupantsRequest(string tenantEmail, SubmitContractOccupantsRequest request, int maxOccupants, DateOnly startDate, DateOnly endDate)
 	{
 		if (request.Occupants.Count == 0)
 		{
@@ -1372,6 +1373,10 @@ public class RentalContractService : IRentalContractService
 			if (occupant.MoveInDate == default(DateOnly))
 			{
 				throw new BadRequestException("RENTAL_CONTRACT_INVALID_OCCUPANT", "Người ở phải có ngày chuyển vào.");
+			}
+			if (occupant.MoveInDate < startDate || occupant.MoveInDate > endDate)
+			{
+				throw new BadRequestException("RENTAL_CONTRACT_INVALID_OCCUPANT_DATE", "Ngày chuyển vào phải nằm trong khoảng thời gian có hiệu lực của hợp đồng.");
 			}
 			if (occupant.MoveOutDate.HasValue && occupant.MoveOutDate.Value <= occupant.MoveInDate)
 			{

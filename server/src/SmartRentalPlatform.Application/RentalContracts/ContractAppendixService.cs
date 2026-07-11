@@ -1384,10 +1384,18 @@ public class ContractAppendixService : IContractAppendixService
                 "Ngày hiệu lực phụ lục không được nằm trong quá khứ.");
         }
 
+        var (_, resolvedEndDate) = RentalContractService.ResolveCurrentContractTermValues(contract);
+        if (effectiveDate < contract.StartDate || effectiveDate > resolvedEndDate)
+        {
+            throw new BadRequestException(
+                ErrorCodes.ValidationError,
+                "Ngày hiệu lực phụ lục phải nằm trong khoảng thời gian có hiệu lực của hợp đồng.");
+        }
+
         if (requesterRole == ContractSignerRole.Tenant)
         {
             ValidateTenantAppendixRules(contract, changes);
-            await ValidateAddedOccupantsAsync(changes, cancellationToken);
+            await ValidateAddedOccupantsAsync(contract, effectiveDate, changes, cancellationToken);
             await ValidateMainTenantRulesAsync(contract, changes, cancellationToken);
             ValidateRenewalRules(contract, changes);
             await ValidateProjectedOccupantsAsync(contract, changes, cancellationToken);
@@ -1399,9 +1407,23 @@ public class ContractAppendixService : IContractAppendixService
     }
 
     private async Task ValidateAddedOccupantsAsync(
+        RentalContract contract,
+        DateOnly effectiveDate,
         IReadOnlyCollection<ParsedAppendixChange> changes,
         CancellationToken cancellationToken)
     {
+        var (_, resolvedEndDate) = RentalContractService.ResolveCurrentContractTermValues(contract);
+
+        var renewalChange = changes.FirstOrDefault(change =>
+            change.TargetType == ContractAppendixTargetType.Contract &&
+            change.ChangeType == ContractAppendixChangeType.Update &&
+            NormalizeFieldName(change.Request.FieldName) == "enddate");
+
+        if (renewalChange is null || !TryParseDateOnly(renewalChange.Request.NewValue, out var newEndDate))
+        {
+            newEndDate = resolvedEndDate;
+        }
+
         var addedOccupants = changes
             .Where(x => x.TargetType == ContractAppendixTargetType.ContractOccupant &&
                         x.ChangeType == ContractAppendixChangeType.Add)
@@ -1410,7 +1432,7 @@ public class ContractAppendixService : IContractAppendixService
 
         foreach (var occupant in addedOccupants)
         {
-            ValidateAppendixOccupantRequest(occupant);
+            ValidateAppendixOccupantRequest(occupant, effectiveDate, newEndDate);
             if (!string.IsNullOrWhiteSpace(occupant.Email))
             {
                 _ = await GetVerifiedOccupantAccountByEmailAsync(occupant.Email.Trim().ToLowerInvariant(), cancellationToken);
@@ -1418,13 +1440,20 @@ public class ContractAppendixService : IContractAppendixService
         }
     }
 
-    private static void ValidateAppendixOccupantRequest(ContractOccupantRequest occupant)
+    private static void ValidateAppendixOccupantRequest(ContractOccupantRequest occupant, DateOnly? effectiveDate = null, DateOnly? endDate = null)
     {
         if (occupant.MoveInDate == default)
         {
             throw new BadRequestException(
                 ErrorCodes.RentalContractInvalidOccupant,
-                "Ngày chuyển vào của người ềEkhông được đềEtrống.");
+                "Ngày chuyển vào của người ở không được để trống.");
+        }
+
+        if (effectiveDate.HasValue && endDate.HasValue && (occupant.MoveInDate < effectiveDate.Value || occupant.MoveInDate > endDate.Value))
+        {
+            throw new BadRequestException(
+                ErrorCodes.RentalContractInvalidOccupant,
+                "Ngày chuyển vào của người ở mới phải nằm trong khoảng thời gian hiệu lực của phụ lục và hợp đồng.");
         }
 
         if (!string.IsNullOrWhiteSpace(occupant.Email))

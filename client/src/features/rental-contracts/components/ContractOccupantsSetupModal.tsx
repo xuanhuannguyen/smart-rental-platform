@@ -287,6 +287,15 @@ export function ContractOccupantsSetupModal({
       return 'Cần chọn ngày dọn vào.';
     }
 
+    if (contract) {
+      const contractStartDate = toDateInput(contract.startDate);
+      const contractEndDate = toDateInput(contract.endDate);
+      
+      if (occupant.moveInDate < contractStartDate || occupant.moveInDate > contractEndDate) {
+        return `Ngày dọn vào phải nằm trong khoảng từ ${new Date(contractStartDate).toLocaleDateString('vi-VN')} đến ${new Date(contractEndDate).toLocaleDateString('vi-VN')}.`;
+      }
+    }
+
     if (occupant.hasAccount) {
       if (!occupant.email.trim()) {
         return 'Cần nhập email tài khoản.';
@@ -624,6 +633,8 @@ export function ContractOccupantsSetupModal({
                         required
                         value={occupant.moveInDate}
                         onChange={(event) => updateOccupant(occupant.id, 'moveInDate', event.target.value)}
+                        min={contract ? toDateInput(contract.startDate) : undefined}
+                        max={contract ? toDateInput(contract.endDate) : undefined}
                       />
                     </div>
 

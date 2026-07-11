@@ -440,7 +440,7 @@ export default function LandlordContractDetailPage() {
                             style={{ padding: '6px 12px', fontSize: '0.85rem' }}
                             onClick={() => setSigningAppendixId(appendix.id)}
                           >
-                            Xem chi tiết
+                            Xem và ký phụ lục
                           </Button>
                         )}
                       </div>
