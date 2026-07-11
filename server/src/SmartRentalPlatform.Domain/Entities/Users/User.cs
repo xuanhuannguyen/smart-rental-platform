@@ -1,5 +1,6 @@
 using SmartRentalPlatform.Domain.Entities.Properties;
 using SmartRentalPlatform.Domain.Entities.Rental;
+using SmartRentalPlatform.Domain.Entities.Media;
 using SmartRentalPlatform.Domain.Enums;
 
 namespace SmartRentalPlatform.Domain.Entities.Users;
@@ -13,6 +14,7 @@ public class User
     public string? PasswordHash { get; set; }
     public string DisplayName { get; set; } = string.Empty;
     public string? AvatarUrl { get; set; }
+    public Guid? AvatarMediaAssetId { get; set; }
     public UserStatus Status { get; set; } = UserStatus.Active;
     public OnboardingStatus OnboardingStatus { get; set; } = OnboardingStatus.NeedProfileUpdate;
     public bool EmailConfirmed { get; set; }
@@ -24,6 +26,7 @@ public class User
     public DateTimeOffset? UpdatedAt { get; set; }
     public DateTimeOffset? DeletedAt { get; set; }
 
+    public MediaAsset? AvatarMediaAsset { get; set; }
     public UserProfile? UserProfile { get; set; }
     public ICollection<UserRole> UserRoles { get; set; } = new List<UserRole>();
     public ICollection<ExternalLogin> ExternalLogins { get; set; } = new List<ExternalLogin>();

@@ -2,7 +2,7 @@ import { NavLink, Outlet, useNavigate } from 'react-router-dom';
 import { useAuth } from '../../../app/providers/AuthProvider';
 import { ROUTE_PATHS } from '../../../app/router/routePaths';
 import { NotificationBell } from '../../../features/notifications/components/NotificationBell';
-import { toAssetUrl } from '../../../shared/api/assets';
+import { toAvatarImageUrl } from '../../../shared/api/assets';
 import './AccountLayout.css';
 
 export function AccountLayout() {
@@ -32,7 +32,7 @@ export function AccountLayout() {
         <div className="sidebar-profile-card" onClick={() => navigate(ROUTE_PATHS.ACCOUNT.PROFILE)}>
           <div className="sidebar-profile-avatar-wrapper">
             {currentUser.avatarUrl && currentUser.avatarUrl.trim() !== '' ? (
-              <img src={toAssetUrl(currentUser.avatarUrl)} alt="Avatar" className="sidebar-profile-avatar" />
+              <img src={toAvatarImageUrl(currentUser.avatarUrl)} alt="Avatar" className="sidebar-profile-avatar" />
             ) : (
               <div className="sidebar-profile-avatar-placeholder">
                 {currentUser.displayName ? currentUser.displayName.charAt(0).toUpperCase() : 'H'}

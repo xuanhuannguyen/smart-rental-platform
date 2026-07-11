@@ -1,9 +1,11 @@
 using Microsoft.EntityFrameworkCore;
 using SmartRentalPlatform.Application.Common.Interfaces;
 using SmartRentalPlatform.Application.Common.Interfaces.Media;
+using SmartRentalPlatform.Domain.Entities.Billing;
 using SmartRentalPlatform.Domain.Entities.Media;
 using SmartRentalPlatform.Domain.Entities.Properties;
 using SmartRentalPlatform.Domain.Entities.RentalContracts;
+using SmartRentalPlatform.Domain.Enums.Billing;
 using SmartRentalPlatform.Domain.Enums.Media;
 using SmartRentalPlatform.Domain.Enums.RentalContracts;
 using SmartRentalPlatform.Domain.Enums.Users;
@@ -80,6 +82,14 @@ public class DefaultMediaPermissionService : IMediaPermissionService
                 cancellationToken);
         }
 
+        if (string.Equals(mediaAsset.LinkedEntityType, nameof(MeterReading), StringComparison.Ordinal))
+        {
+            return await CanAccessMeterReadingAsync(
+                actorUserId.Value,
+                mediaAsset.LinkedEntityId.Value,
+                cancellationToken);
+        }
+
         if (!string.Equals(mediaAsset.LinkedEntityType, nameof(ContractFile), StringComparison.Ordinal))
         {
             return false;
@@ -122,6 +132,54 @@ public class DefaultMediaPermissionService : IMediaPermissionService
             .FirstOrDefaultAsync(cancellationToken);
 
         return landlordUserId != Guid.Empty && landlordUserId == actorUserId;
+    }
+
+    private async Task<bool> CanAccessMeterReadingAsync(
+        Guid actorUserId,
+        Guid meterReadingId,
+        CancellationToken cancellationToken)
+    {
+        var meterReading = await dbContext.MeterReadings
+            .AsNoTracking()
+            .Include(x => x.RentalContract)
+                .ThenInclude(x => x.Room)
+                    .ThenInclude(x => x.RoomingHouse)
+            .Include(x => x.RentalContract)
+                .ThenInclude(x => x.Occupants)
+            .Include(x => x.InvoiceItems)
+                .ThenInclude(x => x.Invoice)
+            .FirstOrDefaultAsync(x => x.Id == meterReadingId, cancellationToken);
+
+        if (meterReading?.RentalContract is null)
+        {
+            return false;
+        }
+
+        if (meterReading.RentalContract.Room.RoomingHouse.LandlordUserId == actorUserId)
+        {
+            return true;
+        }
+
+        var visibleInvoices = meterReading.InvoiceItems
+            .Select(x => x.Invoice)
+            .Where(x => x is not null && x.Status != InvoiceStatus.Draft)
+            .ToList();
+
+        if (visibleInvoices.Count == 0)
+        {
+            return false;
+        }
+
+        if (visibleInvoices.Any(x => x!.TenantUserId == actorUserId))
+        {
+            return true;
+        }
+
+        return visibleInvoices.Any(invoice => meterReading.RentalContract.Occupants.Any(occupant =>
+            occupant.UserId == actorUserId &&
+            occupant.Status != ContractOccupantStatus.Voided &&
+            occupant.MoveInDate <= invoice!.BillingPeriodEnd &&
+            (occupant.MoveOutDate is null || occupant.MoveOutDate >= invoice.BillingPeriodStart)));
     }
 
     private static bool CanAccessByDefault(Guid? actorUserId, MediaAsset mediaAsset)

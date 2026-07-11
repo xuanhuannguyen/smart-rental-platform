@@ -26,6 +26,9 @@ Theo code hiện có trong repo:
 - `Phase 8 - Legal document migration` đã được implement
 - `Phase 9 - Public property image migration backend` đã được implement
 - `Phase 10 - Public property image migration frontend` đã được implement ở mức public image consumption
+- `Phase 11 - Billing proof image migration` đã được implement ở mức backend/schema/permission foundation
+- `Phase 12 - Shared frontend asset API cleanup` đã được implement một phần theo hướng safe cleanup cho public/shared image helpers
+- `Phase 13 - Avatar and low-risk uploads` đã được implement cho avatar media linkage theo hướng compatibility
 
 Các điểm chưa hoàn chỉnh nhưng đã biết từ code hiện tại:
 
@@ -38,11 +41,14 @@ Các điểm chưa hoàn chỉnh nhưng đã biết từ code hiện tại:
 - contract appendix chưa có migration/backfill cho dữ liệu appendix legacy cũ
 - legal document object cũ có thể vẫn đang nằm ở public object key cũ ở tầng storage thật dù metadata đã được migrate sang private semantics
 - public property image route vẫn đang mở theo `objectKey`; frontend hiện đã ưu tiên `imageUrl` backend trả về nhưng fetch layer public chưa chuyển hẳn sang `MediaAssetId`
+- billing proof image hiện đã có `ProofMediaAssetId`, private access rule và backfill metadata; frontend upload/viewer chuyên biệt vẫn chưa được materialize
+- shared helper frontend hiện đã được tách rõ hơn cho public listing/property image, nhưng helper private/transitional vẫn còn giữ compatibility cũ để tránh lan sửa
+- avatar user-uploaded hiện đã có `AvatarMediaAssetId`, nhưng `AvatarUrl` vẫn được giữ song song để tương thích với external avatar và call site cũ
 
 Nếu tiếp tục bám đúng code hiện tại, phase kế tiếp mặc định là:
 
-- `Phase 11 - Billing proof image migration`
-- phase-specific plan: `docs/AI_Media_Migration_Phase4_ContractFile_Plan.md`
+- `Phase 14 - Chat attachment design stub hoặc implementation`
+- phase-specific plan gần nhất còn dùng để tham chiếu avatar: `docs/AI_Media_Migration_Phase13_Avatar_Plan.md`
 
 ---
 
@@ -677,10 +683,10 @@ Dọn frontend public image theo API mới, giảm phụ thuộc `toAssetUrl(obj
 - thêm `ProofMediaAssetId`
 - backfill field cũ
 - tạo media scope riêng cho meter proof
-- thêm rule:
-  - tenant chỉ xem sau `Issued`
-  - không cho thay ảnh sau `Paid`
-  - nếu cần sửa thì tạo evidence/adjustment mới
+- thêm rule theo đích cuối:
+  - tenant/occupant chỉ xem khi invoice đã publish ra khỏi trạng thái `Draft`
+  - rule chặn thay ảnh sau `Paid` chỉ áp dụng khi phase sau thật sự thêm flow update proof riêng
+  - nếu cần sửa sau khi invoice đã finalized thì ưu tiên evidence/adjustment mới thay vì mutate trực tiếp proof cũ
 
 ### Business rule phải giữ
 
@@ -689,9 +695,27 @@ Dọn frontend public image theo API mới, giảm phụ thuộc `toAssetUrl(obj
 
 ### Gate
 
-- tests permission theo `Issued/Paid`
+- tests permission tối thiểu theo `Draft` và một trạng thái published như `Issued`
 - test tenant access
-- test landlord update block sau `Paid`
+- nếu có flow update proof riêng thì mới thêm test landlord update block sau `Paid`
+
+### Trạng thái hiện tại
+
+- `MeterReading` đã có `ProofMediaAssetId`
+- migration `AddMeterReadingProofMediaAssets` đã thêm cột mới và backfill từ `ProofImageObjectKey` sang `media_assets`
+- `BillingService` đã link proof image vào `MediaAsset` khi tạo meter reading mới
+- `LatestMeterReadingResponse` đã expose:
+  - `ProofMediaAssetId`
+  - `ProofImageUrl`
+- `InvoiceItemResponse` đã expose:
+  - `MeterReadingProofMediaAssetId`
+  - `MeterReadingProofImageUrl`
+- `DefaultMediaPermissionService` đã cover private access cho meter reading proof:
+  - landlord được xem
+  - tenant/occupant chỉ xem khi invoice không còn `Draft`
+- upload scope `MeterReading` đã được thêm vào compatibility upload layer và map sang private media
+- frontend hiện mới được cập nhật typing cho phase này; chưa có meter-proof uploader/viewer hoàn chỉnh
+- chưa có flow update proof image riêng sau khi invoice đã tạo, nên rule “không cho thay ảnh sau `Paid`” mới dừng ở mức design note, chưa phải enforcement hiện hành
 
 ---
 
@@ -718,6 +742,25 @@ Dọn helper chung sau khi đã migrate phần lớn module.
 
 - không còn helper chung gây nhầm private/public
 
+### Trạng thái hiện tại
+
+- `client/src/shared/api/assets.ts` đã có helper tách ngữ nghĩa rõ hơn:
+  - `toPublicListingImageUrl`
+  - `toPublicPropertyImageUrl`
+- một số màn public/shared đã chuyển sang helper mới:
+  - `SearchRoomingHousesPage`
+  - `PublicRoomingHouseDetailPage`
+  - `HouseImageGallery`
+  - `MePage` phần public listing cards
+  - `LandlordDashboardPage` phần cover image
+  - `RentalAiChatbot` mini house cards
+- `toAssetUrl` vẫn được giữ cho avatar và các flow transitional/private để tránh đụng vào module chưa chốt
+- phase này chưa dọn:
+  - `houseRule` PDF
+  - legal/KYC/admin private image rendering
+  - avatar/profile image flow
+  - private download/open helper semantics
+
 ---
 
 ## Phase 13 - Avatar and low-risk uploads
@@ -736,6 +779,50 @@ Migrate các phần ít rủi ro cuối để tránh làm bẩn context sớm.
 
 - profile page vẫn hoạt động
 - upload low-risk vẫn chạy
+
+### Trạng thái code hiện tại
+
+- upload avatar đã đi qua `MediaBackedFileStorageService` với:
+  - `FileUploadScope.Avatar`
+  - `MediaScope.Avatar`
+  - `mediaAssetId` trong upload response
+- nhưng business entity `User` hiện vẫn chỉ lưu `AvatarUrl`
+- frontend profile hiện upload avatar xong lưu `uploadResult.url` vào `avatarUrl`
+- các màn hiển thị avatar hiện vẫn dùng `toAssetUrl`
+- Google login vẫn có thể set `AvatarUrl` thành external provider URL
+
+### Kế hoạch an toàn được chốt
+
+- Phase 13 mặc định chỉ làm `avatar`
+- thêm `AvatarMediaAssetId` vào `User` theo hướng compatibility:
+  - giữ `AvatarUrl`
+  - không ép Google avatar phải có `MediaAssetId`
+- chưa gộp `house rule PDF` vào phase này trừ khi có nhu cầu rõ ràng sau
+
+### Trạng thái hiện tại
+
+- `User` đã có `AvatarMediaAssetId`
+- migration `AddUserAvatarMediaAssetLink` đã thêm:
+  - cột `users.avatar_media_asset_id`
+  - index
+  - FK sang `media_assets`
+- `UserService.UpdateUserProfileAsync` đã:
+  - nhận `AvatarMediaAssetId`
+  - validate scope `Avatar`
+  - link metadata về `User`
+  - vẫn giữ `AvatarUrl`
+- `CurrentUserResponse`, `UserProfileResponse`, `LoginResponse`, `GoogleLoginResponse` đã expose `AvatarMediaAssetId`
+- `ProfileInfoPage` đã gửi cả:
+  - `avatarUrl`
+  - `avatarMediaAssetId`
+- shared frontend đã có `toAvatarImageUrl`
+- các avatar call site chính đã chuyển sang helper riêng:
+  - `HomeHeader`
+  - `AccountLayout`
+  - `MePage`
+  - `TenantInvoicesPage`
+  - `ProfileInfoPage`
+- Google/external avatar flow vẫn giữ compatibility bằng `AvatarUrl`
 
 ---
 

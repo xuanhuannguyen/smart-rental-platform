@@ -4,7 +4,7 @@ import { useAuth } from '../../../app/providers/AuthProvider';
 import { ROUTE_PATHS } from '../../../app/router/routePaths';
 import { Button } from '../ui/Button';
 import { Toast } from '../ui/Toast';
-import { toAssetUrl } from '../../api/assets';
+import { toAvatarImageUrl } from '../../api/assets';
 import { getMyRoomingHouseOnboarding } from '../../../features/rooming-houses/api';
 import { NotificationBell } from '../../../features/notifications/components/NotificationBell';
 import './HomeHeader.css';
@@ -123,7 +123,7 @@ export function HomeHeader({ centerContent }: HomeHeaderProps) {
             <div className="avatar-wrapper" ref={dropdownRef}>
             <button className="avatar-btn" onClick={() => setShowDropdown(!showDropdown)}>
               {currentUser.avatarUrl && currentUser.avatarUrl.trim() !== '' ? (
-                <img src={toAssetUrl(currentUser.avatarUrl)} alt="Avatar" className="avatar-image" />
+                <img src={toAvatarImageUrl(currentUser.avatarUrl)} alt="Avatar" className="avatar-image" />
               ) : (
                 <span className="avatar-initials">{avatarInitials}</span>
               )}

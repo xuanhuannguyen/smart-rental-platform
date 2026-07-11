@@ -1,7 +1,7 @@
 import { useMemo, useRef, useState, type FormEvent, type ReactNode } from 'react';
 import { Link } from 'react-router-dom';
 import { getApiErrorMessage } from '../../../shared/api/apiError';
-import { toAssetUrl } from '../../../shared/api/assets';
+import { toPublicListingImageUrl } from '../../../shared/api/assets';
 import { chatRoomingHouseAssistant } from '../api';
 import type { NearbyPlace, RoomingHouseAiChatResponse, RoomingHouseSearchItem } from '../types';
 import './RentalAiChatbot.css';
@@ -468,7 +468,7 @@ function ChatResponseBlocks({
 }
 
 function RoomingHouseMiniCard({ house }: { house: RoomingHouseSearchItem }) {
-  const imageUrl = house.coverImageUrl ? toAssetUrl(house.coverImageUrl) : '';
+  const imageUrl = house.coverImageUrl ? toPublicListingImageUrl(house.coverImageUrl) : '';
   return (
     <Link className="rental-ai-chatbot__house" to={`/rooming-houses/${house.id}`}>
       <div className="rental-ai-chatbot__house-image">

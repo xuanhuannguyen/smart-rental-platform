@@ -4,7 +4,7 @@ import L from 'leaflet';
 import 'leaflet/dist/leaflet.css';
 import { ROUTE_PATHS } from '../../app/router/routePaths';
 import { getApiErrorMessage } from '../../shared/api/apiError';
-import { toAssetUrl } from '../../shared/api/assets';
+import { toPublicListingImageUrl } from '../../shared/api/assets';
 import { Button } from '../../shared/components/ui/Button';
 import { HomeHeader } from '../../shared/components/layout/HomeHeader';
 import { searchPublicRoomingHouses, getAmenities, searchLocationAddress, suggestLocationAddresses } from './api';
@@ -1320,7 +1320,7 @@ export default function SearchRoomingHousesPage() {
                   >
                     <div className="search-result-card__image-container">
                       {item.coverImageUrl ? (
-                        <img src={toAssetUrl(item.coverImageUrl)} alt={item.name} />
+                        <img src={toPublicListingImageUrl(item.coverImageUrl)} alt={item.name} />
                       ) : (
                         <div className="search-result-card__placeholder">Chưa có ảnh</div>
                       )}

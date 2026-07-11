@@ -34,6 +34,8 @@ export interface LatestMeterReading {
   previousReading: number;
   currentReading: number;
   consumption: number;
+  proofMediaAssetId?: string | null;
+  proofImageUrl?: string | null;
 }
 
 export interface RoomBillingContext {
@@ -124,6 +126,7 @@ export interface MeterReadingInput {
   previousReading?: number | null;
   currentReading: number;
   proofImageObjectKey?: string | null;
+  proofMediaAssetId?: string | null;
 }
 
 export interface GenerateInvoiceWithReadingsRequest {
@@ -146,6 +149,8 @@ export interface InvoiceItem {
   serviceTypeId?: string | null;
   serviceName?: string | null;
   meterReadingId?: string | null;
+  meterReadingProofMediaAssetId?: string | null;
+  meterReadingProofImageUrl?: string | null;
   itemType: string;
   description: string;
   quantity: number;

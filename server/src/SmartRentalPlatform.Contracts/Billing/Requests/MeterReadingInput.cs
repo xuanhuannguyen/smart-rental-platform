@@ -8,4 +8,5 @@ public sealed record MeterReadingInput(
     Guid ServiceTypeId,
     decimal? PreviousReading,
     decimal CurrentReading,
-    string? ProofImageObjectKey);
+    string? ProofImageObjectKey,
+    Guid? ProofMediaAssetId = null);

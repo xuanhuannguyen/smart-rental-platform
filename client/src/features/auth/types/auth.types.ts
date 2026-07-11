@@ -51,6 +51,7 @@ export interface AuthUser {
   email: string;
   displayName: string;
   avatarUrl?: string | null;
+  avatarMediaAssetId?: string | null;
   isGoogleUser?: boolean;
   emailConfirmed: boolean;
   requiresEmailVerification?: boolean;

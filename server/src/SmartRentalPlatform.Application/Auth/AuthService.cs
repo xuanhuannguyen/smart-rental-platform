@@ -403,6 +403,7 @@ public class AuthService : IAuthService
         Email = user.Email,
         DisplayName = user.DisplayName,
         AvatarUrl = user.AvatarUrl,
+        AvatarMediaAssetId = user.AvatarMediaAssetId,
         IsGoogleUser = string.IsNullOrEmpty(user.PasswordHash),
         EmailConfirmed = user.EmailConfirmed,
         Status = user.Status.ToString(),

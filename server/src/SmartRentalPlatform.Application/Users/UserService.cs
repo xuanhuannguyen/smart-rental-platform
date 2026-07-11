@@ -4,8 +4,10 @@ using SmartRentalPlatform.Application.Common.Exceptions;
 using SmartRentalPlatform.Application.Common.Interfaces;
 using SmartRentalPlatform.Contracts.Common;
 using SmartRentalPlatform.Contracts.Users;
+using SmartRentalPlatform.Domain.Entities.Media;
 using SmartRentalPlatform.Domain.Entities.Users;
 using SmartRentalPlatform.Domain.Enums;
+using SmartRentalPlatform.Domain.Enums.Media;
 
 namespace SmartRentalPlatform.Application.Users;
 
@@ -55,6 +57,7 @@ public class UserService : IUserService
             Email = user.Email,
             DisplayName = user.DisplayName,
             AvatarUrl = user.AvatarUrl,
+            AvatarMediaAssetId = user.AvatarMediaAssetId,
             IsGoogleUser = string.IsNullOrEmpty(user.PasswordHash),
             EmailConfirmed = user.EmailConfirmed,
             Status = user.Status.ToString(),
@@ -124,6 +127,7 @@ public class UserService : IUserService
             IdentityVerified = approvedKyc is not null,
             ProfileCompleted = profileCompleted,
             AvatarUrl = user.AvatarUrl,
+            AvatarMediaAssetId = user.AvatarMediaAssetId,
             IsGoogleUser = string.IsNullOrEmpty(user.PasswordHash)
         };
     }
@@ -199,9 +203,14 @@ public class UserService : IUserService
         user.DisplayName = request.DisplayName.Trim();
         user.PhoneNumber = request.PhoneNumber?.Trim();
 
-        user.AvatarUrl = request.AvatarUrl?.Trim();
-
         var now = DateTimeOffset.UtcNow;
+        user.AvatarUrl = NormalizeOptionalText(request.AvatarUrl);
+        user.AvatarMediaAssetId = await ResolveAvatarMediaAssetAsync(
+            userId,
+            request.AvatarMediaAssetId,
+            now,
+            cancellationToken);
+
         var profile = await _dbContext.UserProfiles
             .FirstOrDefaultAsync(p => p.UserId == userId, cancellationToken);
 
@@ -257,8 +266,61 @@ public class UserService : IUserService
             IdentityVerified = identityVerified,
             ProfileCompleted = profileCompleted,
             AvatarUrl = user.AvatarUrl,
+            AvatarMediaAssetId = user.AvatarMediaAssetId,
             IsGoogleUser = string.IsNullOrEmpty(user.PasswordHash)
         };
+    }
+
+    private async Task<Guid?> ResolveAvatarMediaAssetAsync(
+        Guid userId,
+        Guid? avatarMediaAssetId,
+        DateTimeOffset now,
+        CancellationToken cancellationToken)
+    {
+        if (!avatarMediaAssetId.HasValue)
+        {
+            return null;
+        }
+
+        MediaAsset? mediaAsset = await _dbContext.MediaAssets
+            .FirstOrDefaultAsync(x => x.Id == avatarMediaAssetId.Value, cancellationToken);
+
+        if (mediaAsset is null)
+        {
+            throw new BadRequestException(
+                ErrorCodes.ValidationError,
+                "Avatar media asset không tồn tại.");
+        }
+
+        if (mediaAsset.Scope != MediaScope.Avatar)
+        {
+            throw new BadRequestException(
+                ErrorCodes.ValidationError,
+                "Media asset được chọn không phải avatar hợp lệ.");
+        }
+
+        if (mediaAsset.OwnerUserId.HasValue && mediaAsset.OwnerUserId.Value != userId)
+        {
+            throw new ForbiddenException(
+                ErrorCodes.Forbidden,
+                "Bạn không có quyền sử dụng avatar media asset này.");
+        }
+
+        mediaAsset.OwnerUserId = userId;
+        mediaAsset.Scope = MediaScope.Avatar;
+        mediaAsset.Visibility = MediaVisibility.Public;
+        mediaAsset.Status = MediaStatus.Linked;
+        mediaAsset.LinkedEntityType = nameof(User);
+        mediaAsset.LinkedEntityId = userId;
+        mediaAsset.UpdatedAt = now;
+
+        return mediaAsset.Id;
+    }
+
+    private static string? NormalizeOptionalText(string? value)
+    {
+        string trimmed = value?.Trim() ?? string.Empty;
+        return trimmed.Length == 0 ? null : trimmed;
     }
 
     public async Task<LandlordEligibilityResponse> GetLandlordEligibilityAsync(

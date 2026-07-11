@@ -3,7 +3,7 @@ import { useNavigate, useParams } from 'react-router-dom';
 import { useAuth } from '../../../app/providers/AuthProvider';
 import { ROUTE_PATHS } from '../../../app/router/routePaths';
 import { getApiErrorMessage } from '../../../shared/api/apiError';
-import { toAssetUrl } from '../../../shared/api/assets';
+import { toAvatarImageUrl } from '../../../shared/api/assets';
 import { Button } from '../../../shared/components/ui/Button';
 import { billingApi } from '../api';
 import type { Invoice } from '../types';
@@ -347,7 +347,7 @@ export default function TenantInvoicesPage() {
           <div className="avatar-wrapper" ref={dropdownRef}>
             <button className="avatar-btn" onClick={() => setShowDropdown(!showDropdown)}>
               {currentUser.avatarUrl && currentUser.avatarUrl.trim() !== '' ? (
-                <img src={toAssetUrl(currentUser.avatarUrl)} alt="Avatar" className="avatar-image" />
+                <img src={toAvatarImageUrl(currentUser.avatarUrl)} alt="Avatar" className="avatar-image" />
               ) : (
                 <span className="avatar-initials">{avatarInitials}</span>
               )}

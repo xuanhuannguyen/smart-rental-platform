@@ -2,6 +2,7 @@
 using System;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
 using SmartRentalPlatform.Infrastructure.Persistence;
@@ -11,9 +12,11 @@ using SmartRentalPlatform.Infrastructure.Persistence;
 namespace SmartRentalPlatform.Infrastructure.Persistence.Migrations
 {
     [DbContext(typeof(AppDbContext))]
-    partial class AppDbContextModelSnapshot : ModelSnapshot
+    [Migration("20260711022858_AddMeterReadingProofMediaAssets")]
+    partial class AddMeterReadingProofMediaAssets
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        /// <inheritdoc />
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder
@@ -36465,10 +36468,6 @@ namespace SmartRentalPlatform.Infrastructure.Persistence.Migrations
                         .HasDefaultValue(0)
                         .HasColumnName("access_failed_count");
 
-                    b.Property<Guid?>("AvatarMediaAssetId")
-                        .HasColumnType("uuid")
-                        .HasColumnName("avatar_media_asset_id");
-
                     b.Property<string>("AvatarUrl")
                         .HasColumnType("text")
                         .HasColumnName("avatar_url");
@@ -36549,8 +36548,6 @@ namespace SmartRentalPlatform.Infrastructure.Persistence.Migrations
                         .HasDefaultValueSql("now()");
 
                     b.HasKey("Id");
-
-                    b.HasIndex("AvatarMediaAssetId");
 
                     b.HasIndex("NormalizedEmail")
                         .IsUnique();
@@ -37391,16 +37388,6 @@ namespace SmartRentalPlatform.Infrastructure.Persistence.Migrations
                         .OnDelete(DeleteBehavior.SetNull);
 
                     b.Navigation("User");
-                });
-
-            modelBuilder.Entity("SmartRentalPlatform.Domain.Entities.Users.User", b =>
-                {
-                    b.HasOne("SmartRentalPlatform.Domain.Entities.Media.MediaAsset", "AvatarMediaAsset")
-                        .WithMany()
-                        .HasForeignKey("AvatarMediaAssetId")
-                        .OnDelete(DeleteBehavior.SetNull);
-
-                    b.Navigation("AvatarMediaAsset");
                 });
 
             modelBuilder.Entity("SmartRentalPlatform.Domain.Entities.Users.UserProfile", b =>

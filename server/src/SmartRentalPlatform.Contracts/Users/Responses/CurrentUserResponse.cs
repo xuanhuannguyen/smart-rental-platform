@@ -10,6 +10,8 @@ public class CurrentUserResponse
 
     public string? AvatarUrl { get; set; }
 
+    public Guid? AvatarMediaAssetId { get; set; }
+
     public bool IsGoogleUser { get; set; }
 
     public bool EmailConfirmed { get; set; }

@@ -37,6 +37,9 @@ Mỗi phase sau phải cập nhật tiếp vào file này, không tạo lại ch
 - `[x]` Phase 8 hoàn thành cho `RoomingHouseLegalDocument` media migration
 - `[x]` Phase 9 hoàn thành cho backend property image migration
 - `[x]` Phase 10 hoàn thành cho frontend public property image migration ở mức consumption/helper
+- `[x]` Phase 11 hoàn thành cho backend meter-reading proof media migration
+- `[x]` Phase 12 hoàn thành một phần theo hướng safe cleanup cho shared frontend public image helpers
+- `[x]` Phase 13 hoàn thành cho avatar media linkage theo hướng compatibility
 - `[x]` Runtime code chính hiện bind `IMediaStorageService` và `IPrivateStorageService` sang `S3StorageService`
 - `[~]` Open risk hiện tập trung ở private module còn lại, admin access/audit, legal/property/billing migration và cleanup phase sau
 
@@ -74,6 +77,12 @@ Mỗi phase sau phải cập nhật tiếp vào file này, không tạo lại ch
 - `[x]` D016: Runtime storage hiện dùng `S3StorageService`; `LocalMediaStorageService` không còn là binding chính trong app runtime
 - `[x]` D017: `KycService` đã đi qua media core nhưng VNPT client vẫn nhận `objectKey` như trước để giữ nguyên provider integration
 - `[x]` D018: `AdminKycDetailResponse` và `AdminKycInfo` đã expose `Front/Back/SelfieMediaAssetId`, nhưng URL admin vẫn còn object-key based cho đến Phase 7
+- `[x]` D019: `MeterReading` proof image dùng `ProofMediaAssetId` nhưng vẫn giữ `ProofImageObjectKey` làm fallback/compatibility
+- `[x]` D020: `DefaultMediaPermissionService` cho meter-reading proof cho phép landlord luôn xem; tenant/occupant chỉ xem khi invoice không còn `Draft`
+- `[x]` D021: Phase 12 chỉ tách helper frontend cho public listing/property image; không động vào helper private/transitional chưa chốt
+- `[x]` D022: `User` avatar dùng thêm `AvatarMediaAssetId` nhưng vẫn giữ `AvatarUrl` để compatibility
+- `[x]` D023: Google/external avatar tiếp tục đi qua `AvatarUrl`, không ép phải có `MediaAssetId`
+- `[x]` D024: Phase 13 chỉ làm `avatar`, không gộp `house rule PDF` vào cùng phase mặc định
 
 ---
 
@@ -81,6 +90,7 @@ Mỗi phase sau phải cập nhật tiếp vào file này, không tạo lại ch
 
 - `[x]` Có phase plan tổng tại `docs/AI_Media_Migration_Phase_Plan.md`
 - `[x]` Có phase-specific plan cho contract file tại `docs/AI_Media_Migration_Phase4_ContractFile_Plan.md`
+- `[x]` Có phase-specific plan cho avatar tại `docs/AI_Media_Migration_Phase13_Avatar_Plan.md`
 - `[x]` Có context guardrail tại `docs/AI_Context_Continuity_Guardrails.md`
 - `[x]` Có audit checklist sống tại `docs/AI_Media_Migration_Audit_Checklist.md`
 - `[~]` Chưa có inventory doc riêng cho Phase 0 được materialize thành artifact độc lập
@@ -534,7 +544,7 @@ Mỗi phase sau phải cập nhật tiếp vào file này, không tạo lại ch
 
 - `[x]` Đã migrate `RoomingHouseLegalDocument`
 - `[ ]` Chưa migrate `PropertyImage`
-- `[ ]` Chưa migrate `MeterReading`
+- `[x]` Đã migrate `MeterReading`
 
 ### Access và permission thật
 
@@ -543,7 +553,9 @@ Mỗi phase sau phải cập nhật tiếp vào file này, không tạo lại ch
   - landlord sở hữu khu trọ được xem
   - admin được xem
   - tenant/guest không được xem
-- `[ ]` Chưa có permission matrix đúng nghiệp vụ cho meter reading proof
+- `[x]` Có permission cơ bản đúng cho meter reading proof:
+  - landlord được xem
+  - tenant/occupant chỉ xem khi invoice không còn `Draft`
 - `[x]` Admin private viewer cho media-backed KYC đã đi qua `MediaAssetId`
 - `[x]` Admin private viewer cho legal document đã đi qua `MediaAssetId`
 
@@ -697,6 +709,162 @@ Mỗi phase sau phải cập nhật tiếp vào file này, không tạo lại ch
 
 - `[!]` Frontend build hiện đang fail ở `ContractPreviewModal.tsx` và `AppendixPreviewModal.tsx` vì `react-pdf`, nên chưa có full frontend build green cho repo tại thời điểm chốt Phase 10
 - `[!]` `toAssetUrl` generic vẫn tồn tại nên phase sau cần tiếp tục thu hẹp nơi sử dụng nếu muốn cleanup sâu hơn
+
+---
+
+## Phase 11 Audit
+
+### Mục tiêu phase
+
+- `[x]` Chuyển `MeterReading` proof image sang media core
+- `[x]` Giữ compatibility cho `ProofImageObjectKey` cũ
+- `[x]` Thêm private access rule cho landlord/tenant/occupant theo invoice status
+
+### Đã làm
+
+- `[x]` Thêm `MeterReading.ProofMediaAssetId`
+- `[x]` Thêm navigation `MeterReading -> ProofMediaAsset`
+- `[x]` Thêm EF config/index/FK cho `proof_media_asset_id`
+- `[x]` Tạo migration `AddMeterReadingProofMediaAssets`
+- `[x]` Migration có backfill meter reading legacy từ `ProofImageObjectKey` sang `media_assets`
+- `[x]` `BillingService` link proof image sang `MediaAsset` khi tạo invoice + meter reading mới
+- `[x]` `LatestMeterReadingResponse` expose `ProofMediaAssetId`
+- `[x]` `LatestMeterReadingResponse` expose `ProofImageUrl`
+- `[x]` `InvoiceItemResponse` expose `MeterReadingProofMediaAssetId`
+- `[x]` `InvoiceItemResponse` expose `MeterReadingProofImageUrl`
+- `[x]` `DefaultMediaPermissionService` đã hỗ trợ private access cho meter-reading proof
+- `[x]` Thêm upload scope `MeterReading` vào compatibility upload layer và map sang private media
+- `[x]` Rule private access hiện hành được implement theo hướng:
+  - landlord luôn xem được
+  - tenant/occupant chỉ xem khi invoice không còn `Draft`
+
+### Chưa hoàn chỉnh
+
+- `[~]` Frontend mới chỉ cập nhật typing; chưa có uploader/viewer proof image hoàn chỉnh ở landlord billing UI hoặc tenant invoice UI
+- `[~]` `ProofImageObjectKey` vẫn còn cần giữ để compatibility và fallback
+- `[~]` Chưa có rule chỉnh sửa meter proof sau khi invoice đã `Paid` vì hiện chưa có flow update proof image riêng
+
+### Không làm trong phase này
+
+- `[x]` Không xóa `ProofImageObjectKey`
+- `[x]` Không refactor toàn bộ landlord billing UI
+- `[x]` Không thêm endpoint update meter proof riêng sau khi invoice đã tạo
+
+### Tests / Verify
+
+- `[x]` `dotnet build server/src/SmartRentalPlatform.Api/SmartRentalPlatform.Api.csproj --no-restore` pass
+- `[x]` `dotnet test server/tests/SmartRentalPlatform.UnitTests/SmartRentalPlatform.UnitTests.csproj --no-restore --filter "FullyQualifiedName~BillingServiceTests|FullyQualifiedName~DefaultMediaPermissionServiceTests"` pass
+- `[x]` Có test generate invoice mới link proof image vào `MediaAsset`
+- `[x]` Có test tenant/occupant bị chặn khi invoice còn `Draft`
+- `[x]` Có test tenant/occupant được xem proof image ở trạng thái published mẫu là `Issued`
+- `[x]` Chưa có test update-block sau `Paid` vì code hiện chưa có flow update proof image riêng
+
+### Findings / risk mở
+
+- `[!]` UI cho meter proof hiện chưa materialize, nên Phase 11 mới hoàn chỉnh ở backend/contract layer
+- `[!]` Backfill meter-reading proof dùng metadata suy luận từ object key cũ, chưa có file-size thật cho legacy object
+- `[!]` Nếu phase sau thêm flow chỉnh sửa proof image sau khi invoice được tạo, cần chốt rõ rule `Paid` và audit semantics trước khi code
+- `[!]` Một số đoạn phase-plan cũ dễ khiến hiểu nhầm là rule `Paid` đã được enforce; implementation hiện tại mới enforce rule xem theo `Draft` vs published
+
+---
+
+## Phase 12 Audit
+
+### Mục tiêu phase
+
+- `[x]` Dọn shared frontend asset helpers theo phạm vi an toàn
+- `[x]` Tách rõ helper public display ra khỏi helper generic/transitional
+- `[x]` Tránh đụng vào các module private hoặc business flow còn chưa chốt
+
+### Đã làm
+
+- `[x]` Thêm `toPublicListingImageUrl` trong `client/src/shared/api/assets.ts`
+- `[x]` Thêm `toPublicPropertyImageUrl` trong `client/src/shared/api/assets.ts`
+- `[x]` Giữ `toAssetUrl` làm compatibility helper cho flow legacy/transitional
+- `[x]` Đổi các call site public rõ ràng sang helper mới:
+  - `SearchRoomingHousesPage`
+  - `PublicRoomingHouseDetailPage`
+  - `HouseImageGallery`
+  - `MePage` phần thẻ listing public
+  - `LandlordDashboardPage` phần cover image
+  - `RentalAiChatbot` phần mini rooming-house card
+
+### Chưa hoàn chỉnh
+
+- `[~]` Chưa tách helper private fetch/open riêng thành abstraction cuối cùng
+- `[~]` `toAssetUrl` vẫn còn được dùng ở avatar và nhiều flow transitional khác
+- `[~]` Chưa dọn `houseRule` PDF, legal document, KYC, admin private image rendering
+
+### Không làm trong phase này
+
+- `[x]` Không refactor avatar/profile image flow
+- `[x]` Không đổi private download/open semantics
+- `[x]` Không chỉnh các module business chưa hoàn thiện như chat attachment hoặc private proof viewer UI
+
+### Tests / Verify
+
+- `[~]` Đã chạy `npm run build` trong `client`, nhưng build tổng hiện đang fail bởi lỗi TypeScript có sẵn ở `ContractPreviewModal` và `AppendixPreviewModal` liên quan `react-pdf`, không nằm trong diff Phase 12
+- `[x]` Các helper mới và call site public đã đổi không phát sinh lỗi riêng được thấy từ lần verify này
+
+### Findings / risk mở
+
+- `[!]` Naming ở frontend đã rõ hơn, nhưng source data vẫn còn mixed giữa `imageUrl` và `objectKey` nên chưa thể bỏ hoàn toàn compatibility helper
+- `[!]` Nếu Phase 13+ động vào avatar hoặc private viewer, cần tiếp tục tách helper theo semantics thay vì mở rộng lại `toAssetUrl`
+- `[!]` Frontend build tổng hiện chưa dùng được như gate mạnh cho Phase 12 vì đang bị chặn bởi lỗi unrelated ở preview PDF module
+
+---
+
+## Phase 13 Audit
+
+### Mục tiêu phase
+
+- `[x]` Nối `User` avatar vào media core theo hướng compatibility
+- `[x]` Giữ `AvatarUrl` để không phá external avatar và flow cũ
+- `[x]` Chỉ đụng `avatar`, không kéo thêm low-risk upload khác khi chưa cần
+
+### Đã làm
+
+- `[x]` Thêm `User.AvatarMediaAssetId`
+- `[x]` Thêm navigation `User -> AvatarMediaAsset`
+- `[x]` Thêm EF config/index/FK cho `users.avatar_media_asset_id`
+- `[x]` Tạo migration `AddUserAvatarMediaAssetLink`
+- `[x]` `UserService.UpdateUserProfileAsync` nhận và link `AvatarMediaAssetId`
+- `[x]` `UserService.UpdateUserProfileAsync` validate media asset phải thuộc scope `Avatar`
+- `[x]` `UserService.UpdateUserProfileAsync` vẫn giữ `AvatarUrl` song song
+- `[x]` `CurrentUserResponse` expose `AvatarMediaAssetId`
+- `[x]` `UserProfileResponse` expose `AvatarMediaAssetId`
+- `[x]` `LoginResponse` expose `AvatarMediaAssetId`
+- `[x]` `GoogleLoginResponse` expose `AvatarMediaAssetId`
+- `[x]` Frontend profile gửi cả `avatarUrl` và `avatarMediaAssetId`
+- `[x]` Thêm helper `toAvatarImageUrl`
+- `[x]` Chuyển các avatar call site chính sang helper riêng
+
+### Chưa hoàn chỉnh
+
+- `[~]` `AvatarUrl` vẫn còn là field compatibility chính cho external avatar và render path hiện tại
+- `[~]` Chưa có backfill từ avatar legacy cũ sang `AvatarMediaAssetId`
+- `[~]` Chưa import Google avatar external vào media core
+
+### Không làm trong phase này
+
+- `[x]` Không xóa `AvatarUrl`
+- `[x]` Không đổi Google avatar sync semantics
+- `[x]` Không gộp `house rule PDF` vào cùng phase
+- `[x]` Không refactor signed/private helper tổng quát
+
+### Tests / Verify
+
+- `[x]` `dotnet build server/src/SmartRentalPlatform.Api/SmartRentalPlatform.Api.csproj --no-restore` pass
+- `[x]` `dotnet test server/tests/SmartRentalPlatform.UnitTests/SmartRentalPlatform.UnitTests.csproj --no-restore --filter "FullyQualifiedName~UserServiceTests|FullyQualifiedName~BillingServiceTests|FullyQualifiedName~DefaultMediaPermissionServiceTests"` pass
+- `[x]` Có test link avatar media asset thành công
+- `[x]` Có test reject media asset sai scope
+- `[~]` Frontend build tổng chưa dùng làm gate mạnh vì vẫn bị chặn bởi lỗi unrelated ở `react-pdf` preview modules
+
+### Findings / risk mở
+
+- `[!]` Avatar hiện đang ở trạng thái hybrid: vừa có `AvatarMediaAssetId`, vừa giữ `AvatarUrl`
+- `[!]` Nếu phase sau muốn chuẩn hóa avatar hoàn toàn vào media core, phải quyết định rõ chiến lược cho Google/external avatar
+- `[!]` Snapshot Phase 11 từng có mismatch navigation ở `MeterReading.ProofMediaAsset`; đã sửa đồng bộ trong snapshot/designer để EF migration phase sau chạy ổn
 
 ---
 

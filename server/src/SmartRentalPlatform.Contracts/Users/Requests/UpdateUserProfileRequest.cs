@@ -18,4 +18,6 @@ public class UpdateUserProfileRequest
     public string? EmergencyContactPhone { get; set; }
 
     public string? AvatarUrl { get; set; }
+
+    public Guid? AvatarMediaAssetId { get; set; }
 }

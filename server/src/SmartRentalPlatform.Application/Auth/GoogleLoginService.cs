@@ -214,6 +214,7 @@ public class GoogleLoginService : IGoogleLoginService
             Email = user.Email,
             DisplayName = user.DisplayName,
             AvatarUrl = user.AvatarUrl,
+            AvatarMediaAssetId = user.AvatarMediaAssetId,
             IsGoogleUser = true,
             EmailConfirmed = user.EmailConfirmed,
             RequiresEmailVerification = requiresEmailVerification,

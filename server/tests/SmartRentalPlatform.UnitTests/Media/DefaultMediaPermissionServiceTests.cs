@@ -1,7 +1,9 @@
 using SmartRentalPlatform.Domain.Entities.Media;
+using SmartRentalPlatform.Domain.Entities.Billing;
 using SmartRentalPlatform.Domain.Entities.Properties;
 using SmartRentalPlatform.Domain.Entities.RentalContracts;
 using SmartRentalPlatform.Domain.Entities.Users;
+using SmartRentalPlatform.Domain.Enums.Billing;
 using SmartRentalPlatform.Domain.Enums;
 using SmartRentalPlatform.Domain.Enums.Media;
 using SmartRentalPlatform.Domain.Enums.Properties;
@@ -204,6 +206,32 @@ public class DefaultMediaPermissionServiceTests : IClassFixture<TestDatabaseFixt
 
         Assert.True(landlordAllowed);
         Assert.False(occupantAllowed);
+    }
+
+    [Fact]
+    public async Task CanViewAsync_ForMeterReadingProof_ShouldDenyOccupantBeforeInvoiceIssued()
+    {
+        var graph = await SeedMeterReadingMediaGraphAsync(InvoiceStatus.Draft);
+        var service = new DefaultMediaPermissionService(fixture.Context);
+
+        var tenantAllowed = await service.CanViewAsync(graph.TenantId, graph.MediaAsset);
+        var occupantAllowed = await service.CanViewAsync(graph.OccupantId, graph.MediaAsset);
+
+        Assert.False(tenantAllowed);
+        Assert.False(occupantAllowed);
+    }
+
+    [Fact]
+    public async Task CanViewAsync_ForMeterReadingProof_ShouldAllowTenantAndOccupantAfterInvoiceIssued()
+    {
+        var graph = await SeedMeterReadingMediaGraphAsync(InvoiceStatus.Issued);
+        var service = new DefaultMediaPermissionService(fixture.Context);
+
+        var tenantAllowed = await service.CanViewAsync(graph.TenantId, graph.MediaAsset);
+        var occupantAllowed = await service.CanViewAsync(graph.OccupantId, graph.MediaAsset);
+
+        Assert.True(tenantAllowed);
+        Assert.True(occupantAllowed);
     }
 
     private async Task<(Guid MainTenantId, Guid OccupantId, MediaAsset MediaAsset)> SeedContractFileGraphAsync(ContractFileVariant variant)
@@ -567,5 +595,200 @@ public class DefaultMediaPermissionServiceTests : IClassFixture<TestDatabaseFixt
         fixture.Context.ChangeTracker.Clear();
 
         return (previousMainTenantId, currentMainTenantId, occupantId, mediaAsset);
+    }
+
+    private async Task<(Guid TenantId, Guid OccupantId, MediaAsset MediaAsset)> SeedMeterReadingMediaGraphAsync(InvoiceStatus invoiceStatus)
+    {
+        var landlordId = Guid.NewGuid();
+        var tenantId = Guid.NewGuid();
+        var occupantId = Guid.NewGuid();
+        var roomingHouseId = Guid.NewGuid();
+        var roomId = Guid.NewGuid();
+        var contractId = Guid.NewGuid();
+        var invoiceId = Guid.NewGuid();
+        var meterReadingId = Guid.NewGuid();
+        var mediaAssetId = Guid.NewGuid();
+        var serviceTypeId = Guid.NewGuid();
+
+        var landlord = new User
+        {
+            Id = landlordId,
+            Email = "billing-landlord@test.com",
+            NormalizedEmail = "BILLING-LANDLORD@TEST.COM",
+            DisplayName = "Landlord",
+            Status = UserStatus.Active,
+            OnboardingStatus = OnboardingStatus.Completed
+        };
+        var tenant = new User
+        {
+            Id = tenantId,
+            Email = "billing-tenant@test.com",
+            NormalizedEmail = "BILLING-TENANT@TEST.COM",
+            DisplayName = "Tenant",
+            Status = UserStatus.Active,
+            OnboardingStatus = OnboardingStatus.Completed
+        };
+        var occupant = new User
+        {
+            Id = occupantId,
+            Email = "billing-occupant@test.com",
+            NormalizedEmail = "BILLING-OCCUPANT@TEST.COM",
+            DisplayName = "Occupant",
+            Status = UserStatus.Active,
+            OnboardingStatus = OnboardingStatus.Completed
+        };
+
+        var serviceType = new BillingServiceType
+        {
+            Id = serviceTypeId,
+            Name = "Electric",
+            SupportsMeterReading = true,
+            MeterUnitName = "kWh",
+            IsActive = true
+        };
+
+        var roomingHouse = new RoomingHouse
+        {
+            Id = roomingHouseId,
+            LandlordUserId = landlordId,
+            Landlord = landlord,
+            Name = "Meter House",
+            AddressLine = "Addr",
+            WardCode = "001",
+            ProvinceCode = "001",
+            AddressDisplay = "Addr Display",
+            ApprovalStatus = RoomingHouseApprovalStatus.Approved,
+            VisibilityStatus = RoomingHouseVisibilityStatus.Visible,
+            CreatedAt = DateTimeOffset.UtcNow,
+            UpdatedAt = DateTimeOffset.UtcNow
+        };
+        var room = new Room
+        {
+            Id = roomId,
+            RoomingHouseId = roomingHouseId,
+            RoomingHouse = roomingHouse,
+            RoomNumber = "301",
+            Status = RoomStatus.Occupied,
+            CreatedAt = DateTimeOffset.UtcNow,
+            UpdatedAt = DateTimeOffset.UtcNow
+        };
+        var contract = new RentalContract
+        {
+            Id = contractId,
+            RentalRequestId = Guid.NewGuid(),
+            RoomDepositId = Guid.NewGuid(),
+            RoomId = roomId,
+            MainTenantUserId = tenantId,
+            MainTenantUser = tenant,
+            Room = room,
+            ContractNumber = "C-003",
+            StartDate = new DateOnly(2026, 7, 1),
+            EndDate = new DateOnly(2027, 7, 1),
+            MonthlyRent = 100,
+            DepositAmount = 100,
+            PaymentDay = 5,
+            Status = RentalContractStatus.Active,
+            CreatedAt = DateTimeOffset.UtcNow,
+            UpdatedAt = DateTimeOffset.UtcNow,
+            Occupants =
+            [
+                new ContractOccupant
+                {
+                    Id = Guid.NewGuid(),
+                    RentalContractId = contractId,
+                    UserId = occupantId,
+                    User = occupant,
+                    FullName = "Occupant",
+                    DateOfBirth = new DateOnly(2000, 1, 1),
+                    MoveInDate = new DateOnly(2026, 7, 1),
+                    Status = ContractOccupantStatus.Active,
+                    CreatedAt = DateTimeOffset.UtcNow,
+                    UpdatedAt = DateTimeOffset.UtcNow
+                }
+            ]
+        };
+        var mediaAsset = new MediaAsset
+        {
+            Id = mediaAssetId,
+            OwnerUserId = landlordId,
+            BucketName = "local-media",
+            ObjectKey = $"private/meter-reading-images/{mediaAssetId:N}.jpg",
+            OriginalFileName = "meter-proof.jpg",
+            StoredFileName = "meter-proof.jpg",
+            ContentType = "image/jpeg",
+            FileSize = 10,
+            Scope = MediaScope.MeterReadingImage,
+            Visibility = MediaVisibility.Private,
+            Status = MediaStatus.Linked,
+            LinkedEntityType = nameof(MeterReading),
+            LinkedEntityId = meterReadingId,
+            CreatedAt = DateTimeOffset.UtcNow,
+            UpdatedAt = DateTimeOffset.UtcNow
+        };
+        var meterReading = new MeterReading
+        {
+            Id = meterReadingId,
+            RoomId = roomId,
+            ContractId = contractId,
+            ServiceTypeId = serviceTypeId,
+            BillingPeriodStart = new DateOnly(2026, 7, 1),
+            BillingPeriodEnd = new DateOnly(2026, 7, 31),
+            PreviousReading = 0,
+            CurrentReading = 100,
+            Consumption = 100,
+            ProofImageObjectKey = mediaAsset.ObjectKey,
+            ProofMediaAssetId = mediaAssetId,
+            RecordedByLandlordUserId = landlordId,
+            ReadingAt = DateTimeOffset.UtcNow,
+            CreatedAt = DateTimeOffset.UtcNow,
+            UpdatedAt = DateTimeOffset.UtcNow
+        };
+        var invoice = new SmartRentalPlatform.Domain.Entities.Billing.Invoice
+        {
+            Id = invoiceId,
+            ContractId = contractId,
+            RoomId = roomId,
+            TenantUserId = tenantId,
+            LandlordUserId = landlordId,
+            InvoiceNo = "INV-METER-001",
+            BillingPeriodStart = meterReading.BillingPeriodStart,
+            BillingPeriodEnd = meterReading.BillingPeriodEnd,
+            DueDate = new DateOnly(2026, 8, 5),
+            RentAmount = 100,
+            UtilityAmount = 50,
+            ServiceAmount = 0,
+            DiscountAmount = 0,
+            TotalAmount = 150,
+            Status = invoiceStatus,
+            CreatedAt = DateTimeOffset.UtcNow,
+            UpdatedAt = DateTimeOffset.UtcNow
+        };
+        invoice.Items.Add(new InvoiceItem
+        {
+            Id = Guid.NewGuid(),
+            InvoiceId = invoiceId,
+            Invoice = invoice,
+            MeterReadingId = meterReadingId,
+            MeterReading = meterReading,
+            ItemType = InvoiceItemType.Service,
+            Description = "Electric",
+            Quantity = 100,
+            UnitPrice = 1,
+            Amount = 100,
+            CreatedAt = DateTimeOffset.UtcNow
+        });
+
+        fixture.Context.Users.AddRange(landlord, tenant, occupant);
+        fixture.Context.BillingServiceTypes.Add(serviceType);
+        fixture.Context.RoomingHouses.Add(roomingHouse);
+        fixture.Context.Rooms.Add(room);
+        fixture.Context.RentalContracts.Add(contract);
+        fixture.Context.MediaAssets.Add(mediaAsset);
+        fixture.Context.MeterReadings.Add(meterReading);
+        fixture.Context.Invoices.Add(invoice);
+        await fixture.Context.SaveChangesAsync();
+        fixture.Context.ChangeTracker.Clear();
+
+        return (tenantId, occupantId, mediaAsset);
     }
 }

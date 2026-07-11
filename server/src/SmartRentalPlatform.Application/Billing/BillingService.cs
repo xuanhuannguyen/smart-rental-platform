@@ -3,12 +3,15 @@ using System.Globalization;
 using System.Text.Json;
 using SmartRentalPlatform.Application.Common.Exceptions;
 using SmartRentalPlatform.Application.Common.Interfaces;
+using SmartRentalPlatform.Application.Common.Media;
 using SmartRentalPlatform.Contracts.Billing.Requests;
 using SmartRentalPlatform.Contracts.Billing.Responses;
 using SmartRentalPlatform.Contracts.Common;
 using SmartRentalPlatform.Domain.Entities.Billing;
+using SmartRentalPlatform.Domain.Entities.Media;
 using SmartRentalPlatform.Domain.Entities.Properties;
 using SmartRentalPlatform.Domain.Enums.Billing;
+using SmartRentalPlatform.Domain.Enums.Media;
 using SmartRentalPlatform.Domain.Enums.Properties;
 using SmartRentalPlatform.Domain.Enums.RentalContracts;
 
@@ -730,14 +733,15 @@ public class BillingService : IBillingService
         };
 
         AddRentInvoiceItem(invoice, monthlyRent, rentAmount, billingPeriod, now);
-        AddMeteredServiceInvoiceItems(
+        await AddMeteredServiceInvoiceItems(
             invoice,
             contract.RoomId,
             contract.Id,
             landlordUserId,
             billingPeriod,
             meteredInputs,
-            now);
+            now,
+            cancellationToken);
         AddFixedServiceInvoiceItems(
             invoice,
             prices,
@@ -944,14 +948,15 @@ public class BillingService : IBillingService
         };
 
         AddRentInvoiceItem(invoice, monthlyRent, rentAmount, billingPeriod, now);
-        AddMeteredServiceInvoiceItems(
+        await AddMeteredServiceInvoiceItems(
             invoice,
             contract.RoomId,
             contract.Id,
             landlordUserId,
             billingPeriod,
             meteredInputs,
-            now);
+            now,
+            cancellationToken);
         AddFixedServiceInvoiceItems(
             invoice,
             prices,
@@ -981,7 +986,8 @@ public class BillingService : IBillingService
         RoomingHouseServicePrice Price,
         decimal PreviousReading,
         decimal CurrentReading,
-        string? ProofImageObjectKey);
+        string? ProofImageObjectKey,
+        Guid? ProofMediaAssetId);
 
     private sealed record ResolvedBillingPeriod(
         DateOnly Start,
@@ -1125,6 +1131,7 @@ public class BillingService : IBillingService
                 x.PreviousReading,
                 x.CurrentReading,
                 x.Consumption,
+                x.ProofMediaAssetId,
                 x.CreatedAt
             })
             .ToListAsync(cancellationToken);
@@ -1146,7 +1153,9 @@ public class BillingService : IBillingService
                         latest.BillingPeriodEnd,
                         latest.PreviousReading,
                         latest.CurrentReading,
-                        latest.Consumption);
+                        latest.Consumption,
+                        latest.ProofMediaAssetId,
+                        BuildPrivateProofImageUrl(latest.ProofMediaAssetId));
                 });
     }
 
@@ -1401,14 +1410,15 @@ public class BillingService : IBillingService
         });
     }
 
-    private void AddMeteredServiceInvoiceItems(
+    private async Task AddMeteredServiceInvoiceItems(
         Invoice invoice,
         Guid roomId,
         Guid contractId,
         Guid landlordUserId,
         ResolvedBillingPeriod billingPeriod,
         IReadOnlyCollection<ResolvedMeterReadingInput> meteredInputs,
-        DateTimeOffset now)
+        DateTimeOffset now,
+        CancellationToken cancellationToken)
     {
         foreach (var input in meteredInputs)
         {
@@ -1431,6 +1441,14 @@ public class BillingService : IBillingService
                 CreatedAt = now,
                 UpdatedAt = now
             };
+
+            reading.ProofMediaAssetId = await EnsureMeterReadingProofMediaAssetAsync(
+                reading.Id,
+                landlordUserId,
+                input.ProofImageObjectKey,
+                input.ProofMediaAssetId,
+                now,
+                cancellationToken);
 
             context.MeterReadings.Add(reading);
             invoice.UtilityAmount += amount;
@@ -1628,7 +1646,8 @@ public class BillingService : IBillingService
                 price,
                 previousReading.Value,
                 input.CurrentReading,
-                input.ProofImageObjectKey));
+                input.ProofImageObjectKey,
+                input.ProofMediaAssetId));
         }
 
         return meteredInputs;
@@ -2109,7 +2128,9 @@ public class BillingService : IBillingService
                 .ThenInclude(x => x.RoomingHouse)
             .Include(x => x.Tenant)
             .Include(x => x.Items)
-                .ThenInclude(x => x.ServiceType);
+                .ThenInclude(x => x.ServiceType)
+            .Include(x => x.Items)
+                .ThenInclude(x => x.MeterReading);
     }
 
     private static PricingUnit ParsePricingUnit(string value)
@@ -2294,11 +2315,109 @@ public class BillingService : IBillingService
             item.ServiceTypeId,
             item.ServiceType?.Name,
             item.MeterReadingId,
+            item.MeterReading?.ProofMediaAssetId,
+            BuildPrivateProofImageUrl(item.MeterReading?.ProofMediaAssetId),
             item.ItemType.ToString(),
             item.Description,
             item.Quantity,
             item.UnitPrice,
             item.Amount);
+    }
+
+    private async Task<Guid?> EnsureMeterReadingProofMediaAssetAsync(
+        Guid meterReadingId,
+        Guid landlordUserId,
+        string? objectKey,
+        Guid? proofMediaAssetId,
+        DateTimeOffset now,
+        CancellationToken cancellationToken)
+    {
+        if (proofMediaAssetId.HasValue)
+        {
+            var linkedAsset = await context.MediaAssets
+                .FirstOrDefaultAsync(x => x.Id == proofMediaAssetId.Value, cancellationToken);
+
+            if (linkedAsset is not null)
+            {
+                linkedAsset.OwnerUserId = landlordUserId;
+                linkedAsset.Scope = MediaScope.MeterReadingImage;
+                linkedAsset.Visibility = MediaVisibility.Private;
+                linkedAsset.Status = MediaStatus.Linked;
+                linkedAsset.LinkedEntityType = nameof(MeterReading);
+                linkedAsset.LinkedEntityId = meterReadingId;
+                linkedAsset.DeletedAt = null;
+                linkedAsset.UpdatedAt = now;
+                return linkedAsset.Id;
+            }
+        }
+
+        if (string.IsNullOrWhiteSpace(objectKey))
+        {
+            return null;
+        }
+
+        var normalizedObjectKey = NormalizeObjectKey(objectKey);
+        var mediaAsset = await context.MediaAssets
+            .FirstOrDefaultAsync(x => x.ObjectKey == normalizedObjectKey, cancellationToken);
+
+        if (mediaAsset is null)
+        {
+            mediaAsset = new MediaAsset
+            {
+                Id = Guid.NewGuid(),
+                OwnerUserId = landlordUserId,
+                BucketName = "legacy-private-storage",
+                ObjectKey = normalizedObjectKey,
+                OriginalFileName = Path.GetFileName(normalizedObjectKey),
+                StoredFileName = Path.GetFileName(normalizedObjectKey),
+                ContentType = GuessContentType(normalizedObjectKey),
+                FileSize = 0,
+                Scope = MediaScope.MeterReadingImage,
+                Visibility = MediaVisibility.Private,
+                Status = MediaStatus.Linked,
+                LinkedEntityType = nameof(MeterReading),
+                LinkedEntityId = meterReadingId,
+                CreatedAt = now,
+                UpdatedAt = now
+            };
+
+            context.MediaAssets.Add(mediaAsset);
+            return mediaAsset.Id;
+        }
+
+        mediaAsset.OwnerUserId = landlordUserId;
+        mediaAsset.Scope = MediaScope.MeterReadingImage;
+        mediaAsset.Visibility = MediaVisibility.Private;
+        mediaAsset.Status = MediaStatus.Linked;
+        mediaAsset.LinkedEntityType = nameof(MeterReading);
+        mediaAsset.LinkedEntityId = meterReadingId;
+        mediaAsset.DeletedAt = null;
+        mediaAsset.UpdatedAt = now;
+
+        return mediaAsset.Id;
+    }
+
+    private static string NormalizeObjectKey(string objectKey)
+    {
+        return objectKey.Replace('\\', '/').Trim().TrimStart('/');
+    }
+
+    private static string GuessContentType(string objectKey)
+    {
+        return Path.GetExtension(objectKey).ToLowerInvariant() switch
+        {
+            ".jpg" or ".jpeg" => "image/jpeg",
+            ".png" => "image/png",
+            ".webp" => "image/webp",
+            _ => "application/octet-stream"
+        };
+    }
+
+    private static string? BuildPrivateProofImageUrl(Guid? mediaAssetId)
+    {
+        return mediaAssetId.HasValue
+            ? PrivateMediaPathBuilder.Build(mediaAssetId.Value)
+            : null;
     }
 
 }
