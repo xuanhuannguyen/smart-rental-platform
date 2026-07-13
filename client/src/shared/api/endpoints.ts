@@ -40,10 +40,10 @@ export const ENDPOINTS = {
   AMENITIES: {
     ROOT: '/api/amenities'
   },
-  FILES: {
-    IMAGES: '/api/files/images'
-  },
   MEDIA: {
+    UPLOAD_URL: '/api/media/upload-url',
+    FINALIZE: '/api/media/finalize',
+    BY_ID: (mediaAssetId: string) => `/api/media/${mediaAssetId}`,
     PRIVATE_BY_ID: (mediaAssetId: string) => `/api/media/private/${mediaAssetId}`,
     PRIVATE_DOWNLOAD: (mediaAssetId: string) => `/api/media/private/${mediaAssetId}/download`,
     PRIVATE_DOWNLOAD_URL: (mediaAssetId: string) => `/api/media/private/${mediaAssetId}/download-url`

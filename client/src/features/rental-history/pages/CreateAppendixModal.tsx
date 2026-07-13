@@ -1,6 +1,7 @@
 import React, { useMemo, useState } from 'react';
 import { getApiErrorMessage } from '../../../shared/api/apiError';
 import { toAssetUrl } from '../../../shared/api/assets';
+import { buildPrivateMediaViewUrl } from '../../../shared/api/media';
 import { Button } from '../../../shared/components/ui/Button';
 import { uploadImage } from '../../files/api';
 import { contractApi } from '../../contracts/api';
@@ -27,9 +28,15 @@ interface AppendixChangeForm {
   transferNewOccupantToMainTenant: boolean;
   documentType: string;
   documentNumber: string;
+  frontMediaAssetId: string | null;
   frontImageObjectKey: string;
+  frontImageUrl: string;
+  backMediaAssetId: string | null;
   backImageObjectKey: string;
+  backImageUrl: string;
+  extraMediaAssetId: string | null;
   extraImageObjectKey: string;
+  extraImageUrl: string;
   removeOccupantId: string;
   newMainTenantUserId: string;
   currentMainTenantLeaves: boolean;
@@ -50,9 +57,15 @@ function createEmptyChange(today: string, defaultEndDate: string): AppendixChang
     transferNewOccupantToMainTenant: false,
     documentType: 'CCCD',
     documentNumber: '',
+    frontMediaAssetId: null,
     frontImageObjectKey: '',
+    frontImageUrl: '',
+    backMediaAssetId: null,
     backImageObjectKey: '',
+    backImageUrl: '',
+    extraMediaAssetId: null,
     extraImageObjectKey: '',
+    extraImageUrl: '',
     removeOccupantId: '',
     newMainTenantUserId: '',
     currentMainTenantLeaves: false,
@@ -144,6 +157,9 @@ function buildAddOccupantForm(newValue: string | null | undefined, today: string
   const payload = parseJsonObject(newValue);
   const document = parseJsonObject(payload.document);
   const hasVerifiedAccount = Boolean(payload.email);
+  const frontMediaAssetId = toFormString(document.frontMediaAssetId) || null;
+  const backMediaAssetId = toFormString(document.backMediaAssetId) || null;
+  const extraMediaAssetId = toFormString(document.extraMediaAssetId) || null;
 
   return {
     ...createEmptyChange(today, defaultEndDate),
@@ -157,9 +173,15 @@ function buildAddOccupantForm(newValue: string | null | undefined, today: string
     newOccupantMoveInDate: toFormString(payload.moveInDate) || today,
     documentType: toFormString(document.documentType) || 'CCCD',
     documentNumber: toFormString(document.documentNumber),
+    frontMediaAssetId,
     frontImageObjectKey: toFormString(document.frontImageObjectKey),
+    frontImageUrl: frontMediaAssetId ? buildPrivateMediaViewUrl(frontMediaAssetId) : '',
+    backMediaAssetId,
     backImageObjectKey: toFormString(document.backImageObjectKey),
+    backImageUrl: backMediaAssetId ? buildPrivateMediaViewUrl(backMediaAssetId) : '',
+    extraMediaAssetId,
     extraImageObjectKey: toFormString(document.extraImageObjectKey),
+    extraImageUrl: extraMediaAssetId ? buildPrivateMediaViewUrl(extraMediaAssetId) : '',
   };
 }
 
@@ -266,7 +288,7 @@ export const CreateAppendixModal: React.FC<Props> = ({ contract, appendix, onClo
 
   const uploadDocumentImage = async (
     changeId: string,
-    field: 'frontImageObjectKey' | 'backImageObjectKey' | 'extraImageObjectKey',
+    field: 'front' | 'back' | 'extra',
     file: File | null
   ) => {
     if (!file) {
@@ -278,7 +300,9 @@ export const CreateAppendixModal: React.FC<Props> = ({ contract, appendix, onClo
 
     try {
       const uploaded = await uploadImage(file, 'LegalDocument');
-      updateChange(changeId, field, uploaded.objectKey);
+      updateChange(changeId, `${field}MediaAssetId` as keyof AppendixChangeForm, uploaded.mediaAssetId || null);
+      updateChange(changeId, `${field}ImageObjectKey` as keyof AppendixChangeForm, uploaded.objectKey);
+      updateChange(changeId, `${field}ImageUrl` as keyof AppendixChangeForm, uploaded.url);
     } catch (err) {
       setError(getApiErrorMessage(err, 'Không thể tải ảnh giấy tờ lên.'));
     } finally {
@@ -328,7 +352,7 @@ export const CreateAppendixModal: React.FC<Props> = ({ contract, appendix, onClo
             !change.newOccupantDateOfBirth ||
             !change.documentType.trim() ||
             !change.documentNumber.trim() ||
-            !change.frontImageObjectKey.trim()
+            (!change.frontMediaAssetId && !change.frontImageObjectKey.trim())
           ) {
             throw new Error(`Thay đổi #${changeNum}: Vui lòng nhập đầy đủ thông tin cá nhân và ảnh mặt trước giấy tờ.`);
           }
@@ -345,8 +369,11 @@ export const CreateAppendixModal: React.FC<Props> = ({ contract, appendix, onClo
               document: {
                 documentType: change.documentType,
                 documentNumber: change.documentNumber.trim(),
+                frontMediaAssetId: change.frontMediaAssetId || null,
                 frontImageObjectKey: change.frontImageObjectKey.trim(),
+                backMediaAssetId: change.backMediaAssetId || null,
                 backImageObjectKey: change.backImageObjectKey.trim() || null,
+                extraMediaAssetId: change.extraMediaAssetId || null,
                 extraImageObjectKey: change.extraImageObjectKey.trim() || null
               }
             })
@@ -531,24 +558,39 @@ export const CreateAppendixModal: React.FC<Props> = ({ contract, appendix, onClo
                         <DocumentImageUploadField
                           label="Ảnh mặt trước giấy tờ"
                           required
+                          imageUrl={change.frontImageUrl}
                           objectKey={change.frontImageObjectKey}
-                          uploading={uploadingField === `${change.id}:frontImageObjectKey`}
-                          onUpload={(file) => void uploadDocumentImage(change.id, 'frontImageObjectKey', file)}
-                          onRemove={() => updateChange(change.id, 'frontImageObjectKey', '')}
+                          uploading={uploadingField === `${change.id}:front`}
+                          onUpload={(file) => void uploadDocumentImage(change.id, 'front', file)}
+                          onRemove={() => {
+                            updateChange(change.id, 'frontMediaAssetId', null);
+                            updateChange(change.id, 'frontImageObjectKey', '');
+                            updateChange(change.id, 'frontImageUrl', '');
+                          }}
                         />
                         <DocumentImageUploadField
                           label="Ảnh mặt sau giấy tờ"
+                          imageUrl={change.backImageUrl}
                           objectKey={change.backImageObjectKey}
-                          uploading={uploadingField === `${change.id}:backImageObjectKey`}
-                          onUpload={(file) => void uploadDocumentImage(change.id, 'backImageObjectKey', file)}
-                          onRemove={() => updateChange(change.id, 'backImageObjectKey', '')}
+                          uploading={uploadingField === `${change.id}:back`}
+                          onUpload={(file) => void uploadDocumentImage(change.id, 'back', file)}
+                          onRemove={() => {
+                            updateChange(change.id, 'backMediaAssetId', null);
+                            updateChange(change.id, 'backImageObjectKey', '');
+                            updateChange(change.id, 'backImageUrl', '');
+                          }}
                         />
                         <DocumentImageUploadField
                           label="Ảnh bổ sung"
+                          imageUrl={change.extraImageUrl}
                           objectKey={change.extraImageObjectKey}
-                          uploading={uploadingField === `${change.id}:extraImageObjectKey`}
-                          onUpload={(file) => void uploadDocumentImage(change.id, 'extraImageObjectKey', file)}
-                          onRemove={() => updateChange(change.id, 'extraImageObjectKey', '')}
+                          uploading={uploadingField === `${change.id}:extra`}
+                          onUpload={(file) => void uploadDocumentImage(change.id, 'extra', file)}
+                          onRemove={() => {
+                            updateChange(change.id, 'extraMediaAssetId', null);
+                            updateChange(change.id, 'extraImageObjectKey', '');
+                            updateChange(change.id, 'extraImageUrl', '');
+                          }}
                         />
                       </>
                     )}
@@ -663,6 +705,7 @@ export const CreateAppendixModal: React.FC<Props> = ({ contract, appendix, onClo
 
 interface DocumentImageUploadFieldProps {
   label: string;
+  imageUrl?: string;
   objectKey: string;
   required?: boolean;
   uploading: boolean;
@@ -672,21 +715,23 @@ interface DocumentImageUploadFieldProps {
 
 function DocumentImageUploadField({
   label,
+  imageUrl,
   objectKey,
   required = false,
   uploading,
   onUpload,
   onRemove
 }: DocumentImageUploadFieldProps) {
+  const previewSrc = imageUrl || (objectKey ? toAssetUrl(objectKey) : '');
   return (
     <div className="form-group">
       <label>
         {label} {required ? '*' : ''}
       </label>
-      {objectKey ? (
+      {previewSrc ? (
         <div style={{ display: 'grid', gap: 8 }}>
           <img
-            src={toAssetUrl(objectKey)}
+            src={previewSrc}
             alt={label}
             style={{
               width: '100%',
@@ -696,7 +741,7 @@ function DocumentImageUploadField({
               border: '1px solid #e2e8f0'
             }}
           />
-          <span style={{ fontSize: 12, color: '#64748b', wordBreak: 'break-all' }}>{objectKey}</span>
+          {objectKey && <span style={{ fontSize: 12, color: '#64748b', wordBreak: 'break-all' }}>{objectKey}</span>}
         </div>
       ) : (
         <div
@@ -723,7 +768,7 @@ function DocumentImageUploadField({
             textDecoration: 'underline'
           }}
         >
-          {uploading ? 'Đang tải...' : objectKey ? 'Thay ảnh' : 'Tải ảnh'}
+          {uploading ? 'Đang tải...' : previewSrc ? 'Thay ảnh' : 'Tải ảnh'}
           <input
             type="file"
             accept="image/*"
@@ -735,13 +780,13 @@ function DocumentImageUploadField({
             }}
           />
         </label>
-        {objectKey && (
+        {previewSrc && (
           <button type="button" className="remove-btn" onClick={onRemove} disabled={uploading}>
             Xóa
           </button>
         )}
       </div>
-      {required && <input value={objectKey} onChange={() => undefined} required style={{ display: 'none' }} />}
+      {required && <input value={previewSrc || objectKey} onChange={() => undefined} required style={{ display: 'none' }} />}
     </div>
   );
 }

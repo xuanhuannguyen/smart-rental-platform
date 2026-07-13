@@ -1,5 +1,6 @@
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Metadata.Builders;
+using SmartRentalPlatform.Domain.Entities.Media;
 using SmartRentalPlatform.Domain.Entities.Properties;
 
 namespace SmartRentalPlatform.Infrastructure.Persistence.Configurations.Properties;
@@ -13,6 +14,7 @@ public class RoomingHouseRuleConfiguration : IEntityTypeConfiguration<RoomingHou
         builder.Property(x => x.Id).HasColumnName("id");
         builder.Property(x => x.RoomingHouseId).HasColumnName("rooming_house_id").IsRequired();
         builder.Property(x => x.SourceType).HasColumnName("source_type").HasConversion<string>().HasMaxLength(30).IsRequired();
+        builder.Property(x => x.MediaAssetId).HasColumnName("media_asset_id");
         builder.Property(x => x.PdfObjectKey).HasColumnName("pdf_object_key").HasColumnType("text").IsRequired();
         builder.Property(x => x.GeneralRules).HasColumnName("general_rules").HasColumnType("text");
         builder.Property(x => x.QuietHours).HasColumnName("quiet_hours").HasColumnType("text");
@@ -26,6 +28,11 @@ public class RoomingHouseRuleConfiguration : IEntityTypeConfiguration<RoomingHou
         builder.Property(x => x.CreatedAt).HasColumnName("created_at").IsRequired();
         builder.Property(x => x.UpdatedAt).HasColumnName("updated_at").IsRequired();
         builder.HasIndex(x => x.RoomingHouseId).IsUnique();
+        builder.HasIndex(x => x.MediaAssetId);
+        builder.HasOne(x => x.MediaAsset)
+            .WithMany()
+            .HasForeignKey(x => x.MediaAssetId)
+            .OnDelete(DeleteBehavior.SetNull);
         builder.HasOne(x => x.RoomingHouse)
             .WithOne(x => x.HouseRule)
             .HasForeignKey<RoomingHouseRule>(x => x.RoomingHouseId)

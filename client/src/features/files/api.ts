@@ -1,33 +1,31 @@
-import { apiClient } from '../../shared/api/apiClient';
-import type { ApiResponse } from '../../shared/api/apiResponse.types';
+import { uploadFileViaMediaWorkflow } from '../../shared/api/media';
 export type FileUploadScope = 'RoomingHouse' | 'LegalDocument' | 'Room' | 'Avatar' | 'HouseRule' | 'MeterReading' | 'ChatAttachment';
 
 export interface FileUploadResponse {
+  /**
+   * @deprecated Compatibility-only storage key. New callers should persist mediaAssetId and use media URLs.
+   */
   objectKey: string;
   url: string;
   mediaAssetId?: string | null;
+  isCompatibilityResponse?: boolean;
+  compatibilityWarning?: string | null;
 }
 
 export async function uploadImage(file: File, scope: FileUploadScope): Promise<FileUploadResponse> {
-  const formData = new FormData();
-  formData.append('file', file);
-  formData.append('scope', scope);
-
-  const data = await apiClient<ApiResponse<FileUploadResponse>>(
-    '/api/files/images',
-    { method: 'POST', auth: true, body: formData }
-  );
-  return data.data;
+  const uploaded = await uploadFileViaMediaWorkflow(file, scope);
+  return {
+    objectKey: uploaded.objectKey,
+    url: uploaded.url,
+    mediaAssetId: uploaded.mediaAssetId,
+  };
 }
 
 export async function uploadPdf(file: File, scope: FileUploadScope): Promise<FileUploadResponse> {
-  const formData = new FormData();
-  formData.append('file', file);
-  formData.append('scope', scope);
-
-  const data = await apiClient<ApiResponse<FileUploadResponse>>(
-    '/api/files/pdfs',
-    { method: 'POST', auth: true, body: formData }
-  );
-  return data.data;
+  const uploaded = await uploadFileViaMediaWorkflow(file, scope);
+  return {
+    objectKey: uploaded.objectKey,
+    url: uploaded.url,
+    mediaAssetId: uploaded.mediaAssetId,
+  };
 }

@@ -116,6 +116,11 @@ public class MediaBackedFileStorageServiceTests : IClassFixture<TestDatabaseFixt
     {
         public MediaUploadRequest? LastRequest { get; private set; }
 
+        public string GetBucketName()
+        {
+            return "local-media";
+        }
+
         public Task<MediaStoredObjectResult> UploadAsync(MediaUploadRequest request, CancellationToken cancellationToken = default)
         {
             LastRequest = request;
@@ -136,6 +141,30 @@ public class MediaBackedFileStorageServiceTests : IClassFixture<TestDatabaseFixt
         public Task<bool> ExistsAsync(string objectKey, CancellationToken cancellationToken = default)
         {
             return Task.FromResult(false);
+        }
+
+        public Task<MediaObjectMetadataResult> GetObjectMetadataAsync(string objectKey, CancellationToken cancellationToken = default)
+        {
+            return Task.FromResult(new MediaObjectMetadataResult
+            {
+                ObjectKey = objectKey,
+                ContentType = "application/pdf",
+                FileSize = 11
+            });
+        }
+
+        public Task<MediaUploadUrlResult> GetUploadUrlAsync(
+            string objectKey,
+            string contentType,
+            TimeSpan ttl,
+            CancellationToken cancellationToken = default)
+        {
+            return Task.FromResult(new MediaUploadUrlResult
+            {
+                Url = $"/upload/{objectKey}",
+                HttpMethod = "PUT",
+                ExpiresAtUtc = DateTimeOffset.UtcNow.Add(ttl)
+            });
         }
 
         public Task DeleteAsync(string objectKey, CancellationToken cancellationToken = default)

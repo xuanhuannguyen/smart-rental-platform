@@ -156,6 +156,7 @@ public sealed class MediaBackedFileStorageService : IFileStorageService
         return scope switch
         {
             FileUploadScope.LegalDocument => MediaVisibility.Private,
+            FileUploadScope.HouseRule => MediaVisibility.Private,
             FileUploadScope.MeterReading => MediaVisibility.Private,
             FileUploadScope.ChatAttachment => MediaVisibility.Private,
             _ => MediaVisibility.Public

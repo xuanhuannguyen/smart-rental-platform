@@ -18,6 +18,8 @@ namespace SmartRentalPlatform.Application.RoomingHouses;
 
 public class RoomingHouseMediaService : IRoomingHouseMediaService
 {
+    private sealed record LinkedMediaAssetResolution(Guid MediaAssetId, string ObjectKey);
+
     private readonly IAppDbContext context;
     private readonly IRoomingHouseQueryService queryService;
 
@@ -224,30 +226,37 @@ public class RoomingHouseMediaService : IRoomingHouseMediaService
             }
 
             legalDocument.DocumentType = documentType;
-            legalDocument.FrontImageObjectKey = request.FrontImageObjectKey.Trim();
-            legalDocument.BackImageObjectKey = request.BackImageObjectKey.Trim();
-            legalDocument.ExtraImageObjectKey = NormalizeOptionalObjectKey(request.ExtraImageObjectKey);
-            legalDocument.FrontMediaAssetId = await EnsureLegalDocumentMediaAssetAsync(
+
+            var frontAsset = await EnsureLegalDocumentMediaAssetAsync(
                 roomingHouseId,
                 roomingHouse.LandlordUserId,
-                legalDocument.FrontImageObjectKey,
+                request.FrontMediaAssetId,
+                request.FrontImageObjectKey,
                 legalDocument.FrontMediaAssetId,
                 now,
                 cancellationToken);
-            legalDocument.BackMediaAssetId = await EnsureLegalDocumentMediaAssetAsync(
+            var backAsset = await EnsureLegalDocumentMediaAssetAsync(
                 roomingHouseId,
                 roomingHouse.LandlordUserId,
-                legalDocument.BackImageObjectKey,
+                request.BackMediaAssetId,
+                request.BackImageObjectKey,
                 legalDocument.BackMediaAssetId,
                 now,
                 cancellationToken);
-            legalDocument.ExtraMediaAssetId = await EnsureOptionalLegalDocumentMediaAssetAsync(
+            var extraAsset = await EnsureOptionalLegalDocumentMediaAssetAsync(
                 roomingHouseId,
                 roomingHouse.LandlordUserId,
-                legalDocument.ExtraImageObjectKey,
+                request.ExtraMediaAssetId,
+                request.ExtraImageObjectKey,
                 legalDocument.ExtraMediaAssetId,
                 now,
                 cancellationToken);
+            legalDocument.FrontMediaAssetId = frontAsset.MediaAssetId;
+            legalDocument.FrontImageObjectKey = frontAsset.ObjectKey;
+            legalDocument.BackMediaAssetId = backAsset.MediaAssetId;
+            legalDocument.BackImageObjectKey = backAsset.ObjectKey;
+            legalDocument.ExtraMediaAssetId = extraAsset?.MediaAssetId;
+            legalDocument.ExtraImageObjectKey = extraAsset?.ObjectKey;
 
             if (!documentNumber.Contains('*') || string.IsNullOrEmpty(legalDocument.DocumentNumberMasked))
             {
@@ -345,14 +354,18 @@ public class RoomingHouseMediaService : IRoomingHouseMediaService
     {
         return ValidateLegalDocumentFields(
             legalDocument.DocumentType,
+            legalDocument.FrontMediaAssetId,
             legalDocument.FrontImageObjectKey,
+            legalDocument.BackMediaAssetId,
             legalDocument.BackImageObjectKey,
             legalDocument.DocumentNumber);
     }
 
     private static LegalDocumentType ValidateLegalDocumentFields(
         string documentTypeValue,
+        Guid? frontMediaAssetId,
         string frontImageObjectKey,
+        Guid? backMediaAssetId,
         string backImageObjectKey,
         string documentNumber)
     {
@@ -364,20 +377,20 @@ public class RoomingHouseMediaService : IRoomingHouseMediaService
                 new { field = nameof(documentTypeValue) });
         }
 
-        if (string.IsNullOrWhiteSpace(frontImageObjectKey))
+        if (!frontMediaAssetId.HasValue && string.IsNullOrWhiteSpace(frontImageObjectKey))
         {
             throw new BadRequestException(
                 ErrorCodes.ValidationError,
-                "Mã lưu trữ ảnh mặt trước giấy tờ là bắt buộc.",
-                new { field = nameof(frontImageObjectKey) });
+                "Cần cung cấp mediaAssetId hoặc mã lưu trữ ảnh mặt trước giấy tờ.",
+                new { field = nameof(frontImageObjectKey), mediaField = nameof(frontMediaAssetId) });
         }
 
-        if (string.IsNullOrWhiteSpace(backImageObjectKey))
+        if (!backMediaAssetId.HasValue && string.IsNullOrWhiteSpace(backImageObjectKey))
         {
             throw new BadRequestException(
                 ErrorCodes.ValidationError,
-                "Mã lưu trữ ảnh mặt sau giấy tờ là bắt buộc.",
-                new { field = nameof(backImageObjectKey) });
+                "Cần cung cấp mediaAssetId hoặc mã lưu trữ ảnh mặt sau giấy tờ.",
+                new { field = nameof(backImageObjectKey), mediaField = nameof(backMediaAssetId) });
         }
 
         if (string.IsNullOrWhiteSpace(documentNumber))
@@ -413,74 +426,35 @@ public class RoomingHouseMediaService : IRoomingHouseMediaService
         }
     }
 
-    private async Task<Guid> EnsureLegalDocumentMediaAssetAsync(
+    private async Task<LinkedMediaAssetResolution> EnsureLegalDocumentMediaAssetAsync(
         Guid roomingHouseId,
         Guid landlordUserId,
-        string objectKey,
+        Guid? requestedMediaAssetId,
+        string? objectKey,
         Guid? existingMediaAssetId,
         DateTimeOffset now,
         CancellationToken cancellationToken)
     {
-        var normalizedObjectKey = NormalizeObjectKey(objectKey);
+        var resolvedAsset = await ResolveLinkedMediaAssetAsync(
+            requestedMediaAssetId,
+            objectKey,
+            existingMediaAssetId,
+            landlordUserId,
+            MediaScope.RoomingHouseLegalDocument,
+            MediaVisibility.Private,
+            nameof(RoomingHouseLegalDocument),
+            roomingHouseId,
+            "legacy-uploads",
+            now,
+            cancellationToken);
 
-        if (existingMediaAssetId.HasValue)
-        {
-            var currentLinkedAsset = await context.MediaAssets
-                .FirstOrDefaultAsync(x => x.Id == existingMediaAssetId.Value, cancellationToken);
-
-            if (currentLinkedAsset is not null &&
-                !string.Equals(currentLinkedAsset.ObjectKey, normalizedObjectKey, StringComparison.Ordinal))
-            {
-                currentLinkedAsset.LinkedEntityType = null;
-                currentLinkedAsset.LinkedEntityId = null;
-                currentLinkedAsset.Status = MediaStatus.Uploaded;
-                currentLinkedAsset.UpdatedAt = now;
-            }
-        }
-
-        var mediaAsset = await context.MediaAssets
-            .FirstOrDefaultAsync(x => x.ObjectKey == normalizedObjectKey, cancellationToken);
-
-        if (mediaAsset is null)
-        {
-            mediaAsset = new MediaAsset
-            {
-                Id = Guid.NewGuid(),
-                OwnerUserId = landlordUserId,
-                BucketName = "legacy-uploads",
-                ObjectKey = normalizedObjectKey,
-                OriginalFileName = Path.GetFileName(normalizedObjectKey),
-                StoredFileName = Path.GetFileName(normalizedObjectKey),
-                ContentType = GuessContentType(normalizedObjectKey),
-                FileSize = 0,
-                Scope = MediaScope.RoomingHouseLegalDocument,
-                Visibility = MediaVisibility.Private,
-                Status = MediaStatus.Linked,
-                LinkedEntityType = nameof(RoomingHouseLegalDocument),
-                LinkedEntityId = roomingHouseId,
-                CreatedAt = now,
-                UpdatedAt = now
-            };
-
-            context.MediaAssets.Add(mediaAsset);
-            return mediaAsset.Id;
-        }
-
-        mediaAsset.OwnerUserId = landlordUserId;
-        mediaAsset.Scope = MediaScope.RoomingHouseLegalDocument;
-        mediaAsset.Visibility = MediaVisibility.Private;
-        mediaAsset.Status = MediaStatus.Linked;
-        mediaAsset.LinkedEntityType = nameof(RoomingHouseLegalDocument);
-        mediaAsset.LinkedEntityId = roomingHouseId;
-        mediaAsset.DeletedAt = null;
-        mediaAsset.UpdatedAt = now;
-
-        return mediaAsset.Id;
+        return new LinkedMediaAssetResolution(resolvedAsset.Id, resolvedAsset.ObjectKey);
     }
 
-    private async Task<Guid?> EnsureOptionalLegalDocumentMediaAssetAsync(
+    private async Task<LinkedMediaAssetResolution?> EnsureOptionalLegalDocumentMediaAssetAsync(
         Guid roomingHouseId,
         Guid landlordUserId,
+        Guid? requestedMediaAssetId,
         string? objectKey,
         Guid? existingMediaAssetId,
         DateTimeOffset now,
@@ -508,10 +482,108 @@ public class RoomingHouseMediaService : IRoomingHouseMediaService
         return await EnsureLegalDocumentMediaAssetAsync(
             roomingHouseId,
             landlordUserId,
+            requestedMediaAssetId,
             objectKey,
             existingMediaAssetId,
             now,
             cancellationToken);
+    }
+
+    private async Task<MediaAsset> ResolveLinkedMediaAssetAsync(
+        Guid? requestedMediaAssetId,
+        string? objectKey,
+        Guid? existingMediaAssetId,
+        Guid ownerUserId,
+        MediaScope scope,
+        MediaVisibility visibility,
+        string linkedEntityType,
+        Guid linkedEntityId,
+        string fallbackBucketName,
+        DateTimeOffset now,
+        CancellationToken cancellationToken)
+    {
+        MediaAsset? mediaAsset = null;
+        string normalizedObjectKey;
+
+        if (requestedMediaAssetId.HasValue)
+        {
+            mediaAsset = await context.MediaAssets
+                .FirstOrDefaultAsync(x => x.Id == requestedMediaAssetId.Value, cancellationToken);
+
+            if (mediaAsset is null)
+            {
+                throw new BadRequestException(
+                    ErrorCodes.ValidationError,
+                    "Media asset được chọn không tồn tại.",
+                    new { mediaAssetId = requestedMediaAssetId.Value });
+            }
+
+            normalizedObjectKey = mediaAsset.ObjectKey;
+        }
+        else
+        {
+            if (string.IsNullOrWhiteSpace(objectKey))
+            {
+                throw new BadRequestException(
+                    ErrorCodes.ValidationError,
+                    "Mã lưu trữ tệp là bắt buộc.",
+                    new { field = nameof(objectKey) });
+            }
+
+            normalizedObjectKey = NormalizeObjectKey(objectKey);
+            mediaAsset = await context.MediaAssets
+                .FirstOrDefaultAsync(x => x.ObjectKey == normalizedObjectKey, cancellationToken);
+        }
+
+        if (existingMediaAssetId.HasValue && existingMediaAssetId != mediaAsset?.Id)
+        {
+            var currentLinkedAsset = await context.MediaAssets
+                .FirstOrDefaultAsync(x => x.Id == existingMediaAssetId.Value, cancellationToken);
+
+            if (currentLinkedAsset is not null)
+            {
+                currentLinkedAsset.LinkedEntityType = null;
+                currentLinkedAsset.LinkedEntityId = null;
+                currentLinkedAsset.Status = MediaStatus.Uploaded;
+                currentLinkedAsset.UpdatedAt = now;
+            }
+        }
+
+        if (mediaAsset is null)
+        {
+            mediaAsset = new MediaAsset
+            {
+                Id = Guid.NewGuid(),
+                OwnerUserId = ownerUserId,
+                BucketName = fallbackBucketName,
+                ObjectKey = normalizedObjectKey,
+                OriginalFileName = Path.GetFileName(normalizedObjectKey),
+                StoredFileName = Path.GetFileName(normalizedObjectKey),
+                ContentType = GuessContentType(normalizedObjectKey),
+                FileSize = 0,
+                Scope = scope,
+                Visibility = visibility,
+                Status = MediaStatus.Linked,
+                LinkedEntityType = linkedEntityType,
+                LinkedEntityId = linkedEntityId,
+                CreatedAt = now,
+                UpdatedAt = now
+            };
+
+            context.MediaAssets.Add(mediaAsset);
+            return mediaAsset;
+        }
+
+        mediaAsset.OwnerUserId = ownerUserId;
+        mediaAsset.Scope = scope;
+        mediaAsset.Visibility = visibility;
+        mediaAsset.Status = MediaStatus.Linked;
+        mediaAsset.LinkedEntityType = linkedEntityType;
+        mediaAsset.LinkedEntityId = linkedEntityId;
+        mediaAsset.DeletedAt = null;
+        mediaAsset.UpdatedAt = now;
+
+        return mediaAsset;
     }
 
     private async Task<Guid> EnsurePropertyImageMediaAssetAsync(

@@ -1,17 +1,22 @@
 using Microsoft.EntityFrameworkCore;
 using SmartRentalPlatform.Application.Common.Exceptions;
 using SmartRentalPlatform.Application.Common.Interfaces;
+using SmartRentalPlatform.Application.Common.Media;
 using SmartRentalPlatform.Contracts.Common;
 using SmartRentalPlatform.Contracts.Files;
 using SmartRentalPlatform.Contracts.RoomingHouseRules.Requests;
 using SmartRentalPlatform.Contracts.RoomingHouseRules.Responses;
+using SmartRentalPlatform.Domain.Entities.Media;
 using SmartRentalPlatform.Domain.Entities.Properties;
+using SmartRentalPlatform.Domain.Enums.Media;
 using SmartRentalPlatform.Domain.Enums.Properties;
 
 namespace SmartRentalPlatform.Application.RoomingHouses;
 
 public class RoomingHouseRuleService : IRoomingHouseRuleService
 {
+    private sealed record LinkedMediaAssetResolution(Guid MediaAssetId, string ObjectKey);
+
     private readonly IAppDbContext context;
     private readonly IFileStorageService fileStorageService;
 
@@ -91,7 +96,16 @@ public class RoomingHouseRuleService : IRoomingHouseRuleService
         rule.SourceType = requestedSourceType;
         if (requestedSourceType == RoomingHouseRuleSourceType.PdfUpload)
         {
-            rule.PdfObjectKey = request.PdfObjectKey!.Trim();
+            var uploadedRulePdf = await EnsureRuleMediaAssetAsync(
+                roomingHouseId,
+                landlordUserId,
+                request.PdfMediaAssetId,
+                request.PdfObjectKey,
+                rule.MediaAssetId,
+                now,
+                cancellationToken);
+            rule.MediaAssetId = uploadedRulePdf.MediaAssetId;
+            rule.PdfObjectKey = uploadedRulePdf.ObjectKey;
             ClearFormFields(rule);
         }
         else
@@ -103,7 +117,24 @@ public class RoomingHouseRuleService : IRoomingHouseRuleService
                 $"house-rule-{roomingHouseId:N}.pdf",
                 FileUploadScope.HouseRule,
                 cancellationToken);
-            rule.PdfObjectKey = uploaded.ObjectKey;
+            rule.PdfObjectKey = NormalizeObjectKey(uploaded.ObjectKey);
+            if (uploaded.MediaAssetId.HasValue)
+            {
+                rule.MediaAssetId = uploaded.MediaAssetId.Value;
+            }
+            else
+            {
+                var generatedPdfAsset = await EnsureRuleMediaAssetAsync(
+                    roomingHouseId,
+                    landlordUserId,
+                    null,
+                    rule.PdfObjectKey,
+                    rule.MediaAssetId,
+                    now,
+                    cancellationToken);
+                rule.MediaAssetId = generatedPdfAsset.MediaAssetId;
+                rule.PdfObjectKey = generatedPdfAsset.ObjectKey;
+            }
         }
 
         rule.UpdatedAt = now;
@@ -149,6 +180,31 @@ public class RoomingHouseRuleService : IRoomingHouseRuleService
         return RoomingHouseRulePdfGenerator.Generate(roomingHouse, request);
     }
 
+    private async Task<LinkedMediaAssetResolution> EnsureRuleMediaAssetAsync(
+        Guid roomingHouseId,
+        Guid ownerUserId,
+        Guid? requestedMediaAssetId,
+        string? objectKey,
+        Guid? existingMediaAssetId,
+        DateTimeOffset now,
+        CancellationToken cancellationToken)
+    {
+        var resolvedAsset = await ResolveLinkedMediaAssetAsync(
+            requestedMediaAssetId,
+            objectKey,
+            existingMediaAssetId,
+            ownerUserId,
+            MediaScope.RoomingHouseRulePdf,
+            MediaVisibility.Private,
+            nameof(RoomingHouseRule),
+            roomingHouseId,
+            "legacy-private-storage",
+            now,
+            cancellationToken);
+
+        return new LinkedMediaAssetResolution(resolvedAsset.Id, resolvedAsset.ObjectKey);
+    }
+
     private static RoomingHouseRuleSourceType ParseSourceType(string sourceType)
     {
         if (!Enum.TryParse<RoomingHouseRuleSourceType>(sourceType, ignoreCase: true, out var parsed))
@@ -189,12 +245,12 @@ public class RoomingHouseRuleService : IRoomingHouseRuleService
     {
         if (sourceType == RoomingHouseRuleSourceType.PdfUpload)
         {
-            if (string.IsNullOrWhiteSpace(request.PdfObjectKey))
+            if (!request.PdfMediaAssetId.HasValue && string.IsNullOrWhiteSpace(request.PdfObjectKey))
             {
                 throw new BadRequestException(
                     ErrorCodes.HouseRuleInvalid,
                     "Vui lòng tải PDF luật khu trọ.",
-                    new { field = nameof(request.PdfObjectKey) });
+                    new { field = nameof(request.PdfObjectKey), mediaField = nameof(request.PdfMediaAssetId) });
             }
 
             return;
@@ -253,6 +309,117 @@ public class RoomingHouseRuleService : IRoomingHouseRuleService
         return string.IsNullOrWhiteSpace(value) ? null : value.Trim();
     }
 
+    private async Task<MediaAsset> ResolveLinkedMediaAssetAsync(
+        Guid? requestedMediaAssetId,
+        string? objectKey,
+        Guid? existingMediaAssetId,
+        Guid ownerUserId,
+        MediaScope scope,
+        MediaVisibility visibility,
+        string linkedEntityType,
+        Guid linkedEntityId,
+        string fallbackBucketName,
+        DateTimeOffset now,
+        CancellationToken cancellationToken)
+    {
+        MediaAsset? mediaAsset = null;
+        string normalizedObjectKey;
+
+        if (requestedMediaAssetId.HasValue)
+        {
+            mediaAsset = await context.MediaAssets
+                .FirstOrDefaultAsync(x => x.Id == requestedMediaAssetId.Value, cancellationToken);
+
+            if (mediaAsset is null)
+            {
+                throw new BadRequestException(
+                    ErrorCodes.ValidationError,
+                    "Media asset được chọn không tồn tại.",
+                    new { mediaAssetId = requestedMediaAssetId.Value });
+            }
+
+            normalizedObjectKey = mediaAsset.ObjectKey;
+        }
+        else
+        {
+            if (string.IsNullOrWhiteSpace(objectKey))
+            {
+                throw new BadRequestException(
+                    ErrorCodes.ValidationError,
+                    "Mã lưu trữ PDF là bắt buộc.",
+                    new { field = nameof(objectKey) });
+            }
+
+            normalizedObjectKey = NormalizeObjectKey(objectKey);
+            mediaAsset = await context.MediaAssets
+                .FirstOrDefaultAsync(x => x.ObjectKey == normalizedObjectKey, cancellationToken);
+        }
+
+        if (existingMediaAssetId.HasValue && existingMediaAssetId != mediaAsset?.Id)
+        {
+            var currentLinkedAsset = await context.MediaAssets
+                .FirstOrDefaultAsync(x => x.Id == existingMediaAssetId.Value, cancellationToken);
+
+            if (currentLinkedAsset is not null)
+            {
+                currentLinkedAsset.LinkedEntityType = null;
+                currentLinkedAsset.LinkedEntityId = null;
+                currentLinkedAsset.Status = MediaStatus.Uploaded;
+                currentLinkedAsset.UpdatedAt = now;
+            }
+        }
+
+        if (mediaAsset is null)
+        {
+            mediaAsset = new MediaAsset
+            {
+                Id = Guid.NewGuid(),
+                OwnerUserId = ownerUserId,
+                BucketName = fallbackBucketName,
+                ObjectKey = normalizedObjectKey,
+                OriginalFileName = Path.GetFileName(normalizedObjectKey),
+                StoredFileName = Path.GetFileName(normalizedObjectKey),
+                ContentType = GuessContentType(normalizedObjectKey),
+                FileSize = 0,
+                Scope = scope,
+                Visibility = visibility,
+                Status = MediaStatus.Linked,
+                LinkedEntityType = linkedEntityType,
+                LinkedEntityId = linkedEntityId,
+                CreatedAt = now,
+                UpdatedAt = now
+            };
+
+            context.MediaAssets.Add(mediaAsset);
+            return mediaAsset;
+        }
+
+        mediaAsset.OwnerUserId = ownerUserId;
+        mediaAsset.Scope = scope;
+        mediaAsset.Visibility = visibility;
+        mediaAsset.Status = MediaStatus.Linked;
+        mediaAsset.LinkedEntityType = linkedEntityType;
+        mediaAsset.LinkedEntityId = linkedEntityId;
+        mediaAsset.DeletedAt = null;
+        mediaAsset.UpdatedAt = now;
+
+        return mediaAsset;
+    }
+
+    private static string NormalizeObjectKey(string objectKey)
+    {
+        return objectKey.Replace('\\', '/').Trim().TrimStart('/');
+    }
+
+    private static string GuessContentType(string objectKey)
+    {
+        return Path.GetExtension(objectKey).ToLowerInvariant() switch
+        {
+            ".pdf" => "application/pdf",
+            _ => "application/octet-stream"
+        };
+    }
+
     internal static RoomingHouseRuleResponse ToResponse(RoomingHouseRule rule)
     {
         return new RoomingHouseRuleResponse
@@ -260,7 +427,11 @@ public class RoomingHouseRuleService : IRoomingHouseRuleService
             Id = rule.Id,
             RoomingHouseId = rule.RoomingHouseId,
             SourceType = rule.SourceType.ToString(),
-            PdfObjectKey = rule.PdfObjectKey,
+            MediaAssetId = rule.MediaAssetId,
+            PdfObjectKey = rule.MediaAssetId.HasValue ? string.Empty : rule.PdfObjectKey,
+            PdfUrl = rule.MediaAssetId.HasValue
+                ? PrivateMediaPathBuilder.Build(rule.MediaAssetId.Value)
+                : string.Empty,
             GeneralRules = rule.GeneralRules,
             QuietHours = rule.QuietHours,
             SecurityPolicy = rule.SecurityPolicy,

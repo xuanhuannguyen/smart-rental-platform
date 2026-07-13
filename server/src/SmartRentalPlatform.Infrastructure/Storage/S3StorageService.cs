@@ -103,6 +103,51 @@ public sealed class S3StorageService : IMediaStorageService, IPrivateStorageServ
         }
     }
 
+    public async Task<MediaObjectMetadataResult> GetObjectMetadataAsync(
+        string objectKey,
+        CancellationToken cancellationToken = default)
+    {
+        var normalizedObjectKey = NormalizeObjectKey(objectKey);
+        var response = await _s3Client.GetObjectMetadataAsync(_options.BucketName, normalizedObjectKey, cancellationToken);
+
+        return new MediaObjectMetadataResult
+        {
+            ObjectKey = normalizedObjectKey,
+            ContentType = response.Headers.ContentType,
+            FileSize = response.Headers.ContentLength
+        };
+    }
+
+    public string GetBucketName()
+    {
+        return _options.BucketName;
+    }
+
+    public Task<MediaUploadUrlResult> GetUploadUrlAsync(
+        string objectKey,
+        string contentType,
+        TimeSpan ttl,
+        CancellationToken cancellationToken = default)
+    {
+        var normalizedObjectKey = NormalizeObjectKey(objectKey);
+
+        var url = _s3Client.GetPreSignedURL(new GetPreSignedUrlRequest
+        {
+            BucketName = _options.BucketName,
+            Key = normalizedObjectKey,
+            Verb = HttpVerb.PUT,
+            ContentType = contentType,
+            Expires = DateTime.UtcNow.Add(ttl)
+        });
+
+        return Task.FromResult(new MediaUploadUrlResult
+        {
+            Url = url,
+            HttpMethod = "PUT",
+            ExpiresAtUtc = DateTimeOffset.UtcNow.Add(ttl)
+        });
+    }
+
     public async Task DeleteAsync(
         string objectKey,
         CancellationToken cancellationToken = default)

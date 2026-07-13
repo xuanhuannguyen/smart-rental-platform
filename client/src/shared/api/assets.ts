@@ -1,4 +1,5 @@
 import { env } from '../../config/env';
+import { buildPrivateMediaViewUrl } from './media';
 
 export type PublicPropertyImageSource = {
   imageUrl?: string | null;
@@ -11,6 +12,7 @@ export type AvatarImageSource = {
 };
 
 // Generic asset helper for legacy/object-key-based flows and explicit API paths.
+// @deprecated Prefer media-id specific helpers such as toPrivateMediaAssetUrl or public image helpers.
 export function toAssetUrl(objectKeyOrUrl: string): string {
   if (!objectKeyOrUrl) return '';
   const trimmed = objectKeyOrUrl.trim();
@@ -63,6 +65,11 @@ export function toAvatarImageUrl(avatar?: string | null | AvatarImageSource): st
     : normalizeOptionalValue(avatar?.avatarUrl);
 
   return safeAvatarUrl ? toAssetUrl(safeAvatarUrl) : '';
+}
+
+export function toPrivateMediaAssetUrl(mediaAssetId?: string | null): string {
+  const safeMediaAssetId = normalizeOptionalValue(mediaAssetId);
+  return safeMediaAssetId ? buildPrivateMediaViewUrl(safeMediaAssetId) : '';
 }
 
 function normalizeOptionalValue(value?: string | null): string {

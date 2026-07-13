@@ -470,7 +470,7 @@ namespace SmartRentalPlatform.Infrastructure.Persistence.Seed
                         Id = Guid.NewGuid(),
                         RoomingHouseId = houseId,
                         ImageUrl = imgUrl,
-                        ObjectKey = $"seed/houses/{houseId}/image_{j}.jpg",
+                        ObjectKey = string.Empty,
                         Caption = $"Ảnh tổng quan {j + 1} của {houseName}",
                         IsCover = j == 0,
                         SortOrder = j,
@@ -478,19 +478,7 @@ namespace SmartRentalPlatform.Infrastructure.Persistence.Seed
                     });
                 }
 
-                // 6. Thêm RoomingHouseLegalDocument
-                context.RoomingHouseLegalDocuments.Add(new RoomingHouseLegalDocument
-                {
-                    RoomingHouseId = houseId,
-                    DocumentType = LegalDocumentType.LAND_USE_CERTIFICATE,
-                    FrontImageObjectKey = $"seed/legal/{houseId}/front.jpg",
-                    BackImageObjectKey = $"seed/legal/{houseId}/back.jpg",
-                    DocumentNumberMasked = $"*****{random.Next(1000, 9999)}",
-                    DocumentNumberHash = $"seed-legal-hash-{houseId}",
-                    UploadedAt = seededAt,
-                    CreatedAt = seededAt,
-                    UpdatedAt = seededAt
-                });
+                // 6. Legal documents are intentionally not seeded with fake object keys.
 
                 // 7. Thêm Tiện ích khu trọ (5-8 tiện ích)
                 int houseAmenityCount = random.Next(5, Math.Min(9, houseAmenities.Count + 1));
@@ -552,7 +540,7 @@ namespace SmartRentalPlatform.Infrastructure.Persistence.Seed
                             Id = Guid.NewGuid(),
                             RoomId = roomId,
                             ImageUrl = roomImgUrl,
-                            ObjectKey = $"seed/rooms/{roomId}/image_{k}.jpg",
+                            ObjectKey = string.Empty,
                             Caption = $"Ảnh phòng {roomNumber} - góc chụp {k + 1}",
                             IsCover = k == 0,
                             SortOrder = k,

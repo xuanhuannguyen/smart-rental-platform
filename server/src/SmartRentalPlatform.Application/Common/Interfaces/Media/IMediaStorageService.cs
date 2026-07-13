@@ -16,6 +16,18 @@ public interface IMediaStorageService
         string objectKey,
         CancellationToken cancellationToken = default);
 
+    Task<MediaObjectMetadataResult> GetObjectMetadataAsync(
+        string objectKey,
+        CancellationToken cancellationToken = default);
+
+    string GetBucketName();
+
+    Task<MediaUploadUrlResult> GetUploadUrlAsync(
+        string objectKey,
+        string contentType,
+        TimeSpan ttl,
+        CancellationToken cancellationToken = default);
+
     Task DeleteAsync(
         string objectKey,
         CancellationToken cancellationToken = default);

@@ -409,6 +409,10 @@ public class RecordingMediaStorageService : IMediaStorageService
 {
     public List<MediaUploadRequest> UploadRequests { get; } = new();
     public List<string> DeletedObjectKeys { get; } = new();
+    public string StoredContentType { get; set; } = "application/pdf";
+
+    public string GetBucketName()
+        => "test-media-bucket";
 
     public async Task<MediaStoredObjectResult> UploadAsync(MediaUploadRequest request, CancellationToken cancellationToken = default)
     {
@@ -431,6 +435,26 @@ public class RecordingMediaStorageService : IMediaStorageService
 
     public Task<bool> ExistsAsync(string objectKey, CancellationToken cancellationToken = default)
         => Task.FromResult(true);
+
+    public Task<MediaObjectMetadataResult> GetObjectMetadataAsync(string objectKey, CancellationToken cancellationToken = default)
+        => Task.FromResult(new MediaObjectMetadataResult
+        {
+            ObjectKey = objectKey,
+            ContentType = StoredContentType,
+            FileSize = 1
+        });
+
+    public Task<MediaUploadUrlResult> GetUploadUrlAsync(
+        string objectKey,
+        string contentType,
+        TimeSpan ttl,
+        CancellationToken cancellationToken = default)
+        => Task.FromResult(new MediaUploadUrlResult
+        {
+            Url = $"https://example.test/upload/{objectKey}",
+            HttpMethod = "PUT",
+            ExpiresAtUtc = DateTimeOffset.UtcNow.Add(ttl)
+        });
 
     public Task DeleteAsync(string objectKey, CancellationToken cancellationToken = default)
     {

@@ -57,6 +57,7 @@ public static class DependencyInjection
         services.AddScoped<IMediaStorageService>(provider => provider.GetRequiredService<S3StorageService>());
         services.AddScoped<IMediaAssetService, MediaAssetService>();
         services.AddScoped<IMediaAccessService, MediaAccessService>();
+        services.AddScoped<IMediaWorkflowService, MediaWorkflowService>();
         services.AddScoped<IMediaPermissionService, DefaultMediaPermissionService>();
         services.Configure<VietMapOptions>(configuration.GetSection(VietMapOptions.SectionName));
         services.AddHttpClient<IVietMapService, VietMapService>((provider, client) =>

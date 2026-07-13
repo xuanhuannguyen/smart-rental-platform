@@ -74,6 +74,41 @@ public class LocalMediaStorageService : IMediaStorageService
         return Task.FromResult(File.Exists(GetFullPath(normalizedObjectKey)));
     }
 
+    public Task<MediaObjectMetadataResult> GetObjectMetadataAsync(
+        string objectKey,
+        CancellationToken cancellationToken = default)
+    {
+        var normalizedObjectKey = NormalizeObjectKey(objectKey);
+        var fullPath = GetFullPath(normalizedObjectKey);
+
+        if (!File.Exists(fullPath))
+        {
+            throw new FileNotFoundException("Storage object not found.", normalizedObjectKey);
+        }
+
+        var fileInfo = new FileInfo(fullPath);
+        return Task.FromResult(new MediaObjectMetadataResult
+        {
+            ObjectKey = normalizedObjectKey,
+            ContentType = GuessContentType(normalizedObjectKey),
+            FileSize = fileInfo.Length
+        });
+    }
+
+    public string GetBucketName()
+    {
+        return LocalBucketName;
+    }
+
+    public Task<MediaUploadUrlResult> GetUploadUrlAsync(
+        string objectKey,
+        string contentType,
+        TimeSpan ttl,
+        CancellationToken cancellationToken = default)
+    {
+        throw new NotSupportedException("Direct upload URLs are not supported by local media storage.");
+    }
+
     public Task DeleteAsync(
         string objectKey,
         CancellationToken cancellationToken = default)
@@ -110,5 +145,17 @@ public class LocalMediaStorageService : IMediaStorageService
     private static string NormalizeObjectKey(string objectKey)
     {
         return objectKey.Replace('\\', '/').Trim().TrimStart('/');
+    }
+
+    private static string GuessContentType(string objectKey)
+    {
+        return Path.GetExtension(objectKey).ToLowerInvariant() switch
+        {
+            ".jpg" or ".jpeg" => "image/jpeg",
+            ".png" => "image/png",
+            ".webp" => "image/webp",
+            ".pdf" => "application/pdf",
+            _ => "application/octet-stream"
+        };
     }
 }

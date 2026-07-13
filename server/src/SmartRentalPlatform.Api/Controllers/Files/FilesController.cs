@@ -1,7 +1,5 @@
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
-using SmartRentalPlatform.Application.Common.Interfaces;
-using SmartRentalPlatform.Application.Common.Models;
 using SmartRentalPlatform.Contracts.Common;
 using SmartRentalPlatform.Contracts.Files;
 
@@ -13,6 +11,7 @@ public class FilesController : ControllerBase
 {
     private const long MaxImageSizeBytes = 5 * 1024 * 1024;
     private const long MaxPdfSizeBytes = 10 * 1024 * 1024;
+    private const string LegacyUploadDisabledMessage = "Legacy upload endpoint is disabled. Use POST /api/media/upload-url and POST /api/media/finalize.";
 
     private static readonly HashSet<string> AllowedExtensions = new(StringComparer.OrdinalIgnoreCase)
     {
@@ -34,18 +33,11 @@ public class FilesController : ControllerBase
         "application/pdf"
     };
 
-    private readonly IFileStorageService fileStorageService;
-
-    public FilesController(IFileStorageService fileStorageService)
-    {
-        this.fileStorageService = fileStorageService;
-    }
-
     [Authorize]
     [HttpPost("images")]
     [Consumes("multipart/form-data")]
     [RequestSizeLimit(MaxImageSizeBytes)]
-    public async Task<ActionResult<ApiResponse<FileUploadResponse>>> UploadImage(
+    public ActionResult<ApiResponse<FileUploadResponse>> UploadImage(
         [FromForm] UploadImageRequest request,
         CancellationToken cancellationToken)
     {
@@ -55,30 +47,14 @@ public class FilesController : ControllerBase
             return BadRequest(validationError);
         }
 
-        var result = await fileStorageService.UploadImageAsync(
-            new ImageUploadFile
-            {
-                Content = request.File.OpenReadStream(),
-                FileName = request.File.FileName,
-                ContentType = request.File.ContentType,
-                Length = request.File.Length
-            },
-            request.Scope,
-            cancellationToken);
-
-        return Ok(new ApiResponse<FileUploadResponse>
-        {
-            Success = true,
-            Message = "Tải ảnh lên thành công.",
-            Data = result
-        });
+        return LegacyUploadGone();
     }
 
     [Authorize]
     [HttpPost("pdfs")]
     [Consumes("multipart/form-data")]
     [RequestSizeLimit(MaxPdfSizeBytes)]
-    public async Task<ActionResult<ApiResponse<FileUploadResponse>>> UploadPdf(
+    public ActionResult<ApiResponse<FileUploadResponse>> UploadPdf(
         [FromForm] UploadPdfRequest request,
         CancellationToken cancellationToken)
     {
@@ -88,23 +64,7 @@ public class FilesController : ControllerBase
             return BadRequest(validationError);
         }
 
-        var result = await fileStorageService.UploadPdfAsync(
-            new ImageUploadFile
-            {
-                Content = request.File.OpenReadStream(),
-                FileName = request.File.FileName,
-                ContentType = request.File.ContentType,
-                Length = request.File.Length
-            },
-            request.Scope,
-            cancellationToken);
-
-        return Ok(new ApiResponse<FileUploadResponse>
-        {
-            Success = true,
-            Message = "Tải PDF lên thành công.",
-            Data = result
-        });
+        return LegacyUploadGone();
     }
 
     private static ApiErrorResponse? ValidateImage(IFormFile file)
@@ -173,6 +133,24 @@ public class FilesController : ControllerBase
             Message = message,
             Details = details
         };
+    }
+
+    private ObjectResult LegacyUploadGone()
+    {
+        Response.Headers["Deprecation"] = "true";
+        Response.Headers.Append("X-SRP-Media-Compatibility", "legacy-files-upload-disabled");
+        Response.Headers.Append("X-SRP-Media-Replacement", "/api/media/upload-url;/api/media/finalize");
+
+        return StatusCode(StatusCodes.Status410Gone, new ApiErrorResponse
+        {
+            Success = false,
+            ErrorCode = ErrorCodes.InvalidStatus,
+            Message = LegacyUploadDisabledMessage,
+            Details = new
+            {
+                replacement = new[] { "/api/media/upload-url", "/api/media/finalize" }
+            }
+        });
     }
 }
 

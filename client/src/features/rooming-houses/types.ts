@@ -61,7 +61,9 @@ export type RoomingHouseRule = {
   id: string;
   roomingHouseId: string;
   sourceType: HouseRuleSourceType;
+  mediaAssetId?: string | null;
   pdfObjectKey: string;
+  pdfUrl?: string | null;
   generalRules?: string | null;
   quietHours?: string | null;
   securityPolicy?: string | null;
@@ -77,6 +79,7 @@ export type RoomingHouseRule = {
 
 export type UpsertRoomingHouseRuleRequest = {
   sourceType: HouseRuleSourceType;
+  pdfMediaAssetId?: string | null;
   pdfObjectKey?: string | null;
   generalRules?: string | null;
   quietHours?: string | null;
@@ -91,8 +94,11 @@ export type UpsertRoomingHouseRuleRequest = {
 
 export type UpdateLegalDocumentRequest = {
   documentType: string;
+  frontMediaAssetId?: string | null;
   frontImageObjectKey: string;
+  backMediaAssetId?: string | null;
   backImageObjectKey: string;
+  extraMediaAssetId?: string | null;
   extraImageObjectKey?: string | null;
   documentNumber: string;
 };

@@ -226,6 +226,11 @@ public class ContractAppendixServiceTests : IClassFixture<TestDatabaseFixture>
     {
         public List<MediaUploadRequest> UploadRequests { get; } = [];
 
+        public string GetBucketName()
+        {
+            return "local-media";
+        }
+
         public Task<MediaStoredObjectResult> UploadAsync(MediaUploadRequest request, CancellationToken cancellationToken = default)
         {
             UploadRequests.Add(request);
@@ -245,6 +250,26 @@ public class ContractAppendixServiceTests : IClassFixture<TestDatabaseFixture>
 
         public Task<bool> ExistsAsync(string objectKey, CancellationToken cancellationToken = default)
             => Task.FromResult(false);
+
+        public Task<MediaObjectMetadataResult> GetObjectMetadataAsync(string objectKey, CancellationToken cancellationToken = default)
+            => Task.FromResult(new MediaObjectMetadataResult
+            {
+                ObjectKey = objectKey,
+                ContentType = "application/pdf",
+                FileSize = 100
+            });
+
+        public Task<MediaUploadUrlResult> GetUploadUrlAsync(
+            string objectKey,
+            string contentType,
+            TimeSpan ttl,
+            CancellationToken cancellationToken = default)
+            => Task.FromResult(new MediaUploadUrlResult
+            {
+                Url = $"https://example.test/upload/{objectKey}",
+                HttpMethod = "PUT",
+                ExpiresAtUtc = DateTimeOffset.UtcNow.Add(ttl)
+            });
 
         public Task DeleteAsync(string objectKey, CancellationToken cancellationToken = default)
             => Task.CompletedTask;

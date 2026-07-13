@@ -5,6 +5,7 @@ using SmartRentalPlatform.Application.Common.Interfaces;
 using SmartRentalPlatform.Application.Common.Interfaces.Media;
 using SmartRentalPlatform.Application.Common.Media;
 using SmartRentalPlatform.Application.Common.Models.Media;
+using SmartRentalPlatform.Contracts.Common;
 using SmartRentalPlatform.Contracts.Media.Responses;
 using System.Text.Json;
 
@@ -21,16 +22,13 @@ public class AdminMediaController : ControllerBase
 
     private readonly ICurrentUserService _currentUserService;
     private readonly IMediaAccessService _mediaAccessService;
-    private readonly IPrivateStorageService _privateStorageService;
 
     public AdminMediaController(
         ICurrentUserService currentUserService,
-        IMediaAccessService mediaAccessService,
-        IPrivateStorageService privateStorageService)
+        IMediaAccessService mediaAccessService)
     {
         _currentUserService = currentUserService;
         _mediaAccessService = mediaAccessService;
-        _privateStorageService = privateStorageService;
     }
 
     [HttpGet("private/{mediaAssetId:guid}")]
@@ -90,9 +88,7 @@ public class AdminMediaController : ControllerBase
     }
 
     [HttpGet("private")]
-    public async Task<IActionResult> GetLegacyPrivateFile(
-        [FromQuery] string objectKey,
-        CancellationToken cancellationToken)
+    public IActionResult GetLegacyPrivateFile([FromQuery] string objectKey)
     {
         if (string.IsNullOrWhiteSpace(objectKey) ||
             objectKey.Contains("..", StringComparison.Ordinal) ||
@@ -101,8 +97,17 @@ public class AdminMediaController : ControllerBase
             return BadRequest("Invalid object key.");
         }
 
-        var stream = await _privateStorageService.OpenReadAsync(objectKey, cancellationToken);
-        return File(stream, GuessContentType(objectKey));
+        Response.Headers["Deprecation"] = "true";
+        Response.Headers.Append("X-SRP-Media-Compatibility", "legacy-admin-private-object-key-route-disabled");
+        Response.Headers.Append("X-SRP-Media-Replacement", "/api/admin/media/private/{mediaAssetId}");
+
+        return StatusCode(StatusCodes.Status410Gone, new ApiErrorResponse
+        {
+            Success = false,
+            ErrorCode = ErrorCodes.InvalidStatus,
+            Message = "Legacy private object-key route is disabled. Use /api/admin/media/private/{mediaAssetId}.",
+            Details = new { replacement = "/api/admin/media/private/{mediaAssetId}" }
+        });
     }
 
     private MediaAuditContext BuildAuditContext(string action, string disposition)
@@ -120,15 +125,4 @@ public class AdminMediaController : ControllerBase
         };
     }
 
-    private static string GuessContentType(string objectKey)
-    {
-        return Path.GetExtension(objectKey).ToLowerInvariant() switch
-        {
-            ".png" => "image/png",
-            ".webp" => "image/webp",
-            ".jpg" or ".jpeg" => "image/jpeg",
-            ".pdf" => "application/pdf",
-            _ => "application/octet-stream"
-        };
-    }
 }

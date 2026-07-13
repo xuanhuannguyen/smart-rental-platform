@@ -4,6 +4,8 @@ public class UpsertRoomingHouseRuleRequest
 {
     public string SourceType { get; set; } = string.Empty;
 
+    public Guid? PdfMediaAssetId { get; set; }
+
     public string? PdfObjectKey { get; set; }
 
     public string? GeneralRules { get; set; }

@@ -10,6 +10,7 @@ using SmartRentalPlatform.Application.Common.Models.Media;
 using SmartRentalPlatform.Contracts.Common;
 using SmartRentalPlatform.Contracts.RentalContracts.Requests;
 using SmartRentalPlatform.Contracts.RentalContracts.Responses;
+using SmartRentalPlatform.Domain.Entities.Media;
 using SmartRentalPlatform.Domain.Entities.RentalContracts;
 using SmartRentalPlatform.Domain.Enums.Kyc;
 using SmartRentalPlatform.Domain.Enums.Media;
@@ -21,6 +22,7 @@ public class ContractAppendixService : IContractAppendixService
 {
     private const string PdfContentType = "application/pdf";
     private static readonly JsonSerializerOptions JsonOptions = new(JsonSerializerDefaults.Web);
+    private sealed record LinkedMediaAssetResolution(Guid MediaAssetId, string ObjectKey);
 
     private readonly IAppDbContext context;
     private readonly IContractSignatureOtpService contractSignatureOtpService;
@@ -738,6 +740,7 @@ public class ContractAppendixService : IContractAppendixService
                 var occupantRequest = ParseOccupantRequest(change.NewValue);
                 var occupant = await CreateOccupantFromAppendixChangeAsync(
                     appendix.RentalContractId,
+                    appendix.CreatedByUserId,
                     occupantRequest,
                     now,
                     cancellationToken);
@@ -855,6 +858,7 @@ public class ContractAppendixService : IContractAppendixService
 
     private async Task<ContractOccupant> CreateOccupantFromAppendixChangeAsync(
         Guid contractId,
+        Guid ownerUserId,
         ContractOccupantRequest occupantRequest,
         DateTimeOffset now,
         CancellationToken cancellationToken)
@@ -896,13 +900,19 @@ public class ContractAppendixService : IContractAppendixService
                 DocumentNumberMasked = MaskDocumentNumber(documentRequest.DocumentNumber),
                 DocumentNumberHash = HashDocumentNumber(documentRequest.DocumentNumber),
                 DocumentNumberEncrypted = EncryptDocumentNumber(documentRequest.DocumentNumber),
-                FrontImageObjectKey = documentRequest.FrontImageObjectKey.Trim(),
-                BackImageObjectKey = NormalizeOptionalText(documentRequest.BackImageObjectKey),
-                ExtraImageObjectKey = NormalizeOptionalText(documentRequest.ExtraImageObjectKey),
                 UploadedAt = now,
                 CreatedAt = now,
                 UpdatedAt = now
             };
+            var frontAsset = await EnsureContractOccupantDocumentMediaAssetAsync(ownerUserId, newDoc, documentRequest.FrontMediaAssetId, documentRequest.FrontImageObjectKey, newDoc.FrontMediaAssetId, now, cancellationToken);
+            var backAsset = await EnsureOptionalContractOccupantDocumentMediaAssetAsync(ownerUserId, newDoc, documentRequest.BackMediaAssetId, documentRequest.BackImageObjectKey, newDoc.BackMediaAssetId, now, cancellationToken);
+            var extraAsset = await EnsureOptionalContractOccupantDocumentMediaAssetAsync(ownerUserId, newDoc, documentRequest.ExtraMediaAssetId, documentRequest.ExtraImageObjectKey, newDoc.ExtraMediaAssetId, now, cancellationToken);
+            newDoc.FrontMediaAssetId = frontAsset.MediaAssetId;
+            newDoc.FrontImageObjectKey = frontAsset.ObjectKey;
+            newDoc.BackMediaAssetId = backAsset?.MediaAssetId;
+            newDoc.BackImageObjectKey = backAsset?.ObjectKey;
+            newDoc.ExtraMediaAssetId = extraAsset?.MediaAssetId;
+            newDoc.ExtraImageObjectKey = extraAsset?.ObjectKey;
             occupant.Documents.Add(newDoc);
             context.ContractOccupantDocuments.Add(newDoc);
         }
@@ -1582,7 +1592,8 @@ public class ContractAppendixService : IContractAppendixService
 
         if (string.IsNullOrWhiteSpace(occupant.Document.DocumentType) ||
             string.IsNullOrWhiteSpace(occupant.Document.DocumentNumber) ||
-            string.IsNullOrWhiteSpace(occupant.Document.FrontImageObjectKey))
+            (!occupant.Document.FrontMediaAssetId.HasValue &&
+             string.IsNullOrWhiteSpace(occupant.Document.FrontImageObjectKey)))
         {
             throw new BadRequestException(
                 ErrorCodes.RentalContractInvalidOccupant,
@@ -2484,11 +2495,188 @@ public class ContractAppendixService : IContractAppendixService
         return string.IsNullOrWhiteSpace(value) ? null : value.Trim();
     }
 
+    private async Task<LinkedMediaAssetResolution> EnsureContractOccupantDocumentMediaAssetAsync(
+        Guid ownerUserId,
+        ContractOccupantDocument document,
+        Guid? requestedMediaAssetId,
+        string? objectKey,
+        Guid? existingMediaAssetId,
+        DateTimeOffset now,
+        CancellationToken cancellationToken)
+    {
+        var mediaAsset = await ResolveLinkedMediaAssetAsync(
+            requestedMediaAssetId,
+            objectKey,
+            existingMediaAssetId,
+            ownerUserId,
+            MediaScope.KycDocument,
+            MediaVisibility.Private,
+            nameof(ContractOccupantDocument),
+            document.Id,
+            "legacy-private-storage",
+            now,
+            cancellationToken);
+
+        return new LinkedMediaAssetResolution(mediaAsset.Id, mediaAsset.ObjectKey);
+    }
+
+    private async Task<LinkedMediaAssetResolution?> EnsureOptionalContractOccupantDocumentMediaAssetAsync(
+        Guid ownerUserId,
+        ContractOccupantDocument document,
+        Guid? requestedMediaAssetId,
+        string? objectKey,
+        Guid? existingMediaAssetId,
+        DateTimeOffset now,
+        CancellationToken cancellationToken)
+    {
+        if (!requestedMediaAssetId.HasValue && string.IsNullOrWhiteSpace(objectKey))
+        {
+            if (existingMediaAssetId.HasValue)
+            {
+                var currentLinkedAsset = await context.MediaAssets
+                    .FirstOrDefaultAsync(x => x.Id == existingMediaAssetId.Value, cancellationToken);
+
+                if (currentLinkedAsset is not null)
+                {
+                    currentLinkedAsset.LinkedEntityType = null;
+                    currentLinkedAsset.LinkedEntityId = null;
+                    currentLinkedAsset.Status = MediaStatus.Uploaded;
+                    currentLinkedAsset.UpdatedAt = now;
+                }
+            }
+
+            return null;
+        }
+
+        return await EnsureContractOccupantDocumentMediaAssetAsync(
+            ownerUserId,
+            document,
+            requestedMediaAssetId,
+            objectKey,
+            existingMediaAssetId,
+            now,
+            cancellationToken);
+    }
+
+    private async Task<MediaAsset> ResolveLinkedMediaAssetAsync(
+        Guid? requestedMediaAssetId,
+        string? objectKey,
+        Guid? existingMediaAssetId,
+        Guid ownerUserId,
+        MediaScope scope,
+        MediaVisibility visibility,
+        string linkedEntityType,
+        Guid linkedEntityId,
+        string fallbackBucketName,
+        DateTimeOffset now,
+        CancellationToken cancellationToken)
+    {
+        MediaAsset? mediaAsset = null;
+        string normalizedObjectKey;
+
+        if (requestedMediaAssetId.HasValue)
+        {
+            mediaAsset = await context.MediaAssets
+                .FirstOrDefaultAsync(x => x.Id == requestedMediaAssetId.Value, cancellationToken);
+
+            if (mediaAsset is null)
+            {
+                throw new BadRequestException(
+                    ErrorCodes.ValidationError,
+                    "Media asset được chọn không tồn tại.",
+                    new { mediaAssetId = requestedMediaAssetId.Value });
+            }
+
+            normalizedObjectKey = mediaAsset.ObjectKey;
+        }
+        else
+        {
+            if (string.IsNullOrWhiteSpace(objectKey))
+            {
+                throw new BadRequestException(
+                    ErrorCodes.ValidationError,
+                    "Mã lưu trữ tệp là bắt buộc.",
+                    new { field = nameof(objectKey) });
+            }
+
+            normalizedObjectKey = NormalizeObjectKey(objectKey);
+            mediaAsset = await context.MediaAssets
+                .FirstOrDefaultAsync(x => x.ObjectKey == normalizedObjectKey, cancellationToken);
+        }
+
+        if (existingMediaAssetId.HasValue && existingMediaAssetId != mediaAsset?.Id)
+        {
+            var currentLinkedAsset = await context.MediaAssets
+                .FirstOrDefaultAsync(x => x.Id == existingMediaAssetId.Value, cancellationToken);
+
+            if (currentLinkedAsset is not null)
+            {
+                currentLinkedAsset.LinkedEntityType = null;
+                currentLinkedAsset.LinkedEntityId = null;
+                currentLinkedAsset.Status = MediaStatus.Uploaded;
+                currentLinkedAsset.UpdatedAt = now;
+            }
+        }
+
+        if (mediaAsset is null)
+        {
+            mediaAsset = new MediaAsset
+            {
+                Id = Guid.NewGuid(),
+                OwnerUserId = ownerUserId,
+                BucketName = fallbackBucketName,
+                ObjectKey = normalizedObjectKey,
+                OriginalFileName = Path.GetFileName(normalizedObjectKey),
+                StoredFileName = Path.GetFileName(normalizedObjectKey),
+                ContentType = GuessContentType(normalizedObjectKey),
+                FileSize = 0,
+                Scope = scope,
+                Visibility = visibility,
+                Status = MediaStatus.Linked,
+                LinkedEntityType = linkedEntityType,
+                LinkedEntityId = linkedEntityId,
+                CreatedAt = now,
+                UpdatedAt = now
+            };
+
+            context.MediaAssets.Add(mediaAsset);
+            return mediaAsset;
+        }
+
+        mediaAsset.OwnerUserId = ownerUserId;
+        mediaAsset.Scope = scope;
+        mediaAsset.Visibility = visibility;
+        mediaAsset.Status = MediaStatus.Linked;
+        mediaAsset.LinkedEntityType = linkedEntityType;
+        mediaAsset.LinkedEntityId = linkedEntityId;
+        mediaAsset.DeletedAt = null;
+        mediaAsset.UpdatedAt = now;
+
+        return mediaAsset;
+    }
+
     private static string NormalizeFieldName(string? value)
     {
         return string.IsNullOrWhiteSpace(value)
             ? string.Empty
             : value.Replace("_", string.Empty, StringComparison.Ordinal).Trim().ToLowerInvariant();
+    }
+
+    private static string NormalizeObjectKey(string objectKey)
+    {
+        return objectKey.Replace('\\', '/').Trim().TrimStart('/');
+    }
+
+    private static string GuessContentType(string objectKey)
+    {
+        return Path.GetExtension(objectKey).ToLowerInvariant() switch
+        {
+            ".jpg" or ".jpeg" => "image/jpeg",
+            ".png" => "image/png",
+            ".webp" => "image/webp",
+            ".pdf" => "application/pdf",
+            _ => "application/octet-stream"
+        };
     }
 
     private static TEnum ParseEnum<TEnum>(string value, string message)

@@ -13,8 +13,11 @@ export interface ContractBriefResponse {
 export interface ContractOccupantDocumentRequest {
   documentType: string;
   documentNumber?: string | null;
+  frontMediaAssetId?: string | null;
   frontImageObjectKey: string;
+  backMediaAssetId?: string | null;
   backImageObjectKey?: string | null;
+  extraMediaAssetId?: string | null;
   extraImageObjectKey?: string | null;
 }
 
@@ -100,9 +103,15 @@ export interface ContractOccupantDocumentResponse {
   contractOccupantId: string;
   documentType: string;
   documentNumberMasked?: string | null;
+  frontMediaAssetId?: string | null;
+  backMediaAssetId?: string | null;
+  extraMediaAssetId?: string | null;
   frontImageObjectKey: string;
   backImageObjectKey?: string | null;
   extraImageObjectKey?: string | null;
+  frontImageUrl?: string | null;
+  backImageUrl?: string | null;
+  extraImageUrl?: string | null;
   uploadedAt: string;
 }
 

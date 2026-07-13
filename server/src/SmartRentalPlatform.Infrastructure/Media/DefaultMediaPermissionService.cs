@@ -5,6 +5,7 @@ using SmartRentalPlatform.Domain.Entities.Billing;
 using SmartRentalPlatform.Domain.Entities.Media;
 using SmartRentalPlatform.Domain.Entities.Properties;
 using SmartRentalPlatform.Domain.Entities.RentalContracts;
+using SmartRentalPlatform.Domain.Entities.Users;
 using SmartRentalPlatform.Domain.Enums.Billing;
 using SmartRentalPlatform.Domain.Enums.Media;
 using SmartRentalPlatform.Domain.Enums.RentalContracts;
@@ -85,6 +86,30 @@ public class DefaultMediaPermissionService : IMediaPermissionService
         if (string.Equals(mediaAsset.LinkedEntityType, nameof(MeterReading), StringComparison.Ordinal))
         {
             return await CanAccessMeterReadingAsync(
+                actorUserId.Value,
+                mediaAsset.LinkedEntityId.Value,
+                cancellationToken);
+        }
+
+        if (string.Equals(mediaAsset.LinkedEntityType, nameof(KycVerification), StringComparison.Ordinal))
+        {
+            return await CanAccessKycVerificationAsync(
+                actorUserId.Value,
+                mediaAsset.LinkedEntityId.Value,
+                cancellationToken);
+        }
+
+        if (string.Equals(mediaAsset.LinkedEntityType, nameof(ContractOccupantDocument), StringComparison.Ordinal))
+        {
+            return await CanAccessContractOccupantDocumentAsync(
+                actorUserId.Value,
+                mediaAsset.LinkedEntityId.Value,
+                cancellationToken);
+        }
+
+        if (string.Equals(mediaAsset.LinkedEntityType, nameof(RoomingHouseRule), StringComparison.Ordinal))
+        {
+            return await CanAccessRoomingHouseRuleAsync(
                 actorUserId.Value,
                 mediaAsset.LinkedEntityId.Value,
                 cancellationToken);
@@ -180,6 +205,65 @@ public class DefaultMediaPermissionService : IMediaPermissionService
             occupant.Status != ContractOccupantStatus.Voided &&
             occupant.MoveInDate <= invoice!.BillingPeriodEnd &&
             (occupant.MoveOutDate is null || occupant.MoveOutDate >= invoice.BillingPeriodStart)));
+    }
+
+    private async Task<bool> CanAccessKycVerificationAsync(
+        Guid actorUserId,
+        Guid kycVerificationId,
+        CancellationToken cancellationToken)
+    {
+        var ownerUserId = await dbContext.KycVerifications
+            .AsNoTracking()
+            .Where(x => x.Id == kycVerificationId)
+            .Select(x => x.UserId)
+            .FirstOrDefaultAsync(cancellationToken);
+
+        return ownerUserId != Guid.Empty && ownerUserId == actorUserId;
+    }
+
+    private async Task<bool> CanAccessContractOccupantDocumentAsync(
+        Guid actorUserId,
+        Guid contractOccupantDocumentId,
+        CancellationToken cancellationToken)
+    {
+        var document = await dbContext.ContractOccupantDocuments
+            .AsNoTracking()
+            .Include(x => x.RentalContractOccupant)
+                .ThenInclude(x => x.RentalContract)
+                    .ThenInclude(x => x.Room)
+                        .ThenInclude(x => x.RoomingHouse)
+            .Include(x => x.RentalContractOccupant)
+                .ThenInclude(x => x.RentalContract)
+                    .ThenInclude(x => x.Appendices)
+                        .ThenInclude(x => x.Changes)
+            .Include(x => x.RentalContractOccupant)
+                .ThenInclude(x => x.RentalContract)
+                    .ThenInclude(x => x.Appendices)
+                        .ThenInclude(x => x.Signatures)
+            .FirstOrDefaultAsync(x => x.Id == contractOccupantDocumentId, cancellationToken);
+
+        if (document?.RentalContractOccupant?.RentalContract is null)
+        {
+            return false;
+        }
+
+        var contract = document.RentalContractOccupant.RentalContract;
+        return contract.Room.RoomingHouse.LandlordUserId == actorUserId ||
+               GetMainTenantUserIds(contract).Contains(actorUserId);
+    }
+
+    private async Task<bool> CanAccessRoomingHouseRuleAsync(
+        Guid actorUserId,
+        Guid roomingHouseId,
+        CancellationToken cancellationToken)
+    {
+        var landlordUserId = await dbContext.RoomingHouseRules
+            .AsNoTracking()
+            .Where(x => x.RoomingHouseId == roomingHouseId)
+            .Select(x => x.RoomingHouse.LandlordUserId)
+            .FirstOrDefaultAsync(cancellationToken);
+
+        return landlordUserId != Guid.Empty && landlordUserId == actorUserId;
     }
 
     private static bool CanAccessByDefault(Guid? actorUserId, MediaAsset mediaAsset)

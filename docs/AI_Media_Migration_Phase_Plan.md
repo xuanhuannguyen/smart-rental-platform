@@ -14,6 +14,115 @@ Tài liệu này ưu tiên cách làm `foundation-first`, sau đó migrate từn
 
 ## Trạng thái implementation hiện tại
 
+### Mapping to new simplified plan
+
+- `Phase 1 - Thiết kế nền`: đã đạt
+- `Phase 2 - Upload/download core`: đã đạt ở media core API/service layer
+- `Phase 3 - Tích hợp module public/private`: đã đạt cho các module đang trong scope migration hiện tại ở mức đọc ưu tiên `MediaAssetId` và upload mới đi qua media/cloud path
+- `Phase 4 - Bảo mật và audit`: đã đạt ở media core enforcement layer cho validate file, limit dung lượng, kiểm quyền private, audit allow/deny access
+- `Phase 5A - Inventory và readiness`: đã materialize inventory tại `docs/AI_Media_Migration_Phase5A_Inventory.md`
+- `Phase 5B - Legacy Object Migration/Backfill`: đã có dry-run/report tool và guarded backfill executor để kiểm/link legacy object trước khi cutover
+- `Phase 5C - Read Path Cutover`: đã chuyển các read path còn nhạy trong scope 5B sang ưu tiên `MediaAssetId`/media URL và scrub private object key khỏi response khi đã có media id
+- `Phase 5D - Legacy Compatibility Guard/Cleanup Prep`: đã đánh dấu deprecation/compatibility cho upload/route object-key cũ và thêm frontend media-id helper để caller mới không mở rộng object-key usage
+- `Phase 5E - Local Legacy Data Cleanup`: đã cleanup DB local sau khi user xác nhận dữ liệu demo/local không cần giữ; post-check còn 0 legacy references và 0 storage missing
+- `Phase 5F - Legacy API/Frontend Lockdown`: đã chặn legacy upload/admin private object-key route bằng `410 Gone` và bỏ frontend caller/endpoint registry trực tiếp `/api/files`
+- `Phase 5G - Schema & Seed Hygiene`: đã dọn runtime seed khỏi fake legacy object keys, thêm/apply migration cleanup sample refs lịch sử, và xác nhận post-check còn 0 legacy references/storage missing
+- `Phase 5H - Reset/Re-seed & End-to-End Verification`: đã reset DB local, apply full migration chain, chạy API seed thật, post-reseed storage/readiness report sạch, backend/frontend build pass
+
+Trong file này vẫn giữ phase map chi tiết cũ để tra lịch sử migration, nhưng khi team nói tới
+`Phase 1/Phase 2/Phase 3/Phase 4` theo plan mới rút gọn thì phải hiểu như sau:
+
+- `Phase 1` chỉ bao gồm:
+  - storage direction
+  - `MediaAsset`, `MediaAuditLog`
+  - enum media
+  - permission matrix nền
+  - schema/migration foundation
+- `Phase 2` mới bao gồm:
+  - upload session
+  - finalize upload
+  - signed/private download core
+  - soft delete flow
+  - chuẩn hóa private file contract
+- `Phase 3` mới bao gồm:
+  - module trong scope đọc ưu tiên `MediaAssetId`
+  - upload mới đi qua media workflow/cloud path
+  - private/public contract mới được dùng làm đường chính cho module đã migrate
+- `Phase 4` mới bao gồm:
+  - validate content type + extension theo `MediaScope`
+  - giới hạn dung lượng theo `MediaScope`
+  - finalize kiểm metadata object thật trong storage
+  - private access chặn `PendingUpload`, `Deleted`, và unauthorized user
+  - audit thành công và bị từ chối cho view/download-url
+
+Trạng thái code sau khi hoàn thành `Phase 4` mới:
+
+- đã có media workflow API chuẩn:
+  - `POST /api/media/upload-url`
+  - `PUT /api/media/upload/{mediaAssetId}` fallback backend-proxy
+  - `POST /api/media/finalize`
+  - `GET /api/media/{mediaAssetId}/download-url`
+  - `DELETE /api/media/{mediaAssetId}`
+- `S3StorageService` hỗ trợ signed upload URL và signed download URL
+- `MediaWorkflowService` chuẩn hóa metadata pending-upload -> uploaded/deleted + audit hook
+- `MediaFileValidationPolicy` enforce allowlist type/extension và size limit theo `MediaScope`
+- `FinalizeUploadAsync` kiểm object metadata thật từ storage trước khi chuyển sang `Uploaded`
+- `MediaController` validate backend-proxy upload theo session metadata trước khi ghi storage
+- `MediaAccessService` chặn private asset chưa finalize, đã soft-delete, hoặc user không đủ quyền; deny case có audit log riêng
+- compatibility upload cũ vẫn còn giữ song song ở `FilesController`
+- một số business flow vẫn còn compatibility/fallback field cũ nên cleanup/rollout vẫn là backlog phase sau
+- Phase 5A đã xác nhận chưa sẵn sàng xóa storage/field cũ; cần Phase 5B migration/backfill dry-run trước
+- Phase 5B hiện đã có:
+  - `LegacyMediaMigrationReadinessService` để quét legacy references theo module
+  - console tool `SmartRentalPlatform.MediaMigrationTool`
+  - JSON report gồm missing media link, match theo object key, sample lỗi, và optional storage existence check
+  - `--mode backfill` mặc định dry-run để lập kế hoạch tạo/link `MediaAsset`
+- Phase 5B hiện chưa copy/move object thật
+- Phase 5B chỉ update database khi chạy rõ `--mode backfill --dry-run false`; không tự apply trong report/dry-run
+- DB local `localhost:5444` ngày 2026-07-13 đã reset sạch, apply migration mới nhất đến `20260713064804_InspectRemainingModelChanges`, chạy Phase 5B backfill apply để tạo/link 3 media asset còn thiếu, rồi dry-run lại sạch với 0 planned creates/links
+- Phase 5C đã cutover read path an toàn cho:
+  - `RoomingHouseRule` PDF: response chỉ trả `pdfUrl` theo media route khi có `MediaAssetId`; frontend không còn coi `pdfObjectKey` là điều kiện bắt buộc sau upload mới
+  - `ContractOccupantDocument`: response dùng private media URL và scrub `Front/Back/ExtraImageObjectKey` khi đã có media id
+  - appendix occupant document editor: khi load change JSON có media id, frontend tự dựng private media view URL để preview thay vì cần object key
+- Phase 5C vẫn giữ request field/fallback object key để không phá compatibility và chưa xóa storage/endpoint/cột legacy
+- Phase 5D đã thêm guard không-breaking:
+  - `FilesController` legacy upload trả header `Deprecation`, `X-SRP-Media-Compatibility`, `X-SRP-Media-Replacement`
+  - `FileUploadResponse` có `IsCompatibilityResponse` và `CompatibilityWarning`
+  - public object-key route `GET /api/media/public/{**objectKey}` có deprecation/replacement headers
+  - admin legacy private route `GET /api/admin/media/private?objectKey=...` có deprecation/replacement headers
+  - frontend đánh dấu `objectKey` là deprecated trong upload result/type và thêm `toPrivateMediaAssetUrl(mediaAssetId)`
+- Phase 5D chưa remove route/field; đây là cleanup prep để các phase sau có tín hiệu runtime và compile-time rõ hơn
+- Storage/bucket verification thật ngày 2026-07-13 đã chạy với `--check-storage true`:
+  - S3 config local đủ và bucket endpoint reachable
+  - DB metadata local sạch: 866/866 legacy references có `MediaAsset` link và match by object key
+  - object vật lý missing toàn bộ: 0 present, 866 missing, 0 errors
+  - nếu cần giữ dữ liệu local hiện tại thì phải copy/re-upload object vào bucket trước khi xóa legacy route/field
+  - nếu dữ liệu local/demo không quan trọng thì đường nhanh hơn là reset/reseed bằng upload mới qua media workflow
+- User đã xác nhận dữ liệu local/demo không cần giữ, nên Phase 5E đã thêm và chạy cleanup mode:
+  - `phase5e --mode cleanup --dry-run true`: 866 candidates, 855 planned deletes, 1 planned clear
+  - `phase5e --mode cleanup --dry-run false`: 855 applied deletes, 1 applied clear
+  - post-check bằng `phase5b --check-storage true`: 0 legacy references, 0 storage missing, 0 storage errors
+- Phase 5F đã lockdown legacy API/frontend:
+  - `POST /api/files/images` và `POST /api/files/pdfs` trả `410 Gone`
+  - `GET /api/admin/media/private?objectKey=...` trả `410 Gone`
+  - frontend không còn expose/use `ENDPOINTS.FILES`
+  - public object-key route vẫn giữ tạm vì public image URL/listing còn phụ thuộc
+- Phase 5G đã cleanup seed/schema hygiene:
+  - runtime seed không còn tạo fake object keys kiểu `demo/...`, `seed/...`, `/uploads/...`
+  - migration data-only `20260713153000_CleanupLegacySampleMediaReferences` cleanup các sample refs lịch sử `demo/%`, `kfc-scenario/%`, `seed/%`, `/uploads/%`
+  - migration đã apply trên DB local `localhost:5444`
+  - post-check với `phase5b --check-storage true` còn 0 legacy references, 0 storage missing, 0 storage errors
+  - legacy columns chưa drop vì DTO/business compatibility/fallback vẫn còn tồn tại
+- Phase 5H đã verify reset/reseed:
+  - DB local `localhost:5444` đã được drop/reset vì dữ liệu local không cần giữ
+  - full migration chain apply từ đầu tới `20260713153000_CleanupLegacySampleMediaReferences`
+  - API startup seed đã chạy với development + wallet QA seed enabled
+  - post-reseed report `phase5b --check-storage true` còn 0 legacy references, 0 missing media links, 0 storage missing/errors
+  - `dotnet build`, media/migration unit tests, và `npm.cmd run build` đều pass
+  - chưa chạy manual/browser E2E upload qua UI trong phase này
+
+### Historical detailed plan status
+
 Theo code hiện có trong repo:
 
 - `Phase 1 - Media schema foundation` đã được implement
@@ -33,7 +142,7 @@ Theo code hiện có trong repo:
 Các điểm chưa hoàn chỉnh nhưng đã biết từ code hiện tại:
 
 - runtime storage hiện đã đi qua `S3StorageService` cho cả `IMediaStorageService` và `IPrivateStorageService`
-- signed download URL đã có ở storage layer, nhưng luồng private file hiện đang chủ yếu dùng `OpenReadAsync`
+- signed download URL đã có ở storage layer và media API core, nhưng nhiều business flow private hiện vẫn đang chủ yếu dùng `OpenReadAsync`
 - permission matrix mới chưa phủ hết mọi module private còn lại
 - audit semantics cho read/download chưa được chốt hoàn toàn
 - business module còn lại phần lớn vẫn chưa lưu `MediaAssetId`
@@ -44,11 +153,12 @@ Các điểm chưa hoàn chỉnh nhưng đã biết từ code hiện tại:
 - billing proof image hiện đã có `ProofMediaAssetId`, private access rule và backfill metadata; frontend upload/viewer chuyên biệt vẫn chưa được materialize
 - shared helper frontend hiện đã được tách rõ hơn cho public listing/property image, nhưng helper private/transitional vẫn còn giữ compatibility cũ để tránh lan sửa
 - avatar user-uploaded hiện đã có `AvatarMediaAssetId`, nhưng `AvatarUrl` vẫn được giữ song song để tương thích với external avatar và call site cũ
+- các mục trên không chặn `Phase 1` theo plan mới rút gọn; sau khi `Phase 2` core đã xong, chúng trở thành backlog rollout/cleanup phase sau
 
 Nếu tiếp tục bám đúng code hiện tại, phase kế tiếp mặc định là:
 
-- `Phase 14 - Chat attachment design stub hoặc implementation`
-- phase-specific plan gần nhất còn dùng để tham chiếu avatar: `docs/AI_Media_Migration_Phase13_Avatar_Plan.md`
+- theo plan cũ chi tiết: `Phase 14 - Chat attachment design stub hoặc implementation`
+- theo plan mới rút gọn: sau Phase 5H, bước tiếp theo là `Phase 5I - Legacy Schema/API Removal Plan`, tức đối chiếu caller theo từng module trước khi drop legacy columns/routes/helpers
 
 ---
 
@@ -350,6 +460,7 @@ Giữ endpoint upload cũ hoạt động nhưng bên dưới đã dùng media co
 - upload cũ vẫn trả `ObjectKey` và `Url`
 - `FilesController` không cần đổi contract
 - mới chỉ cover compatibility flow cho public upload hiện tại, chưa đổi business module sang `MediaAssetId`
+- lưu ý: phase này là `Phase 2` của plan chi tiết cũ, không tương đương `Phase 2` trong plan mới rút gọn
 
 ---
 

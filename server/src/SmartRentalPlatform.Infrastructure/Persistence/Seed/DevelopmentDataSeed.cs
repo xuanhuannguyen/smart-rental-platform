@@ -181,9 +181,9 @@ public static class DevelopmentDataSeed
                 DocumentType = KycDocumentType.CCCD,
                 EkycProvider = EkycProvider.VNPT,
                 EkycSessionId = "dev-approved-tenant-session",
-                FrontImageObjectKey = "demo/kyc/tenant/front.jpg",
-                BackImageObjectKey = "demo/kyc/tenant/back.jpg",
-                SelfieImageObjectKey = "demo/kyc/tenant/selfie.jpg",
+                FrontImageObjectKey = string.Empty,
+                BackImageObjectKey = string.Empty,
+                SelfieImageObjectKey = string.Empty,
                 SelfieCaptureMethod = SelfieCaptureMethod.Upload,
                 OcrFullName = "Nguyen Tenant Demo",
                 OcrCitizenIdMasked = "079********001",
@@ -418,9 +418,9 @@ public static class DevelopmentDataSeed
             UserId = userId,
             DocumentType = KycDocumentType.CCCD,
             EkycProvider = EkycProvider.VNPT,
-            FrontImageObjectKey = $"demo/kyc/{userId}/front.jpg",
-            BackImageObjectKey = $"demo/kyc/{userId}/back.jpg",
-            SelfieImageObjectKey = $"demo/kyc/{userId}/selfie.jpg",
+            FrontImageObjectKey = string.Empty,
+            BackImageObjectKey = string.Empty,
+            SelfieImageObjectKey = string.Empty,
             OcrFullName = fullName,
             OcrCitizenIdMasked = citizenIdMasked,
             CitizenIdHash = citizenIdHash,
@@ -473,8 +473,8 @@ public static class DevelopmentDataSeed
             {
                 Id = Guid.Parse("40000000-0000-0000-0000-000000000001"),
                 RoomingHouseId = ApprovedHouseId,
-                ObjectKey = "demo/houses/hoa-sen/cover.jpg",
-                ImageUrl = "/uploads/demo/houses/hoa-sen/cover.jpg",
+                ObjectKey = string.Empty,
+                ImageUrl = string.Empty,
                 Caption = "Mặt tiền nhà trọ Hoa Sen",
                 IsCover = true,
                 SortOrder = 1,
@@ -485,8 +485,8 @@ public static class DevelopmentDataSeed
             {
                 RoomingHouseId = ApprovedHouseId,
                 DocumentType = LegalDocumentType.LAND_USE_CERTIFICATE,
-                FrontImageObjectKey = "demo/legal/hoa-sen/front.jpg",
-                BackImageObjectKey = "demo/legal/hoa-sen/back.jpg",
+                FrontImageObjectKey = string.Empty,
+                BackImageObjectKey = string.Empty,
                 DocumentNumberMasked = "*****6789",
                 DocumentNumberHash = "demo-hoa-sen-legal-document-hash",
                 UploadedAt = SeededAt,
@@ -544,7 +544,6 @@ public static class DevelopmentDataSeed
             108.265000m,
             RoomingHouseApprovalStatus.Approved,
             RoomingHouseVisibilityStatus.Visible,
-            "demo/houses/sunrise/cover.jpg",
             "Mặt tiền Nhà trọ Sunrise",
             cancellationToken,
             AmenitySeed.WifiId,
@@ -564,7 +563,6 @@ public static class DevelopmentDataSeed
             108.260000m,
             RoomingHouseApprovalStatus.Approved,
             RoomingHouseVisibilityStatus.Visible,
-            "demo/houses/green-view/cover.jpg",
             "Không gian chung Nhà trọ Green View",
             cancellationToken,
             AmenitySeed.WifiId,
@@ -584,7 +582,6 @@ public static class DevelopmentDataSeed
             108.268000m,
             RoomingHouseApprovalStatus.Pending,
             RoomingHouseVisibilityStatus.Hidden,
-            "demo/houses/garden-pending/cover.jpg",
             "Ảnh tổng quan Nhà trọ Garden Pending",
             cancellationToken,
             AmenitySeed.WifiId,
@@ -602,7 +599,6 @@ public static class DevelopmentDataSeed
             108.258000m,
             RoomingHouseApprovalStatus.Rejected,
             RoomingHouseVisibilityStatus.Hidden,
-            "demo/houses/old-town/cover.jpg",
             "Ảnh hiện trạng Nhà trọ Old Town",
             cancellationToken,
             AmenitySeed.WifiId,
@@ -623,7 +619,6 @@ public static class DevelopmentDataSeed
         decimal longitude,
         RoomingHouseApprovalStatus approvalStatus,
         RoomingHouseVisibilityStatus visibilityStatus,
-        string coverObjectKey,
         string coverCaption,
         CancellationToken cancellationToken,
         params int[] amenityIds)
@@ -677,8 +672,8 @@ public static class DevelopmentDataSeed
         {
             Id = Guid.NewGuid(),
             RoomingHouseId = roomingHouseId,
-            ObjectKey = coverObjectKey,
-            ImageUrl = $"/uploads/{coverObjectKey}",
+            ObjectKey = string.Empty,
+            ImageUrl = string.Empty,
             Caption = coverCaption,
             IsCover = true,
             SortOrder = 1,
@@ -723,9 +718,9 @@ public static class DevelopmentDataSeed
             CreatePriceTier(Room201Id, 3, 4500000m));
 
         context.PropertyImages.AddRange(
-            CreateRoomImage(Room101Id, "demo/rooms/101/cover.jpg", "Phòng 101"),
-            CreateRoomImage(Room102Id, "demo/rooms/102/cover.jpg", "Phòng 102"),
-            CreateRoomImage(Room201Id, "demo/rooms/201/cover.jpg", "Phòng 201"));
+            CreateRoomImage(Room101Id, "Phòng 101"),
+            CreateRoomImage(Room102Id, "Phòng 102"),
+            CreateRoomImage(Room201Id, "Phòng 201"));
 
         await context.SaveChangesAsync(cancellationToken);
     }
@@ -854,10 +849,8 @@ public static class DevelopmentDataSeed
                 baseRent + areaPremium + ((occupantCount - 1) * 450000m)));
         }
 
-        var imageSlug = room.RoomNumber.ToLowerInvariant().Replace("-", string.Empty);
         context.PropertyImages.Add(CreateRoomImage(
             room.Id,
-            $"demo/rooms/{imageSlug}/cover.jpg",
             $"Phòng {room.RoomNumber}"));
     }
 
@@ -875,14 +868,14 @@ public static class DevelopmentDataSeed
         };
     }
 
-    private static PropertyImage CreateRoomImage(Guid roomId, string objectKey, string caption)
+    private static PropertyImage CreateRoomImage(Guid roomId, string caption)
     {
         return new PropertyImage
         {
             Id = Guid.NewGuid(),
             RoomId = roomId,
-            ObjectKey = objectKey,
-            ImageUrl = $"/uploads/{objectKey}",
+            ObjectKey = string.Empty,
+            ImageUrl = string.Empty,
             Caption = caption,
             IsCover = true,
             SortOrder = 1,

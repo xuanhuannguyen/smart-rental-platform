@@ -1,3 +1,4 @@
+using SmartRentalPlatform.Domain.Entities.Media;
 using SmartRentalPlatform.Domain.Enums.Properties;
 
 namespace SmartRentalPlatform.Domain.Entities.Properties;
@@ -9,6 +10,8 @@ public class RoomingHouseRule
     public Guid RoomingHouseId { get; set; }
 
     public RoomingHouseRuleSourceType SourceType { get; set; }
+
+    public Guid? MediaAssetId { get; set; }
 
     public string PdfObjectKey { get; set; } = string.Empty;
 
@@ -35,4 +38,6 @@ public class RoomingHouseRule
     public DateTimeOffset UpdatedAt { get; set; }
 
     public RoomingHouse RoomingHouse { get; set; } = null!;
+
+    public MediaAsset? MediaAsset { get; set; }
 }

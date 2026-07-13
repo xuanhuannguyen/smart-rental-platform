@@ -9,6 +9,7 @@ using System.Threading.Tasks;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Query;
 using SmartRentalPlatform.Application.Billing;
+using SmartRentalPlatform.Application.Common.Media;
 using SmartRentalPlatform.Application.Common.Exceptions;
 using SmartRentalPlatform.Application.Common.Interfaces;
 using SmartRentalPlatform.Application.Wallets;
@@ -16,12 +17,14 @@ using SmartRentalPlatform.Contracts.Common;
 using SmartRentalPlatform.Contracts.RentalContracts;
 using SmartRentalPlatform.Contracts.RentalContracts.Requests;
 using SmartRentalPlatform.Contracts.RentalContracts.Responses;
+using SmartRentalPlatform.Domain.Entities.Media;
 using SmartRentalPlatform.Domain.Entities.Properties;
 using SmartRentalPlatform.Domain.Entities.Rental;
 using SmartRentalPlatform.Domain.Entities.RentalContracts;
 using SmartRentalPlatform.Domain.Entities.Users;
 using SmartRentalPlatform.Domain.Enums.Billing;
 using SmartRentalPlatform.Domain.Enums.Kyc;
+using SmartRentalPlatform.Domain.Enums.Media;
 using SmartRentalPlatform.Domain.Enums.Properties;
 using SmartRentalPlatform.Domain.Enums.Payments;
 using SmartRentalPlatform.Domain.Enums.Rental;
@@ -31,6 +34,8 @@ namespace SmartRentalPlatform.Application.RentalContracts;
 
 public class RentalContractService : IRentalContractService
 {
+	private sealed record LinkedMediaAssetResolution(Guid MediaAssetId, string ObjectKey);
+
 	private sealed record ContractPreviewViewerAccess(string ViewerMode, bool ShowFullDocumentNumbers, IReadOnlyCollection<Guid>? VisibleOccupantIds);
 
 	private sealed record VerifiedOccupantAccount(Guid UserId, string FullName, string? PhoneNumber, DateOnly DateOfBirth);
@@ -208,13 +213,19 @@ public class RentalContractService : IRentalContractService
 							DocumentNumberMasked = MaskDocumentNumber(documentRequest.DocumentNumber),
 							DocumentNumberHash = HashDocumentNumber(documentRequest.DocumentNumber),
 							DocumentNumberEncrypted = EncryptDocumentNumber(documentRequest.DocumentNumber),
-							FrontImageObjectKey = documentRequest.FrontImageObjectKey.Trim(),
-							BackImageObjectKey = NormalizeOptionalText(documentRequest.BackImageObjectKey),
-							ExtraImageObjectKey = NormalizeOptionalText(documentRequest.ExtraImageObjectKey),
 							UploadedAt = now,
 							CreatedAt = now,
 							UpdatedAt = now
 						};
+						LinkedMediaAssetResolution frontAsset = await EnsureContractOccupantDocumentMediaAssetAsync(tenantUserId, newDoc, documentRequest.FrontMediaAssetId, documentRequest.FrontImageObjectKey, newDoc.FrontMediaAssetId, now, cancellationToken);
+						LinkedMediaAssetResolution? backAsset = await EnsureOptionalContractOccupantDocumentMediaAssetAsync(tenantUserId, newDoc, documentRequest.BackMediaAssetId, documentRequest.BackImageObjectKey, newDoc.BackMediaAssetId, now, cancellationToken);
+						LinkedMediaAssetResolution? extraAsset = await EnsureOptionalContractOccupantDocumentMediaAssetAsync(tenantUserId, newDoc, documentRequest.ExtraMediaAssetId, documentRequest.ExtraImageObjectKey, newDoc.ExtraMediaAssetId, now, cancellationToken);
+						newDoc.FrontMediaAssetId = frontAsset.MediaAssetId;
+						newDoc.FrontImageObjectKey = frontAsset.ObjectKey;
+						newDoc.BackMediaAssetId = backAsset?.MediaAssetId;
+						newDoc.BackImageObjectKey = backAsset?.ObjectKey;
+						newDoc.ExtraMediaAssetId = extraAsset?.MediaAssetId;
+						newDoc.ExtraImageObjectKey = extraAsset?.ObjectKey;
 						occupant.Documents.Add(newDoc);
 						context.ContractOccupantDocuments.Add(newDoc);
 					}
@@ -1425,9 +1436,15 @@ public class RentalContractService : IRentalContractService
 			ContractOccupantId = document.RentalContractOccupantId,
 			DocumentType = document.DocumentType,
 			DocumentNumberMasked = document.DocumentNumberMasked,
-			FrontImageObjectKey = document.FrontImageObjectKey,
-			BackImageObjectKey = document.BackImageObjectKey,
-			ExtraImageObjectKey = document.ExtraImageObjectKey,
+			FrontMediaAssetId = document.FrontMediaAssetId,
+			BackMediaAssetId = document.BackMediaAssetId,
+			ExtraMediaAssetId = document.ExtraMediaAssetId,
+			FrontImageObjectKey = document.FrontMediaAssetId.HasValue ? string.Empty : document.FrontImageObjectKey,
+			BackImageObjectKey = document.BackMediaAssetId.HasValue ? null : document.BackImageObjectKey,
+			ExtraImageObjectKey = document.ExtraMediaAssetId.HasValue ? null : document.ExtraImageObjectKey,
+			FrontImageUrl = BuildPrivateMediaUrl(document.FrontMediaAssetId),
+			BackImageUrl = BuildOptionalPrivateMediaUrl(document.BackMediaAssetId),
+			ExtraImageUrl = BuildOptionalPrivateMediaUrl(document.ExtraMediaAssetId),
 			UploadedAt = document.UploadedAt
 		};
 	}
@@ -1500,7 +1517,9 @@ public class RentalContractService : IRentalContractService
 			{
 				throw new BadRequestException("RENTAL_CONTRACT_INVALID_OCCUPANT", "Người ở chưa có tài khoản phải có giấy tờ.");
 			}
-			if (!string.IsNullOrWhiteSpace(occupant.Document.DocumentType) && !string.IsNullOrWhiteSpace(occupant.Document.DocumentNumber) && !string.IsNullOrWhiteSpace(occupant.Document.FrontImageObjectKey))
+			if (!string.IsNullOrWhiteSpace(occupant.Document.DocumentType) &&
+				!string.IsNullOrWhiteSpace(occupant.Document.DocumentNumber) &&
+				(occupant.Document.FrontMediaAssetId.HasValue || !string.IsNullOrWhiteSpace(occupant.Document.FrontImageObjectKey)))
 			{
 				continue;
 			}
@@ -1867,6 +1886,115 @@ public class RentalContractService : IRentalContractService
 		return string.IsNullOrWhiteSpace(value) ? null : value.Trim();
 	}
 
+	private async Task<LinkedMediaAssetResolution> EnsureContractOccupantDocumentMediaAssetAsync(Guid ownerUserId, ContractOccupantDocument document, Guid? requestedMediaAssetId, string? objectKey, Guid? existingMediaAssetId, DateTimeOffset now, CancellationToken cancellationToken)
+	{
+		MediaAsset mediaAsset = await ResolveLinkedMediaAssetAsync(requestedMediaAssetId, objectKey, existingMediaAssetId, ownerUserId, MediaScope.KycDocument, MediaVisibility.Private, nameof(ContractOccupantDocument), document.Id, "legacy-private-storage", now, cancellationToken);
+		return new LinkedMediaAssetResolution(mediaAsset.Id, mediaAsset.ObjectKey);
+	}
+
+	private async Task<LinkedMediaAssetResolution?> EnsureOptionalContractOccupantDocumentMediaAssetAsync(Guid ownerUserId, ContractOccupantDocument document, Guid? requestedMediaAssetId, string? objectKey, Guid? existingMediaAssetId, DateTimeOffset now, CancellationToken cancellationToken)
+	{
+		if (!requestedMediaAssetId.HasValue && string.IsNullOrWhiteSpace(objectKey))
+		{
+			if (existingMediaAssetId.HasValue)
+			{
+				MediaAsset mediaAsset = await context.MediaAssets.FirstOrDefaultAsync((MediaAsset x) => x.Id == existingMediaAssetId.Value, cancellationToken);
+				if (mediaAsset != null)
+				{
+					mediaAsset.LinkedEntityType = null;
+					mediaAsset.LinkedEntityId = null;
+					mediaAsset.Status = MediaStatus.Uploaded;
+					mediaAsset.UpdatedAt = now;
+				}
+			}
+			return null;
+		}
+		return await EnsureContractOccupantDocumentMediaAssetAsync(ownerUserId, document, requestedMediaAssetId, objectKey, existingMediaAssetId, now, cancellationToken);
+	}
+
+	private async Task<MediaAsset> ResolveLinkedMediaAssetAsync(Guid? requestedMediaAssetId, string? objectKey, Guid? existingMediaAssetId, Guid ownerUserId, MediaScope scope, MediaVisibility visibility, string linkedEntityType, Guid linkedEntityId, string fallbackBucketName, DateTimeOffset now, CancellationToken cancellationToken)
+	{
+		MediaAsset mediaAsset = null;
+		string text;
+		if (requestedMediaAssetId.HasValue)
+		{
+			mediaAsset = await context.MediaAssets.FirstOrDefaultAsync((MediaAsset x) => x.Id == requestedMediaAssetId.Value, cancellationToken);
+			if (mediaAsset == null)
+			{
+				throw new BadRequestException("VALIDATION_ERROR", "Media asset được chọn không tồn tại.", new
+				{
+					mediaAssetId = requestedMediaAssetId.Value
+				});
+			}
+			text = mediaAsset.ObjectKey;
+		}
+		else
+		{
+			if (string.IsNullOrWhiteSpace(objectKey))
+			{
+				throw new BadRequestException("VALIDATION_ERROR", "Mã lưu trữ tệp là bắt buộc.", new
+				{
+					field = nameof(objectKey)
+				});
+			}
+			text = NormalizeObjectKey(objectKey);
+			mediaAsset = await context.MediaAssets.FirstOrDefaultAsync((MediaAsset x) => x.ObjectKey == text, cancellationToken);
+		}
+		if (existingMediaAssetId.HasValue && existingMediaAssetId != mediaAsset?.Id)
+		{
+			MediaAsset mediaAsset2 = await context.MediaAssets.FirstOrDefaultAsync((MediaAsset x) => x.Id == existingMediaAssetId.Value, cancellationToken);
+			if (mediaAsset2 != null)
+			{
+				mediaAsset2.LinkedEntityType = null;
+				mediaAsset2.LinkedEntityId = null;
+				mediaAsset2.Status = MediaStatus.Uploaded;
+				mediaAsset2.UpdatedAt = now;
+			}
+		}
+		if (mediaAsset == null)
+		{
+			mediaAsset = new MediaAsset
+			{
+				Id = Guid.NewGuid(),
+				OwnerUserId = ownerUserId,
+				BucketName = fallbackBucketName,
+				ObjectKey = text,
+				OriginalFileName = Path.GetFileName(text),
+				StoredFileName = Path.GetFileName(text),
+				ContentType = GuessContentType(text),
+				FileSize = 0,
+				Scope = scope,
+				Visibility = visibility,
+				Status = MediaStatus.Linked,
+				LinkedEntityType = linkedEntityType,
+				LinkedEntityId = linkedEntityId,
+				CreatedAt = now,
+				UpdatedAt = now
+			};
+			context.MediaAssets.Add(mediaAsset);
+			return mediaAsset;
+		}
+		mediaAsset.OwnerUserId = ownerUserId;
+		mediaAsset.Scope = scope;
+		mediaAsset.Visibility = visibility;
+		mediaAsset.Status = MediaStatus.Linked;
+		mediaAsset.LinkedEntityType = linkedEntityType;
+		mediaAsset.LinkedEntityId = linkedEntityId;
+		mediaAsset.DeletedAt = null;
+		mediaAsset.UpdatedAt = now;
+		return mediaAsset;
+	}
+
+	private static string BuildPrivateMediaUrl(Guid? mediaAssetId)
+	{
+		return mediaAssetId.HasValue ? PrivateMediaPathBuilder.Build(mediaAssetId.Value) : string.Empty;
+	}
+
+	private static string? BuildOptionalPrivateMediaUrl(Guid? mediaAssetId)
+	{
+		return mediaAssetId.HasValue ? PrivateMediaPathBuilder.Build(mediaAssetId.Value) : null;
+	}
+
 	private static ContractOccupantStatus ResolveMoveInStatus(DateOnly moveInDate, DateOnly today)
 	{
 		return moveInDate <= today ? ContractOccupantStatus.Active : ContractOccupantStatus.PendingMoveIn;
@@ -1975,6 +2103,23 @@ public class RentalContractService : IRentalContractService
 	private static string NormalizeFieldName(string? value)
 	{
 		return string.IsNullOrWhiteSpace(value) ? string.Empty : value.Replace("_", string.Empty, StringComparison.Ordinal).Trim().ToLowerInvariant();
+	}
+
+	private static string NormalizeObjectKey(string objectKey)
+	{
+		return objectKey.Replace('\\', '/').Trim().TrimStart('/');
+	}
+
+	private static string GuessContentType(string objectKey)
+	{
+		return Path.GetExtension(objectKey).ToLowerInvariant() switch
+		{
+			".jpg" or ".jpeg" => "image/jpeg",
+			".png" => "image/png",
+			".webp" => "image/webp",
+			".pdf" => "application/pdf",
+			_ => "application/octet-stream"
+		};
 	}
 
 	private static int GetSnapshotMaxOccupants(RentalContract contract)

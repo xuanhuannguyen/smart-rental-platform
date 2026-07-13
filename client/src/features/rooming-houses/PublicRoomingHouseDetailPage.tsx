@@ -201,10 +201,10 @@ export default function PublicRoomingHouseDetailPage() {
           
           <div className="rules-card-body">
             <div className="rules-card-info">
-              {house.houseRule?.pdfObjectKey ? (
+              {house.houseRule?.pdfUrl || house.houseRule?.pdfObjectKey ? (
                 <a
                   className="public-house-detail__rule-link"
-                  href={toAssetUrl(house.houseRule.pdfObjectKey)}
+                  href={house.houseRule?.pdfUrl || toAssetUrl(house.houseRule!.pdfObjectKey)}
                   target="_blank"
                   rel="noreferrer"
                 >

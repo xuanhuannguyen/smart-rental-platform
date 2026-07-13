@@ -1,4 +1,6 @@
-﻿namespace SmartRentalPlatform.Domain.Entities.RentalContracts
+using SmartRentalPlatform.Domain.Entities.Media;
+
+namespace SmartRentalPlatform.Domain.Entities.RentalContracts
 {
     public class ContractOccupantDocument
     {
@@ -14,6 +16,12 @@
 
         public string? DocumentNumberEncrypted { get; set; }
 
+        public Guid? FrontMediaAssetId { get; set; }
+
+        public Guid? BackMediaAssetId { get; set; }
+
+        public Guid? ExtraMediaAssetId { get; set; }
+
         public string FrontImageObjectKey { get; set; } = string.Empty;
 
         public string? BackImageObjectKey { get; set; }
@@ -27,5 +35,11 @@
         public DateTimeOffset UpdatedAt { get; set; }
 
         public ContractOccupant RentalContractOccupant { get; set; } = null!;
+
+        public MediaAsset? FrontMediaAsset { get; set; }
+
+        public MediaAsset? BackMediaAsset { get; set; }
+
+        public MediaAsset? ExtraMediaAsset { get; set; }
     }
 }

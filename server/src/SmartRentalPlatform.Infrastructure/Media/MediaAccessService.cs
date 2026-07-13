@@ -1,6 +1,8 @@
 using SmartRentalPlatform.Application.Common.Interfaces;
 using SmartRentalPlatform.Application.Common.Interfaces.Media;
+using SmartRentalPlatform.Application.Common.Exceptions;
 using SmartRentalPlatform.Application.Common.Models.Media;
+using SmartRentalPlatform.Contracts.Common;
 using SmartRentalPlatform.Domain.Entities.Media;
 using SmartRentalPlatform.Domain.Enums.Media;
 
@@ -29,7 +31,20 @@ public class MediaAccessService : IMediaAccessService
         MediaAuditContext? auditContext = null)
     {
         var mediaAsset = await GetMediaAssetAsync(mediaAssetId, cancellationToken);
-        await EnsureCanAccessAsync(actorUserId, mediaAsset, isDownload: false, cancellationToken);
+        try
+        {
+            await EnsureCanAccessAsync(actorUserId, mediaAsset, isDownload: false, cancellationToken);
+        }
+        catch (ForbiddenException)
+        {
+            await WriteAuditLogAsync(
+                mediaAsset.Id,
+                actorUserId,
+                string.IsNullOrWhiteSpace(auditContext?.Action) ? "ViewDenied" : $"{auditContext.Action}Denied",
+                auditContext,
+                cancellationToken);
+            throw;
+        }
 
         var stream = await _mediaStorageService.OpenReadAsync(mediaAsset.ObjectKey, cancellationToken);
         await WriteAuditLogAsync(
@@ -56,7 +71,20 @@ public class MediaAccessService : IMediaAccessService
         MediaAuditContext? auditContext = null)
     {
         var mediaAsset = await GetMediaAssetAsync(mediaAssetId, cancellationToken);
-        await EnsureCanAccessAsync(actorUserId, mediaAsset, isDownload: true, cancellationToken);
+        try
+        {
+            await EnsureCanAccessAsync(actorUserId, mediaAsset, isDownload: true, cancellationToken);
+        }
+        catch (ForbiddenException)
+        {
+            await WriteAuditLogAsync(
+                mediaAsset.Id,
+                actorUserId,
+                string.IsNullOrWhiteSpace(auditContext?.Action) ? "GenerateDownloadUrlDenied" : $"{auditContext.Action}Denied",
+                auditContext,
+                cancellationToken);
+            throw;
+        }
 
         var url = await _mediaStorageService.GetDownloadUrlAsync(mediaAsset.ObjectKey, ttl, cancellationToken);
         await WriteAuditLogAsync(
@@ -85,6 +113,16 @@ public class MediaAccessService : IMediaAccessService
         bool isDownload,
         CancellationToken cancellationToken)
     {
+        if (mediaAsset.Status == MediaStatus.Deleted)
+        {
+            throw new ForbiddenException(ErrorCodes.Forbidden, "Media asset đã bị xóa mềm.");
+        }
+
+        if (mediaAsset.Status == MediaStatus.PendingUpload)
+        {
+            throw new ForbiddenException(ErrorCodes.InvalidStatus, "Media asset chưa hoàn tất upload.");
+        }
+
         if (mediaAsset.Visibility == MediaVisibility.Public)
         {
             return;
@@ -96,7 +134,7 @@ public class MediaAccessService : IMediaAccessService
 
         if (!allowed)
         {
-            throw new UnauthorizedAccessException("You do not have permission to access this media asset.");
+            throw new ForbiddenException(ErrorCodes.Forbidden, "Bạn không có quyền truy cập media asset này.");
         }
     }
 

@@ -35214,6 +35214,10 @@ namespace SmartRentalPlatform.Infrastructure.Persistence.Migrations
                         .HasColumnType("text")
                         .HasColumnName("guest_policy");
 
+                    b.Property<Guid?>("MediaAssetId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("media_asset_id");
+
                     b.Property<string>("ParkingPolicy")
                         .HasColumnType("text")
                         .HasColumnName("parking_policy");
@@ -35250,6 +35254,8 @@ namespace SmartRentalPlatform.Infrastructure.Persistence.Migrations
                         .HasColumnName("utility_policy");
 
                     b.HasKey("Id");
+
+                    b.HasIndex("MediaAssetId");
 
                     b.HasIndex("RoomingHouseId")
                         .IsUnique();
@@ -35848,6 +35854,10 @@ namespace SmartRentalPlatform.Infrastructure.Persistence.Migrations
                         .HasColumnType("text")
                         .HasColumnName("back_image_object_key");
 
+                    b.Property<Guid?>("BackMediaAssetId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("back_media_asset_id");
+
                     b.Property<DateTimeOffset>("CreatedAt")
                         .HasColumnType("timestamp with time zone")
                         .HasColumnName("created_at");
@@ -35875,10 +35885,18 @@ namespace SmartRentalPlatform.Infrastructure.Persistence.Migrations
                         .HasColumnType("text")
                         .HasColumnName("extra_image_object_key");
 
+                    b.Property<Guid?>("ExtraMediaAssetId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("extra_media_asset_id");
+
                     b.Property<string>("FrontImageObjectKey")
                         .IsRequired()
                         .HasColumnType("text")
                         .HasColumnName("front_image_object_key");
+
+                    b.Property<Guid?>("FrontMediaAssetId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("front_media_asset_id");
 
                     b.Property<Guid>("RentalContractOccupantId")
                         .HasColumnType("uuid")
@@ -35894,7 +35912,13 @@ namespace SmartRentalPlatform.Infrastructure.Persistence.Migrations
 
                     b.HasKey("Id");
 
+                    b.HasIndex("BackMediaAssetId");
+
                     b.HasIndex("DocumentNumberHash");
+
+                    b.HasIndex("ExtraMediaAssetId");
+
+                    b.HasIndex("FrontMediaAssetId");
 
                     b.HasIndex("RentalContractOccupantId")
                         .IsUnique();
@@ -37066,11 +37090,18 @@ namespace SmartRentalPlatform.Infrastructure.Persistence.Migrations
 
             modelBuilder.Entity("SmartRentalPlatform.Domain.Entities.Properties.RoomingHouseRule", b =>
                 {
+                    b.HasOne("SmartRentalPlatform.Domain.Entities.Media.MediaAsset", "MediaAsset")
+                        .WithMany()
+                        .HasForeignKey("MediaAssetId")
+                        .OnDelete(DeleteBehavior.SetNull);
+
                     b.HasOne("SmartRentalPlatform.Domain.Entities.Properties.RoomingHouse", "RoomingHouse")
                         .WithOne("HouseRule")
                         .HasForeignKey("SmartRentalPlatform.Domain.Entities.Properties.RoomingHouseRule", "RoomingHouseId")
                         .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired();
+
+                    b.Navigation("MediaAsset");
 
                     b.Navigation("RoomingHouse");
                 });
@@ -37264,11 +37295,32 @@ namespace SmartRentalPlatform.Infrastructure.Persistence.Migrations
 
             modelBuilder.Entity("SmartRentalPlatform.Domain.Entities.RentalContracts.ContractOccupantDocument", b =>
                 {
+                    b.HasOne("SmartRentalPlatform.Domain.Entities.Media.MediaAsset", "BackMediaAsset")
+                        .WithMany()
+                        .HasForeignKey("BackMediaAssetId")
+                        .OnDelete(DeleteBehavior.SetNull);
+
+                    b.HasOne("SmartRentalPlatform.Domain.Entities.Media.MediaAsset", "ExtraMediaAsset")
+                        .WithMany()
+                        .HasForeignKey("ExtraMediaAssetId")
+                        .OnDelete(DeleteBehavior.SetNull);
+
+                    b.HasOne("SmartRentalPlatform.Domain.Entities.Media.MediaAsset", "FrontMediaAsset")
+                        .WithMany()
+                        .HasForeignKey("FrontMediaAssetId")
+                        .OnDelete(DeleteBehavior.SetNull);
+
                     b.HasOne("SmartRentalPlatform.Domain.Entities.RentalContracts.ContractOccupant", "RentalContractOccupant")
                         .WithMany("Documents")
                         .HasForeignKey("RentalContractOccupantId")
                         .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired();
+
+                    b.Navigation("BackMediaAsset");
+
+                    b.Navigation("ExtraMediaAsset");
+
+                    b.Navigation("FrontMediaAsset");
 
                     b.Navigation("RentalContractOccupant");
                 });

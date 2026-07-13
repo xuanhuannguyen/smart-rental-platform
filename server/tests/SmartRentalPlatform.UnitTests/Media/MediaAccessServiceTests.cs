@@ -1,4 +1,5 @@
 using System.Text;
+using SmartRentalPlatform.Application.Common.Exceptions;
 using SmartRentalPlatform.Application.Common.Interfaces.Media;
 using SmartRentalPlatform.Application.Common.Models.Media;
 using SmartRentalPlatform.Domain.Entities.Media;
@@ -92,6 +93,52 @@ public class MediaAccessServiceTests : IClassFixture<TestDatabaseFixture>
         Assert.Equal("{\"mode\":\"inline\"}", audit.MetadataJson);
     }
 
+    [Fact]
+    public async Task OpenReadAsync_ForForbiddenPrivateMedia_ShouldWriteDeniedAudit()
+    {
+        var ownerId = Guid.NewGuid();
+        var outsiderId = Guid.NewGuid();
+        var mediaAsset = new MediaAsset
+        {
+            Id = Guid.NewGuid(),
+            OwnerUserId = ownerId,
+            BucketName = "local-media",
+            ObjectKey = $"private/avatars/{Guid.NewGuid():N}.png",
+            OriginalFileName = "avatar.png",
+            StoredFileName = "avatar.png",
+            ContentType = "image/png",
+            FileSize = 100,
+            Scope = MediaScope.Avatar,
+            Visibility = MediaVisibility.Private,
+            Status = MediaStatus.Uploaded,
+            CreatedAt = DateTimeOffset.UtcNow,
+            UpdatedAt = DateTimeOffset.UtcNow
+        };
+
+        _fixture.Context.MediaAssets.Add(mediaAsset);
+        await _fixture.Context.SaveChangesAsync();
+
+        var service = new MediaAccessService(
+            _fixture.Context,
+            new FakeMediaStorageService(),
+            new DefaultMediaPermissionService(_fixture.Context));
+
+        await Assert.ThrowsAsync<ForbiddenException>(() =>
+            service.OpenReadAsync(
+                mediaAsset.Id,
+                outsiderId,
+                auditContext: new MediaAuditContext
+                {
+                    Action = "View",
+                    IpAddress = "10.0.0.1"
+                }));
+
+        var audit = Assert.Single(_fixture.Context.MediaAuditLogs);
+        Assert.Equal("ViewDenied", audit.Action);
+        Assert.Equal(outsiderId, audit.ActorUserId);
+        Assert.Equal("10.0.0.1", audit.IpAddress);
+    }
+
     private sealed class FakeMediaStorageService : IMediaStorageService
     {
         public Task<MediaStoredObjectResult> UploadAsync(
@@ -114,6 +161,35 @@ public class MediaAccessServiceTests : IClassFixture<TestDatabaseFixture>
         public Task<bool> ExistsAsync(string objectKey, CancellationToken cancellationToken = default)
         {
             return Task.FromResult(true);
+        }
+
+        public Task<MediaObjectMetadataResult> GetObjectMetadataAsync(string objectKey, CancellationToken cancellationToken = default)
+        {
+            return Task.FromResult(new MediaObjectMetadataResult
+            {
+                ObjectKey = objectKey,
+                ContentType = "image/jpeg",
+                FileSize = 100
+            });
+        }
+
+        public string GetBucketName()
+        {
+            return "local-media";
+        }
+
+        public Task<MediaUploadUrlResult> GetUploadUrlAsync(
+            string objectKey,
+            string contentType,
+            TimeSpan ttl,
+            CancellationToken cancellationToken = default)
+        {
+            return Task.FromResult(new MediaUploadUrlResult
+            {
+                Url = $"/upload/{objectKey}",
+                HttpMethod = "PUT",
+                ExpiresAtUtc = DateTimeOffset.UtcNow.Add(ttl)
+            });
         }
 
         public Task DeleteAsync(string objectKey, CancellationToken cancellationToken = default)

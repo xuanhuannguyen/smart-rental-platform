@@ -27,8 +27,8 @@ Mỗi phase sau phải cập nhật tiếp vào file này, không tạo lại ch
 ## Current Status
 
 - `[~]` Phase 0 chưa được materialize thành inventory doc riêng trong `docs`
-- `[x]` Phase 1 hoàn thành ở mức schema foundation
-- `[x]` Phase 2 hoàn thành ở mức service foundation
+- `[x]` Nếu đối chiếu theo plan cũ chi tiết, Phase 1 hoàn thành ở mức schema foundation
+- `[x]` Nếu đối chiếu theo plan cũ chi tiết, Phase 2 hoàn thành ở mức service foundation
 - `[x]` Phase 3 hoàn thành ở mức compatibility upload adapter cho flow public upload cũ
 - `[x]` Phase 4 hoàn thành cho `ContractFile` main file migration
 - `[x]` Phase 5 hoàn thành cho `ContractAppendix` file generation + permission integration
@@ -42,6 +42,32 @@ Mỗi phase sau phải cập nhật tiếp vào file này, không tạo lại ch
 - `[x]` Phase 13 hoàn thành cho avatar media linkage theo hướng compatibility
 - `[x]` Runtime code chính hiện bind `IMediaStorageService` và `IPrivateStorageService` sang `S3StorageService`
 - `[~]` Open risk hiện tập trung ở private module còn lại, admin access/audit, legal/property/billing migration và cleanup phase sau
+- `[x]` Nếu đối chiếu theo plan mới rút gọn:
+  - `Phase 1 - Thiết kế nền` đã đạt
+- `[x]` Nếu đối chiếu theo plan mới rút gọn:
+  - `Phase 2 - Upload/download core` đã đạt ở media core API/service layer
+- `[x]` Nếu đối chiếu theo plan mới rút gọn:
+  - `Phase 3 - Tích hợp module public/private` đã đạt cho module đang trong scope migration hiện tại
+- `[x]` Nếu đối chiếu theo plan mới rút gọn:
+  - `Phase 4 - Bảo mật và audit` đã đạt ở media core enforcement layer
+- `[x]` Nếu đối chiếu theo plan mới rút gọn:
+  - `Phase 5A - Inventory và readiness` đã hoàn thành tại `docs/AI_Media_Migration_Phase5A_Inventory.md`
+- `[x]` Nếu đối chiếu theo plan mới rút gọn:
+  - `Phase 5B - Legacy Object Migration/Backfill` đã có report tool và guarded backfill executor
+- `[x]` Nếu đối chiếu theo plan mới rút gọn:
+  - `Phase 5C - Read Path Cutover` đã hoàn thành ở mức safe cutover cho scope sau Phase 5B
+- `[x]` Nếu đối chiếu theo plan mới rút gọn:
+  - `Phase 5D - Legacy Compatibility Guard/Cleanup Prep` đã hoàn thành ở mức guard/deprecation không-breaking
+- `[x]` Nếu đối chiếu theo plan mới rút gọn:
+  - `Phase 5E - Local legacy data cleanup` đã hoàn thành cho DB local/bucket verification gate
+- `[x]` Nếu đối chiếu theo plan mới rút gọn:
+  - `Phase 5F - Legacy API/Frontend Lockdown` đã chặn legacy upload/admin object-key route và bỏ frontend caller trực tiếp `/api/files`
+- `[x]` Nếu đối chiếu theo plan mới rút gọn:
+  - `Phase 5G - Schema & Seed Hygiene` đã dọn seed/runtime sample media refs và apply cleanup migration data-only trên DB local
+- `[x]` Nếu đối chiếu theo plan mới rút gọn:
+  - `Phase 5H - Reset/Re-seed & End-to-End Verification` đã reset DB local, apply full migration chain, seed thật qua API startup, và post-check sạch legacy media refs
+- `[~]` Business rollout/cleanup sau Phase 4 vẫn còn ongoing:
+  - một số module vẫn giữ compatibility/fallback field cũ để tránh breaking change
 
 ---
 
@@ -83,6 +109,412 @@ Mỗi phase sau phải cập nhật tiếp vào file này, không tạo lại ch
 - `[x]` D022: `User` avatar dùng thêm `AvatarMediaAssetId` nhưng vẫn giữ `AvatarUrl` để compatibility
 - `[x]` D023: Google/external avatar tiếp tục đi qua `AvatarUrl`, không ép phải có `MediaAssetId`
 - `[x]` D024: Phase 13 chỉ làm `avatar`, không gộp `house rule PDF` vào cùng phase mặc định
+- `[x]` D025: Theo plan mới rút gọn, `Phase 1` chỉ bao gồm nền tảng: storage design, `MediaAsset`, enum media, permission matrix nền, schema/migration
+- `[x]` D026: Theo plan mới rút gọn, các mục sau thuộc `Phase 2`, không tính là thiếu sót blocker của `Phase 1`:
+  - `POST /api/media/upload-url`
+  - `POST /api/media/finalize`
+  - signed download URL là đường chính cho private file
+  - soft delete flow thống nhất
+  - bỏ trả private object key/path khỏi frontend ở mức toàn hệ thống
+
+---
+
+## Mapping To New 2-Phase Plan
+
+### Phase 1 - Thiết kế nền
+
+- `[x]` Chốt storage direction ở mức runtime/code hiện tại
+- `[x]` Có `MediaAsset`
+- `[x]` Có `MediaAuditLog`
+- `[x]` Có `MediaScope`, `MediaVisibility`, `MediaStatus`
+- `[x]` Có permission matrix nền ở mức media core cho các media private chính đã migrate
+- `[x]` Có schema/config/migration nền
+- `[x]` Có business linkage nền cho các module media chính đã đi qua migration từng phần
+
+### Phase 2 - Upload/download core
+
+- `[x]` Có `POST /api/media/upload-url`
+- `[x]` Có `POST /api/media/finalize`
+- `[x]` Có `PUT /api/media/upload/{mediaAssetId}` fallback backend-proxy cho môi trường không hỗ trợ direct upload URL
+- `[x]` Có `GET /api/media/{id}/download-url`
+- `[x]` Có `DELETE /api/media/{id}` cho soft delete flow media core
+- `[~]` signed download URL nay có media endpoint chuẩn, nhưng chưa là đường chính toàn hệ thống
+- `[x]` soft delete semantic nay đã có app flow thống nhất ở media core
+- `[~]` private object key/path vẫn còn tồn tại ở một số response/compatibility field
+- `[~]` audit upload/delete đã có ở media workflow core; replace/approve/reject vẫn chưa được chuẩn hóa toàn media layer
+
+- `[x]` D027: MediaController hiện đã expose workflow mới theo hướng cloud-first nhưng vẫn có backend-proxy fallback để không khóa local/non-presigned environments
+- `[x]` D028: Hoàn thành `Phase 2` theo plan mới không đồng nghĩa các business module đã bỏ `FilesController` compatibility upload
+- `[x]` D029: Phase 4 mới enforce validate file theo `MediaScope` bằng `MediaFileValidationPolicy`, gồm content type, extension, size limit, proxy upload metadata và finalize storage metadata
+- `[x]` D030: Phase 4 mới audit denied access ở `MediaAccessService`; denied audit không thay thế business audit riêng cho approve/reject/replace
+- `[x]` D031: Phase 5A chỉ là inventory/readiness; không migration object thật, không xóa field, không xóa endpoint/storage compatibility
+- `[x]` D032: Phase 5B phải chạy migration/backfill dry-run và report trước khi làm read-path cutover hoặc cleanup
+- `[x]` D033: Phase 5B report mode vẫn read-only; backfill mode mặc định dry-run và chỉ ghi DB khi truyền rõ `--mode backfill --dry-run false`
+- `[x]` D034: Storage existence check trong Phase 5B là optional qua `--check-storage true`, để dev/local không bị chặn bởi AWS config
+- `[x]` D035: Phase 5B backfill không copy/move object thật; nó chỉ tạo/link `MediaAsset` metadata khi schema target đã sẵn sàng
+- `[x]` D036: DB local `localhost:5444` ngày 2026-07-13 đã reset sạch, apply migration mới nhất, chạy Phase 5B apply, rồi dry-run lại sạch
+- `[x]` D037: Phase 5C không xóa legacy field/endpoint; chỉ đổi read path sang media-id-first và scrub private object key ở response khi đã có `MediaAssetId`
+- `[x]` D038: Phase 5D chỉ thêm guard/deprecation metadata cho legacy upload/object-key routes và frontend helper; chưa chặn hoặc xóa compatibility route/field
+- `[x]` D039: Phase 5E local cleanup dùng `server/tools/SmartRentalPlatform.MediaMigrationTool -- phase5e --mode cleanup`; mặc định dry-run, apply chỉ khi truyền `--dry-run false`
+- `[x]` D040: User đã xác nhận dữ liệu local/demo không cần giữ, nên Phase 5E đã xóa/clear các legacy media references missing object trong S3 trên DB local `localhost:5444`
+- `[x]` D041: Phase 5F chặn `POST /api/files/images`, `POST /api/files/pdfs`, và `GET /api/admin/media/private?objectKey=...` bằng `410 Gone`; public object-key route vẫn giữ tạm có chủ ý
+- `[x]` D042: Phase 5G chỉ làm seed/data hygiene, không drop legacy columns; runtime seed không còn tạo fake object keys, migration `20260713153000_CleanupLegacySampleMediaReferences` cleanup sample refs lịch sử và đã apply trên DB local
+- `[x]` D043: Phase 5H dùng reset/reseed local làm gate: DB `localhost:5444` đã drop, apply full migration chain, seed qua API startup, rồi report `phase5b --check-storage true` sạch 0 legacy refs
+
+---
+
+### Phase 3 - Tích hợp module public/private
+
+- `[x]` Module trong scope hiện tại đọc ưu tiên `MediaAssetId`
+- `[x]` Upload mới của các module đã migrate đi qua media workflow/cloud path hoặc compatibility adapter đã tạo `MediaAsset`
+- `[x]` Contract private/public mới được dùng làm đường chính cho các module đã migrate
+- `[~]` Một số response vẫn giữ object key/path fallback để tương thích frontend/API cũ
+- `[~]` Chat attachment và conversation-specific permission chưa làm vì thuộc scope người khác/chưa có conversation cụ thể
+
+### Phase 4 - Bảo mật và audit
+
+- `[x]` Có validate content type theo `MediaScope`
+- `[x]` Có validate extension theo `MediaScope`
+- `[x]` Có size limit theo `MediaScope`
+- `[x]` Backend-proxy upload validate request `Content-Type` và `Content-Length` so với upload session metadata
+- `[x]` Finalize upload kiểm object tồn tại và metadata thật trong storage trước khi chuyển sang `Uploaded`
+- `[x]` Private access chặn `PendingUpload`
+- `[x]` Private access chặn `Deleted`
+- `[x]` Private access denied dùng `ForbiddenException` thống nhất
+- `[x]` View/download-url success vẫn ghi audit qua media access layer
+- `[x]` View/download-url denied đã ghi audit action dạng `ViewDenied`/`GenerateDownloadUrlDenied` hoặc `${Action}Denied`
+- `[~]` Upload/delete đã audit ở media workflow core; replace/approve/reject vẫn cần chuẩn hóa theo từng business flow nếu phase sau yêu cầu
+- `[~]` Signed URL đã có ở media core nhưng một số private business flow vẫn stream qua backend để giữ compatibility
+
+### Phase 4 Verify
+
+- `[x]` `dotnet build server/SmartRentalPlatform.slnx` pass
+- `[x]` `dotnet test server/tests/SmartRentalPlatform.UnitTests/SmartRentalPlatform.UnitTests.csproj --no-restore --filter "MediaWorkflowServiceTests|MediaAccessServiceTests|ContractFileServiceTests|ContractAppendixServiceTests|KycServiceTests"` pass: 18/18
+
+---
+
+### Phase 5A - Inventory và readiness
+
+- `[x]` Tạo inventory riêng tại `docs/AI_Media_Migration_Phase5A_Inventory.md`
+- `[x]` Liệt kê legacy field còn tồn tại theo module:
+  - property/room images
+  - legal documents
+  - KYC
+  - contract main file
+  - contract occupant documents
+  - contract appendix occupant documents
+  - meter reading proof
+  - rooming house rule PDF
+  - avatar
+  - file upload compatibility response
+- `[x]` Liệt kê endpoint/storage compatibility còn tồn tại:
+  - `FilesController`
+  - `GET /api/media/public/{**objectKey}`
+  - admin legacy private object-key route
+  - KYC test/provider object-key flow
+  - local storage implementations
+- `[x]` Liệt kê frontend helper/caller còn phụ thuộc object key hoặc `toAssetUrl`
+- `[x]` Đánh dấu module nào có thể sang Phase 5B và module nào chưa thể cutover
+- `[x]` Xác nhận Phase 5A không xóa field/storage/endpoint và không move file thật
+- `[!]` Chat attachment chưa sẵn sàng cutover vì thiếu conversation-specific permission/design trong scope hiện tại
+- `[!]` VNPT eKYC provider boundary vẫn cần object key, không được xóa object-key fields KYC nếu chưa thiết kế lại provider flow
+
+### Phase 5A Verify
+
+- `[x]` Inventory được đối chiếu bằng `rg` trên `server/src` và `client/src`
+- `[x]` Không cần build/test vì Phase 5A chỉ cập nhật docs inventory, không đổi code runtime
+
+---
+
+### Phase 5B - Legacy Object Migration/Backfill
+
+- `[x]` Thêm `LegacyMediaMigrationReadinessService`
+- `[x]` Thêm report models:
+  - `LegacyMediaMigrationReadinessReport`
+  - `LegacyMediaModuleReport`
+  - `LegacyMediaReferenceSample`
+- `[x]` Report quét các module legacy trong scope:
+  - property images
+  - legal documents
+  - KYC
+  - contract files
+  - contract occupant documents
+  - meter reading proofs
+  - rooming house rules
+  - local/avatar media references
+- `[x]` Report tổng hợp:
+  - total legacy references
+  - missing `MediaAssetId`
+  - existing `MediaAssetId`
+  - matching `MediaAsset` by normalized object key
+  - missing `MediaAsset` by object key
+  - sample records cần xử lý
+- `[x]` Có optional storage existence check:
+  - `Present`
+  - `Missing`
+  - `Error`
+  - `NotChecked`
+- `[x]` Thêm console tool `server/tools/SmartRentalPlatform.MediaMigrationTool`
+- `[x]` Tool có `--mode report` read-only và `--mode backfill` mặc định dry-run
+- `[x]` `--mode backfill --dry-run false` là đường apply duy nhất và phải được chạy chủ động
+- `[x]` Tool ghi JSON report mặc định vào `server/data/media-migration/phase5b-readiness-report.json`
+- `[x]` Tool ghi JSON backfill report mặc định vào `server/data/media-migration/phase5b-backfill-report.json`
+- `[x]` Tool được add vào `server/SmartRentalPlatform.slnx` để build chung
+- `[x]` Đã reset DB local `localhost:5444` vì dữ liệu local không quan trọng
+- `[x]` Đã apply migration mới nhất đến `20260713064804_InspectRemainingModelChanges`
+- `[x]` Đã chạy Phase 5B backfill apply trên DB local:
+  - 866 candidates
+  - 3 planned creates
+  - 3 planned links
+  - 3 created `MediaAsset`
+  - 3 linked legacy rows
+  - 0 skipped schema-not-ready
+- `[x]` Dry-run sau apply đã sạch:
+  - 0 planned creates
+  - 0 planned links
+  - 0 skipped schema-not-ready
+- `[ ]` Chưa copy/move object thật
+- `[x]` DB local đã apply database/backfill `MediaAssetId` ở Phase 5B
+- `[x]` Phase 5E sau đó đã cleanup legacy references missing object khỏi DB local, không copy/move object thật
+
+Lệnh chạy report DB-only:
+
+```powershell
+dotnet run --project server/tools/SmartRentalPlatform.MediaMigrationTool -- phase5b --mode report --dry-run true --check-storage false --sample-limit 10 --output server/data/media-migration/phase5b-readiness-report.json
+```
+
+Lệnh chạy report có kiểm bucket/storage:
+
+```powershell
+dotnet run --project server/tools/SmartRentalPlatform.MediaMigrationTool -- phase5b --mode report --dry-run true --check-storage true --sample-limit 10 --output server/data/media-migration/phase5b-readiness-report.json
+```
+
+Lệnh chạy backfill dry-run:
+
+```powershell
+dotnet run --no-restore --project server/tools/SmartRentalPlatform.MediaMigrationTool -- phase5b --mode backfill --dry-run true --check-storage false --sample-limit 10 --output server/data/media-migration/phase5b-backfill-report.json
+```
+
+### Phase 5B Verify
+
+- `[x]` `dotnet build server/SmartRentalPlatform.slnx` pass
+- `[x]` `dotnet test server/tests/SmartRentalPlatform.UnitTests/SmartRentalPlatform.UnitTests.csproj --no-restore --filter "LegacyMediaMigrationReadinessServiceTests"` pass: 4/4
+- `[x]` `dotnet run --no-restore --project server/tools/SmartRentalPlatform.MediaMigrationTool -- phase5b --mode backfill --dry-run true --connection-string "Host=localhost;Port=5444;Database=smart_rental_platform;Username=postgres;Password=postgres" --sample-limit 10` pass, report generated
+- `[x]` `dotnet ef database update 20260713064804_InspectRemainingModelChanges --no-build --project server/src/SmartRentalPlatform.Infrastructure --startup-project server/src/SmartRentalPlatform.Api --context AppDbContext --connection "Host=localhost;Port=5444;Database=smart_rental_platform;Username=postgres;Password=postgres"` pass
+- `[x]` `dotnet run --no-restore --project server/tools/SmartRentalPlatform.MediaMigrationTool -- phase5b --mode backfill --dry-run false --connection-string "Host=localhost;Port=5444;Database=smart_rental_platform;Username=postgres;Password=postgres" --sample-limit 10` pass: created 3, linked 3
+- `[x]` Dry-run sau apply pass: 0 planned creates, 0 planned links
+- `[!]` Build vẫn còn warning cũ:
+  - `Microsoft.OpenApi` vulnerability warning
+  - `LargeScaleRoomingHouseSeeder` EF1002 raw SQL warnings
+
+### Phase 5C - Read Path Cutover
+
+- `[x]` `RoomingHouseRuleService.ToResponse` không trả `PdfObjectKey` khi rule đã có `MediaAssetId`; đường đọc chính là `PdfUrl` qua media private route
+- `[x]` `RoomingHouseRuleEditor` không còn dùng riêng `pdfObjectKey` làm điều kiện save/render; upload mới chỉ có `mediaAssetId` vẫn hiển thị và lưu được
+- `[x]` `ContractOccupantDocumentResponse` không trả private `Front/Back/ExtraImageObjectKey` khi field tương ứng đã có media id
+- `[x]` `ContractOccupantsSetupModal` vẫn preview bằng `front/back/extraImageUrl` và không hiển thị dòng object key rỗng sau khi response đã scrub key
+- `[x]` `CreateAppendixModal` dựng private media view URL từ `front/back/extraMediaAssetId` khi edit appendix change JSON không còn object key
+- `[x]` Request contracts vẫn giữ object-key fallback để không phá dữ liệu/flow legacy chưa cleanup
+- `[ ]` Chưa xóa field/cột legacy object key
+- `[ ]` Chưa xóa `FilesController`, public object-key route, hoặc local compatibility storage
+- `[ ]` Chưa chạy storage existence check thật với bucket production/staging
+
+### Phase 5C Verify
+
+- `[x]` `rg` xác nhận house-rule editor không còn điều kiện chỉ dựa vào `pdfObjectKey`
+- `[x]` `rg` xác nhận application mapper đã sửa không còn trả thẳng các object key trong scope 5C
+- `[x]` `dotnet build server/SmartRentalPlatform.slnx` pass
+- `[x]` `dotnet test server/tests/SmartRentalPlatform.UnitTests/SmartRentalPlatform.UnitTests.csproj --no-restore --filter "ContractAppendixServiceTests|LegacyMediaMigrationReadinessServiceTests|MediaAccessServiceTests"` pass: 7/7
+- `[x]` `npm.cmd run build` pass
+- `[!]` Frontend build còn Vite chunk-size warning do bundle lớn, không liên quan Phase 5C
+
+### Phase 5D - Legacy Compatibility Guard/Cleanup Prep
+
+- `[x]` `FilesController` legacy upload `POST /api/files/images` và `POST /api/files/pdfs` trả deprecation/compatibility headers
+- `[x]` `FileUploadResponse` bổ sung `IsCompatibilityResponse` và `CompatibilityWarning` để client thấy rõ đây là compatibility contract
+- `[x]` Public object-key route `GET /api/media/public/{**objectKey}` trả deprecation/compatibility headers
+- `[x]` Admin legacy private object-key route `GET /api/admin/media/private?objectKey=...` trả deprecation/compatibility headers
+- `[x]` Frontend `MediaWorkflowUploadResult.objectKey` và `FileUploadResponse.objectKey` được đánh dấu deprecated bằng JSDoc
+- `[x]` Frontend thêm `toPrivateMediaAssetUrl(mediaAssetId)` làm helper media-id-first cho private media
+- `[ ]` Chưa remove `FilesController`
+- `[ ]` Chưa remove public object-key route
+- `[ ]` Chưa remove admin legacy private object-key route
+- `[ ]` Chưa remove legacy object-key fields/columns
+- `[x]` Đã chạy storage bucket check thật với `--check-storage true` bằng S3 config local
+- `[!]` Bucket check thật ngày 2026-07-13 cho DB local `localhost:5444` cho kết quả:
+  - 866 legacy references
+  - 0 missing `MediaAsset` links
+  - 0 missing `MediaAsset` by object key
+  - 0 storage present
+  - 866 storage missing
+  - 0 storage errors
+- `[!]` Phase 5E remove legacy cleanup đang bị chặn nếu cần giữ dữ liệu local hiện tại, vì metadata đã có nhưng object vật lý tương ứng không tồn tại trong bucket
+
+### Phase 5D Verify
+
+- `[x]` `dotnet build server/SmartRentalPlatform.slnx` pass
+- `[x]` `npm.cmd run build` pass
+- `[x]` `dotnet run --no-restore --project server/tools/SmartRentalPlatform.MediaMigrationTool -- phase5b --mode report --dry-run true --check-storage true --connection-string "Host=localhost;Port=5444;Database=smart_rental_platform;Username=postgres;Password=postgres" --sample-limit 20 --output server/data/media-migration/phase5b-storage-check-report.json` pass với network thật
+- `[!]` Build vẫn còn warning cũ:
+  - `Microsoft.OpenApi` vulnerability warning
+  - nullable warnings trong `RentalContractService`
+  - EF1002 warnings trong `LargeScaleRoomingHouseSeeder`
+- `[!]` Frontend build còn Vite chunk-size warning do bundle lớn, không liên quan Phase 5D
+
+---
+
+### Phase 5E - Local Legacy Data Cleanup
+
+- `[x]` Thêm `LegacyMediaCleanupOptions`, `LegacyMediaCleanupReport`, module report, totals và sample report
+- `[x]` Thêm `CleanupMissingStorageAsync` trong `LegacyMediaMigrationReadinessService`
+- `[x]` Cleanup yêu cầu storage service thật; không chạy nếu thiếu S3 config/storage implementation
+- `[x]` Cleanup mặc định dry-run; apply chỉ khi truyền rõ `--dry-run false`
+- `[x]` Tool `SmartRentalPlatform.MediaMigrationTool` hỗ trợ:
+  - `phase5e --mode cleanup --dry-run true`
+  - `phase5e --mode cleanup --dry-run false`
+- `[x]` Strategy cleanup local/demo data:
+  - delete row cho `PropertyImages`, `LegalDocuments`, `Kyc`, `ContractFiles`, `ContractOccupantDocuments`
+  - clear media field cho `MeterReadingProofs`, `RoomingHouseRules`, `Avatars`
+- `[x]` Phase 5E dry-run với S3 thật:
+  - 866 candidates
+  - 855 planned deletes
+  - 1 planned clear
+  - 0 storage present
+  - 0 storage errors
+  - 0 no-cleanup-target
+- `[x]` Phase 5E apply trên DB local `localhost:5444`:
+  - 855 applied deletes
+  - 1 applied clear
+- `[x]` Post-cleanup storage check:
+  - 0 legacy references
+  - 0 missing `MediaAsset` links
+  - 0 missing `MediaAsset` by object key
+  - 0 storage missing
+  - 0 storage errors
+- `[ ]` Chưa remove `FilesController`, public object-key route, admin legacy private object-key route khỏi code
+- `[ ]` Chưa drop legacy object-key columns khỏi schema
+
+### Phase 5E Verify
+
+- `[x]` `dotnet build server/SmartRentalPlatform.slnx` pass
+- `[x]` `dotnet run --no-restore --project server/tools/SmartRentalPlatform.MediaMigrationTool -- phase5e --mode cleanup --dry-run true --connection-string "Host=localhost;Port=5444;Database=smart_rental_platform;Username=postgres;Password=postgres" --sample-limit 20 --output server/data/media-migration/phase5e-cleanup-dry-run-report.json` pass
+- `[x]` `dotnet run --no-restore --project server/tools/SmartRentalPlatform.MediaMigrationTool -- phase5e --mode cleanup --dry-run false --connection-string "Host=localhost;Port=5444;Database=smart_rental_platform;Username=postgres;Password=postgres" --sample-limit 20 --output server/data/media-migration/phase5e-cleanup-apply-report.json` pass
+- `[x]` `dotnet run --no-restore --project server/tools/SmartRentalPlatform.MediaMigrationTool -- phase5b --mode report --dry-run true --check-storage true --connection-string "Host=localhost;Port=5444;Database=smart_rental_platform;Username=postgres;Password=postgres" --sample-limit 20 --output server/data/media-migration/phase5e-post-cleanup-storage-check-report.json` pass
+- `[!]` Build vẫn còn warning cũ:
+  - `Microsoft.OpenApi` vulnerability warning
+  - EF1002 warnings trong `LargeScaleRoomingHouseSeeder`
+
+---
+
+### Phase 5F - Legacy API/Frontend Lockdown
+
+- `[x]` `FilesController` legacy upload `POST /api/files/images` trả `410 Gone`
+- `[x]` `FilesController` legacy upload `POST /api/files/pdfs` trả `410 Gone`
+- `[x]` Legacy upload response có `Deprecation`, `X-SRP-Media-Compatibility: legacy-files-upload-disabled`, và replacement headers
+- `[x]` Admin private object-key route `GET /api/admin/media/private?objectKey=...` trả `410 Gone`
+- `[x]` Admin private object-key route response có replacement header sang `/api/admin/media/private/{mediaAssetId}`
+- `[x]` `AdminMediaController` không còn inject trực tiếp `IPrivateStorageService` chỉ để phục vụ object-key route cũ
+- `[x]` `client/src/features/landlord/services/landlordApi.ts` không còn gọi `ENDPOINTS.FILES.IMAGES`, mà dùng media workflow wrapper
+- `[x]` `client/src/shared/api/endpoints.ts` không còn expose nhóm `FILES`
+- `[ ]` Public object-key route `GET /api/media/public/{**objectKey}` vẫn giữ tạm vì public image read path/listing còn dùng URL dạng này
+- `[ ]` Chưa drop legacy object-key columns khỏi schema
+- `[ ]` Chưa remove toàn bộ DTO/frontend legacy fields vì một số module vẫn còn fallback contract
+
+### Phase 5F Verify
+
+- `[x]` `dotnet build server/SmartRentalPlatform.slnx` pass
+- `[x]` `npm.cmd run build` pass
+- `[x]` `dotnet test server/tests/SmartRentalPlatform.UnitTests/SmartRentalPlatform.UnitTests.csproj --no-restore --filter "LegacyMediaMigrationReadinessServiceTests|MediaWorkflowServiceTests|MediaAccessServiceTests"` pass: 11/11
+- `[!]` Build vẫn còn warning cũ:
+  - `Microsoft.OpenApi` vulnerability warning
+  - frontend Vite chunk-size warning
+
+---
+
+### Phase 5G - Schema & Seed Hygiene
+
+- `[x]` Runtime seed không còn tạo fake legacy object keys cho:
+  - `DevelopmentDataSeed`
+  - `LargeScaleRoomingHouseSeeder`
+  - `WalletQaDataSeeder`
+- `[x]` `DevelopmentDataSeed` đã bỏ các tham số helper chỉ dùng để truyền `demo/...` object key giả
+- `[x]` Thêm data-only migration `20260713153000_CleanupLegacySampleMediaReferences`
+- `[x]` Migration cleanup các sample refs lịch sử dạng:
+  - `demo/%`
+  - `kfc-scenario/%`
+  - `seed/%`
+  - `/uploads/demo/%`
+  - `/uploads/kfc-scenario/%`
+  - `/uploads/seed/%`
+- `[x]` Migration xóa/clear refs trong các bảng media-sensitive:
+  - `property_images`
+  - `rooming_house_legal_documents`
+  - `kyc_verifications`
+  - `contract_occupant_documents`
+  - `rooming_house_rules`
+  - `contract_files`
+  - `meter_readings`
+  - `users`
+  - `media_assets`
+  - `media_audit_logs`
+- `[x]` Đã apply migration trên DB local `localhost:5444`
+- `[x]` Post-migration storage check sạch:
+  - 0 legacy references
+  - 0 missing `MediaAsset` links
+  - 0 missing `MediaAsset` by object key
+  - 0 storage missing
+  - 0 storage errors
+- `[ ]` Chưa drop legacy object-key columns khỏi schema vì DTO/business compatibility/fallback còn tồn tại
+- `[ ]` Chưa xóa public object-key route vì public image URL/listing vẫn còn phụ thuộc có chủ ý
+
+### Phase 5G Verify
+
+- `[x]` `rg` trên runtime seed không còn match `demo/kyc`, `demo/houses`, `demo/rooms`, `demo/legal`, `/uploads`, `seed/legal`, `seed/houses`, `seed/rooms`
+- `[x]` `dotnet build server/SmartRentalPlatform.slnx` pass
+- `[x]` `dotnet ef migrations list --no-build --project server/src/SmartRentalPlatform.Infrastructure --startup-project server/src/SmartRentalPlatform.Api --context AppDbContext --connection "Host=localhost;Port=5444;Database=smart_rental_platform;Username=postgres;Password=postgres"` thấy `20260713153000_CleanupLegacySampleMediaReferences (Pending)` trước khi apply
+- `[x]` `dotnet ef database update 20260713153000_CleanupLegacySampleMediaReferences --no-build --project server/src/SmartRentalPlatform.Infrastructure --startup-project server/src/SmartRentalPlatform.Api --context AppDbContext --connection "Host=localhost;Port=5444;Database=smart_rental_platform;Username=postgres;Password=postgres"` pass
+- `[x]` `dotnet run --no-restore --project server/tools/SmartRentalPlatform.MediaMigrationTool -- phase5b --mode report --dry-run true --check-storage true --connection-string "Host=localhost;Port=5444;Database=smart_rental_platform;Username=postgres;Password=postgres" --sample-limit 20 --output server/data/media-migration/phase5g-post-migration-storage-check-report.json` pass
+- `[x]` `dotnet test server/tests/SmartRentalPlatform.UnitTests/SmartRentalPlatform.UnitTests.csproj --no-restore --filter "LegacyMediaMigrationReadinessServiceTests|MediaWorkflowServiceTests|MediaAccessServiceTests"` pass: 11/11
+- `[!]` Build vẫn còn warning cũ:
+  - `Microsoft.OpenApi` vulnerability warning
+  - EF1002 warnings trong `LargeScaleRoomingHouseSeeder`
+
+---
+
+### Phase 5H - Reset/Re-seed & End-to-End Verification
+
+- `[x]` Drop/reset DB local `localhost:5444` để kiểm chứng từ trạng thái sạch
+- `[x]` Apply full EF migration chain từ đầu đến `20260713153000_CleanupLegacySampleMediaReferences`
+- `[x]` Chạy API startup với seed flags:
+  - `SeedData:Development:Enabled = true`
+  - `SeedData:WalletQa:Enabled = true`
+- `[x]` Seed runtime sau Phase 5G không sinh lại legacy media refs
+- `[x]` Post-reseed report với storage check thật:
+  - 0 legacy references
+  - 0 missing `MediaAsset` links
+  - 0 missing `MediaAsset` by object key
+  - 0 storage present
+  - 0 storage missing
+  - 0 storage errors
+- `[x]` Backend build pass sau reset/reseed
+- `[x]` Unit tests media/migration pass sau reset/reseed
+- `[x]` Frontend build pass sau reset/reseed
+- `[ ]` Chưa chạy browser/manual E2E upload thật qua UI
+- `[ ]` Chưa drop legacy object-key columns hoặc public object-key route
+
+### Phase 5H Verify
+
+- `[x]` `dotnet ef database drop --force --no-build --project server/src/SmartRentalPlatform.Infrastructure --startup-project server/src/SmartRentalPlatform.Api --context AppDbContext` pass với `ConnectionStrings__DefaultConnection` trỏ `localhost:5444`
+- `[x]` `dotnet ef database update --no-build --project server/src/SmartRentalPlatform.Infrastructure --startup-project server/src/SmartRentalPlatform.Api --context AppDbContext --connection "Host=localhost;Port=5444;Database=smart_rental_platform;Username=postgres;Password=postgres"` pass
+- `[x]` `dotnet run --no-restore --no-build --project server/src/SmartRentalPlatform.Api` chạy với seed flags; command bị timeout vì server chạy liên tục sau startup, không có lỗi startup/seed được thấy
+- `[x]` `dotnet run --no-restore --project server/tools/SmartRentalPlatform.MediaMigrationTool -- phase5b --mode report --dry-run true --check-storage true --connection-string "Host=localhost;Port=5444;Database=smart_rental_platform;Username=postgres;Password=postgres" --sample-limit 20 --output server/data/media-migration/phase5h-post-reseed-storage-check-report.json` pass
+- `[x]` `dotnet build server/SmartRentalPlatform.slnx` pass
+- `[x]` `dotnet test server/tests/SmartRentalPlatform.UnitTests/SmartRentalPlatform.UnitTests.csproj --no-restore --filter "LegacyMediaMigrationReadinessServiceTests|MediaWorkflowServiceTests|MediaAccessServiceTests"` pass: 11/11
+- `[x]` `npm.cmd run build` trong `client` pass
+- `[!]` Warning còn lại:
+  - `Microsoft.OpenApi` NU1903 vulnerability warning
+  - frontend Vite chunk-size warning
+  - EF CLI local version `9.0.2` cũ hơn runtime `10.0.8`
 
 ---
 
@@ -91,6 +523,7 @@ Mỗi phase sau phải cập nhật tiếp vào file này, không tạo lại ch
 - `[x]` Có phase plan tổng tại `docs/AI_Media_Migration_Phase_Plan.md`
 - `[x]` Có phase-specific plan cho contract file tại `docs/AI_Media_Migration_Phase4_ContractFile_Plan.md`
 - `[x]` Có phase-specific plan cho avatar tại `docs/AI_Media_Migration_Phase13_Avatar_Plan.md`
+- `[x]` Có phase-specific inventory cho cutover tại `docs/AI_Media_Migration_Phase5A_Inventory.md`
 - `[x]` Có context guardrail tại `docs/AI_Context_Continuity_Guardrails.md`
 - `[x]` Có audit checklist sống tại `docs/AI_Media_Migration_Audit_Checklist.md`
 - `[~]` Chưa có inventory doc riêng cho Phase 0 được materialize thành artifact độc lập
