@@ -37,9 +37,46 @@ public sealed class GeminiStructuredOutputService : IAiStructuredOutputService
         object input,
         CancellationToken cancellationToken = default)
     {
-        if (!options.Enabled || (string.IsNullOrWhiteSpace(options.ApiKey) && string.IsNullOrWhiteSpace(options.ServiceAccountJson)))
+        return await CreateJsonWithImagesAsync<T>(
+            schemaName,
+            jsonSchema,
+            instructions,
+            input,
+            [],
+            cancellationToken);
+    }
+
+    public async Task<T?> CreateJsonWithImagesAsync<T>(
+        string schemaName,
+        object jsonSchema,
+        string instructions,
+        object input,
+        IReadOnlyCollection<AiImageInput> images,
+        CancellationToken cancellationToken = default)
+    {
+        if (!options.Enabled || !options.HasCredential())
         {
             return default;
+        }
+
+        var parts = new List<object>
+        {
+            new
+            {
+                text = BuildPrompt(schemaName, instructions, input)
+            }
+        };
+
+        foreach (var image in images)
+        {
+            parts.Add(new
+            {
+                inlineData = new
+                {
+                    mimeType = image.ContentType,
+                    data = Convert.ToBase64String(image.Content)
+                }
+            });
         }
 
         var payload = new
@@ -49,13 +86,7 @@ public sealed class GeminiStructuredOutputService : IAiStructuredOutputService
                 new
                 {
                     role = "user",
-                    parts = new[]
-                    {
-                        new
-                        {
-                            text = BuildPrompt(schemaName, instructions, input)
-                        }
-                    }
+                    parts
                 }
             },
             generationConfig = new
@@ -94,7 +125,7 @@ public sealed class GeminiStructuredOutputService : IAiStructuredOutputService
         for (var attempt = 1; attempt <= maxAttempts; attempt++)
         {
             string requestUrl;
-            if (options.UseVertexAi && !string.IsNullOrWhiteSpace(options.ProjectId))
+            if (options.UseVertexAi)
             {
                 requestUrl = $"https://{options.Region}-aiplatform.googleapis.com/v1/projects/{options.ProjectId}/locations/{options.Region}/publishers/google/models/{options.Model}:generateContent";
             }
@@ -105,7 +136,7 @@ public sealed class GeminiStructuredOutputService : IAiStructuredOutputService
 
             using var request = new HttpRequestMessage(HttpMethod.Post, requestUrl);
             
-            if (options.UseVertexAi && !string.IsNullOrWhiteSpace(options.ServiceAccountJson))
+            if (options.UseVertexAi)
             {
                 var token = await GetAccessTokenAsync(cancellationToken);
                 request.Headers.Authorization = new System.Net.Http.Headers.AuthenticationHeaderValue("Bearer", token);

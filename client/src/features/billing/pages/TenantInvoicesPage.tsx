@@ -9,7 +9,7 @@ import { Toast } from '../../../shared/components/ui/Toast';
 import { toAssetUrl } from '../../../shared/api/assets';
 import { Button } from '../../../shared/components/ui/Button';
 import { billingApi } from '../api';
-import type { Invoice } from '../types';
+import type { Invoice, InvoiceItem } from '../types';
 import { WalletPaymentConfirmModal } from '../../wallet/components/WalletPaymentConfirmModal';
 import '../../home/pages/MePage.css';
 import './BillingPages.css';
@@ -35,6 +35,7 @@ export function TenantInvoicesPanel({ invoiceId: controlledInvoiceId, onOpenInvo
   const [toast, setToast] = useState<{ message: string; type: 'success' | 'error' | 'info' } | null>(null);
   const [error, setError] = useState('');
   const [confirmPay, setConfirmPay] = useState<Invoice | null>(null);
+  const [meterImagePreview, setMeterImagePreview] = useState<{ src: string; title: string; subtitle: string } | null>(null);
 
   useEffect(() => {
     void loadInvoices();
@@ -250,7 +251,22 @@ export function TenantInvoicesPanel({ invoiceId: controlledInvoiceId, onOpenInvo
                           {getInvoiceItemTypeLabel(item.itemType)}
                         </span>
                       </span>
-                      <span className="col-desc" data-label="Mô tả">{item.description}</span>
+                      <span className="col-desc tenant-invoice-item-desc" data-label="Mô tả">
+                        <span>{item.description}</span>
+                        {item.meterReadingProofImageUrl && (
+                          <button
+                            type="button"
+                            className="tenant-meter-proof-button"
+                            onClick={() => setMeterImagePreview({
+                              src: toAssetUrl(item.meterReadingProofImageUrl!),
+                              title: getMeterReadingButtonLabel(item),
+                              subtitle: item.description
+                            })}
+                          >
+                            {getMeterReadingButtonLabel(item)}
+                          </button>
+                        )}
+                      </span>
                       <span className="col-qty" data-label="Số lượng">{item.quantity}</span>
                       <span className="col-price" data-label="Đơn giá">{formatMoney(item.unitPrice)}</span>
                       <strong className="col-amount" data-label="Thành tiền">{formatMoney(item.amount)}</strong>
@@ -292,6 +308,19 @@ export function TenantInvoicesPanel({ invoiceId: controlledInvoiceId, onOpenInvo
         }}
         onClose={() => setConfirmPay(null)}
       />
+
+      {meterImagePreview && (
+        <div className="meter-image-lightbox" role="dialog" aria-modal="true" aria-label={meterImagePreview.title} onClick={() => setMeterImagePreview(null)}>
+          <div className="meter-image-lightbox-content" onClick={(event) => event.stopPropagation()}>
+            <div>
+              <strong>{meterImagePreview.title}</strong>
+              <span>{meterImagePreview.subtitle}</span>
+            </div>
+            <button type="button" onClick={() => setMeterImagePreview(null)} aria-label="Đóng ảnh chỉ số">×</button>
+            <img src={meterImagePreview.src} alt={meterImagePreview.title} />
+          </div>
+        </div>
+      )}
     </>
   );
 }
@@ -469,6 +498,19 @@ function getInvoiceItemTypeLabel(itemType: string) {
   };
 
   return labels[itemType] ?? itemType;
+}
+
+function getMeterReadingButtonLabel(item: InvoiceItem) {
+  const text = `${item.serviceName ?? ''} ${item.description ?? ''}`.toLowerCase();
+  if (text.includes('điện') || text.includes('dien')) {
+    return 'Xem chỉ số điện';
+  }
+
+  if (text.includes('nước') || text.includes('nuoc')) {
+    return 'Xem chỉ số nước';
+  }
+
+  return 'Xem ảnh chỉ số';
 }
 
 function formatMoney(value: number) {

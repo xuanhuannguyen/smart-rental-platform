@@ -290,6 +290,10 @@ export type LocationSuggestion = LocationSearchResult;
 // Reviews
 export type RoomingHouseReviewResponse = {
   id: string;
+  rentalContractId: string;
+  roomNumber?: string | null;
+  contractStartDate?: string | null;
+  contractEndDate?: string | null;
   tenantUserId: string;
   tenantDisplayName: string;
   tenantAvatarUrl?: string | null;
@@ -300,6 +304,11 @@ export type RoomingHouseReviewResponse = {
   createdAt: string;
   updatedAt?: string | null;
   isReported?: boolean;
+  moderationStatus?: string;
+  moderationReason?: string | null;
+  aiModerationProvider?: string | null;
+  aiModerationRiskLevel?: string | null;
+  adminNote?: string | null;
   images: PropertyImageRequest[];
 };
 
@@ -316,9 +325,23 @@ export interface CreateRoomingHouseReviewRequest {
 
 export interface RoomingHouseReviewEligibilitySummaryResponse {
   isEligible: boolean;
-  contractId?: string;
-  existingReview?: RoomingHouseReviewResponse;
+  contractId?: string | null;
+  reason?: string | null;
+  existingReview?: RoomingHouseReviewResponse | null;
+  reviewableContracts: ReviewableContractResponse[];
 };
+
+export interface ReviewableContractResponse {
+  contractId: string;
+  roomNumber: string;
+  startDate: string;
+  endDate?: string | null;
+  status: string;
+  canReview: boolean;
+  reviewStatus?: string | null;
+  reviewId?: string | null;
+  review?: RoomingHouseReviewResponse | null;
+}
 
 export type UpdateRoomingHouseReviewRequest = {
   rating: number;

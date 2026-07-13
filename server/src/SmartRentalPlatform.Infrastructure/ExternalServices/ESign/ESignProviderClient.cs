@@ -374,6 +374,13 @@ public class ESignProviderClient : IESignProviderClient
             hdChiTietId = long.Parse(providerDocumentDetailId)
         };
 
+        _logger.LogInformation(
+            "VNPT SendOtp request. Method {Method}; Endpoint {Endpoint}; EnvelopeId {EnvelopeId}; DocumentDetailId {DocumentDetailId}.",
+            method,
+            endpoint,
+            providerEnvelopeId,
+            providerDocumentDetailId);
+
         using var requestMessage = new HttpRequestMessage(HttpMethod.Post, endpoint)
         {
             Content = new StringContent(JsonSerializer.Serialize(requestBody), Encoding.UTF8, "application/json")

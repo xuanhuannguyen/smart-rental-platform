@@ -89,6 +89,8 @@ public interface IAppDbContext {
     DbSet<PaymentTransaction> PaymentTransactions { get; }
 
     DbSet<PaymentWebhookLog> PaymentWebhookLogs { get; }
+    DbSet<SmartRentalPlatform.Domain.Entities.Payments.WithdrawalRequest> WithdrawalRequests { get; }
+    DbSet<SmartRentalPlatform.Domain.Entities.Payments.WithdrawalWebhookLog> WithdrawalWebhookLogs { get; }
 
     DbSet<BillingServiceType> BillingServiceTypes { get; }
 
@@ -106,6 +108,8 @@ public interface IAppDbContext {
 
     DbSet<ChatMessage> ChatMessages { get; }
 
+    DbSet<ConversationJoinRequest> ConversationJoinRequests { get; }
+
 
 
 
@@ -116,4 +120,6 @@ public interface IAppDbContext {
     Task<IAppDbContextTransaction> BeginTransactionAsync(CancellationToken cancellationToken = default);
 
     Task<int> SaveChangesAsync(CancellationToken cancellationToken = default);
+
+    bool HasActiveTransaction { get; }
 }

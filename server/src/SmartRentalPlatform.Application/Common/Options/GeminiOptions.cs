@@ -23,5 +23,17 @@ public class GeminiOptions
     public string Region { get; set; } = "us-central1";
 
     public string ServiceAccountJson { get; set; } = string.Empty;
+
+    public bool HasCredential()
+    {
+        if (UseVertexAi)
+        {
+            return !string.IsNullOrWhiteSpace(ServiceAccountJson)
+                && !string.IsNullOrWhiteSpace(ProjectId)
+                && !string.IsNullOrWhiteSpace(Region);
+        }
+
+        return !string.IsNullOrWhiteSpace(ApiKey);
+    }
 }
 

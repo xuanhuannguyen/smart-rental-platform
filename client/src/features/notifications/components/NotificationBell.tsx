@@ -53,8 +53,15 @@ function getNotificationLink(notification: Notification): string {
 
   if (notification.referenceType === 'Conversation' && notification.referenceId) {
     const currentRole = window.location.pathname.startsWith('/landlord') ? 'landlord' : 'tenant';
-    const base = currentRole === 'landlord' ? ROUTE_PATHS.LANDLORD.MESSAGES : ROUTE_PATHS.ACCOUNT.MESSAGES;
+    const base = ROUTE_PATHS.MESSAGES;
     return `${base}?conversationId=${notification.referenceId}`;
+  }
+
+  if (
+    notification.referenceId &&
+    (notification.referenceType === 'RoomingHouse' || notification.type === 'RoomingHouseReviewRejected')
+  ) {
+    return `/rooming-houses/${notification.referenceId}?review=1#review-section`;
   }
   
   const role = getNotificationRole(notification);

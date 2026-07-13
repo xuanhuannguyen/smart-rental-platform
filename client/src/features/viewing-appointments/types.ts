@@ -10,6 +10,7 @@ export type ViewingAppointmentStatus =
 export interface ViewingAppointment {
   id: string;
   roomId: string;
+  roomingHouseId?: string | null;
   tenantUserId: string;
   createdByUserId: string;
   scheduledAt: string;

@@ -1,4 +1,5 @@
 export const ROUTE_PATHS = {
+    MESSAGES: '/messages',
     AUTH: {
         LOGIN: '/login',
         REGISTER: '/register',
@@ -39,7 +40,6 @@ export const ROUTE_PATHS = {
         ROOM_DETAIL: (houseId: string, roomId: string) => `/landlord/rooming-houses/${houseId}/rooms/${roomId}`,
         ROOM_CREATE: (houseId: string) => `/landlord/rooming-houses/${houseId}/rooms/create`,
         VIEWING_APPOINTMENTS: '/landlord/viewing-appointments',
-        MESSAGES: '/landlord/messages',
         RENTAL_REQUESTS: '/landlord/rental-requests',
         RENTAL_REQUEST_DETAIL: (id: string) => `/landlord/rental-requests/${id}`,
         SERVICE_PRICES: (houseId: string) => `/landlord/rooming-houses/${houseId}/service-prices`,

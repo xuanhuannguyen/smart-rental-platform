@@ -26,7 +26,8 @@ export const ENDPOINTS = {
     TRANSACTIONS: '/api/me/wallet/transactions',
     TOP_UPS: '/api/me/wallet/topups',
     TOP_UP_BY_ID: (id: string) => `/api/me/wallet/topups/${id}`,
-    CREATE_PAYOS_TOPUP: '/api/me/wallet/topups/payos'
+    CREATE_PAYOS_TOPUP: '/api/me/wallet/topups/payos',
+    WITHDRAWALS: '/api/me/wallet/withdrawals'
   },
   KYC: {
     SUBMISSIONS: '/api/kyc/submissions',
@@ -53,6 +54,9 @@ export const ENDPOINTS = {
     LEGAL_DOCUMENT: (id: string) => `/api/rooming-houses/${id}/legal-document`,
     RENTAL_POLICY: (id: string) => `/api/rooming-houses/${id}/rental-policy`,
     SUBMIT: (id: string) => `/api/rooming-houses/${id}/submit`
+  },
+  LANDLORD_DASHBOARD: {
+    ROOT: '/api/landlord/dashboard'
   },
   BILLING: {
     SERVICE_TYPES: '/api/billing/service-types',
@@ -166,6 +170,8 @@ export const ENDPOINTS = {
   },
   CHAT: {
     CONVERSATIONS: '/api/chat/conversations',
+    CONVERSATIONS_RECENT: '/api/chat/conversations/recent',
+    CONVERSATION_COUNTS: '/api/chat/conversation-counts',
     DIRECT: '/api/chat/conversations/direct',
     GROUPS: '/api/chat/conversations/groups',
     CONVERSATION: (id: string) => `/api/chat/conversations/${id}`,
@@ -176,7 +182,11 @@ export const ENDPOINTS = {
     MESSAGES: (id: string) => `/api/chat/conversations/${id}/messages`,
     READ: (id: string) => `/api/chat/conversations/${id}/read`,
     IMAGES: '/api/chat/images',
+    FILES: '/api/chat/files',
+    DELETE_MESSAGE: (conversationId: string, messageId: string) => `/api/chat/conversations/${conversationId}/messages/${messageId}`,
     QUICK_CONTACTS: '/api/chat/landlord/quick-contacts',
-    SEARCH_USERS: '/api/chat/users/search'
+    SEARCH_USERS: '/api/chat/users/search',
+    UNREAD_COUNT: '/api/chat/unread-count',
+    FILTER_ROOMING_HOUSES: '/api/chat/filters/rooming-houses'
   }
 } as const;

@@ -3,5 +3,7 @@ namespace SmartRentalPlatform.Domain.Enums.Chat;
 public enum ConversationParticipantRole
 {
     Owner = 1,
-    Member = 2
+    Member = 2,
+    Admin = 3
 }
+

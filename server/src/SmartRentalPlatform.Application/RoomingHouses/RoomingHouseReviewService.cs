@@ -11,26 +11,38 @@ using SmartRentalPlatform.Contracts.PropertyImages.Responses;
 using SmartRentalPlatform.Contracts.RoomingHouseReviews.Requests;
 using SmartRentalPlatform.Contracts.RoomingHouseReviews.Responses;
 using SmartRentalPlatform.Domain.Entities.Properties;
+using SmartRentalPlatform.Domain.Entities.RentalContracts;
 using SmartRentalPlatform.Domain.Enums.RentalContracts;
 using SmartRentalPlatform.Contracts.Files;
 using SmartRentalPlatform.Application.RoomingHouses.Helpers;
+using SmartRentalPlatform.Application.RoomingHouses.ReviewModeration;
+using SmartRentalPlatform.Domain.Enums.Notifications;
+using SmartRentalPlatform.Domain.Enums.Properties;
 
 namespace SmartRentalPlatform.Application.RoomingHouses;
 
 public class RoomingHouseReviewService : IRoomingHouseReviewService
 {
+    private const int MaxReviewImages = 4;
+
     private readonly IAppDbContext _context;
     private readonly IFileStorageService _fileStorageService;
     private readonly ICurrentUserService _currentUserService;
+    private readonly IReviewAiModerationService _moderationService;
+    private readonly INotificationService _notificationService;
 
     public RoomingHouseReviewService(
         IAppDbContext context,
         IFileStorageService fileStorageService,
-        ICurrentUserService currentUserService)
+        ICurrentUserService currentUserService,
+        IReviewAiModerationService moderationService,
+        INotificationService notificationService)
     {
         _context = context;
         _fileStorageService = fileStorageService;
         _currentUserService = currentUserService;
+        _moderationService = moderationService;
+        _notificationService = notificationService;
     }
 
     public async Task<ReviewEligibilityResponse> CheckEligibilityAsync(
@@ -45,13 +57,16 @@ public class RoomingHouseReviewService : IRoomingHouseReviewService
         if (contract == null)
             throw new NotFoundException(ErrorCodes.RentalContractNotFound, "Không tìm thấy hợp đồng.");
 
-        // Phải là occupant trong hợp đồng
+        // Phải là người thuê chính hoặc occupant trong hợp đồng
+        var isMainTenant = contract.MainTenantUserId == tenantUserId;
         var occupant = contract.Occupants.FirstOrDefault(x => x.UserId == tenantUserId);
-        if (occupant == null)
+        if (!isMainTenant && occupant == null)
             throw new ForbiddenException(ErrorCodes.ReviewForbidden, "Bạn không có quyền đánh giá hợp đồng này.");
 
+        var today = DateOnly.FromDateTime(DateTime.UtcNow);
+
         // Contract must have started.
-        if (contract.StartDate > DateOnly.FromDateTime(DateTime.UtcNow))
+        if (contract.StartDate > today)
         {
             return new ReviewEligibilityResponse
             {
@@ -60,7 +75,7 @@ public class RoomingHouseReviewService : IRoomingHouseReviewService
             };
         }
 
-        if (contract.Status == RentalContractStatus.Cancelled || contract.Status == RentalContractStatus.Rejected)
+        if (contract.Status == RentalContractStatus.Rejected)
         {
             return new ReviewEligibilityResponse
             {
@@ -69,13 +84,23 @@ public class RoomingHouseReviewService : IRoomingHouseReviewService
             };
         }
 
-        // Hợp đồng phải kết thúc hoặc cá nhân đã dọn ra
-        if (contract.TerminationDate == null && occupant.Status != ContractOccupantStatus.MoveOut)
+        var userHasStayed = HasReviewableStay(contract, occupant, isMainTenant, today);
+
+        if (!IsReviewableContractStatus(contract.Status, userHasStayed))
         {
             return new ReviewEligibilityResponse
             {
                 IsEligible = false,
-                Reason = "Chỉ được đánh giá khi bạn đã dọn ra hoặc hợp đồng đã chấm dứt."
+                Reason = "Chỉ có thể đánh giá hợp đồng đang thuê hoặc đã kết thúc."
+            };
+        }
+
+        if (!userHasStayed)
+        {
+            return new ReviewEligibilityResponse
+            {
+                IsEligible = false,
+                Reason = "Bạn cần đã dọn vào khu trọ trước khi đánh giá."
             };
         }
 
@@ -109,20 +134,22 @@ public class RoomingHouseReviewService : IRoomingHouseReviewService
             .Include(x => x.Room)
             .Include(x => x.Occupants)
             .Where(x => x.Room.RoomingHouseId == roomingHouseId && 
-                        x.Occupants.Any(o => o.UserId == tenantUserId))
+                        (x.MainTenantUserId == tenantUserId || x.Occupants.Any(o => o.UserId == tenantUserId)))
             .OrderByDescending(x => x.CreatedAt)
             .ToListAsync(cancellationToken);
 
         var today = DateOnly.FromDateTime(DateTime.UtcNow);
 
-        // Find contracts that are eligible (started and ended or moved out)
+        // Find contracts that are eligible (started, active/expired, or cancelled after an actual stay)
         var eligibleContracts = contracts.Where(contract => 
         {
-            var occupant = contract.Occupants.First(o => o.UserId == tenantUserId);
+            var occupant = contract.Occupants.FirstOrDefault(o => o.UserId == tenantUserId);
+            var isMainTenant = contract.MainTenantUserId == tenantUserId;
+            var userHasStayed = HasReviewableStay(contract, occupant, isMainTenant, today);
+
             return contract.StartDate <= today &&
-                   contract.Status != RentalContractStatus.Cancelled &&
-                   contract.Status != RentalContractStatus.Rejected &&
-                   (contract.TerminationDate != null || occupant.Status == ContractOccupantStatus.MoveOut);
+                   IsReviewableContractStatus(contract.Status, userHasStayed) &&
+                   userHasStayed;
         }).ToList();
 
         if (!eligibleContracts.Any())
@@ -131,7 +158,9 @@ public class RoomingHouseReviewService : IRoomingHouseReviewService
             {
                 IsEligible = false,
                 ContractId = null,
-                ExistingReview = null
+                Reason = "Bạn cần có hợp đồng đang thuê hoặc đã kết thúc tại khu trọ này để viết đánh giá.",
+                ExistingReview = null,
+                ReviewableContracts = new List<ReviewableContractResponse>()
             };
         }
 
@@ -142,6 +171,28 @@ public class RoomingHouseReviewService : IRoomingHouseReviewService
 
         var reviewedContractIds = existingReviews.Select(x => x.RentalContractId).ToHashSet();
         var eligibleContract = eligibleContracts.FirstOrDefault(x => !reviewedContractIds.Contains(x.Id));
+        var reviewByContractId = new Dictionary<Guid, RoomingHouseReviewResponse>();
+        foreach (var review in existingReviews)
+        {
+            reviewByContractId[review.RentalContractId] = await GetReviewResponseAsync(review.Id, cancellationToken);
+        }
+
+        var reviewableContracts = eligibleContracts.Select(contract =>
+        {
+            reviewByContractId.TryGetValue(contract.Id, out var review);
+            return new ReviewableContractResponse
+            {
+                ContractId = contract.Id,
+                RoomNumber = contract.Room.RoomNumber,
+                StartDate = contract.StartDate,
+                EndDate = contract.EndDate,
+                Status = contract.Status.ToString(),
+                CanReview = review == null,
+                ReviewStatus = review?.ModerationStatus,
+                ReviewId = review?.Id,
+                Review = review
+            };
+        }).ToList();
 
         if (eligibleContract != null)
         {
@@ -149,7 +200,9 @@ public class RoomingHouseReviewService : IRoomingHouseReviewService
             {
                 IsEligible = true,
                 ContractId = eligibleContract.Id,
-                ExistingReview = null
+                Reason = null,
+                ExistingReview = null,
+                ReviewableContracts = reviewableContracts
             };
         }
 
@@ -165,7 +218,9 @@ public class RoomingHouseReviewService : IRoomingHouseReviewService
             {
                 IsEligible = false,
                 ContractId = existingReview.RentalContractId,
-                ExistingReview = existingReviewResponse
+                Reason = "Bạn đã đánh giá tất cả hợp đồng đủ điều kiện tại khu trọ này.",
+                ExistingReview = existingReviewResponse,
+                ReviewableContracts = reviewableContracts
             };
         }
 
@@ -173,7 +228,9 @@ public class RoomingHouseReviewService : IRoomingHouseReviewService
         {
             IsEligible = false,
             ContractId = null,
-            ExistingReview = null
+            Reason = "Bạn cần có hợp đồng đang thuê hoặc đã kết thúc tại khu trọ này để viết đánh giá.",
+            ExistingReview = null,
+            ReviewableContracts = reviewableContracts
         };
     }
 
@@ -186,6 +243,9 @@ public class RoomingHouseReviewService : IRoomingHouseReviewService
         var eligibility = await CheckEligibilityAsync(contractId, tenantUserId, cancellationToken);
         if (!eligibility.IsEligible)
             throw new ConflictException(ErrorCodes.ReviewNotEligible, eligibility.Reason!);
+
+        if (request.Images.Count > MaxReviewImages)
+            throw new ConflictException(ErrorCodes.ValidationError, $"Mỗi đánh giá chỉ được tải tối đa {MaxReviewImages} ảnh.");
 
         var contract = await _context.RentalContracts.Include(x => x.Room).FirstOrDefaultAsync(x => x.Id == contractId, cancellationToken);
         
@@ -201,7 +261,9 @@ public class RoomingHouseReviewService : IRoomingHouseReviewService
                 Rating = request.Rating,
                 Comment = request.Comment,
                 CreatedAt = DateTimeOffset.UtcNow,
-                IsHidden = false
+                IsHidden = false,
+                ModerationStatus = RoomingHouseReviewModerationStatus.PendingAiReview,
+                ModerationReason = "Đánh giá đang chờ AI kiểm duyệt."
             };
 
             _context.RoomingHouseReviews.Add(review);
@@ -229,8 +291,6 @@ public class RoomingHouseReviewService : IRoomingHouseReviewService
             }
 
             await _context.SaveChangesAsync(cancellationToken);
-            await RoomingHouseRatingHelper.UpdateRatingAsync(_context, review.RoomingHouseId, cancellationToken);
-            await _context.SaveChangesAsync(cancellationToken);
             await transaction.CommitAsync(cancellationToken);
 
             return await GetReviewResponseAsync(review.Id, cancellationToken);
@@ -251,7 +311,9 @@ public class RoomingHouseReviewService : IRoomingHouseReviewService
         var query = _context.RoomingHouseReviews
             .Include(x => x.TenantUser)
             .Include(x => x.Images)
-            .Where(x => x.RoomingHouseId == roomingHouseId && !x.IsHidden);
+            .Include(x => x.RentalContract)
+                .ThenInclude(x => x.Room)
+            .Where(x => x.RoomingHouseId == roomingHouseId && !x.IsHidden && x.ModerationStatus == RoomingHouseReviewModerationStatus.Approved);
 
         var totalCount = await query.CountAsync(cancellationToken);
         
@@ -262,7 +324,7 @@ public class RoomingHouseReviewService : IRoomingHouseReviewService
             .ToListAsync(cancellationToken);
 
         var distribution = await _context.RoomingHouseReviews
-            .Where(x => x.RoomingHouseId == roomingHouseId && !x.IsHidden)
+            .Where(x => x.RoomingHouseId == roomingHouseId && !x.IsHidden && x.ModerationStatus == RoomingHouseReviewModerationStatus.Approved)
             .GroupBy(x => x.Rating)
             .Select(g => new { Rating = g.Key, Count = g.Count() })
             .ToDictionaryAsync(x => x.Rating, x => x.Count, cancellationToken);
@@ -313,12 +375,26 @@ public class RoomingHouseReviewService : IRoomingHouseReviewService
         if (DateTimeOffset.UtcNow > review.CreatedAt.AddDays(7))
             throw new ConflictException(ErrorCodes.ValidationError, "Chỉ được sửa đánh giá trong vòng 7 ngày.");
 
+        var totalImagesAfterUpdate = request.RetainedImageIds.Count + request.NewImages.Count;
+        if (totalImagesAfterUpdate > MaxReviewImages)
+            throw new ConflictException(ErrorCodes.ValidationError, $"Mỗi đánh giá chỉ được giữ tối đa {MaxReviewImages} ảnh.");
+
         await using var transaction = await _context.BeginTransactionAsync(cancellationToken);
         try
         {
             review.Rating = request.Rating;
             review.Comment = request.Comment;
             review.UpdatedAt = DateTimeOffset.UtcNow;
+            review.ModerationStatus = RoomingHouseReviewModerationStatus.PendingAiReview;
+            review.ModerationReason = "Đánh giá đã được chỉnh sửa và đang chờ AI kiểm duyệt lại.";
+            review.AiModerationProvider = null;
+            review.AiModerationRiskLevel = null;
+            review.AiModerationCategories = null;
+            review.AiModerationJson = null;
+            review.AiReviewedAt = null;
+            review.ReviewedByAdminId = null;
+            review.AdminReviewedAt = null;
+            review.AdminNote = null;
 
             var imagesToRemove = review.Images
                 .Where(x => request.RetainedImageIds == null || !request.RetainedImageIds.Contains(x.Id))
@@ -355,8 +431,6 @@ public class RoomingHouseReviewService : IRoomingHouseReviewService
                 }
             }
 
-            await _context.SaveChangesAsync(cancellationToken);
-            await RoomingHouseRatingHelper.UpdateRatingAsync(_context, review.RoomingHouseId, cancellationToken);
             await _context.SaveChangesAsync(cancellationToken);
             await transaction.CommitAsync(cancellationToken);
 
@@ -424,6 +498,15 @@ public class RoomingHouseReviewService : IRoomingHouseReviewService
         review.LandlordReplyCreatedAt = DateTimeOffset.UtcNow;
 
         await _context.SaveChangesAsync(cancellationToken);
+
+        await _notificationService.CreateAsync(
+            review.TenantUserId,
+            NotificationType.RoomingHouseReviewReplied,
+            "Chủ trọ đã phản hồi đánh giá",
+            $"Chủ trọ {review.RoomingHouse.Name} đã phản hồi đánh giá của bạn.",
+            review.RoomingHouseId.ToString(),
+            "RoomingHouse",
+            cancellationToken);
     }
 
     public async Task DeleteReplyAsync(
@@ -454,6 +537,8 @@ public class RoomingHouseReviewService : IRoomingHouseReviewService
         var review = await _context.RoomingHouseReviews
             .Include(x => x.TenantUser)
             .Include(x => x.Images)
+            .Include(x => x.RentalContract)
+                .ThenInclude(x => x.Room)
             .FirstOrDefaultAsync(x => x.Id == reviewId, cancellationToken);
 
         if (review == null)
@@ -470,6 +555,10 @@ public class RoomingHouseReviewService : IRoomingHouseReviewService
         return new RoomingHouseReviewResponse
         {
             Id = review.Id,
+            RentalContractId = review.RentalContractId,
+            RoomNumber = review.RentalContract?.Room?.RoomNumber,
+            ContractStartDate = review.RentalContract?.StartDate,
+            ContractEndDate = review.RentalContract?.EndDate,
             TenantUserId = review.TenantUserId,
             TenantDisplayName = review.TenantUser.DisplayName,
             TenantAvatarUrl = review.TenantUser.AvatarUrl,
@@ -479,6 +568,11 @@ public class RoomingHouseReviewService : IRoomingHouseReviewService
             LandlordReplyCreatedAt = review.LandlordReplyCreatedAt,
             CreatedAt = review.CreatedAt,
             UpdatedAt = review.UpdatedAt,
+            ModerationStatus = review.ModerationStatus.ToString(),
+            ModerationReason = review.ModerationReason,
+            AiModerationProvider = review.AiModerationProvider,
+            AiModerationRiskLevel = review.AiModerationRiskLevel,
+            AdminNote = review.AdminNote,
             Images = review.Images.OrderBy(x => x.SortOrder).Select(img => new PropertyImageResponse
             {
                 Id = img.Id,
@@ -488,5 +582,30 @@ public class RoomingHouseReviewService : IRoomingHouseReviewService
                 SortOrder = img.SortOrder
             }).ToList()
         };
+    }
+
+    private static bool IsReviewableContractStatus(RentalContractStatus status, bool userHasStayed)
+    {
+        return status is RentalContractStatus.Active or RentalContractStatus.Expired ||
+               (status == RentalContractStatus.Cancelled && userHasStayed);
+    }
+
+    private static bool IsReviewableOccupantStatus(ContractOccupantStatus status)
+    {
+        return status is ContractOccupantStatus.Active or ContractOccupantStatus.MoveOut;
+    }
+
+    private static bool HasReviewableStay(
+        RentalContract contract,
+        ContractOccupant? occupant,
+        bool isMainTenant,
+        DateOnly today)
+    {
+        if (occupant != null)
+        {
+            return IsReviewableOccupantStatus(occupant.Status) && occupant.MoveInDate <= today;
+        }
+
+        return isMainTenant && contract.ActivatedAt != null && contract.StartDate <= today;
     }
 }

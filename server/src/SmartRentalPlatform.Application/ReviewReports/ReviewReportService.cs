@@ -76,6 +76,9 @@ public class ReviewReportService : IReviewReportService
                 .ThenInclude(r => r.Images)
             .Include(x => x.RoomingHouseReview)
                 .ThenInclude(r => r.RoomingHouse)
+            .Include(x => x.RoomingHouseReview)
+                .ThenInclude(r => r.RentalContract)
+                    .ThenInclude(c => c.Room)
             .AsQueryable();
 
         if (!string.IsNullOrEmpty(status))
@@ -112,6 +115,10 @@ public class ReviewReportService : IReviewReportService
             Review = report.RoomingHouseReview == null ? null : new RoomingHouseReviewResponse
             {
                 Id = report.RoomingHouseReview.Id,
+                RentalContractId = report.RoomingHouseReview.RentalContractId,
+                RoomNumber = report.RoomingHouseReview.RentalContract?.Room?.RoomNumber,
+                ContractStartDate = report.RoomingHouseReview.RentalContract?.StartDate,
+                ContractEndDate = report.RoomingHouseReview.RentalContract?.EndDate,
                 TenantUserId = report.RoomingHouseReview.TenantUserId,
                 TenantDisplayName = report.RoomingHouseReview.TenantUser.DisplayName,
                 TenantAvatarUrl = report.RoomingHouseReview.TenantUser.AvatarUrl,
@@ -152,6 +159,9 @@ public class ReviewReportService : IReviewReportService
                 .ThenInclude(rev => rev.Images)
             .Include(r => r.RoomingHouseReview)
                 .ThenInclude(rev => rev.RoomingHouse)
+            .Include(r => r.RoomingHouseReview)
+                .ThenInclude(rev => rev.RentalContract)
+                    .ThenInclude(c => c.Room)
             .FirstOrDefaultAsync(r => r.Id == reportId, cancellationToken);
 
         if (report == null)
@@ -172,6 +182,10 @@ public class ReviewReportService : IReviewReportService
             Review = report.RoomingHouseReview == null ? null : new RoomingHouseReviewResponse
             {
                 Id = report.RoomingHouseReview.Id,
+                RentalContractId = report.RoomingHouseReview.RentalContractId,
+                RoomNumber = report.RoomingHouseReview.RentalContract?.Room?.RoomNumber,
+                ContractStartDate = report.RoomingHouseReview.RentalContract?.StartDate,
+                ContractEndDate = report.RoomingHouseReview.RentalContract?.EndDate,
                 TenantUserId = report.RoomingHouseReview.TenantUserId,
                 TenantDisplayName = report.RoomingHouseReview.TenantUser.DisplayName,
                 TenantAvatarUrl = report.RoomingHouseReview.TenantUser.AvatarUrl,

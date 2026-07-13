@@ -7,6 +7,7 @@ using SmartRentalPlatform.Application.Billing;
 using SmartRentalPlatform.Application.Chat;
 using SmartRentalPlatform.Application.Common.Interfaces;
 using SmartRentalPlatform.Application.Kyc;
+using SmartRentalPlatform.Application.LandlordDashboard;
 using SmartRentalPlatform.Application.Notifications;
 using SmartRentalPlatform.Application.Payments;
 using SmartRentalPlatform.Application.RentalContracts;
@@ -38,11 +39,14 @@ public static class DependencyInjection
         services.AddScoped<IUserService, UserService>();
         services.AddAdminApprovalServices();
         services.AddScoped<IWalletService, WalletService>();
+        services.AddScoped<IWithdrawalService, WithdrawalService>();
+        services.AddScoped<IWithdrawalWebhookService, WithdrawalWebhookService>();
         services.AddPaymentServices();
         services.AddBillingServices();
         services.AddScoped<INotificationService, NotificationService>();
         services.AddScoped<IChatService, ChatService>();
         services.AddScoped<IViewingAppointmentService, ViewingAppointmentService>();
+        services.AddScoped<ILandlordDashboardService, LandlordDashboardService>();
         return services;
     }
 }

@@ -26,7 +26,9 @@ public sealed class InvoiceQueryLoader
                 .ThenInclude(x => x.RoomingHouse)
             .Include(x => x.Tenant)
             .Include(x => x.Items)
-                .ThenInclude(x => x.ServiceType);
+                .ThenInclude(x => x.ServiceType)
+            .Include(x => x.Items)
+                .ThenInclude(x => x.MeterReading);
     }
 
     internal async Task<InvoiceResponse> GetInvoiceResponseAsync(

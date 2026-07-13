@@ -4,6 +4,7 @@ using System.Threading;
 using System.Threading.Tasks;
 using Microsoft.EntityFrameworkCore;
 using SmartRentalPlatform.Application.Common.Interfaces;
+using SmartRentalPlatform.Domain.Enums.Properties;
 
 namespace SmartRentalPlatform.Application.RoomingHouses.Helpers;
 
@@ -12,7 +13,7 @@ public static class RoomingHouseRatingHelper
     public static async Task UpdateRatingAsync(IAppDbContext context, Guid roomingHouseId, CancellationToken cancellationToken)
     {
         var stats = await context.RoomingHouseReviews
-            .Where(x => x.RoomingHouseId == roomingHouseId && !x.IsHidden)
+            .Where(x => x.RoomingHouseId == roomingHouseId && !x.IsHidden && x.ModerationStatus == RoomingHouseReviewModerationStatus.Approved)
             .GroupBy(x => x.RoomingHouseId)
             .Select(g => new { Total = g.Count(), Average = g.Average(r => (double)r.Rating) })
             .FirstOrDefaultAsync(cancellationToken);

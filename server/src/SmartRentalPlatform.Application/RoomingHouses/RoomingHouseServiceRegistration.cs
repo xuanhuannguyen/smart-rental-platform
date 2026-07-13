@@ -1,4 +1,5 @@
 using Microsoft.Extensions.DependencyInjection;
+using SmartRentalPlatform.Application.RoomingHouses.ReviewModeration;
 using SmartRentalPlatform.Application.RoomingHouses.Search;
 
 namespace SmartRentalPlatform.Application.RoomingHouses;
@@ -21,6 +22,7 @@ internal static class RoomingHouseServiceRegistration
         services.AddScoped<IRoomingHouseSubmissionService, RoomingHouseSubmissionService>();
         services.AddScoped<IFavoriteRoomingHouseService, FavoriteRoomingHouseService>();
         services.AddScoped<IRoomingHouseReviewService, RoomingHouseReviewService>();
+        services.AddScoped<IReviewAiModerationService, ReviewAiModerationService>();
 
         return services;
     }

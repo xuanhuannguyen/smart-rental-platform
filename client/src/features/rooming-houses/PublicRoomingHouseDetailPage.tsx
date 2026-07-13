@@ -12,7 +12,8 @@ import { HomeHeader } from '../../shared/components/layout/HomeHeader';
 import { ROUTE_PATHS } from '../../app/router/routePaths';
 import { saveRoomingHouseView } from './rentalBehaviorStorage';
 import { useAuth } from '../../app/providers/AuthProvider';
-import { createDirectConversation } from '../chat/api';
+import { Toast } from '../../shared/components/ui/Toast';
+import { contactLandlord } from '../chat/api';
 import { HouseReviewsList } from './components/HouseReviewsList';
 import './PublicRoomingHouseDetailPage.css';
 
@@ -96,28 +97,58 @@ export default function PublicRoomingHouseDetailPage() {
   const [house, setHouse] = useState<RoomingHouseDetail | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
-  const [chatStarting, setChatStarting] = useState(false);
+  const [quickMessageOpen, setQuickMessageOpen] = useState(false);
+  const [quickMessage, setQuickMessage] = useState('');
+  const [quickMessageSending, setQuickMessageSending] = useState(false);
+  const [toast, setToast] = useState<{ message: string; type: 'success' | 'error' | 'info' } | null>(null);
   const fromSearch = getSearchReturnUrl(location.state, new URLSearchParams(location.search));
 
-  async function handleMessageLandlord() {
+  const defaultQuickMessage = house
+    ? `Xin chào, tôi muốn hỏi về thông tin khu trọ ${house.name}.`
+    : 'Xin chào, tôi muốn hỏi về thông tin khu trọ này.';
+
+  function handleOpenQuickMessage() {
     if (!house) return;
     if (!currentUser) {
       navigate('/login', { state: { from: location.pathname } });
       return;
     }
     if (currentUser.userId === house.landlordUserId) {
-      setError('Bạn đang xem khu trọ của chính mình.');
+      setToast({ message: 'Bạn đang xem khu trọ của chính mình.', type: 'info' });
       return;
     }
 
-    setChatStarting(true);
+    setQuickMessage(quickMessage.trim() || defaultQuickMessage);
+    setQuickMessageOpen(true);
+  }
+
+  function handleCancelQuickMessage() {
+    setQuickMessageOpen(false);
+    setQuickMessage(defaultQuickMessage);
+  }
+
+  async function handleSendQuickMessage() {
+    if (!house) return;
+    const content = quickMessage.trim();
+    if (!content) {
+      setToast({ message: 'Vui lòng nhập nội dung tin nhắn.', type: 'info' });
+      return;
+    }
+
+    setQuickMessageSending(true);
     try {
-      const conversation = await createDirectConversation(house.landlordUserId);
-      navigate(`${ROUTE_PATHS.ACCOUNT.MESSAGES}?conversationId=${conversation.id}`);
+      const conversation = await contactLandlord(house.id, content);
+      window.dispatchEvent(new CustomEvent('open-chat-bubble', {
+        detail: { conversationId: conversation.id }
+      }));
+      window.dispatchEvent(new CustomEvent('refresh-chat-list'));
+      setQuickMessageOpen(false);
+      setQuickMessage(defaultQuickMessage);
+      setToast({ message: 'Đã gửi tin nhắn cho chủ trọ.', type: 'success' });
     } catch (chatError) {
-      setError(getApiErrorMessage(chatError, 'Không thể mở cuộc trò chuyện với chủ trọ.'));
+      setToast({ message: getApiErrorMessage(chatError, 'Không thể gửi tin nhắn cho chủ trọ.'), type: 'error' });
     } finally {
-      setChatStarting(false);
+      setQuickMessageSending(false);
     }
   }
 
@@ -205,16 +236,16 @@ export default function PublicRoomingHouseDetailPage() {
               <button
                 className="public-house-detail__message-button"
                 type="button"
-                onClick={() => void handleMessageLandlord()}
-                disabled={chatStarting || currentUser?.userId === house.landlordUserId}
+                onClick={handleOpenQuickMessage}
+                disabled={currentUser?.userId === house.landlordUserId}
               >
                 <svg viewBox="0 0 24 24" width="17" height="17" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
                   <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z" />
                 </svg>
-                <span>{chatStarting ? 'Đang mở chat...' : 'Nhắn tin chủ trọ'}</span>
+                <span>Nhắn tin chủ trọ</span>
               </button>
             </div>
-            
+
             <div className="house-amenities-mini-section">
               <h3>Tiện ích</h3>
               {houseAmenities.length > 0 ? (
@@ -521,6 +552,61 @@ export default function PublicRoomingHouseDetailPage() {
         </section>
       </main>
       <RentalAiChatbot context="detail" roomingHouseId={house.id} title={house.name} />
+      {quickMessageOpen && (
+        <div className="public-house-detail__quick-message-overlay" role="presentation" onMouseDown={handleCancelQuickMessage}>
+          <section
+            className="public-house-detail__quick-message"
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="quick-landlord-message-title"
+            onMouseDown={(event) => event.stopPropagation()}
+          >
+            <header className="public-house-detail__quick-message-header">
+              <div>
+                <p>Nhắn tin chủ trọ</p>
+                <h2 id="quick-landlord-message-title">{house.name}</h2>
+              </div>
+              <button
+                type="button"
+                className="public-house-detail__quick-message-close"
+                onClick={handleCancelQuickMessage}
+                disabled={quickMessageSending}
+                aria-label="Đóng"
+              >
+                ×
+              </button>
+            </header>
+            <label htmlFor="quick-landlord-message">Tin nhắn nhanh</label>
+            <textarea
+              id="quick-landlord-message"
+              rows={4}
+              value={quickMessage}
+              onChange={(event) => setQuickMessage(event.target.value)}
+              disabled={quickMessageSending}
+              autoFocus
+            />
+            <div className="public-house-detail__quick-message-actions">
+              <button
+                type="button"
+                className="public-house-detail__quick-message-cancel"
+                onClick={handleCancelQuickMessage}
+                disabled={quickMessageSending}
+              >
+                Hủy
+              </button>
+              <button
+                type="button"
+                className="public-house-detail__quick-message-send"
+                onClick={() => void handleSendQuickMessage()}
+                disabled={quickMessageSending || !quickMessage.trim()}
+              >
+                {quickMessageSending ? 'Đang gửi...' : 'Gửi'}
+              </button>
+            </div>
+          </section>
+        </div>
+      )}
+      {toast && <Toast message={toast.message} type={toast.type} onClose={() => setToast(null)} />}
     </>
   );
 }

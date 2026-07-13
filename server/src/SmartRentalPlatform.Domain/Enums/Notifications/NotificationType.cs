@@ -11,4 +11,7 @@ public enum NotificationType
     RentalRequestApproved,
     RentalRequestRejected,
     NewChatMessage,
+    RoomingHouseReviewNeedsAdminReview,
+    RoomingHouseReviewRejected,
+    RoomingHouseReviewReplied,
 }

@@ -6,6 +6,7 @@ namespace SmartRentalPlatform.Contracts.ViewingAppointments.Responses
     {
         public Guid Id { get; set; }
         public Guid RoomId { get; set; }
+        public Guid? RoomingHouseId { get; set; }
         public Guid TenantUserId { get; set; }
         public Guid CreatedByUserId { get; set; }
         public DateTimeOffset ScheduledAt { get; set; }

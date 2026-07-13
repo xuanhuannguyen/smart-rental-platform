@@ -12,6 +12,7 @@ internal static class AdminApprovalServiceRegistration
         services.AddScoped<IApprovalAuditService, ApprovalAuditService>();
         services.AddScoped<IAdminUserService, AdminUserService>();
         services.AddScoped<IReviewReportService, ReviewReportService>();
+        services.AddScoped<IReviewModerationAdminService, ReviewModerationAdminService>();
 
         return services;
     }

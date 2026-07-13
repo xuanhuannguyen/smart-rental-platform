@@ -28,8 +28,15 @@ export function getNotificationLink(notification: Notification): string {
   const role = getNotificationRole(notification);
 
   if (notification.referenceType === 'Conversation' && notification.referenceId) {
-    const base = role === 'landlord' ? ROUTE_PATHS.LANDLORD.MESSAGES : ROUTE_PATHS.ACCOUNT.MESSAGES;
+    const base = ROUTE_PATHS.MESSAGES;
     return `${base}?conversationId=${notification.referenceId}`;
+  }
+
+  if (
+    notification.referenceId &&
+    (notification.referenceType === 'RoomingHouse' || notification.type === 'RoomingHouseReviewRejected')
+  ) {
+    return `/rooming-houses/${notification.referenceId}?review=1#review-section`;
   }
 
   if (role === 'landlord') {

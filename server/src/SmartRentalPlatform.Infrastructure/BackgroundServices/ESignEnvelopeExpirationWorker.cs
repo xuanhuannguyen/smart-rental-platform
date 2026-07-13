@@ -61,12 +61,12 @@ public class ESignEnvelopeExpirationWorker : BackgroundService
                 if (expiredEnvelopes.Any())
                 {
                     await dbContext.SaveChangesAsync(stoppingToken);
-                    logger.LogInformation("Expired {Count} eSign envelopes", expiredEnvelopes.Count);
+                    logger.SafeLogInformation("Expired {Count} eSign envelopes", expiredEnvelopes.Count);
                 }
             }
             catch (Exception ex)
             {
-                logger.LogError(ex, "Error in ESignEnvelopeExpirationWorker");
+                logger.SafeLogError(ex, "Error in ESignEnvelopeExpirationWorker");
             }
 
             await Task.Delay(TimeSpan.FromMinutes(15), stoppingToken);

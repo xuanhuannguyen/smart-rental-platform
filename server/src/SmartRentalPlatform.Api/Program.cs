@@ -14,6 +14,9 @@ using SmartRentalPlatform.Api.Hubs;
 var builder = WebApplication.CreateBuilder(args);
 
 builder.Configuration.AddJsonFile("appsettings.Local.json", optional: true, reloadOnChange: true);
+builder.Logging.ClearProviders();
+builder.Logging.AddConsole();
+builder.Logging.AddDebug();
 
 QuestPDF.Settings.License = LicenseType.Community;
 

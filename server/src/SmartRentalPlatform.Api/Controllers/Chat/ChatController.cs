@@ -11,6 +11,7 @@ using SmartRentalPlatform.Contracts.Chat.Requests;
 using SmartRentalPlatform.Contracts.Chat.Responses;
 using SmartRentalPlatform.Contracts.Common;
 using SmartRentalPlatform.Contracts.Files;
+using SmartRentalPlatform.Domain.Enums.Chat;
 
 namespace SmartRentalPlatform.Api.Controllers.Chat;
 
@@ -47,10 +48,21 @@ public sealed class ChatController : ControllerBase
     }
 
     [HttpGet("conversations")]
-    public async Task<ActionResult<ApiResponse<List<ConversationResponse>>>> GetConversations(CancellationToken cancellationToken)
+    public async Task<ActionResult<ApiResponse<List<ConversationResponse>>>> GetConversations([FromQuery] string? box, CancellationToken cancellationToken)
     {
-        var result = await chatService.GetConversationsAsync(GetCurrentUserId(), cancellationToken);
+        var result = await chatService.GetConversationsAsync(GetCurrentUserId(), box, cancellationToken);
         return Ok(Success(result, "Tải danh sách tin nhắn thành công."));
+    }
+
+    [HttpGet("conversations/recent")]
+    public async Task<ActionResult<ApiResponse<List<ConversationResponse>>>> GetRecentConversations(
+        [FromQuery] string? box,
+        [FromQuery] int take = 5,
+        [FromQuery] int skip = 0,
+        CancellationToken cancellationToken = default)
+    {
+        var result = await chatService.GetRecentConversationsAsync(GetCurrentUserId(), box, take, skip, cancellationToken);
+        return Ok(Success(result, "Tải cuộc trò chuyện gần đây thành công."));
     }
 
     [HttpPost("conversations/direct")]
@@ -66,6 +78,13 @@ public sealed class ChatController : ControllerBase
         var result = await chatService.CreateGroupConversationAsync(GetCurrentUserId(), request, cancellationToken);
         await BroadcastConversationAsync(result);
         return Ok(Success(result, "Tạo nhóm chat thành công."));
+    }
+
+    [HttpGet("conversations/{id:guid}")]
+    public async Task<ActionResult<ApiResponse<ConversationResponse>>> GetConversation(Guid id, CancellationToken cancellationToken)
+    {
+        var result = await chatService.GetConversationResponseForUserAsync(id, GetCurrentUserId(), cancellationToken);
+        return Ok(Success(result, "Tải thông tin hội thoại thành công."));
     }
 
     [HttpPatch("conversations/{id:guid}")]
@@ -84,9 +103,9 @@ public sealed class ChatController : ControllerBase
     }
 
     [HttpGet("users/search")]
-    public async Task<ActionResult<ApiResponse<List<ChatUserResponse>>>> SearchUsers([FromQuery] string email, CancellationToken cancellationToken)
+    public async Task<ActionResult<ApiResponse<List<ChatUserResponse>>>> SearchUsers([FromQuery] string email, [FromQuery] Guid? roomingHouseId, CancellationToken cancellationToken)
     {
-        var result = await chatService.SearchUsersByEmailAsync(GetCurrentUserId(), email, cancellationToken);
+        var result = await chatService.SearchUsersByEmailAsync(GetCurrentUserId(), email, roomingHouseId, cancellationToken);
         return Ok(Success(result, "Tìm người dùng thành công."));
     }
 
@@ -110,6 +129,14 @@ public sealed class ChatController : ControllerBase
         return Ok(Success(result, "Đã xóa thành viên khỏi nhóm."));
     }
 
+    [HttpPatch("conversations/{id:guid}/participants/{userId:guid}/role")]
+    public async Task<ActionResult<ApiResponse<ConversationResponse>>> UpdateParticipantRole(Guid id, Guid userId, [FromBody] UpdateParticipantRoleRequest request, CancellationToken cancellationToken)
+    {
+        var result = await chatService.UpdateParticipantRoleAsync(GetCurrentUserId(), id, userId, request.Role, cancellationToken);
+        await BroadcastConversationAsync(result);
+        return Ok(Success(result, "Cập nhật vai trò thành viên thành công."));
+    }
+
     [HttpPost("conversations/{id:guid}/leave")]
     public async Task<ActionResult<ApiResponse<ConversationResponse>>> LeaveConversation(Guid id, CancellationToken cancellationToken)
     {
@@ -130,6 +157,13 @@ public sealed class ChatController : ControllerBase
         return Ok(Success(result, "Đã đóng nhóm chat."));
     }
 
+    [HttpPost("conversations/{id:guid}/clear")]
+    public async Task<ActionResult<ApiResponse<ConversationResponse>>> ClearConversation(Guid id, CancellationToken cancellationToken)
+    {
+        var result = await chatService.ClearConversationHistoryAsync(GetCurrentUserId(), id, cancellationToken);
+        return Ok(Success(result, "Xóa lịch sử trò chuyện thành công."));
+    }
+
     [HttpGet("conversations/{id:guid}/messages")]
     public async Task<ActionResult<ApiResponse<List<ChatMessageResponse>>>> GetMessages(
         Guid id,
@@ -144,14 +178,78 @@ public sealed class ChatController : ControllerBase
     [HttpPost("conversations/{id:guid}/messages")]
     public async Task<ActionResult<ApiResponse<ChatMessageResponse>>> SendMessage(Guid id, SendChatMessageRequest request, CancellationToken cancellationToken)
     {
-        var result = await chatService.SendMessageAsync(GetCurrentUserId(), id, request, cancellationToken);
-        await hubContext.Clients.Group(ChatHubGroups.Conversation(id)).SendAsync("ReceiveMessage", result.Message, cancellationToken);
-        await BroadcastConversationAsync(result.Conversation);
+        var senderUserId = GetCurrentUserId();
+        var result = await chatService.SendMessageAsync(senderUserId, id, request, cancellationToken);
+
+        var payload = new { message = result.Message, conversation = result.Conversation };
+
+        // Broadcast MessageCreated to all participants' user groups
+        await hubContext.Clients.Group(ChatHubGroups.User(senderUserId)).SendAsync("MessageCreated", payload, cancellationToken);
         foreach (var recipientId in result.RecipientUserIds)
         {
-            await hubContext.Clients.Group(ChatHubGroups.User(recipientId)).SendAsync("UnreadCountUpdated", new { conversationId = id }, cancellationToken);
+            await hubContext.Clients.Group(ChatHubGroups.User(recipientId)).SendAsync("MessageCreated", payload, cancellationToken);
+            await hubContext.Clients.Group(ChatHubGroups.User(recipientId)).SendAsync("UnreadCountUpdated", new { conversationId = id, lastMessageAt = result.Conversation.LastMessageAt }, cancellationToken);
         }
+
+        // Backward compatibility
+        await hubContext.Clients.Group(ChatHubGroups.Conversation(id)).SendAsync("ReceiveMessage", result.Message, cancellationToken);
+        await BroadcastConversationAsync(result.Conversation);
+
         return Ok(Success(result.Message, "Gửi tin nhắn thành công."));
+    }
+
+    [HttpDelete("conversations/{conversationId:guid}/messages/{messageId:guid}")]
+    public async Task<ActionResult<ApiResponse<ChatMessageResponse>>> DeleteMessage(Guid conversationId, Guid messageId, CancellationToken cancellationToken)
+    {
+        var result = await chatService.DeleteMessageAsync(GetCurrentUserId(), conversationId, messageId, cancellationToken);
+        await hubContext.Clients.Group(ChatHubGroups.Conversation(conversationId)).SendAsync("MessageDeleted", result.Message, cancellationToken);
+        await BroadcastConversationAsync(result.Conversation);
+        return Ok(Success(result.Message, "Xóa tin nhắn thành công."));
+    }
+
+    [HttpPost("conversations/{conversationId:guid}/messages/{messageId:guid}/unsend")]
+    public async Task<ActionResult<ApiResponse<ChatMessageResponse>>> UnsendMessage(Guid conversationId, Guid messageId, CancellationToken cancellationToken)
+    {
+        var result = await chatService.UnsendMessageAsync(GetCurrentUserId(), conversationId, messageId, cancellationToken);
+        await hubContext.Clients.Group(ChatHubGroups.Conversation(conversationId)).SendAsync("MessageDeleted", result, cancellationToken);
+        
+        var conversation = await chatService.GetConversationResponseForUserAsync(conversationId, GetCurrentUserId(), cancellationToken);
+        await BroadcastConversationAsync(conversation);
+        return Ok(Success(result, "Gỡ tin nhắn thành công."));
+    }
+
+    [HttpGet("conversations/{conversationId:guid}/messages/{messageId:guid}/file")]
+    public async Task<IActionResult> DownloadFile(Guid conversationId, Guid messageId, CancellationToken cancellationToken)
+    {
+        var message = await chatService.GetFileMessageAsync(GetCurrentUserId(), conversationId, messageId, cancellationToken);
+        if (string.IsNullOrEmpty(message.FileUrl))
+            throw new BadRequestException("CHAT_FILE_NOT_FOUND", "Không tìm thấy tệp tin.");
+
+        var relativePath = message.FileUrl;
+        if (relativePath.StartsWith("http", StringComparison.OrdinalIgnoreCase))
+        {
+            try
+            {
+                var uri = new Uri(relativePath);
+                relativePath = uri.PathAndQuery;
+            }
+            catch
+            {
+                return Redirect(message.FileUrl);
+            }
+        }
+
+        var pathOnly = relativePath.Split('?')[0].TrimStart('/');
+        var webRootPath = Path.Combine(Directory.GetCurrentDirectory(), "wwwroot");
+        var filePath = Path.Combine(webRootPath, pathOnly);
+
+        if (!System.IO.File.Exists(filePath))
+        {
+            return Redirect(message.FileUrl);
+        }
+
+        var bytes = await System.IO.File.ReadAllBytesAsync(filePath, cancellationToken);
+        return File(bytes, message.FileContentType ?? "application/octet-stream", message.FileName ?? "download");
     }
 
     [HttpPatch("conversations/{id:guid}/read")]
@@ -162,6 +260,132 @@ public sealed class ChatController : ControllerBase
         await hubContext.Clients.Group(ChatHubGroups.Conversation(id)).SendAsync("MessageRead", new { conversationId = id, userId }, cancellationToken);
         await hubContext.Clients.Group(ChatHubGroups.User(userId)).SendAsync("UnreadCountUpdated", new { conversationId = id, unreadCount = 0 }, cancellationToken);
         return Ok(Success(result, "Đã đánh dấu đã đọc."));
+    }
+
+    [HttpGet("conversation-counts")]
+    public async Task<ActionResult<ApiResponse<ChatCountsResponse>>> GetConversationCounts(CancellationToken cancellationToken)
+    {
+        var result = await chatService.GetConversationCountsAsync(GetCurrentUserId(), cancellationToken);
+        return Ok(Success(result, "Tải thống kê hộp thư thành công."));
+    }
+
+    [HttpGet("unread-count")]
+    public async Task<ActionResult<ApiResponse<int>>> GetUnreadCount(CancellationToken cancellationToken)
+    {
+        var result = await chatService.GetUnreadMessageCountAsync(GetCurrentUserId(), cancellationToken);
+        return Ok(Success(result, "Tải số tin chưa đọc thành công."));
+    }
+
+    [HttpPost("conversations/{id:guid}/accept-contact-request")]
+    public async Task<ActionResult<ApiResponse<ConversationResponse>>> AcceptContactRequest(Guid id, CancellationToken cancellationToken)
+    {
+        var result = await chatService.AcceptContactRequestAsync(GetCurrentUserId(), id, cancellationToken);
+        await BroadcastConversationAsync(result.Conversation);
+        if (result.SystemMessage is not null)
+        {
+            var payload = new { message = result.SystemMessage, conversation = result.Conversation };
+            foreach (var participant in result.Conversation.Participants.Where(p => p.LeftAt is null))
+            {
+                await hubContext.Clients.Group(ChatHubGroups.User(participant.UserId)).SendAsync("MessageCreated", payload, cancellationToken);
+            }
+            await hubContext.Clients.Group(ChatHubGroups.Conversation(id)).SendAsync("ReceiveMessage", result.SystemMessage, cancellationToken);
+        }
+
+        return Ok(Success(result.Conversation, "Đã chấp nhận yêu cầu nhắn tin."));
+    }
+
+    [HttpPost("conversations/{id:guid}/reject-contact-request")]
+    public async Task<ActionResult<ApiResponse<ConversationResponse>>> RejectContactRequest(Guid id, CancellationToken cancellationToken)
+    {
+        var userId = GetCurrentUserId();
+        var result = await chatService.RejectContactRequestAsync(userId, id, cancellationToken);
+        await hubContext.Clients.Group(ChatHubGroups.User(userId)).SendAsync("ConversationRejected", new { conversationId = id }, cancellationToken);
+        await BroadcastConversationAsync(result);
+
+        return Ok(Success(result, "Đã từ chối yêu cầu nhắn tin."));
+    }
+
+    [HttpPost("direct/rooming-houses/{roomingHouseId:guid}")]
+    public async Task<ActionResult<ApiResponse<ConversationResponse>>> ContactLandlord(Guid roomingHouseId, [FromBody] ContactLandlordRequest request, CancellationToken cancellationToken)
+    {
+        var conversation = await chatService.ContactLandlordAsync(GetCurrentUserId(), roomingHouseId, request.InitialMessage, cancellationToken);
+        await BroadcastConversationAsync(conversation);
+        foreach (var participant in conversation.Participants)
+        {
+            await hubContext.Clients.Group(ChatHubGroups.User(participant.UserId)).SendAsync("UnreadCountUpdated", new { conversationId = conversation.Id }, cancellationToken);
+        }
+        return Ok(Success(conversation, "Gửi tin nhắn liên hệ chủ trọ thành công."));
+    }
+
+    [HttpPost("direct/rooming-houses/{roomingHouseId:guid}/open")]
+    public async Task<ActionResult<ApiResponse<ConversationResponse>>> OpenDirectConversation(Guid roomingHouseId, CancellationToken cancellationToken)
+    {
+        var conversation = await chatService.CreateDirectConversationByRoomingHouseAsync(GetCurrentUserId(), roomingHouseId, cancellationToken);
+        await BroadcastConversationAsync(conversation);
+        foreach (var participant in conversation.Participants)
+        {
+            await hubContext.Clients.Group(ChatHubGroups.User(participant.UserId)).SendAsync("UnreadCountUpdated", new { conversationId = conversation.Id }, cancellationToken);
+        }
+        return Ok(Success(conversation, "Mở cuộc trò chuyện trực tiếp thành công."));
+    }
+
+    [HttpGet("landlord/rooming-houses/{roomingHouseId:guid}/tenants")]
+    public async Task<ActionResult<ApiResponse<List<ChatUserResponse>>>> GetActiveTenantsByRoomingHouse(Guid roomingHouseId, CancellationToken cancellationToken)
+    {
+        var result = await chatService.GetActiveTenantsByRoomingHouseAsync(GetCurrentUserId(), roomingHouseId, cancellationToken);
+        return Ok(Success(result, "Tải danh sách người thuê thành công."));
+    }
+
+    [HttpGet("conversations/{id:guid}/eligible-members")]
+    public async Task<ActionResult<ApiResponse<List<ChatUserResponse>>>> GetEligibleMembers(Guid id, [FromQuery] Guid? roomingHouseId, CancellationToken cancellationToken)
+    {
+        var result = await chatService.GetEligibleMembersAsync(GetCurrentUserId(), id, roomingHouseId, cancellationToken);
+        return Ok(Success(result, "Tải danh sách thành viên hợp lệ thành công."));
+    }
+
+    [HttpGet("filters/rooming-houses")]
+    public async Task<ActionResult<ApiResponse<List<ChatRoomingHouseFilterResponse>>>> GetFilterRoomingHouses(CancellationToken cancellationToken)
+    {
+        var result = await chatService.GetFilterRoomingHousesAsync(GetCurrentUserId(), cancellationToken);
+        return Ok(Success(result, "Tải bộ lọc nhà trọ thành công."));
+    }
+
+    [HttpGet("conversations/{id:guid}/join-requests")]
+    public async Task<ActionResult<ApiResponse<List<ConversationJoinRequestResponse>>>> GetJoinRequests(Guid id, CancellationToken cancellationToken)
+    {
+        var result = await chatService.GetJoinRequestsAsync(GetCurrentUserId(), id, cancellationToken);
+        return Ok(Success(result, "Tải danh sách yêu cầu tham gia thành công."));
+    }
+
+    [HttpPost("conversations/{id:guid}/join-requests")]
+    public async Task<ActionResult<ApiResponse<ConversationResponse>>> CreateJoinRequest(Guid id, [FromBody] CreateJoinRequestRequest? request, CancellationToken cancellationToken)
+    {
+        var result = await chatService.CreateJoinRequestAsync(GetCurrentUserId(), id, request?.TargetUserId, cancellationToken);
+        await BroadcastConversationAsync(result);
+        return Ok(Success(result, "Gửi yêu cầu tham gia thành công."));
+    }
+
+    [HttpPost("conversations/{id:guid}/join-requests/{requestId:guid}/approve")]
+    public async Task<ActionResult<ApiResponse<ConversationResponse>>> ApproveJoinRequest(Guid id, Guid requestId, CancellationToken cancellationToken)
+    {
+        var result = await chatService.ApproveJoinRequestAsync(GetCurrentUserId(), id, requestId, cancellationToken);
+        await BroadcastConversationAsync(result);
+        return Ok(Success(result, "Đã duyệt yêu cầu tham gia."));
+    }
+
+    [HttpPost("conversations/{id:guid}/join-requests/{requestId:guid}/reject")]
+    public async Task<ActionResult<ApiResponse<object>>> RejectJoinRequest(Guid id, Guid requestId, CancellationToken cancellationToken)
+    {
+        await chatService.RejectJoinRequestAsync(GetCurrentUserId(), id, requestId, cancellationToken);
+        return Ok(Success<object>(new { }, "Đã từ chối yêu cầu tham gia."));
+    }
+
+    [HttpPatch("conversations/{id:guid}/approval-settings")]
+    public async Task<ActionResult<ApiResponse<ConversationResponse>>> UpdateApprovalSettings(Guid id, [FromBody] UpdateApprovalSettingsRequest request, CancellationToken cancellationToken)
+    {
+        var result = await chatService.UpdateApprovalSettingsAsync(GetCurrentUserId(), id, request.RequiresJoinApproval, cancellationToken);
+        await BroadcastConversationAsync(result);
+        return Ok(Success(result, "Cập nhật cài đặt phê duyệt thành công."));
     }
 
     [HttpPost("images")]
@@ -197,6 +421,30 @@ public sealed class ChatController : ControllerBase
         }, "Tải ảnh chat thành công."));
     }
 
+    [HttpPost("files")]
+    [RequestSizeLimit(10 * 1024 * 1024)]
+    public async Task<ActionResult<ApiResponse<ChatFileUploadResponse>>> UploadFile(IFormFile file, CancellationToken cancellationToken)
+    {
+        if (file is null || file.Length == 0)
+            throw new BadRequestException("CHAT_FILE_REQUIRED", "Vui lòng chọn tệp.");
+
+        await using var stream = file.OpenReadStream();
+        var uploaded = await fileStorageService.UploadPdfAsync(
+            stream,
+            file.FileName,
+            FileUploadScope.ChatFile,
+            cancellationToken);
+
+        return Ok(Success(new ChatFileUploadResponse
+        {
+            ObjectKey = uploaded.ObjectKey,
+            Url = uploaded.Url,
+            FileName = file.FileName,
+            ContentType = file.ContentType,
+            Size = file.Length
+        }, "Tải tệp thành công."));
+    }
+
     private Guid GetCurrentUserId()
     {
         return currentUserService.GetRequiredUserId("Bạn cần đăng nhập để sử dụng chat.");
@@ -229,4 +477,24 @@ public sealed class ChatController : ControllerBase
             Data = data
         };
     }
+}
+
+public sealed class UpdateParticipantRoleRequest
+{
+    public ConversationParticipantRole Role { get; set; }
+}
+
+public sealed class CreateJoinRequestRequest
+{
+    public Guid? TargetUserId { get; set; }
+}
+
+public sealed class UpdateApprovalSettingsRequest
+{
+    public bool RequiresJoinApproval { get; set; }
+}
+
+public sealed class ContactLandlordRequest
+{
+    public string InitialMessage { get; set; } = string.Empty;
 }

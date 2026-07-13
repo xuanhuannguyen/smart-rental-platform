@@ -2,6 +2,7 @@ import { Navigate, Outlet, useLocation } from 'react-router-dom';
 import { useAuth } from '../providers/AuthProvider';
 import { LoadingState } from '../../shared/components/feedback/LoadingState';
 import { ROUTE_PATHS } from './routePaths';
+import { FloatingChatContainer } from '../../features/chat/components/FloatingChatContainer';
 
 export function ProtectedRoute() {
     const { isAuthenticated, isLoading } = useAuth();
@@ -21,5 +22,10 @@ export function ProtectedRoute() {
         );
     }
 
-    return <Outlet />;
+    return (
+        <>
+            <Outlet />
+            <FloatingChatContainer />
+        </>
+    );
 }

@@ -1,4 +1,4 @@
-import { useMemo, useRef, useState, type FormEvent, type ReactNode } from 'react';
+import { useEffect, useMemo, useRef, useState, type FormEvent, type ReactNode } from 'react';
 import { Link } from 'react-router-dom';
 import { getApiErrorMessage } from '../../../shared/api/apiError';
 import { toAssetUrl } from '../../../shared/api/assets';
@@ -57,6 +57,23 @@ export default function RentalAiChatbot({ context, roomingHouseId, title }: Rent
   const [conversationId, setConversationId] = useState<string | null>(initialSession.conversationId);
   const [messages, setMessages] = useState<ChatMessage[]>(initialSession.messages);
   const inputRef = useRef<HTMLInputElement | null>(null);
+  const messagesEndRef = useRef<HTMLDivElement | null>(null);
+
+  const scrollToBottom = () => {
+    messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+  };
+
+  useEffect(() => {
+    if (open) {
+      scrollToBottom();
+      const t1 = window.setTimeout(scrollToBottom, 100);
+      const t2 = window.setTimeout(scrollToBottom, 400);
+      return () => {
+        window.clearTimeout(t1);
+        window.clearTimeout(t2);
+      };
+    }
+  }, [open, messages, loading]);
 
   const quickPrompts = useMemo(() => QUICK_PROMPTS[context], [context]);
 
@@ -180,6 +197,7 @@ export default function RentalAiChatbot({ context, roomingHouseId, title }: Rent
                 </article>
               </div>
             )}
+            <div ref={messagesEndRef} />
           </div>
 
           <div className="rental-ai-chatbot__quick">

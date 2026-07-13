@@ -54,16 +54,21 @@ public sealed class ChatHub : Hub
         var userId = GetCurrentUserId();
         var result = await chatService.SendMessageAsync(userId, conversationId, request);
 
+        var payload = new { message = result.Message, conversation = result.Conversation };
+
+        // Broadcast MessageCreated to all participants' user groups
+        await Clients.Group(ChatHubGroups.User(userId)).SendAsync("MessageCreated", payload);
+        foreach (var recipientId in result.RecipientUserIds)
+        {
+            await Clients.Group(ChatHubGroups.User(recipientId)).SendAsync("MessageCreated", payload);
+            await Clients.Group(ChatHubGroups.User(recipientId)).SendAsync("UnreadCountUpdated", new { conversationId, lastMessageAt = result.Conversation.LastMessageAt });
+        }
+
+        // Backward compatibility
         await Clients.Group(ChatHubGroups.Conversation(conversationId))
             .SendAsync("ReceiveMessage", result.Message);
         await Clients.Group(ChatHubGroups.Conversation(conversationId))
             .SendAsync("ConversationUpdated", result.Conversation);
-
-        foreach (var recipientId in result.RecipientUserIds)
-        {
-            await Clients.Group(ChatHubGroups.User(recipientId))
-                .SendAsync("UnreadCountUpdated", new { conversationId, result.Conversation.LastMessageAt });
-        }
 
         return result.Message;
     }

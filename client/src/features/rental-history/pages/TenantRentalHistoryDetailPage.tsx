@@ -558,8 +558,10 @@ export const TenantRentalHistoryDetailPage: React.FC = () => {
                 <Button variant="danger" onClick={() => setIsTerminateModalOpen(true)}>Chấm dứt hợp đồng</Button>
               )}
 
-              {reviewEligibility?.isEligible && (
-                <Button onClick={() => navigate(`/rooming-houses/${contract.roomingHouseId}#review-section`)}>Viết đánh giá khu trọ</Button>
+              {contract.roomingHouseId && (
+                <Button onClick={() => navigate(`/rooming-houses/${contract.roomingHouseId}?review=1#review-section`)}>
+                  {reviewEligibility?.reason === 'Bạn đã đánh giá hợp đồng này rồi.' ? 'Sửa đánh giá khu trọ' : 'Đánh giá khu trọ'}
+                </Button>
               )}
             </div>
 

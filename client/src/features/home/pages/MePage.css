@@ -529,7 +529,7 @@
 }
 
 .home-listings-section {
-  width: min(100% - 40px, 1180px);
+  width: min(100% - 64px, 1560px);
   margin: 0 auto;
   padding: 48px 0 64px;
   display: grid;
@@ -551,7 +551,7 @@
 
 .home-listings-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
+  grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
   gap: 18px;
 }
 
@@ -891,7 +891,7 @@
 }
 
 .home-listings-grid--compact {
-  grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+  grid-template-columns: repeat(auto-fill, minmax(240px, 1fr));
 }
 
 .home-listing-card__tags {
@@ -1024,11 +1024,17 @@
   }
 
   .home-listings-section {
-    width: min(100% - 32px, 1180px);
+    width: min(100% - 32px, 100%);
     padding: 36px 0 48px;
   }
 
   .about-section {
     padding: 60px 20px;
+  }
+}
+
+@media (min-width: 1800px) {
+  .home-listings-section {
+    width: min(100% - 64px, 1720px);
   }
 }

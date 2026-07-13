@@ -945,8 +945,9 @@
 .search-results-section {
   display: grid;
   gap: 24px;
-  max-width: 928px;
-  margin: 0 auto;
+  width: 100%;
+  max-width: 1480px;
+  margin: 0;
 }
 
 /* Map view */
@@ -1094,7 +1095,7 @@
 /* Results Grid & Cards */
 .search-results__grid {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+  grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
   gap: 20px;
 }
 
@@ -1462,5 +1463,11 @@
 
   .search-results__grid {
     grid-template-columns: 1fr;
+  }
+}
+
+@media (min-width: 1800px) {
+  .search-results-section {
+    max-width: 1680px;
   }
 }

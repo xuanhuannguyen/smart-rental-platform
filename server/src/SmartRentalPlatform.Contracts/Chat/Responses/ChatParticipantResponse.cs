@@ -10,4 +10,6 @@ public sealed class ChatParticipantResponse
     public string Source { get; set; } = string.Empty;
     public DateTimeOffset JoinedAt { get; set; }
     public DateTimeOffset? LeftAt { get; set; }
+    public string InboxStatus { get; set; } = "Main";
 }
+

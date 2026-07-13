@@ -16,6 +16,7 @@ public sealed class ConversationConfiguration : IEntityTypeConfiguration<Convers
         builder.Property(x => x.Type).HasColumnName("type").HasConversion<string>().HasMaxLength(20).IsRequired();
         builder.Property(x => x.Title).HasColumnName("title").HasMaxLength(200);
         builder.Property(x => x.RoomId).HasColumnName("room_id");
+        builder.Property(x => x.RoomingHouseId).HasColumnName("rooming_house_id");
         builder.Property(x => x.DirectUserAId).HasColumnName("direct_user_a_id");
         builder.Property(x => x.DirectUserBId).HasColumnName("direct_user_b_id");
         builder.Property(x => x.CreatedByUserId).HasColumnName("created_by_user_id").IsRequired();
@@ -24,8 +25,11 @@ public sealed class ConversationConfiguration : IEntityTypeConfiguration<Convers
         builder.Property(x => x.CreatedAt).HasColumnName("created_at").HasDefaultValueSql("now()").IsRequired();
         builder.Property(x => x.UpdatedAt).HasColumnName("updated_at").HasDefaultValueSql("now()").IsRequired();
         builder.Property(x => x.IsClosed).HasColumnName("is_closed").HasDefaultValue(false).IsRequired();
+        builder.Property(x => x.RequiresJoinApproval).HasColumnName("requires_join_approval").HasDefaultValue(false).IsRequired();
+        builder.Property(x => x.AvatarUrl).HasColumnName("avatar_url").HasMaxLength(1000);
 
         builder.HasOne(x => x.Room).WithMany().HasForeignKey(x => x.RoomId).OnDelete(DeleteBehavior.Restrict);
+        builder.HasOne(x => x.RoomingHouse).WithMany().HasForeignKey(x => x.RoomingHouseId).OnDelete(DeleteBehavior.Restrict);
         builder.HasOne(x => x.CreatedByUser).WithMany().HasForeignKey(x => x.CreatedByUserId).OnDelete(DeleteBehavior.Restrict);
 
         builder.HasIndex(x => new { x.DirectUserAId, x.DirectUserBId })

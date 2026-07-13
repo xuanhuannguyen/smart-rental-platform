@@ -15,8 +15,12 @@ public class ConversationParticipant
     public DateTimeOffset? LastReadAt { get; set; }
     public int UnreadCount { get; set; }
     public bool IsMuted { get; set; }
+    public ConversationParticipantInboxStatus InboxStatus { get; set; } = ConversationParticipantInboxStatus.Main;
+    public DateTimeOffset? InboxStatusUpdatedAt { get; set; }
+    public Guid? InboxStatusUpdatedByUserId { get; set; }
 
     public Conversation Conversation { get; set; } = null!;
     public User User { get; set; } = null!;
     public User? AddedByUser { get; set; }
+    public User? InboxStatusUpdatedByUser { get; set; }
 }

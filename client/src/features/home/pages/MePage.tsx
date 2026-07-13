@@ -510,7 +510,14 @@ function HomeListingCard({ house, onOpen }: { house: HomeListingItem; onOpen: ()
     : 'Liên hệ chủ';
 
   return (
-    <button className="home-listing-card" type="button" onClick={onOpen}>
+    <article
+      className="home-listing-card"
+      onClick={onOpen}
+      onKeyDown={e => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); onOpen(); } }}
+      role="button"
+      tabIndex={0}
+      aria-label={`Xem chi tiết ${house.name}`}
+    >
       <div className="card-image-wrapper">
         {house.coverImageUrl ? (
           <img alt={house.name} src={toAssetUrl(house.coverImageUrl)} className="card-image" />
@@ -583,7 +590,7 @@ function HomeListingCard({ house, onOpen }: { house: HomeListingItem; onOpen: ()
           </span>
         </div>
       </div>
-    </button>
+    </article>
   );
 }
 
@@ -741,7 +748,6 @@ function buildListingCategories(items: HomeListingItem[], personalized: boolean)
         </svg>
       ),
       items: newest,
-      compact: true,
     });
   }
 
@@ -765,7 +771,6 @@ function buildListingCategories(items: HomeListingItem[], personalized: boolean)
         </svg>
       ),
       items: manyRooms,
-      compact: true,
     });
   }
 
@@ -787,7 +792,6 @@ function buildListingCategories(items: HomeListingItem[], personalized: boolean)
         </svg>
       ),
       items: affordable,
-      compact: true,
     });
   }
 

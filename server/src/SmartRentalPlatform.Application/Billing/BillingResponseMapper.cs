@@ -53,10 +53,21 @@ internal static class BillingResponseMapper
             item.ServiceTypeId,
             item.ServiceType?.Name,
             item.MeterReadingId,
+            BuildMeterReadingImageUrl(item.MeterReading?.ProofImageObjectKey),
             item.ItemType.ToString(),
             item.Description,
             item.Quantity,
             item.UnitPrice,
             item.Amount);
+    }
+
+    private static string? BuildMeterReadingImageUrl(string? objectKey)
+    {
+        if (string.IsNullOrWhiteSpace(objectKey))
+        {
+            return null;
+        }
+
+        return $"/uploads/{objectKey.TrimStart('/')}";
     }
 }

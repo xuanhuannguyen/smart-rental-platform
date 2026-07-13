@@ -9,6 +9,7 @@ import { Toast } from '../../../shared/components/ui/Toast';
 import { Card, CardMetaRow, type CardAction, type CardStatusTone } from '../../../shared/components/ui/Card';
 import { getApiErrorMessage } from '../../../shared/api/apiError';
 import { formatDateTimeVi, formatDateVi } from '../../../shared/utils/format';
+import { contactLandlord } from '../../chat/api';
 import './TenantAppointmentsPage.css';
 
 type AppointmentTab = 'all' | 'pending' | 'confirmed' | 'history';
@@ -98,6 +99,7 @@ export default function TenantAppointmentsPage() {
   // Proposal states
   const [proposalActionId, setProposalActionId] = useState<string | null>(null);
   const [proposalLoading, setProposalLoading] = useState(false);
+  const [chatOpeningId, setChatOpeningId] = useState<string | null>(null);
 
   const loadData = async () => {
     setLoading(true);
@@ -171,6 +173,31 @@ export default function TenantAppointmentsPage() {
       setProposalActionId(null);
     } finally {
       setProposalLoading(false);
+    }
+  };
+
+  const handleContactLandlord = async (appointment: ViewingAppointment) => {
+    if (!appointment.roomingHouseId) {
+      setToast({ message: 'Lịch hẹn này chưa có thông tin khu trọ để mở trò chuyện.', type: 'error' });
+      return;
+    }
+
+    setChatOpeningId(appointment.id);
+    try {
+      const houseName = appointment.roomingHouseName ?? 'khu trọ';
+      const roomLabel = appointment.roomNumber ? ` phòng ${appointment.roomNumber}` : '';
+      const initialMessage = `Xin chào, tôi muốn trao đổi thêm về lịch xem${roomLabel} tại ${houseName}.`;
+      const conversation = await contactLandlord(appointment.roomingHouseId, initialMessage);
+
+      window.dispatchEvent(new CustomEvent('open-chat-bubble', {
+        detail: { conversationId: conversation.id }
+      }));
+      window.dispatchEvent(new CustomEvent('refresh-chat-list'));
+      setToast({ message: 'Đã mở bong bóng chat với chủ trọ.', type: 'success' });
+    } catch (err) {
+      setToast({ message: getApiErrorMessage(err, 'Không thể mở trò chuyện với chủ trọ.'), type: 'error' });
+    } finally {
+      setChatOpeningId(null);
     }
   };
 
@@ -327,6 +354,21 @@ export default function TenantAppointmentsPage() {
                     {item.cancelReason && (
                       <div className="cancel-reason tenant-appointment-span-full">
                         <strong>Lý do hủy/từ chối:</strong> "{item.cancelReason}"
+                      </div>
+                    )}
+                    {item.status === 'Rejected' && (
+                      <div className="tenant-appointment-chat-action tenant-appointment-span-full">
+                        <button
+                          type="button"
+                          className="tenant-appointment-chat-action__button"
+                          onClick={() => void handleContactLandlord(item)}
+                          disabled={chatOpeningId === item.id || !item.roomingHouseId}
+                        >
+                          <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round">
+                            <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z" />
+                          </svg>
+                          <span>{chatOpeningId === item.id ? 'Đang mở chat...' : 'Nhắn tin với chủ trọ'}</span>
+                        </button>
                       </div>
                     )}
                     {item.proposedScheduledAt && item.status === 'Rejected' && (

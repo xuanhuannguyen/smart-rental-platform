@@ -7,6 +7,8 @@ import { createRoomingHouseReview, updateRoomingHouseReview } from '../api';
 import type { RoomingHouseReviewResponse, PropertyImageRequest } from '../types';
 import './InlineReviewForm.css';
 
+const MAX_REVIEW_IMAGES = 4;
+
 interface InlineReviewFormProps {
   mode: 'create' | 'edit';
   contractId?: string; // required for create
@@ -80,7 +82,16 @@ export const InlineReviewForm: React.FC<InlineReviewFormProps> = ({
     if (disabled) return;
     if (e.target.files && e.target.files.length > 0) {
       const filesArray = Array.from(e.target.files);
-      setNewImages((prev) => [...prev, ...filesArray]);
+      const availableSlots = MAX_REVIEW_IMAGES - retainedImages.length - newImages.length;
+      if (availableSlots <= 0) {
+        setToast({ message: `Mỗi đánh giá chỉ được tải tối đa ${MAX_REVIEW_IMAGES} ảnh.`, type: 'info' });
+      } else {
+        const acceptedFiles = filesArray.slice(0, availableSlots);
+        setNewImages((prev) => [...prev, ...acceptedFiles]);
+        if (filesArray.length > acceptedFiles.length) {
+          setToast({ message: `Chỉ nhận thêm ${acceptedFiles.length} ảnh. Mỗi đánh giá tối đa ${MAX_REVIEW_IMAGES} ảnh.`, type: 'info' });
+        }
+      }
     }
     if (fileInputRef.current) {
       fileInputRef.current.value = '';
@@ -153,7 +164,9 @@ export const InlineReviewForm: React.FC<InlineReviewFormProps> = ({
     }
   };
 
-  const showActions = isFocused || comment.length > 0 || rating > 0 || newImages.length > 0 || retainedImages.length > 0 || mode === 'edit';
+  const showActions = !disabled && (mode === 'create' || isFocused || comment.length > 0 || rating > 0 || newImages.length > 0 || retainedImages.length > 0 || mode === 'edit');
+  const selectedImageCount = retainedImages.length + newImages.length;
+  const canAddImages = selectedImageCount < MAX_REVIEW_IMAGES;
 
   return (
     <div className={`inline-review-form ${disabled ? 'disabled' : ''} ${hideAvatar ? 'no-avatar' : ''} mode-${mode}`}>
@@ -232,12 +245,14 @@ export const InlineReviewForm: React.FC<InlineReviewFormProps> = ({
                   type="button" 
                   className="icon-btn tool-btn" 
                   onClick={() => fileInputRef.current?.click()}
+                  disabled={!canAddImages}
                   title="Đính kèm ảnh"
                 >
                   <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#2563eb" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                     <path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"></path>
                     <circle cx="12" cy="13" r="4"></circle>
                   </svg>
+                  <span>Thêm ảnh ({selectedImageCount}/{MAX_REVIEW_IMAGES})</span>
                 </button>
                 <input
                   ref={fileInputRef}

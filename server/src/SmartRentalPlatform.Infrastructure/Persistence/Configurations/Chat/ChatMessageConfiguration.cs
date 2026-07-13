@@ -17,6 +17,10 @@ public sealed class ChatMessageConfiguration : IEntityTypeConfiguration<ChatMess
         builder.Property(x => x.MessageType).HasColumnName("message_type").HasConversion<string>().HasMaxLength(20).IsRequired();
         builder.Property(x => x.Content).HasColumnName("content").HasColumnType("text");
         builder.Property(x => x.ImageUrl).HasColumnName("image_url").HasMaxLength(1000);
+        builder.Property(x => x.FileUrl).HasColumnName("file_url").HasMaxLength(1000);
+        builder.Property(x => x.FileName).HasColumnName("file_name").HasMaxLength(255);
+        builder.Property(x => x.FileContentType).HasColumnName("file_content_type").HasMaxLength(100);
+        builder.Property(x => x.FileSize).HasColumnName("file_size");
         builder.Property(x => x.CreatedAt).HasColumnName("created_at").HasDefaultValueSql("now()").IsRequired();
         builder.Property(x => x.DeletedAt).HasColumnName("deleted_at");
 

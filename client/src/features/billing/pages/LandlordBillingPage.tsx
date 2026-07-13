@@ -55,7 +55,7 @@ export default function LandlordBillingPage() {
   const [message, setMessage] = useState('');
   const [toast, setToast] = useState<{ message: string; type: 'success' | 'error' | 'info' } | null>(null);
   const [error, setError] = useState('');
-  const [statusFilter, setStatusFilter] = useState('all');
+  const [statusFilter, setStatusFilter] = useState('');
   const [selectedHouseId, setSelectedHouseId] = useState('');
   const [selectedRoomId, setSelectedRoomId] = useState('');
   const [isCreateInvoiceModalOpen, setIsCreateInvoiceModalOpen] = useState(false);
@@ -183,7 +183,7 @@ export default function LandlordBillingPage() {
     setError('');
     try {
       const response = await billingApi.getLandlordInvoices({
-        status: statusFilter === 'all' ? '' : statusFilter
+        status: statusFilter
       });
       setInvoices(response.data);
     } catch (err) {
@@ -245,9 +245,18 @@ export default function LandlordBillingPage() {
     setToast(null);
     try {
       const response = await billingApi.issueInvoice(invoice.id);
-      setSelectedInvoice(response.data);
-      setInvoices((prev) => prev.map((item) => item.id === response.data.id ? response.data : item));
-      setMessage(`Đã phát hành hóa đơn ${response.data.invoiceNo}. Người thuê có thể xem và thanh toán.`);
+      const updatedInvoice = response.data;
+      setSelectedInvoice(updatedInvoice);
+      setInvoices((prev) => {
+        if (statusFilter !== '' && updatedInvoice.status !== statusFilter) {
+          return prev.filter((item) => item.id !== updatedInvoice.id);
+        }
+        return prev.map((item) => item.id === updatedInvoice.id ? updatedInvoice : item);
+      });
+      setToast({
+        message: `Đã phát hành hóa đơn ${updatedInvoice.invoiceNo} thành công. Người thuê có thể xem và thanh toán.`,
+        type: 'success'
+      });
     } catch (err) {
       setToast({ message: getApiErrorMessage(err, 'Không phát hành được hóa đơn.'), type: 'error' });
     } finally {
@@ -295,7 +304,6 @@ export default function LandlordBillingPage() {
         )}
 
         {tab !== 'invoices' && <NotificationStrip invoices={invoices} />}
-        {toast && <Toast message={toast.message} type={toast.type} onClose={() => setToast(null)} />}
         {toast && <Toast message={toast.message} type={toast.type} onClose={() => setToast(null)} />}
         {error && <Alert type="error">{error}</Alert>}
 
@@ -593,7 +601,7 @@ function InvoiceListSection({
         activeId={statusFilter}
         onChange={onStatusChange}
         items={[
-          { id: 'all', label: 'Tất cả', icon: getTabIcon('all') },
+          { id: '', label: 'Tất cả', icon: getTabIcon('') },
           ...invoiceStatuses.map((status) => ({
             id: status,
             label: getInvoiceStatusLabel(status),
@@ -1272,6 +1280,7 @@ function getTabIcon(status: string) {
   const props = { width: 14, height: 14, viewBox: '0 0 24 24', fill: 'none', stroke: 'currentColor', strokeWidth: 2, strokeLinecap: 'round' as const, strokeLinejoin: 'round' as const, className: 'invoice-tab-icon' };
 
   switch (status.toLowerCase()) {
+    case '':
     case 'all':
       return (
         <svg {...props}>

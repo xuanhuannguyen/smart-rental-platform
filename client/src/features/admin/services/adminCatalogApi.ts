@@ -15,6 +15,7 @@ import type {
   CreateBillingServiceTypeRequest,
   UpdateBillingServiceTypeRequest,
   AdminReviewReportResponse,
+  AdminReviewModerationItemResponse,
   ResolveReviewReportRequest
 } from '../types/adminCatalog.types';
 
@@ -154,6 +155,19 @@ export const adminCatalogApi = {
     return await apiClient<ApiResponse<any>>(`/api/admin/review-reports/${id}/resolve`, {
       method: 'POST',
       body: data,
+      auth: true
+    });
+  },
+
+  getReviewModerationItems: async (page: number = 1, pageSize: number = 10, status: string = 'PendingAdminReview') => {
+    const url = `/api/admin/reviews/moderation?page=${page}&pageSize=${pageSize}&status=${encodeURIComponent(status)}`;
+    return await apiClient<ApiResponse<PagedResult<AdminReviewModerationItemResponse>>>(url, { auth: true });
+  },
+
+  moderateReview: async (id: string, action: 'Approve' | 'Reject', adminNote?: string) => {
+    return await apiClient<ApiResponse<any>>(`/api/admin/reviews/${id}/moderation`, {
+      method: 'POST',
+      body: { action, adminNote },
       auth: true
     });
   }

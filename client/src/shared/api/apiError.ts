@@ -53,6 +53,13 @@ export function getApiErrorMessage(error: unknown, fallback = 'Đã xảy ra l�
     return ERROR_MESSAGES[apiError.errorCode] || apiError.message || fallback;
   }
 
+  // Some controllers return the common ApiResponse shape with success=false
+  // and a message, but without an errorCode.
+  if (error && typeof error === 'object' && 'message' in error) {
+    const apiError = error as { message?: string };
+    return apiError.message || fallback;
+  }
+
   // Generic JS Error
   if (error instanceof Error) {
     return error.message || fallback;

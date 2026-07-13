@@ -12,6 +12,7 @@ import PublicRoomingHouseDetailPage from '../../features/rooming-houses/PublicRo
 import SearchRoomingHousesPage from '../../features/rooming-houses/SearchRoomingHousesPage';
 import PublicRoomDetailPage from '../../features/rooms/pages/PublicRoomDetailPage';
 import LandlordDashboardPage from '../../features/landlord/pages/LandlordDashboardPage';
+import LandlordDashboardOverviewPage from '../../features/landlord/pages/LandlordDashboardOverviewPage';
 import { LandlordRentalRequestsPage } from '../../features/landlord/pages/LandlordRentalRequestsPage';
 import RoomingHouseDetailPage from '../../features/landlord/pages/RoomingHouseDetailPage';
 import RoomDetailPage from '../../features/landlord/pages/RoomDetailPage';
@@ -95,6 +96,10 @@ export const router = createBrowserRouter([
                         element: <Navigate to={ROUTE_PATHS.ME.ROOT} replace />
                     },
                     {
+                        path: ROUTE_PATHS.MESSAGES,
+                        element: <ChatPage />
+                    },
+                    {
                         path: ROUTE_PATHS.ACCOUNT.ROOT,
                         element: <AccountLayout />,
                         children: [
@@ -156,7 +161,7 @@ export const router = createBrowserRouter([
                             },
                             {
                                 path: ROUTE_PATHS.ACCOUNT.MESSAGES,
-                                element: <ChatPage />
+                                element: <Navigate to={ROUTE_PATHS.MESSAGES} replace />
                             },
                             {
                                 path: ROUTE_PATHS.ACCOUNT.ESIGN_RETURN,
@@ -188,16 +193,7 @@ export const router = createBrowserRouter([
                                 children: [
                                     {
                                         path: ROUTE_PATHS.LANDLORD.DASHBOARD,
-                                        element: (
-                                            <div className="landlord-dashboard-page" style={{ display: 'contents' }}>
-                                                <main className="dashboard-main">
-                                                    <div className="empty-panel">
-                                                        <h2>Thống kê</h2>
-                                                        <p>Tính năng thống kê đang được phát triển...</p>
-                                                    </div>
-                                                </main>
-                                            </div>
-                                        )
+                                        element: <LandlordDashboardOverviewPage />
                                     },
                                     {
                                         path: ROUTE_PATHS.LANDLORD.ROOMING_HOUSES,
@@ -214,10 +210,6 @@ export const router = createBrowserRouter([
                                     {
                                         path: ROUTE_PATHS.LANDLORD.VIEWING_APPOINTMENTS,
                                         element: <LandlordAppointmentsPage />
-                                    },
-                                    {
-                                        path: ROUTE_PATHS.LANDLORD.MESSAGES,
-                                        element: <ChatPage />
                                     },
                                     {
                                         path: ROUTE_PATHS.LANDLORD.RENTAL_REQUESTS,

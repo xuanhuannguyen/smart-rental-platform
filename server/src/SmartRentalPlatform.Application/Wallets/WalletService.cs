@@ -33,7 +33,8 @@ public class WalletService : IWalletService
 
     public async Task<WalletAccount> GetOrCreateWalletAsync(Guid userId, CancellationToken cancellationToken = default)
     {
-        await using var transaction = await context.BeginTransactionAsync(cancellationToken);
+        var isExternalTransaction = context.HasActiveTransaction;
+        var transaction = isExternalTransaction ? null : await context.BeginTransactionAsync(cancellationToken);
 
         try
         {
@@ -54,7 +55,7 @@ public class WalletService : IWalletService
             var existing = await LoadWalletByUserIdAsync(userId, cancellationToken);
             if (existing is not null)
             {
-                await transaction.CommitAsync(cancellationToken);
+                if (transaction != null) await transaction.CommitAsync(cancellationToken);
                 return existing;
             }
 
@@ -73,14 +74,18 @@ public class WalletService : IWalletService
 
             context.WalletAccounts.Add(wallet);
             await context.SaveChangesAsync(cancellationToken);
-            await transaction.CommitAsync(cancellationToken);
+            if (transaction != null) await transaction.CommitAsync(cancellationToken);
 
             return wallet;
         }
         catch
         {
-            await transaction.RollbackAsync(cancellationToken);
+            if (transaction != null) await transaction.RollbackAsync(cancellationToken);
             throw;
+        }
+        finally
+        {
+            if (transaction != null) await transaction.DisposeAsync();
         }
     }
 
@@ -162,7 +167,7 @@ public class WalletService : IWalletService
             walletAccountId,
             amount,
             transactionType,
-            WalletTransactionDirection.Credit,
+            WalletTransactionDirection.Debit,
             balanceDelta: 0,
             reservedBalanceDelta: amount,
             metadata,
@@ -180,8 +185,26 @@ public class WalletService : IWalletService
             walletAccountId,
             amount,
             transactionType,
-            WalletTransactionDirection.Debit,
+            WalletTransactionDirection.Credit,
             balanceDelta: 0,
+            reservedBalanceDelta: -amount,
+            metadata,
+            cancellationToken);
+    }
+
+    public Task<WalletMutationResponse> DebitFromReservedAsync(
+        Guid walletAccountId,
+        decimal amount,
+        WalletTransactionType transactionType,
+        WalletTransactionMetadata? metadata = null,
+        CancellationToken cancellationToken = default)
+    {
+        return MutateWalletAsync(
+            walletAccountId,
+            amount,
+            transactionType,
+            WalletTransactionDirection.Debit,
+            balanceDelta: -amount,
             reservedBalanceDelta: -amount,
             metadata,
             cancellationToken);
@@ -199,7 +222,8 @@ public class WalletService : IWalletService
     {
         ValidateAmount(amount);
 
-        await using var transaction = await context.BeginTransactionAsync(cancellationToken);
+        var isExternalTransaction = context.HasActiveTransaction;
+        var transaction = isExternalTransaction ? null : await context.BeginTransactionAsync(cancellationToken);
 
         try
         {
@@ -219,7 +243,7 @@ public class WalletService : IWalletService
                 metadata);
 
             await context.SaveChangesAsync(cancellationToken);
-            await transaction.CommitAsync(cancellationToken);
+            if (transaction != null) await transaction.CommitAsync(cancellationToken);
 
             return new WalletMutationResponse
             {
@@ -229,8 +253,12 @@ public class WalletService : IWalletService
         }
         catch
         {
-            await transaction.RollbackAsync(cancellationToken);
+            if (transaction != null) await transaction.RollbackAsync(cancellationToken);
             throw;
+        }
+        finally
+        {
+            if (transaction != null) await transaction.DisposeAsync();
         }
     }
 
@@ -243,7 +271,8 @@ public class WalletService : IWalletService
         WalletTransactionMetadata? metadata = null,
         CancellationToken cancellationToken = default)
     {
-        await using var transaction = await context.BeginTransactionAsync(cancellationToken);
+        var isExternalTransaction = context.HasActiveTransaction;
+        var transaction = isExternalTransaction ? null : await context.BeginTransactionAsync(cancellationToken);
 
         try
         {
@@ -257,14 +286,18 @@ public class WalletService : IWalletService
                 cancellationToken);
 
             await context.SaveChangesAsync(cancellationToken);
-            await transaction.CommitAsync(cancellationToken);
+            if (transaction != null) await transaction.CommitAsync(cancellationToken);
 
             return result;
         }
         catch
         {
-            await transaction.RollbackAsync(cancellationToken);
+            if (transaction != null) await transaction.RollbackAsync(cancellationToken);
             throw;
+        }
+        finally
+        {
+            if (transaction != null) await transaction.DisposeAsync();
         }
     }
 

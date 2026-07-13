@@ -7,6 +7,7 @@ import { Toast } from '../ui/Toast';
 import { toAssetUrl } from '../../api/assets';
 import { getMyRoomingHouseOnboarding } from '../../../features/rooming-houses/api';
 import { NotificationBell } from '../../../features/notifications/components/NotificationBell';
+import { FloatingChatContainer } from '../../../features/chat/components/FloatingChatContainer';
 import { MessageShortcut } from './MessageShortcut';
 import './HomeHeader.css';
 
@@ -121,7 +122,7 @@ export function HomeHeader({ centerContent }: HomeHeaderProps) {
         {currentUser ? (
           <>
             <div className="home-header-message-action">
-              <MessageShortcut to={ROUTE_PATHS.ACCOUNT.MESSAGES} />
+              <MessageShortcut />
             </div>
             <NotificationBell />
             <div className="avatar-wrapper" ref={dropdownRef}>
@@ -193,6 +194,7 @@ export function HomeHeader({ centerContent }: HomeHeaderProps) {
         )}
       </div>
       {toastMessage && <Toast message={toastMessage} onClose={() => setToastMessage(null)} />}
+      {currentUser && <FloatingChatContainer />}
     </header>
   );
 }

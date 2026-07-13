@@ -10,6 +10,7 @@ using SmartRentalPlatform.Infrastructure.BackgroundServices;
 using SmartRentalPlatform.Infrastructure.ExternalServices.Ekyc;
 using SmartRentalPlatform.Infrastructure.ExternalServices.Email;
 using SmartRentalPlatform.Infrastructure.ExternalServices.ESign;
+using SmartRentalPlatform.Infrastructure.ExternalServices.DeepSeek;
 using SmartRentalPlatform.Infrastructure.ExternalServices.Gemini;
 using SmartRentalPlatform.Infrastructure.ExternalServices.Google;
 using SmartRentalPlatform.Infrastructure.ExternalServices.PayOS;
@@ -66,6 +67,19 @@ public static class DependencyInjection
             client.BaseAddress = new Uri("https://generativelanguage.googleapis.com/v1beta/");
             client.Timeout = TimeSpan.FromSeconds(options.TimeoutSeconds);
         });
+        services.Configure<DeepSeekOptions>(configuration.GetSection(DeepSeekOptions.SectionName));
+        services.AddHttpClient<IChatAiStructuredOutputService, DeepSeekChatStructuredOutputService>((provider, client) =>
+        {
+            var options = provider.GetRequiredService<IOptions<DeepSeekOptions>>().Value;
+            client.BaseAddress = new Uri(options.BaseUrl.TrimEnd('/') + "/");
+            client.Timeout = TimeSpan.FromSeconds(options.TimeoutSeconds);
+        });
+        services.AddHttpClient<IBackupAiStructuredOutputService, DeepSeekChatStructuredOutputService>((provider, client) =>
+        {
+            var options = provider.GetRequiredService<IOptions<DeepSeekOptions>>().Value;
+            client.BaseAddress = new Uri(options.BaseUrl.TrimEnd('/') + "/");
+            client.Timeout = TimeSpan.FromSeconds(options.TimeoutSeconds);
+        });
         services.Configure<VnptEkycOptions>(configuration.GetSection(VnptEkycOptions.SectionName));
         services.AddDataProtection();
         services.AddMemoryCache();
@@ -80,6 +94,9 @@ public static class DependencyInjection
         services.AddHostedService<RentalContractMoveInActivationWorker>();
         services.AddHostedService<ContractAppendixApplicationWorker>();
         services.AddHostedService<ESignEnvelopeExpirationWorker>();
+        services.AddHostedService<WithdrawalStatusSyncWorker>();
+        services.AddHostedService<ReviewAiModerationWorker>();
+        services.Configure<SmartRentalPlatform.Application.Wallets.Options.WithdrawalOptions>(configuration.GetSection(SmartRentalPlatform.Application.Wallets.Options.WithdrawalOptions.SectionName));
         services.Configure<PayOSOptions>(configuration.GetSection(PayOSOptions.SectionName));
         services.AddHttpClient(PayOSClient.HttpClientName, (provider, client) =>
         {

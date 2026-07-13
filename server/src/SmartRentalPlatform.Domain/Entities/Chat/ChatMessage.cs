@@ -11,6 +11,10 @@ public class ChatMessage
     public ChatMessageType MessageType { get; set; }
     public string? Content { get; set; }
     public string? ImageUrl { get; set; }
+    public string? FileUrl { get; set; }
+    public string? FileName { get; set; }
+    public string? FileContentType { get; set; }
+    public long? FileSize { get; set; }
     public DateTimeOffset CreatedAt { get; set; }
     public DateTimeOffset? DeletedAt { get; set; }
 

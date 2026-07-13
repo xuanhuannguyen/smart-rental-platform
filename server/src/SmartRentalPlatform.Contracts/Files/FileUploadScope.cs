@@ -8,5 +8,6 @@ public enum FileUploadScope
     Avatar = 4,
     HouseRule = 5,
     ChatImage = 6,
-    MeterReading = 7
+    MeterReading = 7,
+    ChatFile = 8
 }

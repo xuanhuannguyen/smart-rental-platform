@@ -20,7 +20,8 @@ public static class CorsExtensions
                         "http://[::1]:5173",
                         "http://127.0.0.1:5500")
                     .AllowAnyHeader()
-                    .AllowAnyMethod();
+                    .AllowAnyMethod()
+                    .AllowCredentials();
             });
         });
 

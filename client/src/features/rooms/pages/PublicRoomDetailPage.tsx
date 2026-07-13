@@ -9,9 +9,7 @@ import { Alert } from '../../../shared/components/ui/Alert';
 import { Toast } from '../../../shared/components/ui/Toast';
 import ViewingAppointmentModal from '../../viewing-appointments/components/ViewingAppointmentModal';
 import SubmitRentalRequestModal from '../../rental-requests/components/SubmitRentalRequestModal';
-import { ROUTE_PATHS } from '../../../app/router/routePaths';
 import { HomeHeader } from '../../../shared/components/layout/HomeHeader';
-import { createDirectConversation } from '../../chat/api';
 import './PublicRoomDetailPage.css';
 
 function formatCurrency(value: number) {
@@ -81,7 +79,6 @@ export default function PublicRoomDetailPage() {
   const [error, setError] = useState('');
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [isRentalModalOpen, setIsRentalModalOpen] = useState(false);
-  const [chatStarting, setChatStarting] = useState(false);
   const [toast, setToast] = useState<{ message: string; type: 'success' | 'error' | 'info' } | null>(null);
 
   const handleBookingClick = () => {
@@ -91,28 +88,6 @@ export default function PublicRoomDetailPage() {
     }
     setIsModalOpen(true);
   };
-
-  async function handleMessageLandlord() {
-    if (!house) return;
-    if (!currentUser) {
-      navigate('/login', { state: { from: location.pathname } });
-      return;
-    }
-    if (currentUser.userId === house.landlordUserId) {
-      setError('Bạn đang xem phòng thuộc khu trọ của chính mình.');
-      return;
-    }
-
-    setChatStarting(true);
-    try {
-      const conversation = await createDirectConversation(house.landlordUserId);
-      navigate(`${ROUTE_PATHS.ACCOUNT.MESSAGES}?conversationId=${conversation.id}`);
-    } catch (chatError) {
-      setError(getApiErrorMessage(chatError, 'Không thể mở cuộc trò chuyện với chủ trọ.'));
-    } finally {
-      setChatStarting(false);
-    }
-  }
 
   useEffect(() => {
     async function loadHouseDetail() {
@@ -235,17 +210,6 @@ export default function PublicRoomDetailPage() {
                     <line x1="3" y1="10" x2="21" y2="10" />
                   </svg>
                   <span>Đặt lịch xem phòng</span>
-                </button>
-                <button
-                  className="public-room-detail__action public-room-detail__action--message"
-                  type="button"
-                  onClick={() => void handleMessageLandlord()}
-                  disabled={chatStarting || currentUser?.userId === house.landlordUserId}
-                >
-                  <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
-                    <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z" />
-                  </svg>
-                  <span>{chatStarting ? 'Đang mở chat...' : 'Nhắn tin chủ trọ'}</span>
                 </button>
               </div>
             </header>

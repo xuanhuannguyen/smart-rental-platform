@@ -165,17 +165,6 @@
   border-color: #93c5fd;
 }
 
-.public-room-detail__action--message {
-  background: #102033;
-  color: #ffffff;
-  border-color: #102033;
-}
-
-.public-room-detail__action--message:hover:not(:disabled) {
-  background: #1e3a5f;
-  border-color: #1e3a5f;
-}
-
 .public-room-detail__action:disabled {
   cursor: not-allowed;
   opacity: 0.6;

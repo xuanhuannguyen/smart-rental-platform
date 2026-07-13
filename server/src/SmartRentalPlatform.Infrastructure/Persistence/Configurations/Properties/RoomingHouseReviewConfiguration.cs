@@ -22,6 +22,16 @@ namespace SmartRentalPlatform.Infrastructure.Persistence.Configurations.Properti
             builder.Property(x => x.LandlordReply).HasColumnName("landlord_reply").HasColumnType("text");
             builder.Property(x => x.LandlordReplyCreatedAt).HasColumnName("landlord_reply_created_at");
             builder.Property(x => x.IsHidden).HasColumnName("is_hidden").HasDefaultValue(false).IsRequired();
+            builder.Property(x => x.ModerationStatus).HasColumnName("moderation_status").HasConversion<string>().HasMaxLength(32).HasDefaultValue(SmartRentalPlatform.Domain.Enums.Properties.RoomingHouseReviewModerationStatus.Approved).IsRequired();
+            builder.Property(x => x.ModerationReason).HasColumnName("moderation_reason").HasColumnType("text");
+            builder.Property(x => x.AiModerationProvider).HasColumnName("ai_moderation_provider").HasMaxLength(32);
+            builder.Property(x => x.AiModerationRiskLevel).HasColumnName("ai_moderation_risk_level").HasMaxLength(32);
+            builder.Property(x => x.AiModerationCategories).HasColumnName("ai_moderation_categories").HasColumnType("text");
+            builder.Property(x => x.AiModerationJson).HasColumnName("ai_moderation_json").HasColumnType("text");
+            builder.Property(x => x.AiReviewedAt).HasColumnName("ai_reviewed_at");
+            builder.Property(x => x.ReviewedByAdminId).HasColumnName("reviewed_by_admin_id");
+            builder.Property(x => x.AdminReviewedAt).HasColumnName("admin_reviewed_at");
+            builder.Property(x => x.AdminNote).HasColumnName("admin_note").HasColumnType("text");
             builder.Property(x => x.CreatedAt).HasColumnName("created_at").IsRequired();
             builder.Property(x => x.UpdatedAt).HasColumnName("updated_at");
 
@@ -38,6 +48,11 @@ namespace SmartRentalPlatform.Infrastructure.Persistence.Configurations.Properti
             builder.HasOne(x => x.TenantUser)
                 .WithMany()
                 .HasForeignKey(x => x.TenantUserId)
+                .OnDelete(DeleteBehavior.Restrict);
+
+            builder.HasOne(x => x.ReviewedByAdmin)
+                .WithMany()
+                .HasForeignKey(x => x.ReviewedByAdminId)
                 .OnDelete(DeleteBehavior.Restrict);
 
             builder.HasOne(x => x.RentalContract)

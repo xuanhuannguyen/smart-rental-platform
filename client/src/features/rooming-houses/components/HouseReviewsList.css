@@ -29,6 +29,131 @@
   gap: 2rem;
 }
 
+.contract-review-section {
+  margin: 24px 0;
+}
+
+.contract-review-notice {
+  align-items: flex-start;
+  flex-direction: column;
+  gap: 0.35rem;
+  text-align: left;
+}
+
+.contract-review-notice h3 {
+  font-size: 1rem;
+  margin-bottom: 0;
+}
+
+.contract-review-panel {
+  border: 1px solid #e2e8f0;
+  border-radius: 12px;
+  padding: 18px;
+  background: #fff;
+}
+
+.contract-review-panel__header {
+  margin-bottom: 14px;
+}
+
+.contract-review-panel__header h3 {
+  margin: 0 0 4px;
+  font-size: 1rem;
+  color: #0f172a;
+}
+
+.contract-review-panel__header p {
+  margin: 0;
+  color: #64748b;
+  font-size: 0.9rem;
+}
+
+.contract-review-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+  gap: 12px;
+}
+
+.contract-review-card {
+  border: 1px solid #e2e8f0;
+  border-radius: 10px;
+  background: #f8fafc;
+  padding: 14px;
+}
+
+.contract-review-card__main {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  align-items: flex-start;
+}
+
+.contract-review-card__main strong {
+  color: #0f172a;
+}
+
+.contract-review-card__main p {
+  margin: 4px 0 0;
+  color: #64748b;
+  font-size: 0.84rem;
+}
+
+.contract-review-card__status,
+.review-contract-chip {
+  border-radius: 999px;
+  background: #eff6ff;
+  color: #1d4ed8;
+  font-weight: 700;
+  font-size: 0.78rem;
+  padding: 4px 8px;
+  white-space: nowrap;
+}
+
+.contract-review-card__review-status {
+  display: inline-flex;
+  margin-top: 12px;
+  border-radius: 999px;
+  padding: 4px 9px;
+  font-size: 0.78rem;
+  font-weight: 700;
+}
+
+.contract-review-card__review-status.empty {
+  background: #f1f5f9;
+  color: #475569;
+}
+
+.contract-review-card__review-status.pending {
+  background: #fffbeb;
+  color: #92400e;
+}
+
+.contract-review-card__review-status.approved {
+  background: #dcfce7;
+  color: #166534;
+}
+
+.contract-review-card__review-status.rejected {
+  background: #fee2e2;
+  color: #991b1b;
+}
+
+.contract-review-card__actions {
+  margin-top: 12px;
+}
+
+.contract-review-card__hint {
+  margin: 0;
+  color: #64748b;
+  font-size: 0.84rem;
+}
+
+.review-contract-chip {
+  background: #f1f5f9;
+  color: #475569;
+  font-weight: 600;
+}
+
 .review-item {
   background: #f8fafc;
   padding: 1.5rem;
@@ -319,4 +444,98 @@
 
 .delete-icon:hover {
   color: #dc2626;
+}
+
+/* Review Info Box (used for Moderation states instead of summary header class) */
+.review-info-box {
+  background: #f8fafc;
+  border: 1px solid #e2e8f0;
+  border-radius: 12px;
+  padding: 16px 20px;
+  margin: 16px 0;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  align-items: flex-start;
+  text-align: left;
+}
+
+.review-info-box__header {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.review-info-box__icon {
+  width: 18px;
+  height: 18px;
+  flex-shrink: 0;
+}
+
+.review-info-box h3 {
+  font-size: 15px;
+  font-weight: 700;
+  color: #1e293b;
+  margin: 0;
+}
+
+.review-info-box p {
+  font-size: 13px;
+  color: #64748b;
+  margin: 0;
+  line-height: 1.5;
+}
+
+/* Specific theme styles for Rejected reviews */
+.review-info-box.rejected {
+  background: #fef2f2;
+  border-color: #fee2e2;
+}
+
+.review-info-box.rejected .review-info-box__icon {
+  color: #ef4444;
+}
+
+.review-info-box.rejected h3 {
+  color: #991b1b;
+}
+
+.review-info-box.rejected p {
+  color: #b91c1c;
+}
+
+/* Specific theme styles for Pending reviews */
+.review-info-box.pending {
+  background: #fffbeb;
+  border-color: #fef3c7;
+}
+
+.review-info-box.pending .review-info-box__icon {
+  color: #d97706;
+}
+
+.review-info-box.pending h3 {
+  color: #92400e;
+}
+
+.review-info-box.pending p {
+  color: #b45309;
+}
+
+/* Specific theme styles for Approved reviews */
+.review-info-box.approved {
+  background: #f0fdf4;
+  border-color: #dcfce7;
+}
+
+.review-info-box.approved .review-info-box__icon {
+  color: #16a34a;
+}
+
+.review-info-box.approved h3 {
+  color: #166534;
+}
+
+.review-info-box.approved p {
+  color: #15803d;
 }

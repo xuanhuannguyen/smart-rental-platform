@@ -54,6 +54,8 @@ public class AppDbContext : DbContext, IAppDbContext
     public DbSet<WalletTransaction> WalletTransactions => Set<WalletTransaction>();
     public DbSet<PaymentTransaction> PaymentTransactions => Set<PaymentTransaction>();
     public DbSet<PaymentWebhookLog> PaymentWebhookLogs => Set<PaymentWebhookLog>();
+    public DbSet<SmartRentalPlatform.Domain.Entities.Payments.WithdrawalRequest> WithdrawalRequests => Set<SmartRentalPlatform.Domain.Entities.Payments.WithdrawalRequest>();
+    public DbSet<SmartRentalPlatform.Domain.Entities.Payments.WithdrawalWebhookLog> WithdrawalWebhookLogs => Set<SmartRentalPlatform.Domain.Entities.Payments.WithdrawalWebhookLog>();
     // Billing
     public DbSet<BillingServiceType> BillingServiceTypes => Set<BillingServiceType>();
     public DbSet<RoomingHouseServicePrice> RoomingHouseServicePrices => Set<RoomingHouseServicePrice>();
@@ -64,6 +66,7 @@ public class AppDbContext : DbContext, IAppDbContext
     public DbSet<Conversation> Conversations => Set<Conversation>();
     public DbSet<ConversationParticipant> ConversationParticipants => Set<ConversationParticipant>();
     public DbSet<ChatMessage> ChatMessages => Set<ChatMessage>();
+    public DbSet<ConversationJoinRequest> ConversationJoinRequests => Set<ConversationJoinRequest>();
 
     // Viewing appointments
     public DbSet<ViewingAppointment> ViewingAppointments => Set<ViewingAppointment>();
@@ -89,6 +92,8 @@ public class AppDbContext : DbContext, IAppDbContext
         var transaction = await Database.BeginTransactionAsync(cancellationToken);
         return new AppDbContextTransaction(transaction);
     }
+
+    public bool HasActiveTransaction => Database.CurrentTransaction != null;
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {

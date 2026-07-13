@@ -10,6 +10,7 @@ public class Conversation
     public ConversationType Type { get; set; }
     public string? Title { get; set; }
     public Guid? RoomId { get; set; }
+    public Guid? RoomingHouseId { get; set; }
     public Guid? DirectUserAId { get; set; }
     public Guid? DirectUserBId { get; set; }
     public Guid CreatedByUserId { get; set; }
@@ -18,8 +19,11 @@ public class Conversation
     public DateTimeOffset CreatedAt { get; set; }
     public DateTimeOffset UpdatedAt { get; set; }
     public bool IsClosed { get; set; }
+    public bool RequiresJoinApproval { get; set; }
+    public string? AvatarUrl { get; set; }
 
     public Room? Room { get; set; }
+    public RoomingHouse? RoomingHouse { get; set; }
     public User CreatedByUser { get; set; } = null!;
     public ICollection<ConversationParticipant> Participants { get; set; } = new List<ConversationParticipant>();
     public ICollection<ChatMessage> Messages { get; set; } = new List<ChatMessage>();

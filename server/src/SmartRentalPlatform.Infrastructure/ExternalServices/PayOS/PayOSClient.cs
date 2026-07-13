@@ -41,13 +41,13 @@ public class PayOSClient : IPayOSClient
         PayOSCreatePaymentInput input,
         CancellationToken cancellationToken = default)
     {
-        if (IsDevelopmentMockMode())
+        if (IsPaymentDevelopmentMockMode())
         {
             logger.LogWarning("PayOS is running in Development Mock Mode because credentials are not configured.");
             return CreateMockPaymentResult(input);
         }
 
-        EnsureConfigured();
+        EnsurePaymentConfigured();
 
         var amount = decimal.ToInt64(decimal.Round(input.Amount, 0, MidpointRounding.AwayFromZero));
         var orderCode = long.Parse(input.ProviderOrderCode);
@@ -108,7 +108,128 @@ public class PayOSClient : IPayOSClient
             GatewayResponseMessage = parsed.Desc,
             ExpiresAt = parsed.Data.ExpiredAt.HasValue
                 ? DateTimeOffset.FromUnixTimeSeconds(parsed.Data.ExpiredAt.Value)
-                : input.ExpiresAt
+                : null
+        };
+    }
+
+    public async Task<PayOSCreatePayoutResult> CreatePayoutAsync(
+        PayOSCreatePayoutInput input,
+        CancellationToken cancellationToken = default)
+    {
+        if (IsPayoutDevelopmentMockMode())
+        {
+            logger.LogWarning("PayOS is running in Development Mock Mode. Mocking CreatePayout.");
+            return new PayOSCreatePayoutResult
+            {
+                GatewayResponseCode = "00",
+                GatewayResponseMessage = "Success",
+                PayoutId = "mock_payout_id_" + input.ProviderOrderCode,
+                ReferenceId = input.ProviderOrderCode,
+                ApprovalState = "PROCESSING",
+                TransactionState = "PROCESSING"
+            };
+        }
+
+        EnsurePayoutConfigured();
+
+        var amount = decimal.ToInt64(decimal.Round(input.Amount, 0, MidpointRounding.AwayFromZero));
+        
+        var payload = new PayOSCreatePayoutRequest(
+            input.ProviderOrderCode,
+            amount,
+            input.Description,
+            input.BankBin,
+            input.AccountNumber,
+            new[] { "withdrawal" }
+        );
+
+        var signature = BuildPayoutSignature(payload);
+
+        var httpClient = httpClientFactory.CreateClient(HttpClientName);
+        using var request = new HttpRequestMessage(HttpMethod.Post, "/v1/payouts")
+        {
+            Content = JsonContent.Create(payload, options: JsonOptions)
+        };
+        request.Headers.TryAddWithoutValidation("x-client-id", options.PayoutClientId);
+        request.Headers.TryAddWithoutValidation("x-api-key", options.PayoutApiKey);
+        request.Headers.TryAddWithoutValidation("x-idempotency-key", input.IdempotencyKey);
+        request.Headers.TryAddWithoutValidation("x-signature", signature);
+
+        using var response = await httpClient.SendAsync(request, cancellationToken);
+        var body = await response.Content.ReadAsStringAsync(cancellationToken);
+
+        if (!response.IsSuccessStatusCode)
+        {
+            throw new InvalidOperationException($"PayOS create payout failed with HTTP {(int)response.StatusCode}. Response: {body}");
+        }
+
+        var parsed = JsonSerializer.Deserialize<PayOSPayoutResponse>(body, JsonOptions);
+        if (parsed is null)
+        {
+            throw new InvalidOperationException("PayOS create payout response was invalid.");
+        }
+
+        var transaction = parsed.Data?.Transactions?.FirstOrDefault();
+
+        return new PayOSCreatePayoutResult
+        {
+            GatewayResponseCode = parsed.Code,
+            GatewayResponseMessage = parsed.Desc,
+            PayoutId = parsed.Data?.Id,
+            ReferenceId = parsed.Data?.ReferenceId,
+            ApprovalState = parsed.Data?.ApprovalState,
+            TransactionId = transaction?.Id,
+            TransactionState = transaction?.State
+        };
+    }
+
+    public async Task<PayOSPayoutDetailsResult> GetPayoutDetailsAsync(
+        string payoutId,
+        CancellationToken cancellationToken = default)
+    {
+        if (IsPayoutDevelopmentMockMode())
+        {
+            return new PayOSPayoutDetailsResult
+            {
+                ApprovalState = "SUCCESS",
+                TransactionState = "SUCCESS",
+                GatewayResponseCode = "00",
+                GatewayResponseMessage = "Success",
+                PayoutId = payoutId
+            };
+        }
+        
+        EnsurePayoutConfigured();
+        var httpClient = httpClientFactory.CreateClient(HttpClientName);
+        using var request = new HttpRequestMessage(HttpMethod.Get, $"/v1/payouts/{payoutId}");
+        request.Headers.TryAddWithoutValidation("x-client-id", options.PayoutClientId);
+        request.Headers.TryAddWithoutValidation("x-api-key", options.PayoutApiKey);
+
+        using var response = await httpClient.SendAsync(request, cancellationToken);
+        var body = await response.Content.ReadAsStringAsync(cancellationToken);
+        
+        if (!response.IsSuccessStatusCode)
+        {
+            throw new InvalidOperationException($"PayOS get payout failed with HTTP {(int)response.StatusCode}.");
+        }
+
+        var parsed = JsonSerializer.Deserialize<PayOSPayoutResponse>(body, JsonOptions);
+        if (parsed is null)
+        {
+            throw new InvalidOperationException("PayOS get payout details response was invalid.");
+        }
+
+        var transaction = parsed.Data?.Transactions?.FirstOrDefault();
+
+        return new PayOSPayoutDetailsResult
+        {
+            GatewayResponseCode = parsed.Code,
+            GatewayResponseMessage = parsed.Desc,
+            PayoutId = parsed.Data?.Id,
+            ReferenceId = parsed.Data?.ReferenceId,
+            ApprovalState = parsed.Data?.ApprovalState,
+            TransactionId = transaction?.Id,
+            TransactionState = transaction?.State
         };
     }
 
@@ -129,26 +250,44 @@ public class PayOSClient : IPayOSClient
         };
     }
 
-    private void EnsureConfigured()
+    private void EnsurePaymentConfigured()
     {
         if (string.IsNullOrWhiteSpace(options.ClientId)
             || string.IsNullOrWhiteSpace(options.ApiKey)
             || string.IsNullOrWhiteSpace(options.ChecksumKey)
-            || string.IsNullOrWhiteSpace(options.BaseUrl)
             || string.IsNullOrWhiteSpace(options.ReturnUrl)
             || string.IsNullOrWhiteSpace(options.CancelUrl))
         {
-            throw new InvalidOperationException("PayOS configuration is incomplete.");
+            throw new InvalidOperationException("PayOS payment configuration is incomplete.");
         }
     }
 
-    private bool IsDevelopmentMockMode()
+    private void EnsurePayoutConfigured()
+    {
+        if (string.IsNullOrWhiteSpace(options.PayoutClientId)
+            || string.IsNullOrWhiteSpace(options.PayoutApiKey)
+            || string.IsNullOrWhiteSpace(options.PayoutChecksumKey)
+            || string.IsNullOrWhiteSpace(options.BaseUrl))
+        {
+            throw new InvalidOperationException("PayOS payout configuration is incomplete.");
+        }
+    }
+
+    private bool IsPaymentDevelopmentMockMode()
     {
         return environment.IsDevelopment() &&
             (IsMissingOrPlaceholder(options.ClientId)
             || IsMissingOrPlaceholder(options.ApiKey)
             || IsMissingOrPlaceholder(options.ChecksumKey)
             || IsMissingOrPlaceholder(options.BaseUrl));
+    }
+
+    private bool IsPayoutDevelopmentMockMode()
+    {
+        return IsMissingOrPlaceholder(options.PayoutClientId)
+            || IsMissingOrPlaceholder(options.PayoutApiKey)
+            || IsMissingOrPlaceholder(options.PayoutChecksumKey)
+            || IsMissingOrPlaceholder(options.BaseUrl);
     }
 
     private static bool IsMissingOrPlaceholder(string? value)
@@ -159,9 +298,7 @@ public class PayOSClient : IPayOSClient
         }
 
         var normalized = value.Trim().ToLowerInvariant();
-        return normalized is "your-client-id"
-            or "your-api-key"
-            or "your-checksum-key"
+        return normalized is "string"
             or "placeholder"
             or "dev-placeholder"
             or "changeme"
@@ -204,6 +341,25 @@ public class PayOSClient : IPayOSClient
         return Convert.ToHexString(hmac.ComputeHash(Encoding.UTF8.GetBytes(data))).ToLowerInvariant();
     }
 
+    private string BuildPayoutSignature(PayOSCreatePayoutRequest request)
+    {
+        var fields = new SortedDictionary<string, string>(StringComparer.Ordinal)
+        {
+            ["amount"] = request.Amount.ToString(),
+            ["category"] = JsonSerializer.Serialize(request.Category, JsonOptions),
+            ["description"] = request.Description,
+            ["referenceId"] = request.ReferenceId,
+            ["toAccountNumber"] = request.ToAccountNumber,
+            ["toBin"] = request.ToBin
+        };
+
+        var query = string.Join("&", fields.Select(kvp => 
+            $"{Uri.EscapeDataString(kvp.Key)}={Uri.EscapeDataString(kvp.Value)}"));
+            
+        using var hmac = new HMACSHA256(Encoding.UTF8.GetBytes(options.PayoutChecksumKey));
+        return Convert.ToHexString(hmac.ComputeHash(Encoding.UTF8.GetBytes(query))).ToLowerInvariant();
+    }
+
     private sealed record PayOSCreatePaymentRequest(
         long OrderCode,
         long Amount,
@@ -232,5 +388,34 @@ public class PayOSClient : IPayOSClient
         public string? CheckoutUrl { get; set; }
         public string? QrCode { get; set; }
         public long? ExpiredAt { get; set; }
+    }
+
+    private sealed record PayOSCreatePayoutRequest(
+        string ReferenceId,
+        long Amount,
+        string Description,
+        string ToBin,
+        string ToAccountNumber,
+        string[] Category);
+
+    private sealed class PayOSPayoutResponse
+    {
+        public string? Code { get; set; }
+        public string? Desc { get; set; }
+        public PayOSPayoutData? Data { get; set; }
+    }
+
+    private sealed class PayOSPayoutData
+    {
+        public string? Id { get; set; }
+        public string? ReferenceId { get; set; }
+        public string? ApprovalState { get; set; }
+        public PayOSPayoutTransaction[]? Transactions { get; set; }
+    }
+    
+    private sealed class PayOSPayoutTransaction
+    {
+        public string? Id { get; set; }
+        public string? State { get; set; }
     }
 }
