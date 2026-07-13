@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useLocation, useNavigate } from 'react-router-dom';
 import { ROUTE_PATHS } from '../../../app/router/routePaths';
 import { contractApi } from '../api';
 import type { ContractHistoryItemResponse } from '../types';
@@ -10,13 +10,17 @@ import '../../landlord/pages/LandlordDashboardPage.css';
 
 export default function LandlordContractsPage() {
   const navigate = useNavigate();
+  const location = useLocation();
+  const query = new URLSearchParams(location.search);
   const [contracts, setContracts] = useState<ContractHistoryItemResponse[]>([]);
   const [loading, setLoading] = useState(true);
   const [message, setMessage] = useState('');
 
   const [selectedHouseId, setSelectedHouseId] = useState<string>('');
   const [selectedRoomId, setSelectedRoomId] = useState<string>('');
-  const [selectedStatus, setSelectedStatus] = useState<string>('all');
+  const [selectedStatus, setSelectedStatus] = useState<string>(
+    query.get('filter') === 'expiring' ? 'Expiring' : 'all'
+  );
 
   useEffect(() => {
     async function loadData() {
@@ -64,12 +68,24 @@ export default function LandlordContractsPage() {
     setSelectedRoomId('');
   }, [selectedHouseId]);
 
+  useEffect(() => {
+    setSelectedStatus(query.get('filter') === 'expiring' ? 'Expiring' : 'all');
+  }, [location.search]);
+
   const filteredContracts = useMemo(() => {
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    const expiringDate = new Date(today);
+    expiringDate.setDate(expiringDate.getDate() + 30);
+
     return contracts.filter(c => {
       // Chỉ hiển thị các trạng thái từ active trở đi
       if (!['Active', 'Expired', 'Cancelled'].includes(c.status)) return false;
 
-      if (selectedStatus !== 'all' && c.status !== selectedStatus) return false;
+      if (selectedStatus === 'Expiring') {
+        const endDate = new Date(`${c.endDate}T00:00:00`);
+        if (c.status !== 'Active' || endDate < today || endDate > expiringDate) return false;
+      } else if (selectedStatus !== 'all' && c.status !== selectedStatus) return false;
       if (selectedHouseId && c.roomingHouseId !== selectedHouseId) return false;
       if (selectedRoomId && c.roomId !== selectedRoomId) return false;
       return true;
@@ -143,6 +159,12 @@ export default function LandlordContractsPage() {
             style={{ padding: '12px 16px', background: 'none', border: 'none', borderBottom: selectedStatus === 'Active' ? '2px solid #2563eb' : '2px solid transparent', color: selectedStatus === 'Active' ? '#2563eb' : '#6b7280', fontWeight: selectedStatus === 'Active' ? 600 : 500, cursor: 'pointer', whiteSpace: 'nowrap', transition: 'all 0.2s' }}
           >
             Đang hiệu lực
+          </button>
+          <button
+            onClick={() => setSelectedStatus('Expiring')}
+            style={{ padding: '12px 16px', background: 'none', border: 'none', borderBottom: selectedStatus === 'Expiring' ? '2px solid #2563eb' : '2px solid transparent', color: selectedStatus === 'Expiring' ? '#2563eb' : '#6b7280', fontWeight: selectedStatus === 'Expiring' ? 600 : 500, cursor: 'pointer', whiteSpace: 'nowrap', transition: 'all 0.2s' }}
+          >
+            Sắp hết hạn
           </button>
           <button 
             onClick={() => setSelectedStatus('Expired')} 

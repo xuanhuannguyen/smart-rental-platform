@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useLocation, useNavigate } from 'react-router-dom';
 import { ROUTE_PATHS } from '../../../app/router/routePaths';
 import { rentalRequestApi } from '../../rental-requests/api';
 import { Alert } from '../../../shared/components/ui/Alert';
@@ -116,10 +116,15 @@ type TabKey = (typeof TABS)[number]['key'];
 
 export function LandlordRentalRequestsPage() {
   const navigate = useNavigate();
+  const location = useLocation();
+  const query = new URLSearchParams(location.search);
+  const queryStatus = query.get('status') ?? 'all';
   const [requests, setRequests] = useState<RentalRequest[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
-  const [activeTab, setActiveTab] = useState<TabKey>('all');
+  const [activeTab, setActiveTab] = useState<TabKey>(
+    TABS.some(tab => tab.key === queryStatus) ? queryStatus as TabKey : 'all'
+  );
 
   const fetchRequests = async () => {
     try {
@@ -133,6 +138,10 @@ export function LandlordRentalRequestsPage() {
   };
 
   useEffect(() => { void fetchRequests(); }, []);
+
+  useEffect(() => {
+    setActiveTab(TABS.some(tab => tab.key === queryStatus) ? queryStatus as TabKey : 'all');
+  }, [queryStatus]);
 
   const filteredRequests = requests.filter(req =>
     activeTab === 'all' ? true : req.status === activeTab

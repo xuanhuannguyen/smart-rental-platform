@@ -1198,7 +1198,9 @@ export default function RoomDetailPage() {
 
 type ReadingDraft = {
   previousReading: number;
+  hasPreviousReading: boolean;
   currentReading: number;
+  hasCurrentReading: boolean;
   proofImageObjectKey: string;
   proofImageUrl: string;
   aiReading: number | null;
@@ -1207,7 +1209,9 @@ type ReadingDraft = {
 
 const emptyInvoiceReadingDraft: ReadingDraft = {
   previousReading: 0,
+  hasPreviousReading: false,
   currentReading: 0,
+  hasCurrentReading: false,
   proofImageObjectKey: '',
   proofImageUrl: '',
   aiReading: null,
@@ -1306,7 +1310,9 @@ function CreateInvoiceWithReadingsModal({
           nextReadings[service.serviceTypeId] = {
             ...emptyInvoiceReadingDraft,
             previousReading: latestReading?.currentReading ?? 0,
+            hasPreviousReading: Boolean(latestReading),
             currentReading: latestReading?.currentReading ?? 0,
+            hasCurrentReading: false,
           };
         });
         setReadings(nextReadings);
@@ -1377,6 +1383,7 @@ function CreateInvoiceWithReadingsModal({
       });
       updateReading(serviceTypeId, {
         currentReading: response.data.reading,
+        hasCurrentReading: true,
         aiReading: response.data.reading,
         aiRawText: response.data.rawText,
         proofImageObjectKey: response.data.proofImageObjectKey,
@@ -1417,8 +1424,14 @@ function CreateInvoiceWithReadingsModal({
     });
 
     for (const reading of meterReadings) {
-      if (!reading.proofImageObjectKey || reading.aiReading === null || !reading.aiRawText) {
-        setError('Vui lòng upload và đọc ảnh cho tất cả dịch vụ tính theo chỉ số.');
+      const price = meteredPrices.find((item) => item.serviceTypeId === reading.serviceTypeId);
+      const draft = readings[reading.serviceTypeId] ?? emptyInvoiceReadingDraft;
+      if (price?.requiresPreviousReading && !draft.hasPreviousReading) {
+        setError(`Vui lòng nhập chỉ số đầu kỳ ${price.serviceName}.`);
+        return;
+      }
+      if (!draft.hasCurrentReading) {
+        setError(`Vui lòng nhập chỉ số mới ${price?.serviceName ?? ''}.`.trim());
         return;
       }
       const latestReading = latestReadingByServiceType[reading.serviceTypeId];
@@ -1521,29 +1534,67 @@ function CreateInvoiceWithReadingsModal({
                         const draft = readings[price.serviceTypeId] ?? emptyInvoiceReadingDraft;
                         const latestReading = latestReadingByServiceType[price.serviceTypeId];
                         const previousReading = latestReading?.currentReading ?? Number(draft.previousReading);
+                        const aiReadingIsLower = draft.aiReading !== null && draft.aiReading < previousReading;
+                        const confirmedReadingIsLower = draft.hasCurrentReading && Number(draft.currentReading) < previousReading;
                         const consumption = Math.max(0, Number(draft.currentReading) - previousReading);
                         const amount = Math.round(consumption * price.unitPrice);
                         return (
-                          <div key={price.serviceTypeId} className="invoice-create-meter-card">
+                          <div key={price.serviceTypeId} className={`invoice-create-meter-card${aiReadingIsLower ? ' meter-card-warning' : ''}`}>
                             <div className="meter-reading-main">
                               <strong className="meter-reading-title">{price.serviceName} ({formatMoneyString(price.unitPrice)} đ / {price.meterUnitName})</strong>
                               <div className="meter-reading-fields">
-                                <div className="invoice-create-field">
-                                  <span className="label">Chỉ số cũ</span>
-                                  <strong>{previousReading} {price.meterUnitName}</strong>
-                                  <small>Giữ nguyên từ kỳ trước</small>
-                                </div>
+                                {price.requiresPreviousReading ? (
+                                  <label className="invoice-create-field">
+                                    <span className="label">Chỉ số đầu kỳ</span>
+                                    <input
+                                      type="number"
+                                      min="0"
+                                      value={draft.hasPreviousReading ? draft.previousReading : ''}
+                                      placeholder="Nhập chỉ số khi bắt đầu ở"
+                                      onChange={(event) => updateReading(price.serviceTypeId, {
+                                        previousReading: Number(event.target.value),
+                                        hasPreviousReading: event.target.value !== '',
+                                      })}
+                                    />
+                                    <small>Nhập lần đầu cho phòng này</small>
+                                  </label>
+                                ) : (
+                                  <div className="invoice-create-field">
+                                    <span className="label">Chỉ số cũ</span>
+                                    <strong>{previousReading} {price.meterUnitName}</strong>
+                                    <small>Giữ nguyên từ kỳ trước</small>
+                                  </div>
+                                )}
                                 <div className="invoice-create-field">
                                   <span className="label">Chỉ số mới (AI)</span>
-                                  <strong>{draft.aiReading ?? '--'} {draft.aiReading !== null ? price.meterUnitName : ''}</strong>
-                                  <small>{draft.aiReading !== null ? 'Đọc từ ảnh' : 'Chưa upload ảnh'}</small>
+                                  <strong className={aiReadingIsLower ? 'meter-reading-danger' : undefined}>{draft.aiReading ?? '--'} {draft.aiReading !== null ? price.meterUnitName : ''}</strong>
+                                  {aiReadingIsLower ? (
+                                    <small className="meter-warning-text">Chỉ số AI thấp hơn chỉ số cũ. Ảnh đã được giữ.</small>
+                                  ) : (
+                                    <small>{draft.aiReading !== null ? 'Đọc từ ảnh' : 'Chưa upload ảnh'}</small>
+                                  )}
                                 </div>
                                 <label className="invoice-create-field">
                                   <span className="label">Chỉ số xác nhận cuối cùng</span>
-                                  <input type="number" min="0" value={draft.currentReading} disabled={draft.aiReading === null} onChange={(event) => updateReading(price.serviceTypeId, { currentReading: Number(event.target.value) })} />
+                                  <input
+                                    type="number"
+                                    min="0"
+                                    value={draft.hasCurrentReading ? draft.currentReading : ''}
+                                    placeholder={`Từ ${previousReading}`}
+                                    aria-invalid={confirmedReadingIsLower}
+                                    className={confirmedReadingIsLower ? 'meter-input-invalid' : undefined}
+                                    onChange={(event) => updateReading(price.serviceTypeId, {
+                                      currentReading: Number(event.target.value),
+                                      hasCurrentReading: event.target.value !== '',
+                                    })}
+                                  />
                                   {draft.aiReading !== null && (
-                                    <small className={draft.currentReading === draft.aiReading ? 'meter-ok' : 'meter-edited'}>
-                                      {draft.currentReading === draft.aiReading ? '✓ Không chỉnh sửa' : '✓ Đã chỉnh sửa kết quả AI'}
+                                    <small className={confirmedReadingIsLower ? 'meter-warning-text' : draft.currentReading === draft.aiReading ? 'meter-ok' : 'meter-edited'}>
+                                      {confirmedReadingIsLower
+                                        ? `Cần nhập từ ${previousReading} ${price.meterUnitName} trở lên trước khi tạo hóa đơn.`
+                                        : draft.currentReading === draft.aiReading
+                                          ? '✓ Không chỉnh sửa'
+                                          : '✓ Đã chỉnh sửa kết quả AI'}
                                     </small>
                                   )}
                                 </label>

@@ -1,359 +1,100 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { ROUTE_PATHS } from '../../../app/router/routePaths';
 import { getApiErrorMessage } from '../../../shared/api/apiError';
-import { toAssetUrl } from '../../../shared/api/assets';
-import { formatDateVi } from '../../../shared/utils/format';
-import { formatStatus, getCreateHouseBlockedMessage, getStatusToneClass } from '../../../shared/utils/status';
-import { getMyRoomingHouseOnboarding, getMyRoomingHouses } from '../../rooming-houses/api';
-import type { RoomingHouseOnboarding, RoomingHouseSummary } from '../../rooming-houses/types';
+import { landlordApi } from '../services/landlordApi';
+import type { LandlordDashboardData } from '../types/landlord.types';
 import './LandlordDashboardPage.css';
 
-const fallbackImage = 'https://images.unsplash.com/photo-1564013799919-ab600027ffc6?auto=format&fit=crop&w=600&q=80';
+const money = new Intl.NumberFormat('vi-VN', { style: 'currency', currency: 'VND', maximumFractionDigits: 0 });
 
 export default function LandlordDashboardPage() {
   const navigate = useNavigate();
-  const [houses, setHouses] = useState<RoomingHouseSummary[]>([]);
-  const [onboarding, setOnboarding] = useState<RoomingHouseOnboarding | null>(null);
+  const [month, setMonth] = useState(() => new Date().toISOString().slice(0, 7));
+  const [data, setData] = useState<LandlordDashboardData | null>(null);
   const [loading, setLoading] = useState(true);
-  const [message, setMessage] = useState('');
+  const [error, setError] = useState('');
 
-  useEffect(() => {
-    async function loadData() {
-      setLoading(true);
-      setMessage('');
+  const loadDashboard = useCallback(async () => {
+    setLoading(true); setError('');
+    try {
+      const response = await landlordApi.getDashboard(month);
+      setData(response.data ?? null);
+    } catch (err) {
+      setError(getApiErrorMessage(err, 'Không thể tải dữ liệu dashboard.'));
+    } finally { setLoading(false); }
+  }, [month]);
 
-      try {
-        const [housesData, onboardingData] = await Promise.all([
-          getMyRoomingHouses(),
-          getMyRoomingHouseOnboarding(),
-        ]);
+  useEffect(() => { void loadDashboard(); }, [loadDashboard]);
 
-        setHouses(housesData);
-        setOnboarding(onboardingData);
-      } catch (err) {
-        setMessage(getApiErrorMessage(err, 'Không thể tải thông tin kênh chủ trọ.'));
-      } finally {
-        setLoading(false);
-      }
-    }
-
-    void loadData();
-  }, []);
-
-  const houseStats = useMemo(() => ({
-    total: houses.length,
-    approved: houses.filter((house) => house.approvalStatus === 'Approved').length,
-    pending: houses.filter((house) => house.approvalStatus === 'Pending').length,
-    rejected: houses.filter((house) => house.approvalStatus === 'Rejected').length,
-    draft: houses.filter((house) => house.approvalStatus === 'Draft').length,
-  }), [houses]);
-
-  const blockingHouse = useMemo(
-    () => houses.find((house) =>
-      house.approvalStatus === 'Draft' ||
-      house.approvalStatus === 'Pending' ||
-      house.approvalStatus === 'Rejected'
-    ),
-    [houses]
-  );
-
-  const canCreateNew = onboarding?.canCreateDraft ?? !blockingHouse;
-
-  function handleCreateNewHouse() {
-    if (blockingHouse) {
-      setMessage(getCreateHouseBlockedMessage(blockingHouse.approvalStatus));
-      return;
-    }
-
-    navigate(`${ROUTE_PATHS.LANDLORD.REGISTER}?mode=new`);
-  }
-
-  function handleCardClick(house: RoomingHouseSummary) {
-    if (house.approvalStatus === 'Approved') {
-      navigate(ROUTE_PATHS.LANDLORD.ROOMING_HOUSE_DETAIL(house.id));
-      return;
-    }
-
-    if (house.approvalStatus === 'Draft' || house.approvalStatus === 'Rejected') {
-      navigate(`${ROUTE_PATHS.LANDLORD.REGISTER}?id=${house.id}`);
-    }
-  }
-
-  if (loading) {
-    return (
-      <div className="landlord-dashboard-page" style={{ display: 'contents' }}>
-        <main className="dashboard-main">
-          <div className="empty-panel">Đang tải bảng quản lý...</div>
-        </main>
-      </div>
-    );
-  }
+  if (loading && !data) return <DashboardSkeleton />;
+  if (error && !data) return <main className="dashboard-main"><ErrorPanel message={error} retry={loadDashboard} /></main>;
 
   return (
-    <div className="landlord-dashboard-page" style={{ display: 'contents' }}>
-      <main className="dashboard-main">
-        <section className="overview-band">
-          <div className="overview-left">
-            <p className="eyebrow">Quản lý</p>
-            <h2>Khu trọ của tôi</h2>
-            <p className="overview-description">Quản lý danh sách các khu trọ của bạn.</p>
-          </div>
+    <main className="dashboard-main landlord-dashboard-page">
+      <header className="dash-header">
+        <div><p className="dash-kicker">TỔNG QUAN VẬN HÀNH</p><h1>Dashboard</h1><p>Theo dõi tình hình khu trọ và các công việc cần xử lý.</p></div>
+        <label className="month-picker"><CalendarIcon /><span>Tháng</span><input type="month" value={month} max="2099-12" onChange={(event) => setMonth(event.target.value)} /></label>
+      </header>
 
-          <div className="overview-right">
-            <div className="overview-stats">
-              <div className="stat-item stat-item--total">
-                <BuildingIcon />
-                <span>Tổng khu trọ</span>
-                <strong className="stat-badge">{houseStats.total}</strong>
-              </div>
-              <div className="stat-item stat-item--approved">
-                <CheckCircleIcon />
-                <span>Đã duyệt</span>
-                <strong className="stat-badge">{houseStats.approved}</strong>
-              </div>
-              <div className="stat-item stat-item--pending">
-                <ClockIcon />
-                <span>Chờ duyệt</span>
-                <strong className="stat-badge">{houseStats.pending}</strong>
-              </div>
-              <div className="stat-item stat-item--rejected">
-                <BanIcon />
-                <span>Bản nháp / lỗi</span>
-                <strong className="stat-badge">{houseStats.draft + houseStats.rejected}</strong>
-              </div>
-            </div>
-
-            <div className="overview-actions">
-              <button
-                className="primary-action"
-                disabled={!canCreateNew}
-                onClick={handleCreateNewHouse}
-                title={blockingHouse ? getCreateHouseBlockedMessage(blockingHouse.approvalStatus) : 'Tạo khu trọ mới'}
-              >
-                + Tạo khu trọ mới
-              </button>
-            </div>
-          </div>
-        </section>
-
-        {message && <p className="dashboard-message">{message}</p>}
-
-        <section className="card-grid">
-          {houses.length === 0 ? (
-            <div className="empty-panel">
-              <h2>Bạn chưa có khu trọ nào</h2>
-              <p>Tạo khu trọ đầu tiên để bắt đầu quản lý phòng cho thuê.</p>
-            </div>
-          ) : (
-            houses.map((house) => (
-              <button
-                className="dashboard-card"
-                key={house.id}
-                onClick={() => handleCardClick(house)}
-              >
-                <div className="card-media-wrapper">
-                  <img
-                    src={house.coverImageUrl ? toAssetUrl(house.coverImageUrl) : fallbackImage}
-                    alt={house.name}
-                    className="card-cover-image"
-                  />
-                  <div className="card-status-overlay">
-                    <span className={`status-pill status-pill--icon ${getStatusToneClass(house.approvalStatus)}`}>
-                      {house.approvalStatus === 'Pending' && <ClockIconSmall />}
-                      {house.approvalStatus === 'Approved' && <CheckIconSmall />}
-                      {house.approvalStatus === 'Rejected' && <AlertIconSmall />}
-                      {house.approvalStatus === 'Draft' && <DraftIconSmall />}
-                      {formatStatus(house.approvalStatus)}
-                    </span>
-                    <span className={`status-pill status-pill--icon ${house.visibilityStatus === 'Hidden' ? 'status-pill--visibility-hidden' : getStatusToneClass(house.visibilityStatus)}`}>
-                      <span className="dot-indicator"></span>
-                      {formatStatus(house.visibilityStatus)}
-                    </span>
-                  </div>
-                  
-                  <div className="card-menu-trigger-overlay" onClick={(event) => event.stopPropagation()}>
-                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
-                      <circle cx="12" cy="5" r="1.5" fill="currentColor" />
-                      <circle cx="12" cy="12" r="1.5" fill="currentColor" />
-                      <circle cx="12" cy="19" r="1.5" fill="currentColor" />
-                    </svg>
-                  </div>
-                </div>
-
-                <div className="card-body-content">
-                  <div className="card-title-row">
-                    <h3>{house.name}</h3>
-                  </div>
-
-                  <div className="card-location">
-                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                      <path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z" />
-                      <circle cx="12" cy="10" r="3" />
-                    </svg>
-                    <span>{house.addressDisplay}</span>
-                  </div>
-
-                  <hr className="card-divider" />
-
-                  <div className="card-metrics-grid">
-                    <div className="metric-item">
-                      <div className="metric-icon metric-icon--blue">
-                        <BuildingIcon />
-                      </div>
-                      <div className="metric-text-group">
-                        <span className="metric-label">PHÒNG TRỐNG</span>
-                        <strong className="metric-value">
-                          {house.availableRooms ?? 0} / {house.totalRooms ?? 0}
-                        </strong>
-                      </div>
-                    </div>
-
-                    <div className="metric-item">
-                      <div className="metric-icon metric-icon--green">
-                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                          <rect x="3" y="4" width="18" height="18" rx="2" ry="2" />
-                          <line x1="16" y1="2" x2="16" y2="6" />
-                          <line x1="8" y1="2" x2="8" y2="6" />
-                          <line x1="3" y1="10" x2="21" y2="10" />
-                        </svg>
-                      </div>
-                      <div className="metric-text-group">
-                        <span className="metric-label">CẬP NHẬT</span>
-                        <strong className="metric-value">
-                          {formatDateVi(house.updatedAt)}
-                        </strong>
-                      </div>
-                    </div>
-                  </div>
-
-                  {house.rejectedReason && (
-                    <div className="card-error-row">
-                      <p className="warning-text">Lý do từ chối: {house.rejectedReason}</p>
-                    </div>
-                  )}
-
-                  <div className="card-footer-alert-banner">
-                    {house.approvalStatus === 'Approved' ? (
-                      <div className="alert-banner-content alert-banner-content--success">
-                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" className="banner-icon">
-                          <path d="M22 11.08V12a10 10 0 1 1-5.93-9.14" />
-                          <polyline points="22 4 12 14.01 9 11.01" />
-                        </svg>
-                        <span>Quản lý phòng và thông tin</span>
-                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" className="chevron-icon">
-                          <polyline points="9 18 15 12 9 6" />
-                        </svg>
-                      </div>
-                    ) : house.approvalStatus === 'Draft' || house.approvalStatus === 'Rejected' ? (
-                      <div className="alert-banner-content alert-banner-content--warning">
-                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" className="banner-icon">
-                          <polygon points="7.86 2 16.14 2 22 7.86 22 16.14 16.14 22 7.86 22 2 16.14 2 7.86 7.86 2" />
-                          <line x1="12" y1="8" x2="12" y2="12" />
-                          <line x1="12" y1="16" x2="12.01" y2="16" />
-                        </svg>
-                        <span>Chỉnh sửa hồ sơ</span>
-                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" className="chevron-icon">
-                          <polyline points="9 18 15 12 9 6" />
-                        </svg>
-                      </div>
-                    ) : (
-                      <div className="alert-banner-content alert-banner-content--info">
-                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" className="banner-icon">
-                          <circle cx="12" cy="12" r="10" />
-                          <polyline points="12 6 12 12 16 14" />
-                        </svg>
-                        <span>Đang chờ quản trị viên duyệt...</span>
-                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" className="chevron-icon">
-                          <polyline points="9 18 15 12 9 6" />
-                        </svg>
-                      </div>
-                    )}
-                  </div>
-                </div>
-              </button>
-            ))
-          )}
-        </section>
-      </main>
-    </div>
+      {error && <div className="inline-error">{error}<button onClick={() => void loadDashboard()}>Thử lại</button></div>}
+      {data?.totalRoomingHouses === 0 ? <EmptyDashboard onCreate={() => navigate(`${ROUTE_PATHS.LANDLORD.REGISTER}?mode=new`)} /> : data && <DashboardContent data={data} navigate={navigate} />}
+    </main>
   );
 }
 
-function BuildingIcon() {
-  return (
-    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ flexShrink: 0 }}>
-      <rect x="4" y="2" width="16" height="20" rx="2" ry="2" />
-      <line x1="9" y1="22" x2="9" y2="16" />
-      <line x1="15" y1="22" x2="15" y2="16" />
-      <line x1="9" y1="16" x2="15" y2="16" />
-      <path d="M9 6h.01" />
-      <path d="M15 6h.01" />
-      <path d="M9 10h.01" />
-      <path d="M15 10h.01" />
-    </svg>
-  );
+function DashboardContent({ data, navigate }: { data: LandlordDashboardData; navigate: ReturnType<typeof useNavigate> }) {
+  const kpis = [
+    ['building', 'Tổng khu trọ', data.totalRoomingHouses, 'blue'], ['bed', 'Tổng phòng', data.totalRooms, 'indigo'],
+    ['users', 'Đang thuê', data.occupiedRooms, 'green'], ['door', 'Phòng trống', data.availableRooms, 'orange'],
+    ['wallet', 'Doanh thu tháng', money.format(data.monthlyRevenue), 'violet']
+  ] as const;
+  const summaries = [
+    { icon: 'invoice', title: 'Tóm tắt hóa đơn', rows: [['Bản nháp', data.draftInvoices, 'slate'], ['Đã phát hành', data.issuedInvoices, 'blue'], ['Đã thanh toán', data.paidInvoices, 'green'], ['Quá hạn', data.overdueInvoices, 'red']] },
+    { icon: 'contract', title: 'Tóm tắt hợp đồng', rows: [['Đang hiệu lực', data.activeContracts, 'green'], ['Sắp hết hạn', data.expiringContracts, 'orange'], ['Hết hạn', data.expiredContracts, 'red']] },
+    { icon: 'request', title: 'Yêu cầu thuê', rows: [['Chờ duyệt', data.pendingRequests, 'orange'], ['Đã chấp nhận', data.acceptedRequests, 'green'], ['Từ chối', data.rejectedRequests, 'red']] },
+    { icon: 'calendar', title: 'Lịch hẹn xem phòng', rows: [['Hôm nay', data.todayAppointments, 'blue'], ['Sắp tới', data.upcomingAppointments, 'violet'], ['Hoàn thành', data.completedAppointments, 'green']] }
+  ];
+  const alerts = [
+    [data.overdueInvoices, 'hóa đơn quá hạn', `${ROUTE_PATHS.LANDLORD.INVOICES}?status=Overdue`, 'red'], [data.expiringContracts, 'hợp đồng sắp hết hạn', `${ROUTE_PATHS.LANDLORD.CONTRACTS}?filter=expiring`, 'orange'],
+    [data.pendingRequests, 'yêu cầu thuê chờ duyệt', `${ROUTE_PATHS.LANDLORD.RENTAL_REQUESTS}?status=Pending`, 'yellow'], [data.todayAppointments, 'lịch xem phòng hôm nay', `${ROUTE_PATHS.LANDLORD.VIEWING_APPOINTMENTS}?filter=today`, 'violet']
+  ] as const;
+  return <>
+    <section className="kpi-grid">{kpis.map(([icon, label, value, tone]) => <article className={`kpi-card kpi-${tone}`} key={label}><Icon name={icon} /><div><span>{label}</span><strong>{value}</strong>{label === 'Phòng trống' && <small>{data.occupancyRate}% đã lấp đầy</small>}</div></article>)}</section>
+    <section className="revenue-strip"><Icon name="chart" /><div><span>Tổng doanh thu đã thanh toán</span><strong>{money.format(data.totalRevenue)}</strong></div></section>
+    <section className="dashboard-upper"><RevenueChart data={data.revenueChart} /><div className="summary-grid">{summaries.map((item) => <SummaryCard key={item.title} {...item} />)}</div></section>
+    <section className="dashboard-lower">
+      <div className="lower-stack"><Panel title="Cảnh báo cần xử lý" icon="warning"><div className="action-list">{alerts.map(([count, label, path, tone]) => <button key={label} onClick={() => navigate(path)}><span className={`alert-count ${tone}`}>{count}</span><span>{label}</span><Icon name="chevron" /></button>)}</div></Panel>
+      <Panel title="Thao tác nhanh" icon="bolt"><div className="action-list quick-list"><button onClick={() => navigate(ROUTE_PATHS.LANDLORD.ROOMING_HOUSES)}><Icon name="meter" /><span>Ghi chỉ số điện/nước</span><Icon name="chevron" /></button><button onClick={() => navigate(ROUTE_PATHS.LANDLORD.INVOICES)}><Icon name="invoice" /><span>Tạo hóa đơn</span><Icon name="chevron" /></button><button onClick={() => navigate(ROUTE_PATHS.LANDLORD.RENTAL_REQUESTS)}><Icon name="request" /><span>Xem yêu cầu thuê</span><Icon name="chevron" /></button><button onClick={() => navigate(ROUTE_PATHS.LANDLORD.VIEWING_APPOINTMENTS)}><Icon name="calendar" /><span>Xem lịch hẹn hôm nay</span><Icon name="chevron" /></button></div></Panel></div>
+      <Panel title="Hóa đơn gần đây" icon="invoice" className="invoice-panel"><InvoiceTable data={data.latestInvoices} onOpen={(id) => navigate(ROUTE_PATHS.LANDLORD.INVOICE_DETAIL(id))} /><button className="view-all" onClick={() => navigate(ROUTE_PATHS.LANDLORD.INVOICES)}>Xem tất cả hóa đơn <Icon name="chevron" /></button></Panel>
+    </section>
+  </>;
 }
 
-function CheckCircleIcon() {
-  return (
-    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ flexShrink: 0 }}>
-      <path d="M22 11.08V12a10 10 0 1 1-5.93-9.14" />
-      <polyline points="22 4 12 14.01 9 11.01" />
-    </svg>
-  );
+function RevenueChart({ data }: { data: LandlordDashboardData['revenueChart'] }) {
+  const max = Math.max(...data.map((item) => item.revenue), 1);
+  return <Panel title="Biểu đồ doanh thu 6 tháng" icon="chart" className="chart-panel"><div className="chart-wrap"><div className="y-label">Triệu đồng</div><div className="bars">{data.map((item) => { const height = item.revenue === 0 ? 3 : Math.max(12, item.revenue / max * 100); return <div className="bar-column" key={item.month}><span>{item.revenue > 0 ? Math.round(item.revenue / 1_000_000) : 0}</span><div className="bar-track"><div className="bar" tabIndex={0} aria-label={`Doanh thu tháng ${item.month}: ${money.format(item.revenue)}`} data-tooltip={money.format(item.revenue)} style={{ height: `${height}%` }} /></div><small>Tháng {item.month.slice(0, 2)}</small></div>; })}</div></div></Panel>;
 }
 
-function ClockIcon() {
-  return (
-    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ flexShrink: 0 }}>
-      <circle cx="12" cy="12" r="10" />
-      <polyline points="12 6 12 12 16 14" />
-    </svg>
-  );
+function SummaryCard({ icon, title, rows }: { icon: string; title: string; rows: (string | number)[][] }) { return <Panel title={title} icon={icon} className="summary-card"><ul>{rows.map(([label, value, tone]) => <li key={label}><span><i className={`dot ${tone}`} />{label}</span><strong>{value}</strong></li>)}</ul></Panel>; }
+function Panel({ title, icon, className = '', children }: { title: string; icon: string; className?: string; children: React.ReactNode }) { return <article className={`dashboard-panel ${className}`}><h2><Icon name={icon} />{title}</h2>{children}</article>; }
+
+function InvoiceTable({ data, onOpen }: { data: LandlordDashboardData['latestInvoices']; onOpen: (id: string) => void }) {
+  if (!data.length) return <div className="table-empty">Chưa có hóa đơn trong hệ thống.</div>;
+  const labels: Record<string, string> = { Draft: 'Bản nháp', Issued: 'Đã phát hành', Paid: 'Đã thanh toán', Overdue: 'Quá hạn', Cancelled: 'Đã hủy' };
+  return <div className="invoice-table-wrap"><table><thead><tr><th>Mã hóa đơn</th><th>Phòng</th><th>Trạng thái</th><th>Số tiền</th><th>Hạn thanh toán</th><th /></tr></thead><tbody>{data.map((item) => <tr key={item.id}><td>{item.invoiceCode}</td><td>{item.roomName}</td><td><span className={`invoice-status status-${item.status.toLowerCase()}`}>{labels[item.status]}</span></td><td>{money.format(item.amount)}</td><td>{new Date(`${item.dueDate}T00:00:00`).toLocaleDateString('vi-VN')}</td><td><button aria-label={`Mở ${item.invoiceCode}`} onClick={() => onOpen(item.id)}>•••</button></td></tr>)}</tbody></table></div>;
 }
 
-function BanIcon() {
-  return (
-    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ flexShrink: 0 }}>
-      <circle cx="12" cy="12" r="10" />
-      <line x1="4.93" y1="4.93" x2="19.07" y2="19.07" />
-    </svg>
-  );
-}
+function EmptyDashboard({ onCreate }: { onCreate: () => void }) { return <section className="empty-dashboard"><div><Icon name="building" /></div><h2>Bắt đầu với khu trọ đầu tiên</h2><p>Tạo khu trọ để dashboard có thể tổng hợp phòng, hợp đồng, hóa đơn và doanh thu của bạn.</p><button onClick={onCreate}>+ Tạo khu trọ</button></section>; }
+function ErrorPanel({ message, retry }: { message: string; retry: () => void }) { return <section className="empty-dashboard error-dashboard"><div><Icon name="warning" /></div><h2>Không thể tải dashboard</h2><p>{message}</p><button onClick={retry}>Thử lại</button></section>; }
+function DashboardSkeleton() { return <main className="dashboard-main landlord-dashboard-page"><div className="skeleton skeleton-title" /><div className="skeleton-grid">{Array.from({ length: 5 }, (_, i) => <div className="skeleton skeleton-card" key={i} />)}</div><div className="skeleton skeleton-chart" /></main>; }
 
-function ClockIconSmall() {
-  return (
-    <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" style={{ marginRight: '4px', flexShrink: 0 }}>
-      <circle cx="12" cy="12" r="10" />
-      <polyline points="12 6 12 12 16 14" />
-    </svg>
-  );
-}
-
-function CheckIconSmall() {
-  return (
-    <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" style={{ marginRight: '4px', flexShrink: 0 }}>
-      <polyline points="20 6 9 17 4 12" />
-    </svg>
-  );
-}
-
-function AlertIconSmall() {
-  return (
-    <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" style={{ marginRight: '4px', flexShrink: 0 }}>
-      <circle cx="12" cy="12" r="10" />
-      <line x1="12" y1="8" x2="12" y2="12" />
-      <line x1="12" y1="16" x2="12.01" y2="16" />
-    </svg>
-  );
-}
-
-function DraftIconSmall() {
-  return (
-    <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" style={{ marginRight: '4px', flexShrink: 0 }}>
-      <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7" />
-      <path d="M18.5 2.5a2.121 2.121 0 1 1 3 3L12 15l-4 1 1-4 9.5-9.5z" />
-    </svg>
-  );
+function CalendarIcon() { return <Icon name="calendar" />; }
+function Icon({ name }: { name: string }) {
+  const paths: Record<string, React.ReactNode> = {
+    building: <><path d="M4 21V4a1 1 0 0 1 1-1h10a1 1 0 0 1 1 1v17"/><path d="M16 9h3a1 1 0 0 1 1 1v11M8 7h4M8 11h4M8 15h4M9 21v-3h3v3"/></>, bed: <><path d="M3 20v-8M21 20v-6a2 2 0 0 0-2-2H5a2 2 0 0 0-2 2v2h18M7 12V8h5a2 2 0 0 1 2 2v2"/></>,
+    users: <><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M22 21v-2a4 4 0 0 0-3-3.87M16 3.13a4 4 0 0 1 0 7.75"/></>, door: <><path d="M4 21h16M6 21V4a1 1 0 0 1 1-1h10a1 1 0 0 1 1 1v17"/><path d="M14 12h.01"/></>,
+    wallet: <><rect x="2" y="5" width="20" height="14" rx="2"/><path d="M16 13h4M2 9h20"/></>, chart: <><path d="M3 3v18h18"/><path d="m7 15 4-4 3 3 5-7"/></>, invoice: <><path d="M6 2h9l4 4v16H6z"/><path d="M14 2v5h5M9 12h7M9 16h7"/></>, contract: <><path d="M5 3h14v18H5zM9 8h6M9 12h6M9 16h4"/></>, request: <><circle cx="9" cy="7" r="4"/><path d="M2 21v-2a4 4 0 0 1 4-4h6M19 14v6M16 17h6"/></>, calendar: <><rect x="3" y="5" width="18" height="16" rx="2"/><path d="M16 3v4M8 3v4M3 10h18"/></>, warning: <><path d="M12 3 2 21h20L12 3Z"/><path d="M12 9v5M12 18h.01"/></>, bolt: <path d="m13 2-9 12h8l-1 8 9-12h-8z"/>, meter: <><path d="M4 19a8 8 0 1 1 16 0"/><path d="m12 15 4-5M8 19h8"/></>, chevron: <path d="m9 18 6-6-6-6"/>
+  };
+  return <svg className="dash-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">{paths[name]}</svg>;
 }

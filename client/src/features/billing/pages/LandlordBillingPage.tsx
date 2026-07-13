@@ -36,6 +36,7 @@ export default function LandlordBillingPage() {
   const navigate = useNavigate();
   const query = new URLSearchParams(location.search);
   const queryRoomId = query.get('roomId') ?? '';
+  const queryStatus = query.get('status') ?? '';
   const roomingHouseId = id ?? '';
   const tab = getTab(location.pathname, invoiceId);
 
@@ -50,7 +51,9 @@ export default function LandlordBillingPage() {
   const [busy, setBusy] = useState('');
   const [message, setMessage] = useState('');
   const [error, setError] = useState('');
-  const [statusFilter, setStatusFilter] = useState('all');
+  const [statusFilter, setStatusFilter] = useState(
+    invoiceStatuses.includes(queryStatus) ? queryStatus : 'all'
+  );
   const [selectedHouseId, setSelectedHouseId] = useState('');
   const [selectedRoomId, setSelectedRoomId] = useState('');
   const [isCreateInvoiceModalOpen, setIsCreateInvoiceModalOpen] = useState(false);
@@ -106,6 +109,10 @@ export default function LandlordBillingPage() {
       void loadRoomContext(queryRoomId);
     }
   }, [queryRoomId]);
+
+  useEffect(() => {
+    setStatusFilter(invoiceStatuses.includes(queryStatus) ? queryStatus : 'all');
+  }, [queryStatus]);
 
   useEffect(() => {
     if (!roomingHouseId && roomContext?.roomingHouseId) {
