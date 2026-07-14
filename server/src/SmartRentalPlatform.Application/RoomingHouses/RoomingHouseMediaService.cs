@@ -446,10 +446,7 @@ public class RoomingHouseMediaService : IRoomingHouseMediaService
 
             if (currentLinkedAsset is not null)
             {
-                currentLinkedAsset.LinkedEntityType = null;
-                currentLinkedAsset.LinkedEntityId = null;
-                currentLinkedAsset.Status = MediaStatus.Uploaded;
-                currentLinkedAsset.UpdatedAt = now;
+                RetireMediaAsset(currentLinkedAsset, now);
             }
         }
 
@@ -579,11 +576,17 @@ public class RoomingHouseMediaService : IRoomingHouseMediaService
 
         foreach (var mediaAsset in mediaAssets)
         {
-            mediaAsset.LinkedEntityType = null;
-            mediaAsset.LinkedEntityId = null;
-            mediaAsset.Status = MediaStatus.Uploaded;
-            mediaAsset.UpdatedAt = now;
+            RetireMediaAsset(mediaAsset, now);
         }
+    }
+
+    private static void RetireMediaAsset(MediaAsset mediaAsset, DateTimeOffset now)
+    {
+        mediaAsset.LinkedEntityType = null;
+        mediaAsset.LinkedEntityId = null;
+        mediaAsset.Status = MediaStatus.Deleted;
+        mediaAsset.DeletedAt = now;
+        mediaAsset.UpdatedAt = now;
     }
 
     private static string MaskDocumentNumber(string documentNumber)

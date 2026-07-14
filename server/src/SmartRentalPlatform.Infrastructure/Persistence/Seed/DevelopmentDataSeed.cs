@@ -1,5 +1,11 @@
 using Microsoft.EntityFrameworkCore;
 using SmartRentalPlatform.Application.Common.Interfaces;
+using SmartRentalPlatform.Application.Common.Interfaces.Media;
+using SmartRentalPlatform.Application.Common.Media;
+using SmartRentalPlatform.Application.Common.Models.Media;
+using SmartRentalPlatform.Application.RoomingHouses;
+using SmartRentalPlatform.Contracts.RoomingHouseRules.Requests;
+using SmartRentalPlatform.Domain.Entities.Media;
 using SmartRentalPlatform.Domain.Entities.Billing;
 using SmartRentalPlatform.Domain.Entities.Payments;
 using SmartRentalPlatform.Domain.Entities.Properties;
@@ -7,6 +13,7 @@ using SmartRentalPlatform.Domain.Entities.Users;
 
 using SmartRentalPlatform.Domain.Enums;
 using SmartRentalPlatform.Domain.Enums.Billing;
+using SmartRentalPlatform.Domain.Enums.Media;
 using SmartRentalPlatform.Domain.Enums.Payments;
 using WalletAccountStatus = SmartRentalPlatform.Domain.Enums.Payments.WalletAccountStatus;
 
@@ -27,6 +34,7 @@ public static class DevelopmentDataSeed
     private static readonly Guid DummyLandlordUserId = Guid.Parse("10000000-0000-0000-0000-000000009999");
     private static readonly Guid TenantApprovedKycId = Guid.Parse("50000000-0000-0000-0000-000000000001");
     private static readonly Guid ApprovedHouseId = Guid.Parse("20000000-0000-0000-0000-000000000001");
+    private static readonly Guid ApprovedHouseRuleId = Guid.Parse("21000000-0000-0000-0000-000000000001");
     private static readonly Guid DraftHouseId = Guid.Parse("20000000-0000-0000-0000-000000000002");
     private static readonly Guid SunriseHouseId = Guid.Parse("20000000-0000-0000-0000-000000000003");
     private static readonly Guid GreenViewHouseId = Guid.Parse("20000000-0000-0000-0000-000000000004");
@@ -56,10 +64,14 @@ public static class DevelopmentDataSeed
     private static readonly Guid InternetServiceTypeId = Guid.Parse("80000000-0000-0000-0000-000000000003");
     private static readonly Guid TrashServiceTypeId = Guid.Parse("80000000-0000-0000-0000-000000000004");
     private static readonly DateTimeOffset SeededAt = new(2026, 1, 1, 0, 0, 0, TimeSpan.Zero);
+    private static readonly byte[] PlaceholderImageBytes = Convert.FromBase64String(
+        "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO5Wv7sAAAAASUVORK5CYII=");
 
     public static async Task SeedAsync(
         AppDbContext context,
         IPasswordService passwordService,
+        IMediaStorageService mediaStorageService,
+        IMediaObjectKeyFactory mediaObjectKeyFactory,
         CancellationToken cancellationToken = default)
     {
         var location = await GetSeedLocationAsync(context, cancellationToken);
@@ -71,9 +83,23 @@ public static class DevelopmentDataSeed
         await SeedUsersAsync(context, passwordService, cancellationToken);
         await SeedApprovedKycAsync(context, cancellationToken);
         await SeedBillingServiceTypesAsync(context, cancellationToken);
-        await SeedRoomingHousesAsync(context, location, cancellationToken);
+        await SeedRoomingHousesAsync(
+            context,
+            location,
+            mediaStorageService,
+            mediaObjectKeyFactory,
+            cancellationToken);
         await SeedRoomsAsync(context, cancellationToken);
-        await LargeScaleRoomingHouseSeeder.SeedAsync(context, cancellationToken);
+        await LargeScaleRoomingHouseSeeder.SeedAsync(
+            context,
+            mediaStorageService,
+            mediaObjectKeyFactory,
+            cancellationToken);
+        await BackfillPublicSeedMediaAsync(
+            context,
+            mediaStorageService,
+            mediaObjectKeyFactory,
+            cancellationToken);
         // await SeedAdditionalRoomsAsync(context, cancellationToken);
         // await SeedBillingAsync(context, cancellationToken);
     }
@@ -434,6 +460,8 @@ public static class DevelopmentDataSeed
     private static async Task SeedRoomingHousesAsync(
         AppDbContext context,
         SeedLocation location,
+        IMediaStorageService mediaStorageService,
+        IMediaObjectKeyFactory mediaObjectKeyFactory,
         CancellationToken cancellationToken)
     {
         if (!await context.RoomingHouses.AnyAsync(x => x.Id == ApprovedHouseId, cancellationToken))
@@ -503,6 +531,12 @@ public static class DevelopmentDataSeed
                 UpdatedAt = SeededAt
             });
         }
+
+        await EnsureApprovedHouseRuleSeedAsync(
+            context,
+            mediaStorageService,
+            mediaObjectKeyFactory,
+            cancellationToken);
 
         if (!await context.RoomingHouses.AnyAsync(x => x.Id == DraftHouseId, cancellationToken))
         {
@@ -596,6 +630,198 @@ public static class DevelopmentDataSeed
             AmenitySeed.ParkingId);
 
         await context.SaveChangesAsync(cancellationToken);
+    }
+
+    public static async Task EnsureApprovedHouseRuleSeedAsync(
+        AppDbContext context,
+        IMediaStorageService mediaStorageService,
+        IMediaObjectKeyFactory mediaObjectKeyFactory,
+        CancellationToken cancellationToken = default)
+    {
+        var approvedHouse = context.RoomingHouses.Local.FirstOrDefault(x => x.Id == ApprovedHouseId)
+            ?? await context.RoomingHouses.FirstOrDefaultAsync(x => x.Id == ApprovedHouseId, cancellationToken);
+
+        if (approvedHouse is null)
+        {
+            return;
+        }
+
+        var request = BuildApprovedHouseRuleRequest();
+        var now = DateTimeOffset.UtcNow;
+        var houseRule = context.RoomingHouseRules.Local.FirstOrDefault(x => x.RoomingHouseId == ApprovedHouseId)
+            ?? await context.RoomingHouseRules.FirstOrDefaultAsync(x => x.RoomingHouseId == ApprovedHouseId, cancellationToken);
+
+        if (houseRule is null)
+        {
+            houseRule = new RoomingHouseRule
+            {
+                Id = ApprovedHouseRuleId,
+                RoomingHouseId = ApprovedHouseId,
+                CreatedAt = SeededAt
+            };
+            context.RoomingHouseRules.Add(houseRule);
+        }
+
+        var mediaAsset = houseRule.MediaAssetId.HasValue
+            ? context.MediaAssets.Local.FirstOrDefault(x => x.Id == houseRule.MediaAssetId.Value)
+                ?? await context.MediaAssets.FirstOrDefaultAsync(x => x.Id == houseRule.MediaAssetId.Value, cancellationToken)
+            : null;
+
+        mediaAsset = await EnsureApprovedHouseRuleMediaAssetAsync(
+            context,
+            approvedHouse,
+            mediaAsset,
+            mediaStorageService,
+            mediaObjectKeyFactory,
+            request,
+            cancellationToken);
+
+        houseRule.SourceType = RoomingHouseRuleSourceType.FormGenerated;
+        houseRule.MediaAssetId = mediaAsset.Id;
+        houseRule.GeneralRules = request.GeneralRules;
+        houseRule.QuietHours = request.QuietHours;
+        houseRule.SecurityPolicy = request.SecurityPolicy;
+        houseRule.CleaningPolicy = request.CleaningPolicy;
+        houseRule.GuestPolicy = request.GuestPolicy;
+        houseRule.ParkingPolicy = request.ParkingPolicy;
+        houseRule.UtilityPolicy = request.UtilityPolicy;
+        houseRule.DamageCompensationPolicy = request.DamageCompensationPolicy;
+        houseRule.AdditionalNotes = request.AdditionalNotes;
+        houseRule.UpdatedAt = now;
+    }
+
+    private static async Task<MediaAsset> EnsureApprovedHouseRuleMediaAssetAsync(
+        AppDbContext context,
+        RoomingHouse approvedHouse,
+        MediaAsset? existingAsset,
+        IMediaStorageService mediaStorageService,
+        IMediaObjectKeyFactory mediaObjectKeyFactory,
+        UpsertRoomingHouseRuleRequest request,
+        CancellationToken cancellationToken)
+    {
+        const string fileName = "house-rule-approved-demo.pdf";
+        await using var pdfStream = RoomingHouseRulePdfGenerator.Generate(approvedHouse, request);
+        using var buffer = new MemoryStream();
+        await pdfStream.CopyToAsync(buffer, cancellationToken);
+        var pdfBytes = buffer.ToArray();
+
+        if (existingAsset is not null)
+        {
+            existingAsset.OwnerUserId = LandlordUserId;
+            existingAsset.Scope = MediaScope.RoomingHouseRulePdf;
+            existingAsset.Visibility = MediaVisibility.Private;
+            existingAsset.Status = MediaStatus.Linked;
+            existingAsset.LinkedEntityType = nameof(RoomingHouseRule);
+            existingAsset.LinkedEntityId = ApprovedHouseId;
+            existingAsset.DeletedAt = null;
+            existingAsset.ContentType = "application/pdf";
+            existingAsset.FileSize = pdfBytes.Length;
+            existingAsset.OriginalFileName = fileName;
+            existingAsset.UpdatedAt = DateTimeOffset.UtcNow;
+
+            if (string.IsNullOrWhiteSpace(existingAsset.ObjectKey))
+            {
+                var objectKey = mediaObjectKeyFactory.Create(
+                    MediaScope.RoomingHouseRulePdf,
+                    MediaVisibility.Private,
+                    fileName);
+                existingAsset.ObjectKey = objectKey.ObjectKey;
+                existingAsset.StoredFileName = objectKey.StoredFileName;
+            }
+            else if (string.IsNullOrWhiteSpace(existingAsset.StoredFileName))
+            {
+                existingAsset.StoredFileName = Path.GetFileName(existingAsset.ObjectKey);
+            }
+
+            if (string.IsNullOrWhiteSpace(existingAsset.BucketName))
+            {
+                existingAsset.BucketName = mediaStorageService.GetBucketName();
+            }
+
+            if (!await mediaStorageService.ExistsAsync(existingAsset.ObjectKey, cancellationToken))
+            {
+                await UploadApprovedHouseRulePdfAsync(
+                    mediaStorageService,
+                    existingAsset.ObjectKey,
+                    pdfBytes,
+                    fileName,
+                    cancellationToken);
+            }
+
+            return existingAsset;
+        }
+
+        var createdObjectKey = mediaObjectKeyFactory.Create(
+            MediaScope.RoomingHouseRulePdf,
+            MediaVisibility.Private,
+            fileName);
+
+        await UploadApprovedHouseRulePdfAsync(
+            mediaStorageService,
+            createdObjectKey.ObjectKey,
+            pdfBytes,
+            fileName,
+            cancellationToken);
+
+        var mediaAsset = new MediaAsset
+        {
+            Id = Guid.NewGuid(),
+            OwnerUserId = LandlordUserId,
+            BucketName = mediaStorageService.GetBucketName(),
+            ObjectKey = createdObjectKey.ObjectKey,
+            OriginalFileName = fileName,
+            StoredFileName = createdObjectKey.StoredFileName,
+            ContentType = "application/pdf",
+            FileSize = pdfBytes.Length,
+            Scope = MediaScope.RoomingHouseRulePdf,
+            Visibility = MediaVisibility.Private,
+            Status = MediaStatus.Linked,
+            LinkedEntityType = nameof(RoomingHouseRule),
+            LinkedEntityId = ApprovedHouseId,
+            CreatedAt = DateTimeOffset.UtcNow,
+            UpdatedAt = DateTimeOffset.UtcNow
+        };
+
+        context.MediaAssets.Add(mediaAsset);
+        return mediaAsset;
+    }
+
+    private static async Task UploadApprovedHouseRulePdfAsync(
+        IMediaStorageService mediaStorageService,
+        string objectKey,
+        byte[] pdfBytes,
+        string fileName,
+        CancellationToken cancellationToken)
+    {
+        await using var content = new MemoryStream(pdfBytes);
+        await mediaStorageService.UploadAsync(
+            new MediaUploadRequest
+            {
+                Content = content,
+                OriginalFileName = fileName,
+                ContentType = "application/pdf",
+                FileSize = pdfBytes.Length,
+                ObjectKey = objectKey,
+                Visibility = MediaVisibility.Private
+            },
+            cancellationToken);
+    }
+
+    private static UpsertRoomingHouseRuleRequest BuildApprovedHouseRuleRequest()
+    {
+        return new UpsertRoomingHouseRuleRequest
+        {
+            SourceType = RoomingHouseRuleSourceType.FormGenerated.ToString(),
+            GeneralRules = "Giu gin trat tu chung, khong gay on ao, khong tu y cai tao phong.",
+            QuietHours = "Sau 22:30 vui long giam tieng on va khong tu tap dong nguoi.",
+            SecurityPolicy = "Khoa cua, tat dien khi ra khoi phong va bao ngay cho chu tro neu co su co.",
+            CleaningPolicy = "Do rac dung gio, giu ve sinh hanh lang, khu bep va nha tam chung.",
+            GuestPolicy = "Khach o lai qua dem can thong bao truoc cho chu tro.",
+            ParkingPolicy = "De xe dung vi tri quy dinh, khong chan loi di chung.",
+            UtilityPolicy = "Su dung dien, nuoc tiet kiem va khong dau noi thiet bi cong suat lon trai phep.",
+            DamageCompensationPolicy = "Nguoi gay hu hong tai san co trach nhiem boi thuong theo muc do thiet hai.",
+            AdditionalNotes = "Lien he chu tro qua so hotline noi bo neu can ho tro khan cap."
+        };
     }
 
     private static async Task SeedRoomingHouseAsync(
@@ -737,6 +963,216 @@ public static class DevelopmentDataSeed
         {
             await context.SaveChangesAsync(cancellationToken);
         }
+    }
+
+    private static async Task BackfillPublicSeedMediaAsync(
+        AppDbContext context,
+        IMediaStorageService mediaStorageService,
+        IMediaObjectKeyFactory mediaObjectKeyFactory,
+        CancellationToken cancellationToken)
+    {
+        await BackfillRoomingHouseImagesAsync(
+            context,
+            mediaStorageService,
+            mediaObjectKeyFactory,
+            cancellationToken);
+        await BackfillRoomImagesAsync(
+            context,
+            mediaStorageService,
+            mediaObjectKeyFactory,
+            cancellationToken);
+
+        await context.SaveChangesAsync(cancellationToken);
+    }
+
+    private static async Task BackfillRoomingHouseImagesAsync(
+        AppDbContext context,
+        IMediaStorageService mediaStorageService,
+        IMediaObjectKeyFactory mediaObjectKeyFactory,
+        CancellationToken cancellationToken)
+    {
+        var roomingHouses = await context.RoomingHouses
+            .Where(x => x.DeletedAt == null)
+            .Where(x => !context.PropertyImages.Any(pi => pi.RoomingHouseId == x.Id && pi.MediaAssetId.HasValue))
+            .Select(x => new
+            {
+                x.Id,
+                x.Name,
+                x.LandlordUserId,
+                x.CreatedAt
+            })
+            .ToListAsync(cancellationToken);
+
+        if (roomingHouses.Count == 0)
+        {
+            return;
+        }
+
+        var roomingHouseIds = roomingHouses.Select(x => x.Id).ToList();
+        var existingImages = await context.PropertyImages
+            .Where(x => x.RoomingHouseId.HasValue && roomingHouseIds.Contains(x.RoomingHouseId.Value))
+            .OrderByDescending(x => x.IsCover)
+            .ThenBy(x => x.SortOrder)
+            .ThenBy(x => x.CreatedAt)
+            .ToListAsync(cancellationToken);
+
+        foreach (var roomingHouse in roomingHouses)
+        {
+            var propertyImage = existingImages.FirstOrDefault(x => x.RoomingHouseId == roomingHouse.Id)
+                ?? new PropertyImage
+                {
+                    Id = Guid.NewGuid(),
+                    RoomingHouseId = roomingHouse.Id,
+                    Caption = $"Ảnh tổng quan {roomingHouse.Name}",
+                    IsCover = true,
+                    SortOrder = 1,
+                    CreatedAt = roomingHouse.CreatedAt
+                };
+
+            await EnsurePublicPropertyImageMediaAsync(
+                context,
+                mediaStorageService,
+                mediaObjectKeyFactory,
+                roomingHouse.LandlordUserId,
+                propertyImage,
+                MediaScope.RoomingHouseImage,
+                $"seed-rooming-house-{roomingHouse.Id:N}-cover.png",
+                roomingHouse.CreatedAt,
+                cancellationToken);
+        }
+    }
+
+    private static async Task BackfillRoomImagesAsync(
+        AppDbContext context,
+        IMediaStorageService mediaStorageService,
+        IMediaObjectKeyFactory mediaObjectKeyFactory,
+        CancellationToken cancellationToken)
+    {
+        var rooms = await context.Rooms
+            .Where(x => x.DeletedAt == null)
+            .Where(x => !context.PropertyImages.Any(pi => pi.RoomId == x.Id && pi.MediaAssetId.HasValue))
+            .Select(x => new
+            {
+                x.Id,
+                x.RoomNumber,
+                x.CreatedAt,
+                x.RoomingHouseId,
+                LandlordUserId = x.RoomingHouse.LandlordUserId
+            })
+            .ToListAsync(cancellationToken);
+
+        if (rooms.Count == 0)
+        {
+            return;
+        }
+
+        var roomIds = rooms.Select(x => x.Id).ToList();
+        var existingImages = await context.PropertyImages
+            .Where(x => x.RoomId.HasValue && roomIds.Contains(x.RoomId.Value))
+            .OrderByDescending(x => x.IsCover)
+            .ThenBy(x => x.SortOrder)
+            .ThenBy(x => x.CreatedAt)
+            .ToListAsync(cancellationToken);
+
+        foreach (var room in rooms)
+        {
+            var propertyImage = existingImages.FirstOrDefault(x => x.RoomId == room.Id)
+                ?? new PropertyImage
+                {
+                    Id = Guid.NewGuid(),
+                    RoomId = room.Id,
+                    Caption = $"Phòng {room.RoomNumber}",
+                    IsCover = true,
+                    SortOrder = 1,
+                    CreatedAt = room.CreatedAt
+                };
+
+            await EnsurePublicPropertyImageMediaAsync(
+                context,
+                mediaStorageService,
+                mediaObjectKeyFactory,
+                room.LandlordUserId,
+                propertyImage,
+                MediaScope.RoomImage,
+                $"seed-room-{room.Id:N}-cover.png",
+                room.CreatedAt,
+                cancellationToken);
+        }
+    }
+
+    private static async Task EnsurePublicPropertyImageMediaAsync(
+        AppDbContext context,
+        IMediaStorageService mediaStorageService,
+        IMediaObjectKeyFactory mediaObjectKeyFactory,
+        Guid ownerUserId,
+        PropertyImage propertyImage,
+        MediaScope scope,
+        string fileName,
+        DateTimeOffset createdAt,
+        CancellationToken cancellationToken)
+    {
+        if (propertyImage.MediaAssetId.HasValue)
+        {
+            propertyImage.ImageUrl = PublicMediaPathBuilder.Build(propertyImage.MediaAssetId.Value);
+            return;
+        }
+
+        var objectKey = mediaObjectKeyFactory.Create(scope, MediaVisibility.Public, fileName);
+        var storedObject = await UploadPlaceholderImageAsync(
+            mediaStorageService,
+            objectKey.ObjectKey,
+            fileName,
+            cancellationToken);
+        var mediaAssetId = Guid.NewGuid();
+
+        context.MediaAssets.Add(new MediaAsset
+        {
+            Id = mediaAssetId,
+            OwnerUserId = ownerUserId,
+            BucketName = storedObject.BucketName,
+            ObjectKey = storedObject.ObjectKey,
+            OriginalFileName = fileName,
+            StoredFileName = storedObject.StoredFileName,
+            ContentType = "image/png",
+            FileSize = PlaceholderImageBytes.Length,
+            Scope = scope,
+            Visibility = MediaVisibility.Public,
+            Status = MediaStatus.Linked,
+            LinkedEntityType = nameof(PropertyImage),
+            LinkedEntityId = propertyImage.Id,
+            CreatedAt = createdAt,
+            UpdatedAt = createdAt
+        });
+
+        if (context.Entry(propertyImage).State == EntityState.Detached)
+        {
+            context.PropertyImages.Add(propertyImage);
+        }
+
+        propertyImage.MediaAssetId = mediaAssetId;
+        propertyImage.ImageUrl = PublicMediaPathBuilder.Build(mediaAssetId);
+        propertyImage.IsCover = true;
+        propertyImage.SortOrder = propertyImage.SortOrder <= 0 ? 1 : propertyImage.SortOrder;
+    }
+
+    private static async Task<MediaStoredObjectResult> UploadPlaceholderImageAsync(
+        IMediaStorageService mediaStorageService,
+        string objectKey,
+        string fileName,
+        CancellationToken cancellationToken)
+    {
+        await using var content = new MemoryStream(PlaceholderImageBytes, writable: false);
+        return await mediaStorageService.UploadAsync(
+            new MediaUploadRequest
+            {
+                Content = content,
+                OriginalFileName = fileName,
+                ContentType = "image/png",
+                FileSize = PlaceholderImageBytes.Length,
+                ObjectKey = objectKey,
+                Visibility = MediaVisibility.Public
+            },
+            cancellationToken);
     }
 
     private static User CreateUser(

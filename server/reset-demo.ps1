@@ -2,7 +2,7 @@
 # Reset the local database back to the demo scenario from a completely clean schema.
 
 param(
-    [string]$TargetMigration = "20260623120000_DemoFullFlowDataset",
+    [string]$TargetMigration = "20260714092159_FinalizeMediaSchemaCleanup",
     [int]$ApiPort = 5294,
     [switch]$ClearUploads,
     [switch]$SkipApiStart

@@ -1,9 +1,11 @@
+using Microsoft.EntityFrameworkCore;
 using System.Threading.RateLimiting;
 using Microsoft.AspNetCore.RateLimiting;
 using SmartRentalPlatform.Api.Extensions;
 using SmartRentalPlatform.Api.Middlewares;
 using SmartRentalPlatform.Application;
 using SmartRentalPlatform.Application.Common.Interfaces;
+using SmartRentalPlatform.Application.Common.Interfaces.Media;
 using SmartRentalPlatform.Infrastructure;
 using SmartRentalPlatform.Infrastructure.Persistence;
 using SmartRentalPlatform.Infrastructure.Persistence.Seed;
@@ -59,13 +61,21 @@ builder.Services.AddInfrastructure(builder.Configuration);
 
 var app = builder.Build();
 
+await ApplyDevelopmentDatabaseMigrationsAsync(app);
+
 if (ShouldSeedDevelopmentData(app))
 {
     await using var scope = app.Services.CreateAsyncScope();
     var dbContext = scope.ServiceProvider.GetRequiredService<AppDbContext>();
     var passwordService = scope.ServiceProvider.GetRequiredService<IPasswordService>();
+    var mediaStorageService = scope.ServiceProvider.GetRequiredService<IMediaStorageService>();
+    var mediaObjectKeyFactory = scope.ServiceProvider.GetRequiredService<IMediaObjectKeyFactory>();
     await DevelopmentDataSeed.SeedAdminAsync(dbContext, passwordService);
-    await DevelopmentDataSeed.SeedAsync(dbContext, passwordService);
+    await DevelopmentDataSeed.SeedAsync(
+        dbContext,
+        passwordService,
+        mediaStorageService,
+        mediaObjectKeyFactory);
 }
 
 if (ShouldSeedWalletQaData(app))
@@ -148,6 +158,18 @@ static bool ShouldSeedDevelopmentData(WebApplication app)
 {
     return app.Environment.IsDevelopment() &&
         app.Configuration.GetValue("SeedData:Development:Enabled", false);
+}
+
+static async Task ApplyDevelopmentDatabaseMigrationsAsync(WebApplication app)
+{
+    if (!app.Environment.IsDevelopment())
+    {
+        return;
+    }
+
+    await using var scope = app.Services.CreateAsyncScope();
+    var dbContext = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+    await dbContext.Database.MigrateAsync();
 }
 
 static bool ShouldSeedWalletQaData(WebApplication app)

@@ -163,6 +163,70 @@ public class RoomingHouseMediaServiceTests : IDisposable
     }
 
     [Fact]
+    public async Task UpdateImagesAsync_ShouldDeletePreviousMediaAssets_WhenReplacingImages()
+    {
+        var landlord = TestDataBuilder.BuildUser(email: "house-image-replace@unit.test", displayName: "House Image Replace");
+        var house = TestDataBuilder.BuildRoomingHouse(landlord.Id, status: RoomingHouseApprovalStatus.Draft);
+        var firstAssetIds = new[] { Guid.NewGuid(), Guid.NewGuid(), Guid.NewGuid() };
+        var secondAssetIds = new[] { Guid.NewGuid(), Guid.NewGuid(), Guid.NewGuid() };
+
+        _fixture.Context.Users.Add(landlord);
+        _fixture.Context.RoomingHouses.Add(house);
+        _fixture.Context.MediaAssets.AddRange(
+            BuildPublicImageAsset(firstAssetIds[0], landlord.Id, "public/rooming-house-images/first-cover.jpg", MediaScope.RoomingHouseImage),
+            BuildPublicImageAsset(firstAssetIds[1], landlord.Id, "public/rooming-house-images/first-second.jpg", MediaScope.RoomingHouseImage),
+            BuildPublicImageAsset(firstAssetIds[2], landlord.Id, "public/rooming-house-images/first-third.jpg", MediaScope.RoomingHouseImage),
+            BuildPublicImageAsset(secondAssetIds[0], landlord.Id, "public/rooming-house-images/second-cover.jpg", MediaScope.RoomingHouseImage),
+            BuildPublicImageAsset(secondAssetIds[1], landlord.Id, "public/rooming-house-images/second-second.jpg", MediaScope.RoomingHouseImage),
+            BuildPublicImageAsset(secondAssetIds[2], landlord.Id, "public/rooming-house-images/second-third.jpg", MediaScope.RoomingHouseImage));
+        await _fixture.Context.SaveChangesAsync();
+
+        var service = new RoomingHouseMediaService(
+            _fixture.Context,
+            new FakeRoomingHouseQueryService(_fixture.Context));
+
+        await service.UpdateImagesAsync(
+            house.Id,
+            new UpdatePropertyImagesRequest
+            {
+                Images =
+                [
+                    new UpdatePropertyImageItemRequest { MediaAssetId = firstAssetIds[0], IsCover = true, SortOrder = 0 },
+                    new UpdatePropertyImageItemRequest { MediaAssetId = firstAssetIds[1], IsCover = false, SortOrder = 1 },
+                    new UpdatePropertyImageItemRequest { MediaAssetId = firstAssetIds[2], IsCover = false, SortOrder = 2 }
+                ]
+            });
+
+        var result = await service.UpdateImagesAsync(
+            house.Id,
+            new UpdatePropertyImagesRequest
+            {
+                Images =
+                [
+                    new UpdatePropertyImageItemRequest { MediaAssetId = secondAssetIds[0], IsCover = true, SortOrder = 0 },
+                    new UpdatePropertyImageItemRequest { MediaAssetId = secondAssetIds[1], IsCover = false, SortOrder = 1 },
+                    new UpdatePropertyImageItemRequest { MediaAssetId = secondAssetIds[2], IsCover = false, SortOrder = 2 }
+                ]
+            });
+
+        Assert.NotNull(result);
+        Assert.Equal(secondAssetIds, result!.Images.OrderBy(x => x.SortOrder).Select(x => x.MediaAssetId).Cast<Guid>().ToArray());
+
+        var retiredAssets = await _fixture.Context.MediaAssets
+            .Where(x => firstAssetIds.Contains(x.Id))
+            .ToListAsync();
+
+        Assert.Equal(3, retiredAssets.Count);
+        Assert.All(retiredAssets, asset =>
+        {
+            Assert.Equal(MediaStatus.Deleted, asset.Status);
+            Assert.NotNull(asset.DeletedAt);
+            Assert.Null(asset.LinkedEntityType);
+            Assert.Null(asset.LinkedEntityId);
+        });
+    }
+
+    [Fact]
     public async Task UpdateLegalDocumentAsync_ShouldLinkMediaAssetsAndReturnPrivateUrls()
     {
         var landlord = TestDataBuilder.BuildUser(email: "legal-owner@unit.test", displayName: "Legal Owner");

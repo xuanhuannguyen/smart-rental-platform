@@ -1,7 +1,9 @@
 using Microsoft.AspNetCore.Http;
 using Microsoft.EntityFrameworkCore;
+using SmartRentalPlatform.Application.Common.Exceptions;
 using SmartRentalPlatform.Application.Common.Interfaces;
 using SmartRentalPlatform.Application.Kyc;
+using SmartRentalPlatform.Contracts.Common;
 using SmartRentalPlatform.Application.Rooms;
 using SmartRentalPlatform.Application.Users;
 using SmartRentalPlatform.Contracts.Kyc.Requests;
@@ -108,6 +110,48 @@ public class MediaMigrationRegressionTests : IDisposable
             Assert.Equal(MediaVisibility.Private, x.Visibility);
             Assert.Equal(MediaStatus.Linked, x.Status);
         });
+    }
+
+    [Fact]
+    public async Task KycSubmit_ShouldRejectMediaAssetsWithWrongScopeOrVisibility()
+    {
+        var context = _fixture.Context;
+        var user = TestDataBuilder.BuildUser(email: "media-migration-kyc-invalid@unit.test", displayName: "Media Migration Kyc Invalid");
+        context.Users.Add(user);
+        await context.SaveChangesAsync();
+
+        var frontAsset = BuildKycMediaAsset(user.Id, "front-invalid.jpg");
+        var backAsset = BuildKycMediaAsset(user.Id, "back-invalid.jpg");
+        var selfieAsset = BuildKycMediaAsset(user.Id, "selfie-invalid.jpg");
+        selfieAsset.Scope = MediaScope.Avatar;
+        selfieAsset.Visibility = MediaVisibility.Public;
+
+        context.MediaAssets.AddRange(frontAsset, backAsset, selfieAsset);
+        await context.SaveChangesAsync();
+
+        var service = new KycService(
+            context,
+            new FakeVnptEkycClient(),
+            new FakeHashService(),
+            new FakeMediaAccessService(),
+            new FakeSensitiveDataProtector());
+
+        var exception = await Assert.ThrowsAsync<KycBusinessException>(() =>
+            service.SubmitAsync(
+                user.Id,
+                new SubmitKycRequest
+                {
+                    DocumentType = KycDocumentType.CCCD.ToString(),
+                    SelfieCaptureMethod = SelfieCaptureMethod.Upload.ToString(),
+                    FrontMediaAssetId = frontAsset.Id,
+                    BackMediaAssetId = backAsset.Id,
+                    SelfieMediaAssetId = selfieAsset.Id
+                },
+                CancellationToken.None));
+
+        Assert.Equal(ErrorCodes.ValidationError, exception.ErrorCode);
+        Assert.Empty(context.KycVerifications.Where(x => x.UserId == user.Id));
+        Assert.All(context.MediaAssets.Where(x => x.OwnerUserId == user.Id), x => Assert.Equal(MediaStatus.Uploaded, x.Status));
     }
 
     [Fact]

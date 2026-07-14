@@ -2578,6 +2578,14 @@ public class ContractAppendixService : IContractAppendixService
                 new { mediaAssetId = requestedMediaAssetId });
         }
 
+        EnsureContractOccupantDocumentAssetIsReusable(
+            mediaAsset,
+            ownerUserId,
+            scope,
+            visibility,
+            linkedEntityType,
+            linkedEntityId);
+
         if (existingMediaAssetId.HasValue && existingMediaAssetId != mediaAsset?.Id)
         {
             var currentLinkedAsset = await context.MediaAssets
@@ -2602,6 +2610,54 @@ public class ContractAppendixService : IContractAppendixService
         mediaAsset.UpdatedAt = now;
 
         return mediaAsset;
+    }
+
+    private static void EnsureContractOccupantDocumentAssetIsReusable(
+        MediaAsset mediaAsset,
+        Guid ownerUserId,
+        MediaScope expectedScope,
+        MediaVisibility expectedVisibility,
+        string linkedEntityType,
+        Guid linkedEntityId)
+    {
+        if (mediaAsset.OwnerUserId.HasValue && mediaAsset.OwnerUserId.Value != ownerUserId)
+        {
+            throw new BadRequestException(
+                ErrorCodes.ImageInvalidOwner,
+                "Bạn không có quyền sử dụng media asset giấy tờ này.",
+                new { mediaAssetId = mediaAsset.Id });
+        }
+
+        if (mediaAsset.Scope != expectedScope || mediaAsset.Visibility != expectedVisibility)
+        {
+            throw new BadRequestException(
+                ErrorCodes.ValidationError,
+                "Media asset không phù hợp với giấy tờ tùy thân.",
+                new { mediaAssetId = mediaAsset.Id, expectedScope = expectedScope.ToString() });
+        }
+
+        if (mediaAsset.Status is MediaStatus.PendingUpload or MediaStatus.Deleted)
+        {
+            throw new BadRequestException(
+                ErrorCodes.ValidationError,
+                "Media asset giấy tờ chưa sẵn sàng để liên kết.",
+                new { mediaAssetId = mediaAsset.Id, status = mediaAsset.Status.ToString() });
+        }
+
+        if (mediaAsset.Status == MediaStatus.Linked &&
+            (!string.Equals(mediaAsset.LinkedEntityType, linkedEntityType, StringComparison.Ordinal) ||
+             mediaAsset.LinkedEntityId != linkedEntityId))
+        {
+            throw new BadRequestException(
+                ErrorCodes.ValidationError,
+                "Media asset giấy tờ đã được liên kết với bản ghi khác.",
+                new
+                {
+                    mediaAssetId = mediaAsset.Id,
+                    currentLinkedEntityType = mediaAsset.LinkedEntityType,
+                    currentLinkedEntityId = mediaAsset.LinkedEntityId
+                });
+        }
     }
 
     private static string NormalizeFieldName(string? value)

@@ -216,11 +216,18 @@ public class UserService : IUserService
         user.PhoneNumber = request.PhoneNumber?.Trim();
 
         var now = DateTimeOffset.UtcNow;
+        var previousAvatarMediaAssetId = user.AvatarMediaAssetId;
         user.AvatarMediaAssetId = await ResolveAvatarMediaAssetAsync(
             userId,
             request.AvatarMediaAssetId,
             now,
             cancellationToken);
+        if (previousAvatarMediaAssetId.HasValue &&
+            previousAvatarMediaAssetId.Value != user.AvatarMediaAssetId)
+        {
+            await RetireAvatarMediaAssetAsync(previousAvatarMediaAssetId.Value, userId, now, cancellationToken);
+        }
+
         if (user.AvatarMediaAssetId.HasValue)
         {
             user.AvatarUrl = null;
@@ -319,6 +326,14 @@ public class UserService : IUserService
                 "Media asset được chọn không phải avatar hợp lệ.");
         }
 
+        if (mediaAsset.Visibility != MediaVisibility.Public ||
+            mediaAsset.Status is MediaStatus.PendingUpload or MediaStatus.Deleted)
+        {
+            throw new BadRequestException(
+                ErrorCodes.ValidationError,
+                "Avatar media asset chưa sẵn sàng để sử dụng.");
+        }
+
         if (mediaAsset.OwnerUserId.HasValue && mediaAsset.OwnerUserId.Value != userId)
         {
             throw new ForbiddenException(
@@ -332,9 +347,40 @@ public class UserService : IUserService
         mediaAsset.Status = MediaStatus.Linked;
         mediaAsset.LinkedEntityType = nameof(User);
         mediaAsset.LinkedEntityId = userId;
+        mediaAsset.DeletedAt = null;
         mediaAsset.UpdatedAt = now;
 
         return mediaAsset.Id;
+    }
+
+    private async Task RetireAvatarMediaAssetAsync(
+        Guid avatarMediaAssetId,
+        Guid userId,
+        DateTimeOffset now,
+        CancellationToken cancellationToken)
+    {
+        var mediaAsset = await _dbContext.MediaAssets
+            .FirstOrDefaultAsync(x => x.Id == avatarMediaAssetId, cancellationToken);
+
+        if (mediaAsset is null || mediaAsset.Scope != MediaScope.Avatar)
+        {
+            return;
+        }
+
+        var belongsToUser =
+            mediaAsset.OwnerUserId == userId ||
+            (mediaAsset.LinkedEntityType == nameof(User) && mediaAsset.LinkedEntityId == userId);
+
+        if (!belongsToUser)
+        {
+            return;
+        }
+
+        mediaAsset.LinkedEntityType = null;
+        mediaAsset.LinkedEntityId = null;
+        mediaAsset.Status = MediaStatus.Deleted;
+        mediaAsset.DeletedAt = now;
+        mediaAsset.UpdatedAt = now;
     }
 
     private static string? NormalizeOptionalText(string? value)

@@ -6,7 +6,7 @@ using SmartRentalPlatform.Domain.Entities.Properties;
 
 namespace SmartRentalPlatform.Application.RoomingHouses;
 
-internal static class RoomingHouseRulePdfGenerator
+public static class RoomingHouseRulePdfGenerator
 {
     public static Stream Generate(RoomingHouse house, UpsertRoomingHouseRuleRequest request)
     {

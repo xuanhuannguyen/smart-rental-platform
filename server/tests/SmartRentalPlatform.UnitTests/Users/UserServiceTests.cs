@@ -60,6 +60,77 @@ public class UserServiceTests : IDisposable
     }
 
     [Fact]
+    public async Task UpdateUserProfileAsync_ShouldDeletePreviousAvatar_WhenReplacingAvatar()
+    {
+        var user = TestDataBuilder.BuildUser(email: "avatar-replace@unit.test", displayName: "Avatar Replace");
+        var previousAvatar = new MediaAsset
+        {
+            Id = Guid.NewGuid(),
+            OwnerUserId = user.Id,
+            BucketName = "test-bucket",
+            ObjectKey = "public/avatars/2026/07/14/avatar-old.jpg",
+            OriginalFileName = "avatar-old.jpg",
+            StoredFileName = "avatar-old.jpg",
+            ContentType = "image/jpeg",
+            FileSize = 1200,
+            Scope = MediaScope.Avatar,
+            Visibility = MediaVisibility.Public,
+            Status = MediaStatus.Linked,
+            LinkedEntityType = nameof(SmartRentalPlatform.Domain.Entities.Users.User),
+            LinkedEntityId = user.Id,
+            CreatedAt = DateTimeOffset.UtcNow,
+            UpdatedAt = DateTimeOffset.UtcNow
+        };
+        var nextAvatar = new MediaAsset
+        {
+            Id = Guid.NewGuid(),
+            OwnerUserId = user.Id,
+            BucketName = "test-bucket",
+            ObjectKey = "public/avatars/2026/07/14/avatar-new.jpg",
+            OriginalFileName = "avatar-new.jpg",
+            StoredFileName = "avatar-new.jpg",
+            ContentType = "image/jpeg",
+            FileSize = 1300,
+            Scope = MediaScope.Avatar,
+            Visibility = MediaVisibility.Public,
+            Status = MediaStatus.Uploaded,
+            CreatedAt = DateTimeOffset.UtcNow,
+            UpdatedAt = DateTimeOffset.UtcNow
+        };
+
+        user.AvatarMediaAssetId = previousAvatar.Id;
+        user.AvatarUrl = null;
+
+        _fixture.Context.Users.Add(user);
+        _fixture.Context.MediaAssets.AddRange(previousAvatar, nextAvatar);
+        await _fixture.Context.SaveChangesAsync();
+
+        var service = CreateService(user.Id);
+
+        var result = await service.UpdateUserProfileAsync(
+            new UpdateUserProfileRequest
+            {
+                DisplayName = "Avatar Replace Updated",
+                AvatarMediaAssetId = nextAvatar.Id
+            });
+
+        var refreshedPreviousAvatar = _fixture.Context.MediaAssets.Single(x => x.Id == previousAvatar.Id);
+        var refreshedNextAvatar = _fixture.Context.MediaAssets.Single(x => x.Id == nextAvatar.Id);
+
+        Assert.Equal(nextAvatar.Id, result.AvatarMediaAssetId);
+        Assert.Equal($"/api/media/public/{nextAvatar.Id:D}", result.AvatarUrl);
+
+        Assert.Equal(MediaStatus.Deleted, refreshedPreviousAvatar.Status);
+        Assert.NotNull(refreshedPreviousAvatar.DeletedAt);
+        Assert.Null(refreshedPreviousAvatar.LinkedEntityType);
+        Assert.Null(refreshedPreviousAvatar.LinkedEntityId);
+
+        Assert.Equal(MediaStatus.Linked, refreshedNextAvatar.Status);
+        Assert.Equal(nameof(SmartRentalPlatform.Domain.Entities.Users.User), refreshedNextAvatar.LinkedEntityType);
+        Assert.Equal(user.Id, refreshedNextAvatar.LinkedEntityId);
+    }
+
+    [Fact]
     public async Task UpdateUserProfileAsync_ShouldThrowBadRequest_WhenAvatarMediaAssetHasWrongScope()
     {
         var user = TestDataBuilder.BuildUser(email: "avatar-invalid@unit.test", displayName: "Avatar Invalid");

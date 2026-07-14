@@ -1,5 +1,6 @@
 using System.Reflection;
 using System.Text;
+using SmartRentalPlatform.Application.Common.Exceptions;
 using SmartRentalPlatform.Application.Common.Interfaces;
 using SmartRentalPlatform.Application.Common.Interfaces.Media;
 using SmartRentalPlatform.Application.Common.Models.Media;
@@ -34,17 +35,9 @@ public class ContractAppendixServiceTests : IClassFixture<TestDatabaseFixture>
     {
         var appendix = await SeedAppendixGraphAsync();
         var mediaStorage = new RecordingMediaStorageService();
-        var service = new ContractAppendixService(
-            fixture.Context,
-            new FakeContractSignatureOtpService(),
-            new FakeContractPdfRenderer(),
-            new QueueMediaObjectKeyFactory(
-                "private/contract-appendix-pdfs/2026/07/10/raw.pdf",
-                "private/contract-appendix-pdfs/2026/07/10/masked.pdf"),
-            mediaStorage,
-            new MediaAssetService(fixture.Context),
-            new FakeHashService(),
-            new FakeSensitiveDataProtector());
+        var service = CreateService(new QueueMediaObjectKeyFactory(
+            "private/contract-appendix-pdfs/2026/07/10/raw.pdf",
+            "private/contract-appendix-pdfs/2026/07/10/masked.pdf"), mediaStorage);
 
         await InvokeGenerateAppendixFileAsync(service, appendix, DateTimeOffset.UtcNow);
         await fixture.Context.SaveChangesAsync();
@@ -61,6 +54,48 @@ public class ContractAppendixServiceTests : IClassFixture<TestDatabaseFixture>
         Assert.Equal(2, fixture.Context.MediaAssets.Count());
         Assert.All(fixture.Context.MediaAssets, x => Assert.Equal(MediaScope.ContractAppendixPdf, x.Scope));
         Assert.Equal(2, mediaStorage.UploadRequests.Count);
+    }
+
+    [Fact]
+    public async Task ResolveLinkedMediaAssetAsync_ShouldRejectAssetAlreadyLinkedToAnotherEntity()
+    {
+        var ownerUserId = Guid.NewGuid();
+        var mediaAsset = new MediaAsset
+        {
+            Id = Guid.NewGuid(),
+            OwnerUserId = ownerUserId,
+            BucketName = "local-media",
+            ObjectKey = "private/kyc-documents/2026/07/14/linked-front.jpg",
+            OriginalFileName = "linked-front.jpg",
+            StoredFileName = "linked-front.jpg",
+            ContentType = "image/jpeg",
+            FileSize = 256,
+            Scope = MediaScope.KycDocument,
+            Visibility = MediaVisibility.Private,
+            Status = MediaStatus.Linked,
+            LinkedEntityType = nameof(KycVerification),
+            LinkedEntityId = Guid.NewGuid(),
+            CreatedAt = DateTimeOffset.UtcNow,
+            UpdatedAt = DateTimeOffset.UtcNow
+        };
+
+        fixture.Context.MediaAssets.Add(mediaAsset);
+        await fixture.Context.SaveChangesAsync();
+
+        var service = CreateService();
+        var exception = await Assert.ThrowsAsync<BadRequestException>(() =>
+            InvokeResolveLinkedMediaAssetAsync(
+                service,
+                mediaAsset.Id,
+                null,
+                ownerUserId,
+                MediaScope.KycDocument,
+                MediaVisibility.Private,
+                nameof(ContractOccupantDocument),
+                Guid.NewGuid(),
+                DateTimeOffset.UtcNow));
+
+        Assert.Equal("VALIDATION_ERROR", exception.ErrorCode);
     }
 
     private async Task<ContractAppendix> SeedAppendixGraphAsync()
@@ -173,6 +208,42 @@ public class ContractAppendixServiceTests : IClassFixture<TestDatabaseFixture>
 
         var task = (Task)method!.Invoke(service, [appendix, now, CancellationToken.None])!;
         await task;
+    }
+
+    private static async Task<MediaAsset> InvokeResolveLinkedMediaAssetAsync(
+        ContractAppendixService service,
+        Guid requestedMediaAssetId,
+        Guid? existingMediaAssetId,
+        Guid ownerUserId,
+        MediaScope scope,
+        MediaVisibility visibility,
+        string linkedEntityType,
+        Guid linkedEntityId,
+        DateTimeOffset now)
+    {
+        var method = typeof(ContractAppendixService).GetMethod(
+            "ResolveLinkedMediaAssetAsync",
+            BindingFlags.Instance | BindingFlags.NonPublic);
+
+        Assert.NotNull(method);
+
+        var task = (Task<MediaAsset>)method!.Invoke(service, [requestedMediaAssetId, existingMediaAssetId, ownerUserId, scope, visibility, linkedEntityType, linkedEntityId, now, CancellationToken.None])!;
+        return await task;
+    }
+
+    private ContractAppendixService CreateService(
+        IMediaObjectKeyFactory? mediaObjectKeyFactory = null,
+        IMediaStorageService? mediaStorageService = null)
+    {
+        return new ContractAppendixService(
+            fixture.Context,
+            new FakeContractSignatureOtpService(),
+            new FakeContractPdfRenderer(),
+            mediaObjectKeyFactory ?? new QueueMediaObjectKeyFactory(),
+            mediaStorageService ?? new RecordingMediaStorageService(),
+            new MediaAssetService(fixture.Context),
+            new FakeHashService(),
+            new FakeSensitiveDataProtector());
     }
 
     private sealed class FakeContractSignatureOtpService : IContractSignatureOtpService

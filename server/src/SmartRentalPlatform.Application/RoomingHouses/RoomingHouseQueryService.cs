@@ -3,6 +3,7 @@ using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging;
 using SmartRentalPlatform.Application.Common.Exceptions;
 using SmartRentalPlatform.Application.Common.Interfaces;
+using SmartRentalPlatform.Application.Common.Media;
 using SmartRentalPlatform.Application.RoomingHouses.Search;
 using SmartRentalPlatform.Contracts.Amenities;
 using SmartRentalPlatform.Contracts.Common;
@@ -122,23 +123,24 @@ public class RoomingHouseQueryService : IRoomingHouseQueryService
     public async Task<List<RoomingHouseListingResponse>> GetPublicListingAsync(
         CancellationToken cancellationToken = default)
     {
-        return await context.RoomingHouses
+        var rawItems = await context.RoomingHouses
             .AsNoTracking()
             .Where(x => x.DeletedAt == null &&
                         x.ApprovalStatus == RoomingHouseApprovalStatus.Approved &&
                         x.VisibilityStatus == RoomingHouseVisibilityStatus.Visible &&
                         x.Rooms.Any(r => r.Status == RoomStatus.Available && r.DeletedAt == null))
             .OrderByDescending(x => x.CreatedAt)
-            .Select(x => new RoomingHouseListingResponse
+            .Select(x => new
             {
-                Id = x.Id,
-                Name = x.Name,
+                x.Id,
+                x.Name,
                 AddressDisplay = x.Ward != null && x.Province != null
                     ? x.AddressLine + ", " + x.Ward.Name + ", " + x.Province.Name
                     : x.AddressDisplay,
-                CoverImageUrl = x.Images
+                CoverImageMediaAssetId = x.Images
+                    .Where(i => i.MediaAssetId.HasValue)
                     .OrderBy(i => i.SortOrder)
-                    .Select(i => i.ImageUrl)
+                    .Select(i => i.MediaAssetId)
                     .FirstOrDefault(),
                 AvailableRooms = x.Rooms.Count(r => r.Status == RoomStatus.Available && r.DeletedAt == null),
                 MinMonthlyRent = x.Rooms
@@ -170,9 +172,28 @@ public class RoomingHouseQueryService : IRoomingHouseQueryService
                         IconCode = a.Amenity.IconCode
                     })
                     .ToList(),
-                CreatedAt = x.CreatedAt
+                x.CreatedAt
             })
             .ToListAsync(cancellationToken);
+
+        return rawItems
+            .Select(x => new RoomingHouseListingResponse
+            {
+                Id = x.Id,
+                Name = x.Name,
+                AddressDisplay = x.AddressDisplay,
+                CoverImageUrl = x.CoverImageMediaAssetId.HasValue
+                    ? PublicMediaPathBuilder.Build(x.CoverImageMediaAssetId.Value)
+                    : null,
+                AvailableRooms = x.AvailableRooms,
+                MinMonthlyRent = x.MinMonthlyRent,
+                MaxMonthlyRent = x.MaxMonthlyRent,
+                MinAreaM2 = x.MinAreaM2,
+                MaxAreaM2 = x.MaxAreaM2,
+                Amenities = x.Amenities,
+                CreatedAt = x.CreatedAt
+            })
+            .ToList();
     }
 
     public async Task<PagedResult<RoomingHouseSearchItemResponse>> SearchPublicAsync(
@@ -261,7 +282,7 @@ public class RoomingHouseQueryService : IRoomingHouseQueryService
                 CreatedAt = x.CreatedAt,
                 ProvinceName = x.Province.Name,
                 WardName = x.Ward.Name,
-                ImageCount = x.Images.Count,
+                ImageCount = x.Images.Count(i => i.MediaAssetId.HasValue),
                 HasVerifiedKyc = x.Landlord.KycVerifications.Any(k => k.Status == KycVerificationStatus.Approved),
                 ReviewedAt = x.ReviewedAt,
                 HouseAmenities = x.RoomingHouseAmenities
@@ -291,7 +312,7 @@ public class RoomingHouseQueryService : IRoomingHouseQueryService
                                 Name = ra.Amenity.Name
                             })
                             .ToList(),
-                        ImageCount = r.Images.Count
+                        ImageCount = r.Images.Count(i => i.MediaAssetId.HasValue)
                     })
                     .ToList()
             })
@@ -342,18 +363,19 @@ public class RoomingHouseQueryService : IRoomingHouseQueryService
             var rawItems = await context.RoomingHouses
                 .AsNoTracking()
                 .Where(x => pageItemIds.Contains(x.Id))
-                .Select(x => new RoomingHouseSearchItemResponse
+                .Select(x => new
                 {
-                    Id = x.Id,
-                    Name = x.Name,
+                    x.Id,
+                    x.Name,
                     AddressDisplay = x.Ward != null && x.Province != null
                         ? x.AddressLine + ", " + x.Ward.Name + ", " + x.Province.Name
                         : x.AddressDisplay,
-                    Latitude = x.Latitude,
-                    Longitude = x.Longitude,
-                    CoverImageUrl = x.Images
+                    x.Latitude,
+                    x.Longitude,
+                    CoverImageMediaAssetId = x.Images
+                        .Where(i => i.MediaAssetId.HasValue)
                         .OrderBy(i => i.SortOrder)
-                        .Select(i => i.ImageUrl)
+                        .Select(i => i.MediaAssetId)
                         .FirstOrDefault(),
                     AvailableRooms = x.Rooms.Count(r => r.Status == RoomStatus.Available && r.DeletedAt == null),
                     TotalRooms = x.Rooms.Count(r => r.DeletedAt == null),
@@ -390,8 +412,30 @@ public class RoomingHouseQueryService : IRoomingHouseQueryService
                 })
                 .ToListAsync(cancellationToken);
 
+            var materializedItems = rawItems
+                .Select(x => new RoomingHouseSearchItemResponse
+                {
+                    Id = x.Id,
+                    Name = x.Name,
+                    AddressDisplay = x.AddressDisplay,
+                    Latitude = x.Latitude,
+                    Longitude = x.Longitude,
+                    CoverImageUrl = x.CoverImageMediaAssetId.HasValue
+                        ? PublicMediaPathBuilder.Build(x.CoverImageMediaAssetId.Value)
+                        : null,
+                    AvailableRooms = x.AvailableRooms,
+                    TotalRooms = x.TotalRooms,
+                    MinMonthlyRent = x.MinMonthlyRent,
+                    MaxMonthlyRent = x.MaxMonthlyRent,
+                    MinAreaM2 = x.MinAreaM2,
+                    MaxAreaM2 = x.MaxAreaM2,
+                    Amenities = x.Amenities,
+                    CreatedAt = x.CreatedAt
+                })
+                .ToList();
+
             // Restore DistanceKm into the items and re-sort to match scored order
-            foreach (var item in rawItems)
+            foreach (var item in materializedItems)
             {
                 if (distanceByHouseId.TryGetValue(item.Id, out var distance))
                 {
@@ -402,7 +446,7 @@ public class RoomingHouseQueryService : IRoomingHouseQueryService
             var idOrder = pagedCandidates
                 .Select((c, i) => (c.Id, Index: i))
                 .ToDictionary(x => x.Id, x => x.Index);
-            pageItems = rawItems
+            pageItems = materializedItems
                 .OrderBy(x => idOrder.GetValueOrDefault(x.Id, int.MaxValue))
                 .ToList();
         }

@@ -288,6 +288,12 @@ public class KycService : IKycService
         if (asset == null || asset.OwnerUserId != userId)
             throw new KycBusinessException(ErrorCodes.ValidationError, "Invalid or unauthorized media asset.", 400);
 
+        if (asset.Scope != MediaScope.KycDocument || asset.Visibility != MediaVisibility.Private)
+            throw new KycBusinessException(ErrorCodes.ValidationError, "Media asset must be a private KYC document.", 400);
+
+        if (asset.DeletedAt.HasValue)
+            throw new KycBusinessException(ErrorCodes.ValidationError, "Media asset is no longer available.", 400);
+
         if (asset.Status != MediaStatus.Uploaded)
             throw new KycBusinessException(ErrorCodes.ValidationError, "Media asset must be in Uploaded status to be submitted.", 400);
 
@@ -296,6 +302,9 @@ public class KycService : IKycService
 
     private void LinkMediaAsset(MediaAsset asset, Guid kycId)
     {
+        asset.Scope = MediaScope.KycDocument;
+        asset.Visibility = MediaVisibility.Private;
+        asset.DeletedAt = null;
         asset.Status = MediaStatus.Linked;
         asset.LinkedEntityType = nameof(KycVerification);
         asset.LinkedEntityId = kycId;
