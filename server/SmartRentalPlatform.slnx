@@ -10,7 +10,4 @@
     <Project Path="tests/SmartRentalPlatform.UnitTests/SmartRentalPlatform.UnitTests.csproj" />
     <Project Path="tests/SmartRentalPlatform.IntegrationTests/SmartRentalPlatform.IntegrationTests.csproj" />
   </Folder>
-  <Folder Name="/tools/">
-    <Project Path="tools/SmartRentalPlatform.MediaMigrationTool/SmartRentalPlatform.MediaMigrationTool.csproj" />
-  </Folder>
 </Solution>

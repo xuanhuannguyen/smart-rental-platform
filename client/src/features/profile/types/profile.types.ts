@@ -23,7 +23,6 @@ export interface UpdateUserProfileRequest {
   phoneNumber?: string | null;
   emergencyContactName?: string | null;
   emergencyContactPhone?: string | null;
-  avatarUrl?: string | null;
   avatarMediaAssetId?: string | null;
 }
 

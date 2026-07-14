@@ -22,9 +22,6 @@ public class ContractOccupantDocumentConfiguration : IEntityTypeConfiguration<Co
         builder.Property(x => x.FrontMediaAssetId).HasColumnName("front_media_asset_id");
         builder.Property(x => x.BackMediaAssetId).HasColumnName("back_media_asset_id");
         builder.Property(x => x.ExtraMediaAssetId).HasColumnName("extra_media_asset_id");
-        builder.Property(x => x.FrontImageObjectKey).HasColumnName("front_image_object_key").HasColumnType("text").IsRequired();
-        builder.Property(x => x.BackImageObjectKey).HasColumnName("back_image_object_key").HasColumnType("text");
-        builder.Property(x => x.ExtraImageObjectKey).HasColumnName("extra_image_object_key").HasColumnType("text");
         builder.Property(x => x.UploadedAt).HasColumnName("uploaded_at").IsRequired();
         builder.Property(x => x.CreatedAt).HasColumnName("created_at").IsRequired();
         builder.Property(x => x.UpdatedAt).HasColumnName("updated_at").IsRequired();

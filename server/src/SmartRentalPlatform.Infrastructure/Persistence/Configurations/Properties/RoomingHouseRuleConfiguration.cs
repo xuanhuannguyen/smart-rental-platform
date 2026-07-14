@@ -15,7 +15,6 @@ public class RoomingHouseRuleConfiguration : IEntityTypeConfiguration<RoomingHou
         builder.Property(x => x.RoomingHouseId).HasColumnName("rooming_house_id").IsRequired();
         builder.Property(x => x.SourceType).HasColumnName("source_type").HasConversion<string>().HasMaxLength(30).IsRequired();
         builder.Property(x => x.MediaAssetId).HasColumnName("media_asset_id");
-        builder.Property(x => x.PdfObjectKey).HasColumnName("pdf_object_key").HasColumnType("text").IsRequired();
         builder.Property(x => x.GeneralRules).HasColumnName("general_rules").HasColumnType("text");
         builder.Property(x => x.QuietHours).HasColumnName("quiet_hours").HasColumnType("text");
         builder.Property(x => x.SecurityPolicy).HasColumnName("security_policy").HasColumnType("text");

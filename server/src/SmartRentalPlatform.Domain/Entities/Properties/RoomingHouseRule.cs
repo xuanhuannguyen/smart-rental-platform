@@ -13,8 +13,6 @@ public class RoomingHouseRule
 
     public Guid? MediaAssetId { get; set; }
 
-    public string PdfObjectKey { get; set; } = string.Empty;
-
     public string? GeneralRules { get; set; }
 
     public string? QuietHours { get; set; }

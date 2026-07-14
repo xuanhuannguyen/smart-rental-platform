@@ -40,7 +40,6 @@ export default function RoomingHouseRuleEditor({
     lockedSourceType ?? 'PdfUpload'
   );
   const [pdfMediaAssetId, setPdfMediaAssetId] = useState(houseRule?.mediaAssetId ?? null);
-  const [pdfObjectKey, setPdfObjectKey] = useState(houseRule?.pdfObjectKey ?? '');
   const [uploadedPdf, setUploadedPdf] = useState<FileUploadResponse | null>(null);
   const [form, setForm] = useState<UpsertRoomingHouseRuleRequest>(() =>
     buildForm(houseRule)
@@ -52,7 +51,6 @@ export default function RoomingHouseRuleEditor({
   useEffect(() => {
     setSourceType(houseRule?.sourceType ?? 'PdfUpload');
     setPdfMediaAssetId(houseRule?.mediaAssetId ?? null);
-    setPdfObjectKey(houseRule?.pdfObjectKey ?? '');
     setUploadedPdf(null);
     setForm(buildForm(houseRule));
     setMessage('');
@@ -65,7 +63,6 @@ export default function RoomingHouseRuleEditor({
     try {
       const uploaded = await uploadPdf(file, 'HouseRule');
       setPdfMediaAssetId(uploaded.mediaAssetId || null);
-      setPdfObjectKey(uploaded.objectKey);
       setUploadedPdf(uploaded);
       setMessage('Đã tải PDF lên. Bấm lưu để áp dụng luật khu trọ.');
     } catch (error) {
@@ -77,7 +74,7 @@ export default function RoomingHouseRuleEditor({
 
   async function saveRule() {
     const isEmpty = sourceType === 'PdfUpload'
-      ? !pdfMediaAssetId && !pdfObjectKey
+      ? !pdfMediaAssetId
       : !form.generalRules && !form.quietHours && !form.securityPolicy && !form.cleaningPolicy && !form.guestPolicy && !form.parkingPolicy && !form.utilityPolicy && !form.damageCompensationPolicy && !form.additionalNotes;
 
     if (isEmpty) {
@@ -90,7 +87,7 @@ export default function RoomingHouseRuleEditor({
     try {
       const payload: UpsertRoomingHouseRuleRequest =
         sourceType === 'PdfUpload'
-          ? { sourceType, pdfMediaAssetId, pdfObjectKey: pdfObjectKey || null }
+          ? { sourceType, pdfMediaAssetId }
           : { ...form, sourceType: 'FormGenerated' };
       const saved = await upsertRoomingHouseRule(roomingHouseId, payload);
       setUploadedPdf(null);
@@ -124,10 +121,10 @@ export default function RoomingHouseRuleEditor({
   const canChooseSource = !lockedSourceType;
 
   const isEmpty = sourceType === 'PdfUpload'
-    ? !pdfMediaAssetId && !pdfObjectKey
+    ? !pdfMediaAssetId
     : !form.generalRules && !form.quietHours && !form.securityPolicy && !form.cleaningPolicy && !form.guestPolicy && !form.parkingPolicy && !form.utilityPolicy && !form.damageCompensationPolicy && !form.additionalNotes;
-  const pdfLink = uploadedPdf?.url || houseRule?.pdfUrl || (pdfMediaAssetId ? buildPrivateMediaViewUrl(pdfMediaAssetId) : '') || (pdfObjectKey ? toAssetUrl(pdfObjectKey) : '');
-  const hasPdf = Boolean(pdfMediaAssetId || pdfObjectKey || pdfLink);
+  const pdfLink = uploadedPdf?.url || houseRule?.pdfUrl || (pdfMediaAssetId ? buildPrivateMediaViewUrl(pdfMediaAssetId) : '');
+  const hasPdf = Boolean(pdfMediaAssetId || pdfLink);
 
   return (
     <div className="rooming-house-rule-editor">

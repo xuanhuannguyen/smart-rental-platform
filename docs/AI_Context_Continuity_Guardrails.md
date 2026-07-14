@@ -12,30 +12,26 @@ Tài liệu này đi kèm với `docs/AI_Media_Migration_Phase_Plan.md`.
 ## Current status
 
 - Done:
-  - phase cũ theo lộ trình chi tiết đã đi đến avatar/media-link coverage
-  - nếu đối chiếu theo plan mới rút gọn, `Phase 1 - Thiết kế nền` đã đạt
-  - media core hiện đã có API chuẩn cho `upload-url/finalize/download-url/soft-delete`
-  - theo plan mới, `Phase 3 - Tích hợp module public/private` đã đạt cho module trong scope hiện tại
-  - theo plan mới, `Phase 4 - Bảo mật và audit` đã enforce validate file, size limit, storage metadata check, private access deny, và audit allow/deny ở media core
-  - theo plan mới, `Phase 5A - Inventory và readiness` đã materialize tại `docs/AI_Media_Migration_Phase5A_Inventory.md`
-  - theo plan mới, `Phase 5B - Legacy Object Migration/Backfill` đã có report tool và guarded backfill executor
-  - theo plan mới, `Phase 5C - Read Path Cutover` đã chuyển scope sau 5B sang media-id-first read path và scrub private object key trong response khi đã có `MediaAssetId`
-  - theo plan mới, `Phase 5D - Legacy Compatibility Guard/Cleanup Prep` đã thêm deprecation/compatibility headers cho legacy upload/object-key routes và frontend helper media-id-first
-  - storage bucket verification thật đã chạy ngày 2026-07-13 với S3 config local: bucket reachable, DB metadata clean, nhưng 866/866 legacy objects missing trong bucket
-  - theo plan mới, `Phase 5E - Local legacy data cleanup` đã thêm `phase5e --mode cleanup` vào migration tool, apply trên DB local `localhost:5444`, và post-check còn 0 legacy references / 0 storage missing
-  - theo plan mới, `Phase 5F - Legacy API/Frontend Lockdown` đã chặn legacy upload bằng `410 Gone`, chặn admin private object-key route bằng `410 Gone`, và bỏ frontend endpoint registry/caller trực tiếp `/api/files`
-  - theo plan mới, `Phase 5G - Schema & Seed Hygiene` đã dọn runtime seed khỏi fake legacy object keys, thêm/apply data-only cleanup migration `20260713153000_CleanupLegacySampleMediaReferences`, và post-check còn 0 legacy references / 0 storage missing
-  - theo plan mới, `Phase 5H - Reset/Re-seed & End-to-End Verification` đã drop/reset DB local `localhost:5444`, apply full migration chain từ đầu, chạy API seed thật, và post-reseed check còn 0 legacy references / 0 storage missing
+  - phase chi tiết cũ đã đi qua toàn bộ migration chính và đã chốt cleanup runtime/schema cho scope media hiện tại
+  - nếu đối chiếu theo plan mới rút gọn, `Phase 1` đến `Phase 5I` đã đạt cho repo hiện tại
+  - media core hiện có API chuẩn cho `upload-url/finalize/download-url/soft-delete`
+  - route/object-key compatibility cũ đã bị gỡ khỏi code runtime: không còn `FilesController`, public route theo `objectKey`, hay admin private route theo `objectKey`
+  - `IPrivateStorageService`, `LocalPrivateStorageService`, `LocalFileStorageService`, migration tool cũ và JSON report artifacts đã bị retire/xóa khỏi repo working tree
+  - cleanup migration `20260714092159_RemoveLegacyMediaCompatibilityFields` là mốc drop legacy columns còn lại trong scope hiện tại
+  - `dotnet build server/SmartRentalPlatform.slnx` pass sau cleanup
+  - `dotnet test server/tests/SmartRentalPlatform.UnitTests/SmartRentalPlatform.UnitTests.csproj --no-build` pass `193/193`
 - Not done:
   - business modules toàn hệ thống vẫn chưa chuyển hết sang media workflow mới
   - replace/approve/reject audit chưa được chuẩn hóa toàn hệ thống nếu không đi qua business service riêng
-  - chưa xóa fallback field/storage/endpoint cũ khỏi code/schema toàn hệ thống; schema legacy columns chưa drop vì DTO/business compatibility vẫn còn dùng
+  - chưa rà soát và migrate những module ngoài scope media-cleanup hiện tại như chat attachment hoặc các tính năng chưa materialize
 - Follow-up:
-  - mọi chat tiếp theo phải phân biệt rõ `phase cũ nhiều bước` và `phase mới rút gọn nhiều phase`
-  - phase tiếp theo theo plan mới là lập plan drop legacy schema/API theo từng module, chưa xóa hàng loạt nếu chưa đối chiếu caller
+  - mọi chat tiếp theo phải phân biệt rõ `phase lịch sử` với `trạng thái cuối hiện tại`
+  - nếu mở phase mới, mặc định coi media migration chính đã hoàn tất; chỉ làm module mới hoặc hardening ngoài scope cũ
 - Known risks:
-  - không được hiểu nhầm rằng việc có media API mới đồng nghĩa toàn bộ business flow đã bỏ compatibility upload cũ
+  - không được hiểu nhầm các ghi chú phase cũ bên dưới là trạng thái runtime hiện tại
   - không được hiểu nhầm `Phase 4` cũ trong historical plan là cùng scope với `Phase 4 - Bảo mật và audit` của plan mới
+
+Lưu ý: nhiều section bên dưới giữ lại để tra lịch sử condense/handoff của các phase trước cleanup. Chúng không còn là hướng dẫn thực thi hiện tại nếu mâu thuẫn với code và migration mới nhất.
 
 ---
 
@@ -116,14 +112,13 @@ Mỗi khi chuyển phase, luôn nêu lại các quyết định đã chốt:
 - `MediaScope`, `MediaVisibility`, `MediaStatus` đã chốt
 - object key format đã chốt
 - public/private semantics đã chốt
-- fallback cũ chưa được xóa
+- fallback cũ trong scope media migration chính đã được xóa; ngoại lệ chủ đích duy nhất đang còn là `User.AvatarUrl` cho external avatar
 - trong plan mới rút gọn:
   - `Phase 1` chỉ gồm nền tảng
   - `Phase 2` mới gồm upload session/finalize/download/signed URL/soft delete core
   - `Phase 3` mới gồm module integration cho scope hiện tại
   - `Phase 4` mới gồm security/audit enforcement ở media core
-  - `Phase 5A` chỉ gồm inventory/readiness, không migration/cutover
-  - `Phase 5B` hiện có report + backfill executor guarded by dry-run; chưa copy object thật và chưa update database nếu không chạy `--mode backfill --dry-run false`
+  - `Phase 5A` đến `Phase 5I` giờ là chuỗi lịch sử đã hoàn tất cho scope cleanup hiện tại
 
 Nếu không nhắc lại, AI dễ “thiết kế lại” từ đầu sau khi condense.
 
@@ -144,7 +139,7 @@ Tạo một section hoặc file lưu các quyết định đã khóa:
 - D007: Phase 4 mới audit cả denied access, nhưng replace/approve/reject audit vẫn là follow-up nếu phase sau đụng business workflow đó
 - D008: Phase 5A đã tạo inventory tại `docs/AI_Media_Migration_Phase5A_Inventory.md`; phase này không xóa field, không xóa endpoint, không move file thật
 - D009: Phase 5B phải bắt đầu bằng dry-run/report cho legacy object migration/backfill trước khi Phase 5C/5D/5E cutover cleanup
-- D010: Phase 5B tool nằm ở `server/tools/SmartRentalPlatform.MediaMigrationTool`; mặc định ghi JSON report vào `server/data/media-migration/phase5b-readiness-report.json`
+- D010: Tool/report của Phase 5B là artifact lịch sử; sau cleanup ngày `2026-07-14` chúng đã bị retire khỏi repo runtime/solution
 - D011: Phase 5B report mode vẫn read-only; backfill mode mặc định dry-run và chỉ ghi DB khi truyền rõ `--mode backfill --dry-run false`
 - D012: Phase 5B backfill yêu cầu schema media-link đã có trên DB target; DB local `localhost:5444` đã reset/apply migration mới nhất và Phase 5B apply ngày 2026-07-13 đã link 3 legacy rows còn thiếu
 - D013: Sau Phase 5B apply local, dry-run lại báo `Planned creates = 0`, `Planned links = 0`, `SkippedSchemaNotReady = 0`

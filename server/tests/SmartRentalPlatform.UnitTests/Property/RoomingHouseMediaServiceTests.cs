@@ -1,4 +1,5 @@
 using Microsoft.EntityFrameworkCore;
+using SmartRentalPlatform.Application.Common.Media;
 using SmartRentalPlatform.Application.RoomingHouses;
 using SmartRentalPlatform.Contracts.Common;
 using SmartRentalPlatform.Contracts.LegalDocuments.Requests;
@@ -20,30 +21,21 @@ public class RoomingHouseMediaServiceTests : IDisposable
     private readonly TestDatabaseFixture _fixture = new();
 
     [Fact]
-    public async Task UpdateImagesAsync_ShouldLinkPublicMediaAssetsAndReturnMediaAssetIds()
+    public async Task UpdateImagesAsync_ShouldLinkSelectedMediaAssetsAndReturnMediaAssetIds()
     {
         var landlord = TestDataBuilder.BuildUser(email: "house-image-owner@unit.test", displayName: "House Image Owner");
         var house = TestDataBuilder.BuildRoomingHouse(landlord.Id, status: RoomingHouseApprovalStatus.Draft);
+        var coverAssetId = Guid.NewGuid();
+        var secondAssetId = Guid.NewGuid();
+        var thirdAssetId = Guid.NewGuid();
         var imageObjectKey = "public/rooming-house-images/cover.jpg";
 
         _fixture.Context.Users.Add(landlord);
         _fixture.Context.RoomingHouses.Add(house);
-        _fixture.Context.MediaAssets.Add(new MediaAsset
-        {
-            Id = Guid.NewGuid(),
-            OwnerUserId = landlord.Id,
-            BucketName = "local-media",
-            ObjectKey = imageObjectKey,
-            OriginalFileName = "cover.jpg",
-            StoredFileName = "cover.jpg",
-            ContentType = "image/jpeg",
-            FileSize = 11,
-            Scope = MediaScope.RoomingHouseImage,
-            Visibility = MediaVisibility.Public,
-            Status = MediaStatus.Uploaded,
-            CreatedAt = DateTimeOffset.UtcNow,
-            UpdatedAt = DateTimeOffset.UtcNow
-        });
+        _fixture.Context.MediaAssets.AddRange(
+            BuildPublicImageAsset(coverAssetId, landlord.Id, imageObjectKey, MediaScope.RoomingHouseImage),
+            BuildPublicImageAsset(secondAssetId, landlord.Id, "public/rooming-house-images/second.jpg", MediaScope.RoomingHouseImage),
+            BuildPublicImageAsset(thirdAssetId, landlord.Id, "public/rooming-house-images/third.jpg", MediaScope.RoomingHouseImage));
         await _fixture.Context.SaveChangesAsync();
 
         var service = new RoomingHouseMediaService(
@@ -58,19 +50,19 @@ public class RoomingHouseMediaServiceTests : IDisposable
                 [
                     new UpdatePropertyImageItemRequest
                     {
-                        ObjectKey = imageObjectKey,
+                        MediaAssetId = coverAssetId,
                         IsCover = true,
                         SortOrder = 0
                     },
                     new UpdatePropertyImageItemRequest
                     {
-                        ObjectKey = "public/rooming-house-images/second.jpg",
+                        MediaAssetId = secondAssetId,
                         IsCover = false,
                         SortOrder = 1
                     },
                     new UpdatePropertyImageItemRequest
                     {
-                        ObjectKey = "public/rooming-house-images/third.jpg",
+                        MediaAssetId = thirdAssetId,
                         IsCover = false,
                         SortOrder = 2
                     }
@@ -79,8 +71,10 @@ public class RoomingHouseMediaServiceTests : IDisposable
 
         Assert.NotNull(result);
         Assert.Equal(3, result!.Images.Count);
-        Assert.All(result.Images, image => Assert.NotNull(image.MediaAssetId));
-        Assert.Equal($"/api/media/public/{imageObjectKey}", result.Images[0].ImageUrl);
+        Assert.Equal(
+            [coverAssetId, secondAssetId, thirdAssetId],
+            result.Images.OrderBy(x => x.SortOrder).Select(x => x.MediaAssetId).Cast<Guid>().ToArray());
+        Assert.Equal($"/api/media/public/{coverAssetId:D}", result.Images[0].ImageUrl);
 
         var imagesInDb = await _fixture.Context.PropertyImages
             .Where(x => x.RoomingHouseId == house.Id)
@@ -104,19 +98,86 @@ public class RoomingHouseMediaServiceTests : IDisposable
     }
 
     [Fact]
+    public async Task UpdateImagesAsync_ShouldResolveObjectKeysFromMediaAssetIds()
+    {
+        var landlord = TestDataBuilder.BuildUser(email: "house-image-media-id@unit.test", displayName: "House Image Media Id");
+        var house = TestDataBuilder.BuildRoomingHouse(landlord.Id, status: RoomingHouseApprovalStatus.Draft);
+        var coverAssetId = Guid.NewGuid();
+        var secondAssetId = Guid.NewGuid();
+        var thirdAssetId = Guid.NewGuid();
+
+        _fixture.Context.Users.Add(landlord);
+        _fixture.Context.RoomingHouses.Add(house);
+        _fixture.Context.MediaAssets.AddRange(
+            BuildPublicImageAsset(coverAssetId, landlord.Id, "public/rooming-house-images/cover.jpg", MediaScope.RoomingHouseImage),
+            BuildPublicImageAsset(secondAssetId, landlord.Id, "public/rooming-house-images/second.jpg", MediaScope.RoomingHouseImage),
+            BuildPublicImageAsset(thirdAssetId, landlord.Id, "public/rooming-house-images/third.jpg", MediaScope.RoomingHouseImage));
+        await _fixture.Context.SaveChangesAsync();
+
+        var service = new RoomingHouseMediaService(
+            _fixture.Context,
+            new FakeRoomingHouseQueryService(_fixture.Context));
+
+        var result = await service.UpdateImagesAsync(
+            house.Id,
+            new UpdatePropertyImagesRequest
+            {
+                Images =
+                [
+                    new UpdatePropertyImageItemRequest
+                    {
+                        MediaAssetId = coverAssetId,
+                        IsCover = true,
+                        SortOrder = 0
+                    },
+                    new UpdatePropertyImageItemRequest
+                    {
+                        MediaAssetId = secondAssetId,
+                        IsCover = false,
+                        SortOrder = 1
+                    },
+                    new UpdatePropertyImageItemRequest
+                    {
+                        MediaAssetId = thirdAssetId,
+                        IsCover = false,
+                        SortOrder = 2
+                    }
+                ]
+            });
+
+        Assert.NotNull(result);
+        Assert.Equal(
+            [
+                $"/api/media/public/{coverAssetId:D}",
+                $"/api/media/public/{secondAssetId:D}",
+                $"/api/media/public/{thirdAssetId:D}"
+            ],
+            result!.Images.OrderBy(x => x.SortOrder).Select(x => x.ImageUrl).ToArray());
+
+        var imagesInDb = await _fixture.Context.PropertyImages
+            .Where(x => x.RoomingHouseId == house.Id)
+            .OrderBy(x => x.SortOrder)
+            .ToListAsync();
+
+        Assert.All(imagesInDb, x => Assert.NotNull(x.MediaAssetId));
+    }
+
+    [Fact]
     public async Task UpdateLegalDocumentAsync_ShouldLinkMediaAssetsAndReturnPrivateUrls()
     {
         var landlord = TestDataBuilder.BuildUser(email: "legal-owner@unit.test", displayName: "Legal Owner");
         var house = TestDataBuilder.BuildRoomingHouse(landlord.Id, status: RoomingHouseApprovalStatus.Draft);
-        var frontObjectKey = "public/rooming-house-legal-documents/front.jpg";
-        var backObjectKey = "public/rooming-house-legal-documents/back.jpg";
+        var frontAssetId = Guid.NewGuid();
+        var backAssetId = Guid.NewGuid();
+        var frontObjectKey = "private/rooming-house-legal-documents/front.jpg";
+        var backObjectKey = "private/rooming-house-legal-documents/back.jpg";
 
         _fixture.Context.Users.Add(landlord);
         _fixture.Context.RoomingHouses.Add(house);
         _fixture.Context.MediaAssets.AddRange(
             new MediaAsset
             {
-                Id = Guid.NewGuid(),
+                Id = frontAssetId,
                 OwnerUserId = landlord.Id,
                 BucketName = "local-media",
                 ObjectKey = frontObjectKey,
@@ -125,14 +186,14 @@ public class RoomingHouseMediaServiceTests : IDisposable
                 ContentType = "image/jpeg",
                 FileSize = 11,
                 Scope = MediaScope.RoomingHouseLegalDocument,
-                Visibility = MediaVisibility.Public,
+                Visibility = MediaVisibility.Private,
                 Status = MediaStatus.Uploaded,
                 CreatedAt = DateTimeOffset.UtcNow,
                 UpdatedAt = DateTimeOffset.UtcNow
             },
             new MediaAsset
             {
-                Id = Guid.NewGuid(),
+                Id = backAssetId,
                 OwnerUserId = landlord.Id,
                 BucketName = "local-media",
                 ObjectKey = backObjectKey,
@@ -141,7 +202,7 @@ public class RoomingHouseMediaServiceTests : IDisposable
                 ContentType = "image/jpeg",
                 FileSize = 12,
                 Scope = MediaScope.RoomingHouseLegalDocument,
-                Visibility = MediaVisibility.Public,
+                Visibility = MediaVisibility.Private,
                 Status = MediaStatus.Uploaded,
                 CreatedAt = DateTimeOffset.UtcNow,
                 UpdatedAt = DateTimeOffset.UtcNow
@@ -157,8 +218,8 @@ public class RoomingHouseMediaServiceTests : IDisposable
             new UpdateRoomingHouseLegalDocumentRequest
             {
                 DocumentType = LegalDocumentType.LAND_USE_CERTIFICATE.ToString(),
-                FrontImageObjectKey = frontObjectKey,
-                BackImageObjectKey = backObjectKey,
+                FrontMediaAssetId = frontAssetId,
+                BackMediaAssetId = backAssetId,
                 DocumentNumber = "123456789"
             });
 
@@ -187,6 +248,30 @@ public class RoomingHouseMediaServiceTests : IDisposable
     public void Dispose()
     {
         _fixture.Dispose();
+    }
+
+    private static MediaAsset BuildPublicImageAsset(
+        Guid assetId,
+        Guid ownerUserId,
+        string objectKey,
+        MediaScope scope)
+    {
+        return new MediaAsset
+        {
+            Id = assetId,
+            OwnerUserId = ownerUserId,
+            BucketName = "local-media",
+            ObjectKey = objectKey,
+            OriginalFileName = Path.GetFileName(objectKey),
+            StoredFileName = Path.GetFileName(objectKey),
+            ContentType = "image/jpeg",
+            FileSize = 11,
+            Scope = scope,
+            Visibility = MediaVisibility.Public,
+            Status = MediaStatus.Uploaded,
+            CreatedAt = DateTimeOffset.UtcNow,
+            UpdatedAt = DateTimeOffset.UtcNow
+        };
     }
 
     private sealed class FakeRoomingHouseQueryService : IRoomingHouseQueryService
@@ -230,8 +315,9 @@ public class RoomingHouseMediaServiceTests : IDisposable
                         {
                             Id = x.Id,
                             MediaAssetId = x.MediaAssetId,
-                            ObjectKey = x.ObjectKey,
-                            ImageUrl = $"/api/media/public/{x.ObjectKey}",
+                            ImageUrl = x.MediaAssetId.HasValue
+                                ? PublicMediaPathBuilder.Build(x.MediaAssetId.Value)
+                                : x.ImageUrl,
                             Caption = x.Caption,
                             IsCover = x.IsCover,
                             SortOrder = x.SortOrder,
@@ -247,9 +333,6 @@ public class RoomingHouseMediaServiceTests : IDisposable
                             BackMediaAssetId = house.LegalDocument.BackMediaAssetId,
                             ExtraMediaAssetId = house.LegalDocument.ExtraMediaAssetId,
                             DocumentType = house.LegalDocument.DocumentType.ToString(),
-                            FrontImageObjectKey = house.LegalDocument.FrontImageObjectKey,
-                            BackImageObjectKey = house.LegalDocument.BackImageObjectKey,
-                            ExtraImageObjectKey = house.LegalDocument.ExtraImageObjectKey,
                             FrontImageUrl = house.LegalDocument.FrontMediaAssetId.HasValue
                                 ? $"/api/media/private/{house.LegalDocument.FrontMediaAssetId:D}"
                                 : string.Empty,

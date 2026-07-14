@@ -10,8 +10,6 @@ public class RoomingHouseRuleResponse
 
     public Guid? MediaAssetId { get; set; }
 
-    public string PdfObjectKey { get; set; } = string.Empty;
-
     public string PdfUrl { get; set; } = string.Empty;
 
     public string? GeneralRules { get; set; }

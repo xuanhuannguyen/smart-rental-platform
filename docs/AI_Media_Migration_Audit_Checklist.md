@@ -26,48 +26,17 @@ Mỗi phase sau phải cập nhật tiếp vào file này, không tạo lại ch
 
 ## Current Status
 
-- `[~]` Phase 0 chưa được materialize thành inventory doc riêng trong `docs`
-- `[x]` Nếu đối chiếu theo plan cũ chi tiết, Phase 1 hoàn thành ở mức schema foundation
-- `[x]` Nếu đối chiếu theo plan cũ chi tiết, Phase 2 hoàn thành ở mức service foundation
-- `[x]` Phase 3 hoàn thành ở mức compatibility upload adapter cho flow public upload cũ
-- `[x]` Phase 4 hoàn thành cho `ContractFile` main file migration
-- `[x]` Phase 5 hoàn thành cho `ContractAppendix` file generation + permission integration
-- `[x]` Phase 6 hoàn thành cho `KycVerification` media migration
-- `[x]` Phase 7 hoàn thành cho admin private media access + audit wiring
-- `[x]` Phase 8 hoàn thành cho `RoomingHouseLegalDocument` media migration
-- `[x]` Phase 9 hoàn thành cho backend property image migration
-- `[x]` Phase 10 hoàn thành cho frontend public property image migration ở mức consumption/helper
-- `[x]` Phase 11 hoàn thành cho backend meter-reading proof media migration
-- `[x]` Phase 12 hoàn thành một phần theo hướng safe cleanup cho shared frontend public image helpers
-- `[x]` Phase 13 hoàn thành cho avatar media linkage theo hướng compatibility
-- `[x]` Runtime code chính hiện bind `IMediaStorageService` và `IPrivateStorageService` sang `S3StorageService`
-- `[~]` Open risk hiện tập trung ở private module còn lại, admin access/audit, legal/property/billing migration và cleanup phase sau
-- `[x]` Nếu đối chiếu theo plan mới rút gọn:
-  - `Phase 1 - Thiết kế nền` đã đạt
-- `[x]` Nếu đối chiếu theo plan mới rút gọn:
-  - `Phase 2 - Upload/download core` đã đạt ở media core API/service layer
-- `[x]` Nếu đối chiếu theo plan mới rút gọn:
-  - `Phase 3 - Tích hợp module public/private` đã đạt cho module đang trong scope migration hiện tại
-- `[x]` Nếu đối chiếu theo plan mới rút gọn:
-  - `Phase 4 - Bảo mật và audit` đã đạt ở media core enforcement layer
-- `[x]` Nếu đối chiếu theo plan mới rút gọn:
-  - `Phase 5A - Inventory và readiness` đã hoàn thành tại `docs/AI_Media_Migration_Phase5A_Inventory.md`
-- `[x]` Nếu đối chiếu theo plan mới rút gọn:
-  - `Phase 5B - Legacy Object Migration/Backfill` đã có report tool và guarded backfill executor
-- `[x]` Nếu đối chiếu theo plan mới rút gọn:
-  - `Phase 5C - Read Path Cutover` đã hoàn thành ở mức safe cutover cho scope sau Phase 5B
-- `[x]` Nếu đối chiếu theo plan mới rút gọn:
-  - `Phase 5D - Legacy Compatibility Guard/Cleanup Prep` đã hoàn thành ở mức guard/deprecation không-breaking
-- `[x]` Nếu đối chiếu theo plan mới rút gọn:
-  - `Phase 5E - Local legacy data cleanup` đã hoàn thành cho DB local/bucket verification gate
-- `[x]` Nếu đối chiếu theo plan mới rút gọn:
-  - `Phase 5F - Legacy API/Frontend Lockdown` đã chặn legacy upload/admin object-key route và bỏ frontend caller trực tiếp `/api/files`
-- `[x]` Nếu đối chiếu theo plan mới rút gọn:
-  - `Phase 5G - Schema & Seed Hygiene` đã dọn seed/runtime sample media refs và apply cleanup migration data-only trên DB local
-- `[x]` Nếu đối chiếu theo plan mới rút gọn:
-  - `Phase 5H - Reset/Re-seed & End-to-End Verification` đã reset DB local, apply full migration chain, seed thật qua API startup, và post-check sạch legacy media refs
-- `[~]` Business rollout/cleanup sau Phase 4 vẫn còn ongoing:
-  - một số module vẫn giữ compatibility/fallback field cũ để tránh breaking change
+- `[x]` Tính đến ngày `2026-07-14`, runtime trong repo đã chuyển sang `media-asset-only` cho toàn bộ scope migration chính; fallback object-key cũ đã bị gỡ khỏi request/response/service path đang chạy.
+- `[x]` Đã xóa hoàn toàn `FilesController`, public media route theo `objectKey`, admin private route theo `objectKey`, `IPrivateStorageService`, `LocalPrivateStorageService`, `LocalFileStorageService`, cùng các field/DTO compatibility tương ứng.
+- `[x]` KYC provider integration hiện nhận file stream + metadata trực tiếp từ `IMediaAccessService`; các cột `Front/Back/SelfieImageObjectKey` không còn trong model runtime.
+- `[x]` `ContractFile`, `ContractAppendix`, `RoomingHouseRule`, `PropertyImage`, `RoomingHouseLegalDocument`, `ContractOccupantDocument`, `MeterReading` và profile-avatar update path đều dùng `MediaAssetId` làm contract nội bộ chính.
+- `[x]` Migration `20260714092159_RemoveLegacyMediaCompatibilityFields` đã được tạo để drop phần schema legacy còn lại, gồm cả `meter_readings.proof_image_object_key`.
+- `[x]` Seed/runtime sample data không còn sinh fake legacy object key; repo cũng không còn giữ tool/report migration như một phần vận hành thường xuyên.
+- `[x]` `dotnet build server/SmartRentalPlatform.slnx` pass sau cleanup.
+- `[x]` `dotnet test server/tests/SmartRentalPlatform.UnitTests/SmartRentalPlatform.UnitTests.csproj --no-build` pass: `193/193`.
+- `[~]` Phần hybrid còn giữ có chủ đích duy nhất là `User.AvatarUrl` cho external avatar URL; avatar upload nội bộ dùng `AvatarMediaAssetId`.
+
+Lưu ý: các section phase lịch sử bên dưới là snapshot theo từng mốc triển khai. Khi có khác biệt, trạng thái ở section này và migration mới nhất là nguồn sự thật.
 
 ---
 
@@ -75,7 +44,7 @@ Mỗi phase sau phải cập nhật tiếp vào file này, không tạo lại ch
 
 - `[x]` Không đổi endpoint cũ ở Phase 1-2
 - `[x]` Không migrate business module cũ ở Phase 1-2
-- `[x]` Không xóa fallback field cũ
+- `[x]` Không xóa fallback field cũ ở Phase 1-4
 - `[x]` `MediaAsset` là metadata source of truth cho lộ trình mới
 - `[x]` `MediaAuditLog` là audit source cho lộ trình mới
 - `[x]` Private media không được coi là có public URL cố định
@@ -103,7 +72,7 @@ Mỗi phase sau phải cập nhật tiếp vào file này, không tạo lại ch
 - `[x]` D016: Runtime storage hiện dùng `S3StorageService`; `LocalMediaStorageService` không còn là binding chính trong app runtime
 - `[x]` D017: `KycService` đã đi qua media core nhưng VNPT client vẫn nhận `objectKey` như trước để giữ nguyên provider integration
 - `[x]` D018: `AdminKycDetailResponse` và `AdminKycInfo` đã expose `Front/Back/SelfieMediaAssetId`, nhưng URL admin vẫn còn object-key based cho đến Phase 7
-- `[x]` D019: `MeterReading` proof image dùng `ProofMediaAssetId` nhưng vẫn giữ `ProofImageObjectKey` làm fallback/compatibility
+- `[x]` D019: Từ cleanup ngày 2026-07-14, `MeterReading` proof image đã dùng `ProofMediaAssetId`-only ở request/service/runtime write path; `ProofImageObjectKey` chỉ còn là dấu vết schema/migration lịch sử
 - `[x]` D020: `DefaultMediaPermissionService` cho meter-reading proof cho phép landlord luôn xem; tenant/occupant chỉ xem khi invoice không còn `Draft`
 - `[x]` D021: Phase 12 chỉ tách helper frontend cho public listing/property image; không động vào helper private/transitional chưa chốt
 - `[x]` D022: `User` avatar dùng thêm `AvatarMediaAssetId` nhưng vẫn giữ `AvatarUrl` để compatibility
@@ -116,6 +85,10 @@ Mỗi phase sau phải cập nhật tiếp vào file này, không tạo lại ch
   - signed download URL là đường chính cho private file
   - soft delete flow thống nhất
   - bỏ trả private object key/path khỏi frontend ở mức toàn hệ thống
+- `[x]` D044: Cleanup ngày `2026-07-14` loại bỏ hoàn toàn `IPrivateStorageService` và các local/private compatibility storage adapter; app runtime chỉ còn `IMediaStorageService` bind vào `S3StorageService`.
+- `[x]` D045: Cleanup ngày `2026-07-14` đổi boundary VNPT eKYC sang file stream trực tiếp; object-key KYC chỉ còn tồn tại trong lịch sử migration/docs.
+- `[x]` D046: Cleanup ngày `2026-07-14` retire hẳn readiness/backfill tooling; `SmartRentalPlatform.MediaMigrationTool` và JSON report cũ không còn là artifact vận hành của repo.
+- `[x]` D047: Cleanup ngày `2026-07-14` chấp nhận reset/re-seed lại local/demo data thay vì duy trì tương thích schema hoặc fallback runtime với legacy object-key path.
 
 ---
 
@@ -153,11 +126,11 @@ Mỗi phase sau phải cập nhật tiếp vào file này, không tạo lại ch
 - `[x]` D034: Storage existence check trong Phase 5B là optional qua `--check-storage true`, để dev/local không bị chặn bởi AWS config
 - `[x]` D035: Phase 5B backfill không copy/move object thật; nó chỉ tạo/link `MediaAsset` metadata khi schema target đã sẵn sàng
 - `[x]` D036: DB local `localhost:5444` ngày 2026-07-13 đã reset sạch, apply migration mới nhất, chạy Phase 5B apply, rồi dry-run lại sạch
-- `[x]` D037: Phase 5C không xóa legacy field/endpoint; chỉ đổi read path sang media-id-first và scrub private object key ở response khi đã có `MediaAssetId`
+- `[x]` D037: Ở mốc Phase 5C ban đầu chưa xóa legacy field/endpoint; cleanup sau ngày 2026-07-14 mới bắt đầu remove fallback object key ở property/legal/rule/billing/contract-occupant API/runtime path
 - `[x]` D038: Phase 5D chỉ thêm guard/deprecation metadata cho legacy upload/object-key routes và frontend helper; chưa chặn hoặc xóa compatibility route/field
 - `[x]` D039: Phase 5E local cleanup dùng `server/tools/SmartRentalPlatform.MediaMigrationTool -- phase5e --mode cleanup`; mặc định dry-run, apply chỉ khi truyền `--dry-run false`
 - `[x]` D040: User đã xác nhận dữ liệu local/demo không cần giữ, nên Phase 5E đã xóa/clear các legacy media references missing object trong S3 trên DB local `localhost:5444`
-- `[x]` D041: Phase 5F chặn `POST /api/files/images`, `POST /api/files/pdfs`, và `GET /api/admin/media/private?objectKey=...` bằng `410 Gone`; public object-key route vẫn giữ tạm có chủ ý
+- `[x]` D041: Phase 5F chặn `POST /api/files/images`, `POST /api/files/pdfs`, và `GET /api/admin/media/private?objectKey=...` bằng `410 Gone`; cleanup ngày 2026-07-14 đã xóa luôn public object-key route `GET /api/media/public/{**objectKey}`
 - `[x]` D042: Phase 5G chỉ làm seed/data hygiene, không drop legacy columns; runtime seed không còn tạo fake object keys, migration `20260713153000_CleanupLegacySampleMediaReferences` cleanup sample refs lịch sử và đã apply trên DB local
 - `[x]` D043: Phase 5H dùng reset/reseed local làm gate: DB `localhost:5444` đã drop, apply full migration chain, seed qua API startup, rồi report `phase5b --check-storage true` sạch 0 legacy refs
 
@@ -311,12 +284,12 @@ dotnet run --no-restore --project server/tools/SmartRentalPlatform.MediaMigratio
 
 - `[x]` `RoomingHouseRuleService.ToResponse` không trả `PdfObjectKey` khi rule đã có `MediaAssetId`; đường đọc chính là `PdfUrl` qua media private route
 - `[x]` `RoomingHouseRuleEditor` không còn dùng riêng `pdfObjectKey` làm điều kiện save/render; upload mới chỉ có `mediaAssetId` vẫn hiển thị và lưu được
-- `[x]` `ContractOccupantDocumentResponse` không trả private `Front/Back/ExtraImageObjectKey` khi field tương ứng đã có media id
+- `[x]` `ContractOccupantDocumentResponse` đã bỏ hẳn private `Front/Back/ExtraImageObjectKey`; response chỉ còn `MediaAssetId` + private media URL
 - `[x]` `ContractOccupantsSetupModal` vẫn preview bằng `front/back/extraImageUrl` và không hiển thị dòng object key rỗng sau khi response đã scrub key
 - `[x]` `CreateAppendixModal` dựng private media view URL từ `front/back/extraMediaAssetId` khi edit appendix change JSON không còn object key
-- `[x]` Request contracts vẫn giữ object-key fallback để không phá dữ liệu/flow legacy chưa cleanup
+- `[x]` Runtime/API path cho `PropertyImage`, `RoomingHouseLegalDocument`, `RoomingHouseRule`, `MeterReadingInput`, `ContractOccupantDocument` đã chuyển sang `mediaAssetId`-only; không còn request object-key fallback trong các flow này
 - `[ ]` Chưa xóa field/cột legacy object key
-- `[ ]` Chưa xóa `FilesController`, public object-key route, hoặc local compatibility storage
+- `[ ]` Chưa xóa local compatibility storage
 - `[ ]` Chưa chạy storage existence check thật với bucket production/staging
 
 ### Phase 5C Verify
@@ -332,13 +305,13 @@ dotnet run --no-restore --project server/tools/SmartRentalPlatform.MediaMigratio
 
 - `[x]` `FilesController` legacy upload `POST /api/files/images` và `POST /api/files/pdfs` trả deprecation/compatibility headers
 - `[x]` `FileUploadResponse` bổ sung `IsCompatibilityResponse` và `CompatibilityWarning` để client thấy rõ đây là compatibility contract
-- `[x]` Public object-key route `GET /api/media/public/{**objectKey}` trả deprecation/compatibility headers
+- `[x]` Tại mốc Phase 5D, public object-key route `GET /api/media/public/{**objectKey}` đã trả deprecation/compatibility headers trước khi bị xóa ở cleanup ngày 2026-07-14
 - `[x]` Admin legacy private object-key route `GET /api/admin/media/private?objectKey=...` trả deprecation/compatibility headers
 - `[x]` Frontend `MediaWorkflowUploadResult.objectKey` và `FileUploadResponse.objectKey` được đánh dấu deprecated bằng JSDoc
 - `[x]` Frontend thêm `toPrivateMediaAssetUrl(mediaAssetId)` làm helper media-id-first cho private media
-- `[ ]` Chưa remove `FilesController`
-- `[ ]` Chưa remove public object-key route
-- `[ ]` Chưa remove admin legacy private object-key route
+- `[x]` Đã remove `FilesController` ở cleanup ngày 2026-07-14
+- `[x]` Đã remove public object-key route ở cleanup ngày 2026-07-14
+- `[x]` Đã remove admin legacy private object-key route ở cleanup ngày 2026-07-14
 - `[ ]` Chưa remove legacy object-key fields/columns
 - `[x]` Đã chạy storage bucket check thật với `--check-storage true` bằng S3 config local
 - `[!]` Bucket check thật ngày 2026-07-13 cho DB local `localhost:5444` cho kết quả:
@@ -391,7 +364,7 @@ dotnet run --no-restore --project server/tools/SmartRentalPlatform.MediaMigratio
   - 0 missing `MediaAsset` by object key
   - 0 storage missing
   - 0 storage errors
-- `[ ]` Chưa remove `FilesController`, public object-key route, admin legacy private object-key route khỏi code
+- `[x]` Đã remove `FilesController` và admin legacy private object-key route khỏi code ở cleanup ngày 2026-07-14
 - `[ ]` Chưa drop legacy object-key columns khỏi schema
 
 ### Phase 5E Verify
@@ -416,7 +389,7 @@ dotnet run --no-restore --project server/tools/SmartRentalPlatform.MediaMigratio
 - `[x]` `AdminMediaController` không còn inject trực tiếp `IPrivateStorageService` chỉ để phục vụ object-key route cũ
 - `[x]` `client/src/features/landlord/services/landlordApi.ts` không còn gọi `ENDPOINTS.FILES.IMAGES`, mà dùng media workflow wrapper
 - `[x]` `client/src/shared/api/endpoints.ts` không còn expose nhóm `FILES`
-- `[ ]` Public object-key route `GET /api/media/public/{**objectKey}` vẫn giữ tạm vì public image read path/listing còn dùng URL dạng này
+- `[x]` Public object-key route `GET /api/media/public/{**objectKey}` đã bị xóa ở cleanup ngày 2026-07-14; public image read path/listing hiện dùng `/api/media/public/{mediaAssetId}`
 - `[ ]` Chưa drop legacy object-key columns khỏi schema
 - `[ ]` Chưa remove toàn bộ DTO/frontend legacy fields vì một số module vẫn còn fallback contract
 
@@ -465,7 +438,7 @@ dotnet run --no-restore --project server/tools/SmartRentalPlatform.MediaMigratio
   - 0 storage missing
   - 0 storage errors
 - `[ ]` Chưa drop legacy object-key columns khỏi schema vì DTO/business compatibility/fallback còn tồn tại
-- `[ ]` Chưa xóa public object-key route vì public image URL/listing vẫn còn phụ thuộc có chủ ý
+- `[x]` Public object-key route đã bị xóa ở cleanup ngày 2026-07-14; public image URL/listing hiện dùng mediaAssetId route
 
 ### Phase 5G Verify
 
@@ -500,7 +473,7 @@ dotnet run --no-restore --project server/tools/SmartRentalPlatform.MediaMigratio
 - `[x]` Unit tests media/migration pass sau reset/reseed
 - `[x]` Frontend build pass sau reset/reseed
 - `[ ]` Chưa chạy browser/manual E2E upload thật qua UI
-- `[ ]` Chưa drop legacy object-key columns hoặc public object-key route
+- `[ ]` Chưa drop legacy object-key columns
 
 ### Phase 5H Verify
 
@@ -1079,7 +1052,7 @@ dotnet run --no-restore --project server/tools/SmartRentalPlatform.MediaMigratio
 
 ### Chưa hoàn chỉnh
 
-- `[~]` Public route hiện vẫn đọc qua `/api/media/public/{objectKey}`, chưa chuyển sang media-backed public resolver
+- `[x]` Public route hiện đọc qua `/api/media/public/{mediaAssetId}`, không còn dùng object-key route
 - `[~]` Frontend vẫn còn có thể phụ thuộc vào `ObjectKey/ImageUrl` ở một số chỗ cho đến Phase 10
 - `[~]` Legacy field `ObjectKey` và `ImageUrl` vẫn phải giữ để compatibility
 
@@ -1096,7 +1069,7 @@ dotnet run --no-restore --project server/tools/SmartRentalPlatform.MediaMigratio
 
 ### Findings / risk mở
 
-- `[!]` Public object access runtime hiện vẫn object-key based; `MediaAssetId` mới đang là metadata source of truth ở backend write/read-model layer, chưa phải fetch layer cuối
+- `[x]` Public object access runtime hiện đã mediaAssetId-based cho property image/avatar public route chính
 - `[!]` Rooming house/room image cũ được backfill metadata nhưng không đổi object key vật lý
 - `[!]` Phase 10 phải dọn frontend helper để tránh tiếp tục coi `objectKey` là API contract chính
 
@@ -1150,7 +1123,7 @@ dotnet run --no-restore --project server/tools/SmartRentalPlatform.MediaMigratio
 ### Mục tiêu phase
 
 - `[x]` Chuyển `MeterReading` proof image sang media core
-- `[x]` Giữ compatibility cho `ProofImageObjectKey` cũ
+- `[x]` Cleanup sau phase đã bỏ compatibility mới phát sinh cho `ProofImageObjectKey` ở request/service/runtime write path
 - `[x]` Thêm private access rule cho landlord/tenant/occupant theo invoice status
 
 ### Đã làm
@@ -1161,6 +1134,8 @@ dotnet run --no-restore --project server/tools/SmartRentalPlatform.MediaMigratio
 - `[x]` Tạo migration `AddMeterReadingProofMediaAssets`
 - `[x]` Migration có backfill meter reading legacy từ `ProofImageObjectKey` sang `media_assets`
 - `[x]` `BillingService` link proof image sang `MediaAsset` khi tạo invoice + meter reading mới
+- `[x]` `MeterReadingInput` đã bỏ `ProofImageObjectKey`; upload mới chỉ đi qua `ProofMediaAssetId`
+- `[x]` `BillingService` không còn tự tạo/link legacy `MediaAsset` từ object key khi tạo meter reading mới
 - `[x]` `LatestMeterReadingResponse` expose `ProofMediaAssetId`
 - `[x]` `LatestMeterReadingResponse` expose `ProofImageUrl`
 - `[x]` `InvoiceItemResponse` expose `MeterReadingProofMediaAssetId`
@@ -1174,12 +1149,12 @@ dotnet run --no-restore --project server/tools/SmartRentalPlatform.MediaMigratio
 ### Chưa hoàn chỉnh
 
 - `[~]` Frontend mới chỉ cập nhật typing; chưa có uploader/viewer proof image hoàn chỉnh ở landlord billing UI hoặc tenant invoice UI
-- `[~]` `ProofImageObjectKey` vẫn còn cần giữ để compatibility và fallback
+- `[~]` `ProofImageObjectKey` vẫn còn trong migration/schema history; chưa có cleanup migration drop cột
 - `[~]` Chưa có rule chỉnh sửa meter proof sau khi invoice đã `Paid` vì hiện chưa có flow update proof image riêng
 
 ### Không làm trong phase này
 
-- `[x]` Không xóa `ProofImageObjectKey`
+- `[~]` Trong phase gốc chưa xóa `ProofImageObjectKey`; cleanup ngày 2026-07-14 đã bỏ field này khỏi request/service/runtime write path nhưng chưa drop khỏi migration chain
 - `[x]` Không refactor toàn bộ landlord billing UI
 - `[x]` Không thêm endpoint update meter proof riêng sau khi invoice đã tạo
 
@@ -1264,6 +1239,7 @@ dotnet run --no-restore --project server/tools/SmartRentalPlatform.MediaMigratio
 - `[x]` `UserService.UpdateUserProfileAsync` nhận và link `AvatarMediaAssetId`
 - `[x]` `UserService.UpdateUserProfileAsync` validate media asset phải thuộc scope `Avatar`
 - `[x]` `UserService.UpdateUserProfileAsync` vẫn giữ `AvatarUrl` song song
+- `[x]` `AvatarMediaUrlResolver` ưu tiên build public URL trực tiếp từ `AvatarMediaAssetId`; `AvatarUrl` chỉ còn là explicit external/custom URL path
 - `[x]` `CurrentUserResponse` expose `AvatarMediaAssetId`
 - `[x]` `UserProfileResponse` expose `AvatarMediaAssetId`
 - `[x]` `LoginResponse` expose `AvatarMediaAssetId`
@@ -1274,7 +1250,7 @@ dotnet run --no-restore --project server/tools/SmartRentalPlatform.MediaMigratio
 
 ### Chưa hoàn chỉnh
 
-- `[~]` `AvatarUrl` vẫn còn là field compatibility chính cho external avatar và render path hiện tại
+- `[~]` `AvatarUrl` vẫn còn là field compatibility chính cho external avatar; media-backed avatar nội bộ hiện resolve qua `AvatarMediaAssetId`
 - `[~]` Chưa có backfill từ avatar legacy cũ sang `AvatarMediaAssetId`
 - `[~]` Chưa import Google avatar external vào media core
 

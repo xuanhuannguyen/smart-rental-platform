@@ -15,7 +15,7 @@ namespace SmartRentalPlatform.Application.RoomingHouses;
 
 public class RoomingHouseRuleService : IRoomingHouseRuleService
 {
-    private sealed record LinkedMediaAssetResolution(Guid MediaAssetId, string ObjectKey);
+    private sealed record LinkedMediaAssetResolution(Guid MediaAssetId);
 
     private readonly IAppDbContext context;
     private readonly IFileStorageService fileStorageService;
@@ -100,12 +100,10 @@ public class RoomingHouseRuleService : IRoomingHouseRuleService
                 roomingHouseId,
                 landlordUserId,
                 request.PdfMediaAssetId,
-                request.PdfObjectKey,
                 rule.MediaAssetId,
                 now,
                 cancellationToken);
             rule.MediaAssetId = uploadedRulePdf.MediaAssetId;
-            rule.PdfObjectKey = uploadedRulePdf.ObjectKey;
             ClearFormFields(rule);
         }
         else
@@ -117,23 +115,13 @@ public class RoomingHouseRuleService : IRoomingHouseRuleService
                 $"house-rule-{roomingHouseId:N}.pdf",
                 FileUploadScope.HouseRule,
                 cancellationToken);
-            rule.PdfObjectKey = NormalizeObjectKey(uploaded.ObjectKey);
             if (uploaded.MediaAssetId.HasValue)
             {
                 rule.MediaAssetId = uploaded.MediaAssetId.Value;
             }
             else
             {
-                var generatedPdfAsset = await EnsureRuleMediaAssetAsync(
-                    roomingHouseId,
-                    landlordUserId,
-                    null,
-                    rule.PdfObjectKey,
-                    rule.MediaAssetId,
-                    now,
-                    cancellationToken);
-                rule.MediaAssetId = generatedPdfAsset.MediaAssetId;
-                rule.PdfObjectKey = generatedPdfAsset.ObjectKey;
+                throw new InvalidOperationException("PDF luật khu trọ phải trả về mediaAssetId sau khi tải lên.");
             }
         }
 
@@ -184,25 +172,55 @@ public class RoomingHouseRuleService : IRoomingHouseRuleService
         Guid roomingHouseId,
         Guid ownerUserId,
         Guid? requestedMediaAssetId,
-        string? objectKey,
         Guid? existingMediaAssetId,
         DateTimeOffset now,
         CancellationToken cancellationToken)
     {
-        var resolvedAsset = await ResolveLinkedMediaAssetAsync(
-            requestedMediaAssetId,
-            objectKey,
-            existingMediaAssetId,
-            ownerUserId,
-            MediaScope.RoomingHouseRulePdf,
-            MediaVisibility.Private,
-            nameof(RoomingHouseRule),
-            roomingHouseId,
-            "legacy-private-storage",
-            now,
-            cancellationToken);
+        if (!requestedMediaAssetId.HasValue)
+        {
+            throw new BadRequestException(
+                ErrorCodes.ValidationError,
+                "PDF luật khu trọ phải gửi mediaAssetId.",
+                new { field = nameof(requestedMediaAssetId) });
+        }
 
-        return new LinkedMediaAssetResolution(resolvedAsset.Id, resolvedAsset.ObjectKey);
+        var mediaAsset = await context.MediaAssets
+            .FirstOrDefaultAsync(x => x.Id == requestedMediaAssetId.Value, cancellationToken);
+
+        if (mediaAsset is null)
+        {
+            throw new BadRequestException(
+                ErrorCodes.ValidationError,
+                "Media asset được chọn không tồn tại.",
+                new { mediaAssetId = requestedMediaAssetId.Value });
+        }
+
+        EnsureRuleAssetIsReusable(mediaAsset, ownerUserId);
+
+        if (existingMediaAssetId.HasValue && existingMediaAssetId.Value != mediaAsset.Id)
+        {
+            var currentLinkedAsset = await context.MediaAssets
+                .FirstOrDefaultAsync(x => x.Id == existingMediaAssetId.Value, cancellationToken);
+
+            if (currentLinkedAsset is not null)
+            {
+                currentLinkedAsset.LinkedEntityType = null;
+                currentLinkedAsset.LinkedEntityId = null;
+                currentLinkedAsset.Status = MediaStatus.Uploaded;
+                currentLinkedAsset.UpdatedAt = now;
+            }
+        }
+
+        mediaAsset.OwnerUserId = ownerUserId;
+        mediaAsset.Scope = MediaScope.RoomingHouseRulePdf;
+        mediaAsset.Visibility = MediaVisibility.Private;
+        mediaAsset.Status = MediaStatus.Linked;
+        mediaAsset.LinkedEntityType = nameof(RoomingHouseRule);
+        mediaAsset.LinkedEntityId = roomingHouseId;
+        mediaAsset.DeletedAt = null;
+        mediaAsset.UpdatedAt = now;
+
+        return new LinkedMediaAssetResolution(mediaAsset.Id);
     }
 
     private static RoomingHouseRuleSourceType ParseSourceType(string sourceType)
@@ -245,12 +263,12 @@ public class RoomingHouseRuleService : IRoomingHouseRuleService
     {
         if (sourceType == RoomingHouseRuleSourceType.PdfUpload)
         {
-            if (!request.PdfMediaAssetId.HasValue && string.IsNullOrWhiteSpace(request.PdfObjectKey))
+            if (!request.PdfMediaAssetId.HasValue)
             {
                 throw new BadRequestException(
                     ErrorCodes.HouseRuleInvalid,
                     "Vui lòng tải PDF luật khu trọ.",
-                    new { field = nameof(request.PdfObjectKey), mediaField = nameof(request.PdfMediaAssetId) });
+                    new { field = nameof(request.PdfMediaAssetId) });
             }
 
             return;
@@ -309,115 +327,33 @@ public class RoomingHouseRuleService : IRoomingHouseRuleService
         return string.IsNullOrWhiteSpace(value) ? null : value.Trim();
     }
 
-    private async Task<MediaAsset> ResolveLinkedMediaAssetAsync(
-        Guid? requestedMediaAssetId,
-        string? objectKey,
-        Guid? existingMediaAssetId,
-        Guid ownerUserId,
-        MediaScope scope,
-        MediaVisibility visibility,
-        string linkedEntityType,
-        Guid linkedEntityId,
-        string fallbackBucketName,
-        DateTimeOffset now,
-        CancellationToken cancellationToken)
+    private static void EnsureRuleAssetIsReusable(
+        MediaAsset mediaAsset,
+        Guid ownerUserId)
     {
-        MediaAsset? mediaAsset = null;
-        string normalizedObjectKey;
-
-        if (requestedMediaAssetId.HasValue)
+        if (mediaAsset.OwnerUserId.HasValue && mediaAsset.OwnerUserId.Value != ownerUserId)
         {
-            mediaAsset = await context.MediaAssets
-                .FirstOrDefaultAsync(x => x.Id == requestedMediaAssetId.Value, cancellationToken);
-
-            if (mediaAsset is null)
-            {
-                throw new BadRequestException(
-                    ErrorCodes.ValidationError,
-                    "Media asset được chọn không tồn tại.",
-                    new { mediaAssetId = requestedMediaAssetId.Value });
-            }
-
-            normalizedObjectKey = mediaAsset.ObjectKey;
-        }
-        else
-        {
-            if (string.IsNullOrWhiteSpace(objectKey))
-            {
-                throw new BadRequestException(
-                    ErrorCodes.ValidationError,
-                    "Mã lưu trữ PDF là bắt buộc.",
-                    new { field = nameof(objectKey) });
-            }
-
-            normalizedObjectKey = NormalizeObjectKey(objectKey);
-            mediaAsset = await context.MediaAssets
-                .FirstOrDefaultAsync(x => x.ObjectKey == normalizedObjectKey, cancellationToken);
+            throw new BadRequestException(
+                ErrorCodes.ImageInvalidOwner,
+                "Bạn không có quyền sử dụng media asset PDF này.",
+                new { mediaAssetId = mediaAsset.Id });
         }
 
-        if (existingMediaAssetId.HasValue && existingMediaAssetId != mediaAsset?.Id)
+        if (mediaAsset.Scope != MediaScope.RoomingHouseRulePdf || mediaAsset.Visibility != MediaVisibility.Private)
         {
-            var currentLinkedAsset = await context.MediaAssets
-                .FirstOrDefaultAsync(x => x.Id == existingMediaAssetId.Value, cancellationToken);
-
-            if (currentLinkedAsset is not null)
-            {
-                currentLinkedAsset.LinkedEntityType = null;
-                currentLinkedAsset.LinkedEntityId = null;
-                currentLinkedAsset.Status = MediaStatus.Uploaded;
-                currentLinkedAsset.UpdatedAt = now;
-            }
+            throw new BadRequestException(
+                ErrorCodes.ValidationError,
+                "Media asset không phù hợp với PDF luật khu trọ.",
+                new { mediaAssetId = mediaAsset.Id });
         }
 
-        if (mediaAsset is null)
+        if (mediaAsset.Status is MediaStatus.PendingUpload or MediaStatus.Deleted)
         {
-            mediaAsset = new MediaAsset
-            {
-                Id = Guid.NewGuid(),
-                OwnerUserId = ownerUserId,
-                BucketName = fallbackBucketName,
-                ObjectKey = normalizedObjectKey,
-                OriginalFileName = Path.GetFileName(normalizedObjectKey),
-                StoredFileName = Path.GetFileName(normalizedObjectKey),
-                ContentType = GuessContentType(normalizedObjectKey),
-                FileSize = 0,
-                Scope = scope,
-                Visibility = visibility,
-                Status = MediaStatus.Linked,
-                LinkedEntityType = linkedEntityType,
-                LinkedEntityId = linkedEntityId,
-                CreatedAt = now,
-                UpdatedAt = now
-            };
-
-            context.MediaAssets.Add(mediaAsset);
-            return mediaAsset;
+            throw new BadRequestException(
+                ErrorCodes.ValidationError,
+                "Media asset PDF chưa sẵn sàng để liên kết.",
+                new { mediaAssetId = mediaAsset.Id, status = mediaAsset.Status.ToString() });
         }
-
-        mediaAsset.OwnerUserId = ownerUserId;
-        mediaAsset.Scope = scope;
-        mediaAsset.Visibility = visibility;
-        mediaAsset.Status = MediaStatus.Linked;
-        mediaAsset.LinkedEntityType = linkedEntityType;
-        mediaAsset.LinkedEntityId = linkedEntityId;
-        mediaAsset.DeletedAt = null;
-        mediaAsset.UpdatedAt = now;
-
-        return mediaAsset;
-    }
-
-    private static string NormalizeObjectKey(string objectKey)
-    {
-        return objectKey.Replace('\\', '/').Trim().TrimStart('/');
-    }
-
-    private static string GuessContentType(string objectKey)
-    {
-        return Path.GetExtension(objectKey).ToLowerInvariant() switch
-        {
-            ".pdf" => "application/pdf",
-            _ => "application/octet-stream"
-        };
     }
 
     internal static RoomingHouseRuleResponse ToResponse(RoomingHouseRule rule)
@@ -428,7 +364,6 @@ public class RoomingHouseRuleService : IRoomingHouseRuleService
             RoomingHouseId = rule.RoomingHouseId,
             SourceType = rule.SourceType.ToString(),
             MediaAssetId = rule.MediaAssetId,
-            PdfObjectKey = rule.MediaAssetId.HasValue ? string.Empty : rule.PdfObjectKey,
             PdfUrl = rule.MediaAssetId.HasValue
                 ? PrivateMediaPathBuilder.Build(rule.MediaAssetId.Value)
                 : string.Empty,

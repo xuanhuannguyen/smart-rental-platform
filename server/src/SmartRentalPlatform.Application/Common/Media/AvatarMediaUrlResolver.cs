@@ -1,5 +1,6 @@
 using Microsoft.EntityFrameworkCore;
 using SmartRentalPlatform.Application.Common.Interfaces;
+using SmartRentalPlatform.Domain.Enums.Media;
 
 namespace SmartRentalPlatform.Application.Common.Media;
 
@@ -11,24 +12,35 @@ public static class AvatarMediaUrlResolver
         Guid? avatarMediaAssetId,
         CancellationToken cancellationToken = default)
     {
-        if (!string.IsNullOrWhiteSpace(avatarUrl))
+        if (avatarMediaAssetId.HasValue)
         {
-            return avatarUrl.Trim();
+            var mediaAssetExists = await dbContext.MediaAssets
+                .AsNoTracking()
+                .AnyAsync(
+                    x => x.Id == avatarMediaAssetId.Value &&
+                         x.Scope == MediaScope.Avatar &&
+                         x.Visibility == MediaVisibility.Public &&
+                         x.Status != MediaStatus.PendingUpload &&
+                         x.Status != MediaStatus.Deleted,
+                    cancellationToken);
+
+            if (mediaAssetExists)
+            {
+                return PublicMediaPathBuilder.Build(avatarMediaAssetId.Value);
+            }
         }
 
-        if (!avatarMediaAssetId.HasValue)
+        return IsExternalUrl(avatarUrl) ? avatarUrl!.Trim() : null;
+    }
+
+    private static bool IsExternalUrl(string? url)
+    {
+        if (string.IsNullOrWhiteSpace(url))
         {
-            return null;
+            return false;
         }
 
-        var objectKey = await dbContext.MediaAssets
-            .AsNoTracking()
-            .Where(x => x.Id == avatarMediaAssetId.Value)
-            .Select(x => x.ObjectKey)
-            .FirstOrDefaultAsync(cancellationToken);
-
-        return string.IsNullOrWhiteSpace(objectKey)
-            ? null
-            : PublicMediaPathBuilder.Build(objectKey);
+        return Uri.TryCreate(url.Trim(), UriKind.Absolute, out var parsedUri) &&
+               (parsedUri.Scheme == Uri.UriSchemeHttp || parsedUri.Scheme == Uri.UriSchemeHttps);
     }
 }

@@ -16,7 +16,6 @@ public class MeterReading
     public decimal PreviousReading { get; set; }
     public decimal CurrentReading { get; set; }
     public decimal Consumption { get; set; }
-    public string? ProofImageObjectKey { get; set; }
     public Guid? ProofMediaAssetId { get; set; }
     public Guid RecordedByLandlordUserId { get; set; }
     public DateTimeOffset ReadingAt { get; set; }

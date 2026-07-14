@@ -66,11 +66,11 @@ internal static class RoomValidationRules
                 new { field = nameof(images) });
         }
 
-        if (images.Any(x => string.IsNullOrWhiteSpace(x.ObjectKey)))
+        if (images.Any(x => !x.MediaAssetId.HasValue))
         {
             throw new BadRequestException(
                 ErrorCodes.ValidationError,
-                "Mã lưu trữ ảnh là bắt buộc.",
+                "Mỗi ảnh phòng phải có mediaAssetId hợp lệ.",
                 new { field = nameof(images) });
         }
     }
@@ -96,11 +96,11 @@ internal static class RoomValidationRules
                 new { field = nameof(images) });
         }
 
-        if (imageList.Any(x => string.IsNullOrWhiteSpace(x.ObjectKey)))
+        if (imageList.Any(x => !x.MediaAssetId.HasValue))
         {
             throw new BadRequestException(
                 ErrorCodes.ValidationError,
-                "Mã lưu trữ ảnh là bắt buộc.",
+                "Media asset ảnh là bắt buộc.",
                 new { field = nameof(images) });
         }
     }

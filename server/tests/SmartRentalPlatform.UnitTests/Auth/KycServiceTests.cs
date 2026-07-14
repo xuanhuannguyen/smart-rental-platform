@@ -9,7 +9,6 @@ using SmartRentalPlatform.Application.Common.Interfaces;
 using SmartRentalPlatform.Application.Common.Interfaces.Media;
 using SmartRentalPlatform.Application.Common.Models.Media;
 using SmartRentalPlatform.Application.Kyc;
-using SmartRentalPlatform.Infrastructure.Media;
 using SmartRentalPlatform.Infrastructure.Persistence;
 using SmartRentalPlatform.Contracts.Kyc;
 using SmartRentalPlatform.Domain.Entities.Media;
@@ -24,28 +23,19 @@ namespace SmartRentalPlatform.UnitTests.Auth;
 public class KycServiceTests : IClassFixture<TestDatabaseFixture>
 {
     private readonly TestDatabaseFixture _fixture;
-    private readonly QueueMediaObjectKeyFactory _mediaObjectKeyFactory;
-    private readonly RecordingMediaStorageService _mediaStorageService;
-    private readonly MediaAssetService _mediaAssetService;
     private readonly FakeVnptEkycClient _vnptEkycClient;
     private readonly FakeHashService _hashService;
+    private readonly FakeMediaAccessService _mediaAccessService;
     private readonly FakeSensitiveDataProtector _sensitiveDataProtector;
 
     public KycServiceTests(TestDatabaseFixture fixture)
     {
         _fixture = fixture;
         _fixture.Reset();
-        _mediaObjectKeyFactory = new QueueMediaObjectKeyFactory();
-        _mediaStorageService = new RecordingMediaStorageService();
-        _mediaAssetService = new MediaAssetService(_fixture.Context);
         _vnptEkycClient = new FakeVnptEkycClient();
         _hashService = new FakeHashService();
+        _mediaAccessService = new FakeMediaAccessService();
         _sensitiveDataProtector = new FakeSensitiveDataProtector();
-    }
-
-    private static IFormFile CreateMockFile()
-    {
-        return new FakeFormFile("dummy image data");
     }
 
     [Fact]
@@ -59,9 +49,9 @@ public class KycServiceTests : IClassFixture<TestDatabaseFixture>
         {
             DocumentType = "NationalId",
             SelfieCaptureMethod = SelfieCaptureMethod.Upload.ToString(),
-            FrontImage = null!, // Missing
-            BackImage = CreateMockFile(),
-            SelfieImage = CreateMockFile()
+            FrontMediaAssetId = Guid.Empty, // Missing
+            BackMediaAssetId = Guid.NewGuid(),
+            SelfieMediaAssetId = Guid.NewGuid()
         };
 
         // Act & Assert
@@ -77,20 +67,21 @@ public class KycServiceTests : IClassFixture<TestDatabaseFixture>
         context.Users.Add(user);
         await context.SaveChangesAsync();
 
+        var frontAsset = new MediaAsset { Id = Guid.NewGuid(), ObjectKey = "private/kyc-documents/2026/07/10/front-file.jpg", OriginalFileName = "front.jpg", OwnerUserId = user.Id, Scope = MediaScope.KycDocument, Visibility = MediaVisibility.Private, Status = MediaStatus.Uploaded };
+        var backAsset = new MediaAsset { Id = Guid.NewGuid(), ObjectKey = "private/kyc-documents/2026/07/10/back-file.jpg", OriginalFileName = "back.jpg", OwnerUserId = user.Id, Scope = MediaScope.KycDocument, Visibility = MediaVisibility.Private, Status = MediaStatus.Uploaded };
+        var selfieAsset = new MediaAsset { Id = Guid.NewGuid(), ObjectKey = "private/kyc-documents/2026/07/10/selfie-file.jpg", OriginalFileName = "selfie.jpg", OwnerUserId = user.Id, Scope = MediaScope.KycDocument, Visibility = MediaVisibility.Private, Status = MediaStatus.Uploaded };
+        context.MediaAssets.AddRange(frontAsset, backAsset, selfieAsset);
+        await context.SaveChangesAsync();
+
         var kycService = CreateService(context);
         var request = new SubmitKycRequest
         {
             DocumentType = "CCCD",
             SelfieCaptureMethod = SelfieCaptureMethod.Upload.ToString(),
-            FrontImage = CreateMockFile(),
-            BackImage = CreateMockFile(),
-            SelfieImage = CreateMockFile()
+            FrontMediaAssetId = frontAsset.Id,
+            BackMediaAssetId = backAsset.Id,
+            SelfieMediaAssetId = selfieAsset.Id
         };
-
-        _mediaObjectKeyFactory.Enqueue(
-            "private/kyc-documents/2026/07/10/front-file.jpg",
-            "private/kyc-documents/2026/07/10/back-file.jpg",
-            "private/kyc-documents/2026/07/10/selfie-file.jpg");
 
         var ekycResult = new VnptEkycClientResult
         {
@@ -132,7 +123,7 @@ public class KycServiceTests : IClassFixture<TestDatabaseFixture>
             .Where(x => x.LinkedEntityType == nameof(KycVerification) && x.LinkedEntityId == kycInDb.Id)
             .ToListAsync();
         Assert.Equal(3, mediaAssets.Count);
-        Assert.Equal(3, _mediaStorageService.UploadRequests.Count);
+        Assert.Equal(3, mediaAssets.Count);
         Assert.All(mediaAssets, x =>
         {
             Assert.Equal(MediaScope.KycDocument, x.Scope);
@@ -157,6 +148,72 @@ public class KycServiceTests : IClassFixture<TestDatabaseFixture>
     }
 
     [Fact]
+    public async Task SubmitAsync_HappyPath_ShouldUpdateOnboardingAndReturnPendingReviewMessage()
+    {
+        var context = _fixture.Context;
+        var user = TestDataBuilder.BuildUser(email: "kyc-happy-regression@example.com", displayName: "Kyc Happy Regression");
+        context.Users.Add(user);
+        await context.SaveChangesAsync();
+
+        var frontAsset = new MediaAsset { Id = Guid.NewGuid(), ObjectKey = "private/kyc-documents/2026/07/14/front-happy.jpg", OriginalFileName = "front-happy.jpg", OwnerUserId = user.Id, Scope = MediaScope.KycDocument, Visibility = MediaVisibility.Private, Status = MediaStatus.Uploaded };
+        var backAsset = new MediaAsset { Id = Guid.NewGuid(), ObjectKey = "private/kyc-documents/2026/07/14/back-happy.jpg", OriginalFileName = "back-happy.jpg", OwnerUserId = user.Id, Scope = MediaScope.KycDocument, Visibility = MediaVisibility.Private, Status = MediaStatus.Uploaded };
+        var selfieAsset = new MediaAsset { Id = Guid.NewGuid(), ObjectKey = "private/kyc-documents/2026/07/14/selfie-happy.jpg", OriginalFileName = "selfie-happy.jpg", OwnerUserId = user.Id, Scope = MediaScope.KycDocument, Visibility = MediaVisibility.Private, Status = MediaStatus.Uploaded };
+        context.MediaAssets.AddRange(frontAsset, backAsset, selfieAsset);
+        await context.SaveChangesAsync();
+
+        _vnptEkycClient.VerifyAsyncFunc = _ => Task.FromResult(new VnptEkycClientResult
+        {
+            SessionId = "session-happy-regression",
+            EkycResult = EkycResult.Passed.ToString(),
+            OcrFullName = "TRAN VAN B",
+            OcrCitizenId = "123456789012",
+            OcrDateOfBirth = new DateTime(1998, 2, 3),
+            OcrGender = "Male",
+            OcrAddress = "Ho Chi Minh City, Viet Nam",
+            OcrConfidence = 0.98m,
+            DocumentCheckResult = DocumentCheckResult.Valid.ToString(),
+            FaceMatchScore = 0.96m,
+            FaceMatchResult = FaceMatchResult.Matched.ToString(),
+            LivenessResult = LivenessResult.Passed.ToString()
+        });
+        _hashService.HashSha256HexFunc = _ => "happy_hash";
+        _sensitiveDataProtector.EncryptFunc = value => $"encrypted::{value}";
+
+        var kycService = CreateService(context);
+        var request = new SubmitKycRequest
+        {
+            DocumentType = KycDocumentType.CCCD.ToString(),
+            SelfieCaptureMethod = SelfieCaptureMethod.Upload.ToString(),
+            FrontMediaAssetId = frontAsset.Id,
+            BackMediaAssetId = backAsset.Id,
+            SelfieMediaAssetId = selfieAsset.Id
+        };
+
+        var result = await kycService.SubmitAsync(user.Id, request, CancellationToken.None);
+
+        Assert.Equal(KycVerificationStatus.PendingAdminReview.ToString(), result.Status);
+        Assert.Equal(EkycResult.Passed.ToString(), result.EkycResult);
+        Assert.Equal(KycRiskLevel.Low.ToString(), result.RiskLevel);
+        Assert.Equal("Submission received. Your profile is pending admin review.", result.Message);
+        Assert.Equal("1234xxxx9012", result.OcrCitizenIdMasked);
+
+        context.ChangeTracker.Clear();
+
+        var savedUser = await context.Users.SingleAsync(x => x.Id == user.Id);
+        var savedKyc = await context.KycVerifications.SingleAsync(x => x.UserId == user.Id);
+        var linkedAssets = await context.MediaAssets
+            .Where(x => x.LinkedEntityType == nameof(KycVerification) && x.LinkedEntityId == savedKyc.Id)
+            .ToListAsync();
+
+        Assert.Equal(OnboardingStatus.KycPending, savedUser.OnboardingStatus);
+        Assert.Equal(frontAsset.Id, savedKyc.FrontMediaAssetId);
+        Assert.Equal(backAsset.Id, savedKyc.BackMediaAssetId);
+        Assert.Equal(selfieAsset.Id, savedKyc.SelfieMediaAssetId);
+        Assert.Equal("happy_hash", savedKyc.CitizenIdHash);
+        Assert.Equal(3, linkedAssets.Count);
+    }
+
+    [Fact]
     public async Task SubmitAsync_ShouldThrowKycBusinessException_WhenDocumentTypeIsInvalid()
     {
         var context = _fixture.Context;
@@ -164,14 +221,20 @@ public class KycServiceTests : IClassFixture<TestDatabaseFixture>
         context.Users.Add(user);
         await context.SaveChangesAsync();
 
+        var frontAsset = new MediaAsset { Id = Guid.NewGuid(), ObjectKey = "front.jpg", OriginalFileName = "front.jpg", OwnerUserId = user.Id, Scope = MediaScope.KycDocument, Visibility = MediaVisibility.Private, Status = MediaStatus.Uploaded };
+        var backAsset = new MediaAsset { Id = Guid.NewGuid(), ObjectKey = "back.jpg", OriginalFileName = "back.jpg", OwnerUserId = user.Id, Scope = MediaScope.KycDocument, Visibility = MediaVisibility.Private, Status = MediaStatus.Uploaded };
+        var selfieAsset = new MediaAsset { Id = Guid.NewGuid(), ObjectKey = "selfie.jpg", OriginalFileName = "selfie.jpg", OwnerUserId = user.Id, Scope = MediaScope.KycDocument, Visibility = MediaVisibility.Private, Status = MediaStatus.Uploaded };
+        context.MediaAssets.AddRange(frontAsset, backAsset, selfieAsset);
+        await context.SaveChangesAsync();
+
         var kycService = CreateService(context);
         var request = new SubmitKycRequest
         {
             DocumentType = "NationalId",
             SelfieCaptureMethod = SelfieCaptureMethod.Upload.ToString(),
-            FrontImage = CreateMockFile(),
-            BackImage = CreateMockFile(),
-            SelfieImage = CreateMockFile()
+            FrontMediaAssetId = frontAsset.Id,
+            BackMediaAssetId = backAsset.Id,
+            SelfieMediaAssetId = selfieAsset.Id
         };
 
         await Assert.ThrowsAsync<KycBusinessException>(() => kycService.SubmitAsync(user.Id, request, CancellationToken.None));
@@ -189,9 +252,6 @@ public class KycServiceTests : IClassFixture<TestDatabaseFixture>
             UserId = approvedUser.Id,
             DocumentType = KycDocumentType.CCCD,
             EkycProvider = EkycProvider.VNPT,
-            FrontImageObjectKey = "front",
-            BackImageObjectKey = "back",
-            SelfieImageObjectKey = "selfie",
             SelfieCaptureMethod = SelfieCaptureMethod.Upload,
             CitizenIdHash = "duplicate_hash",
             EkycResult = EkycResult.Passed,
@@ -206,20 +266,21 @@ public class KycServiceTests : IClassFixture<TestDatabaseFixture>
         context.KycVerifications.Add(approved);
         await context.SaveChangesAsync();
 
+        var frontAsset = new MediaAsset { Id = Guid.NewGuid(), ObjectKey = "front.jpg", OriginalFileName = "front.jpg", OwnerUserId = user.Id, Scope = MediaScope.KycDocument, Visibility = MediaVisibility.Private, Status = MediaStatus.Uploaded };
+        var backAsset = new MediaAsset { Id = Guid.NewGuid(), ObjectKey = "back.jpg", OriginalFileName = "back.jpg", OwnerUserId = user.Id, Scope = MediaScope.KycDocument, Visibility = MediaVisibility.Private, Status = MediaStatus.Uploaded };
+        var selfieAsset = new MediaAsset { Id = Guid.NewGuid(), ObjectKey = "selfie.jpg", OriginalFileName = "selfie.jpg", OwnerUserId = user.Id, Scope = MediaScope.KycDocument, Visibility = MediaVisibility.Private, Status = MediaStatus.Uploaded };
+        context.MediaAssets.AddRange(frontAsset, backAsset, selfieAsset);
+        await context.SaveChangesAsync();
+
         var kycService = CreateService(context);
         var request = new SubmitKycRequest
         {
             DocumentType = KycDocumentType.CCCD.ToString(),
             SelfieCaptureMethod = SelfieCaptureMethod.Upload.ToString(),
-            FrontImage = CreateMockFile(),
-            BackImage = CreateMockFile(),
-            SelfieImage = CreateMockFile()
+            FrontMediaAssetId = frontAsset.Id,
+            BackMediaAssetId = backAsset.Id,
+            SelfieMediaAssetId = selfieAsset.Id
         };
-
-        _mediaObjectKeyFactory.Enqueue(
-            "private/kyc-documents/2026/07/10/front-dup.jpg",
-            "private/kyc-documents/2026/07/10/back-dup.jpg",
-            "private/kyc-documents/2026/07/10/selfie-dup.jpg");
         _hashService.HashSha256HexFunc = _ => "duplicate_hash";
         _sensitiveDataProtector.EncryptFunc = _ => "encrypted";
         _vnptEkycClient.VerifyAsyncFunc = _ => Task.FromResult(new VnptEkycClientResult
@@ -233,7 +294,6 @@ public class KycServiceTests : IClassFixture<TestDatabaseFixture>
         });
 
         await Assert.ThrowsAsync<KycBusinessException>(() => kycService.SubmitAsync(user.Id, request, CancellationToken.None));
-        Assert.Equal(3, _mediaStorageService.DeletedObjectKeys.Count);
     }
 
     [Fact]
@@ -247,9 +307,6 @@ public class KycServiceTests : IClassFixture<TestDatabaseFixture>
             UserId = user.Id,
             DocumentType = KycDocumentType.CCCD,
             EkycProvider = EkycProvider.VNPT,
-            FrontImageObjectKey = "front",
-            BackImageObjectKey = "back",
-            SelfieImageObjectKey = "selfie",
             SelfieCaptureMethod = SelfieCaptureMethod.Upload,
             CitizenIdHash = "hash",
             OcrFullName = "NGUYEN VAN B",
@@ -285,9 +342,6 @@ public class KycServiceTests : IClassFixture<TestDatabaseFixture>
             UserId = user.Id,
             DocumentType = KycDocumentType.CCCD,
             EkycProvider = EkycProvider.VNPT,
-            FrontImageObjectKey = "front1",
-            BackImageObjectKey = "back1",
-            SelfieImageObjectKey = "selfie1",
             SelfieCaptureMethod = SelfieCaptureMethod.Upload,
             CitizenIdHash = "hash1",
             EkycResult = EkycResult.Failed,
@@ -303,9 +357,6 @@ public class KycServiceTests : IClassFixture<TestDatabaseFixture>
             UserId = user.Id,
             DocumentType = KycDocumentType.CCCD,
             EkycProvider = EkycProvider.VNPT,
-            FrontImageObjectKey = "front2",
-            BackImageObjectKey = "back2",
-            SelfieImageObjectKey = "selfie2",
             SelfieCaptureMethod = SelfieCaptureMethod.Upload,
             CitizenIdHash = "hash2",
             EkycResult = EkycResult.Passed,
@@ -333,145 +384,53 @@ public class KycServiceTests : IClassFixture<TestDatabaseFixture>
     {
         return new KycService(
             context,
-            _mediaObjectKeyFactory,
-            _mediaStorageService,
-            _mediaAssetService,
             _vnptEkycClient,
             _hashService,
+            _mediaAccessService,
             _sensitiveDataProtector);
     }
 }
 
 #region Fakes for KycService
-public class FakeFormFile : IFormFile
-{
-    private readonly MemoryStream _stream;
-
-    public FakeFormFile(string content, string fileName = "test.jpg", string contentType = "image/jpeg")
-    {
-        var bytes = System.Text.Encoding.UTF8.GetBytes(content);
-        _stream = new MemoryStream(bytes);
-        Length = bytes.Length;
-        FileName = fileName;
-        ContentType = contentType;
-    }
-
-    public string ContentType { get; }
-    public string ContentDisposition => $"form-data; name=\"file\"; filename=\"{FileName}\"";
-    public IHeaderDictionary Headers => new HeaderDictionary();
-    public long Length { get; }
-    public string Name => "file";
-    public string FileName { get; }
-
-    public Stream OpenReadStream()
-    {
-        return new MemoryStream(_stream.ToArray());
-    }
-
-    public void CopyTo(Stream target)
-    {
-        _stream.Position = 0;
-        _stream.CopyTo(target);
-    }
-
-    public Task CopyToAsync(Stream target, CancellationToken cancellationToken = default)
-    {
-        _stream.Position = 0;
-        return _stream.CopyToAsync(target, cancellationToken);
-    }
-}
-
-public class QueueMediaObjectKeyFactory : IMediaObjectKeyFactory
-{
-    private readonly Queue<string> _objectKeys = new();
-
-    public void Enqueue(params string[] objectKeys)
-    {
-        foreach (var objectKey in objectKeys)
-        {
-            _objectKeys.Enqueue(objectKey);
-        }
-    }
-
-    public MediaObjectKeyResult Create(MediaScope scope, MediaVisibility visibility, string originalFileName)
-    {
-        return new MediaObjectKeyResult
-        {
-            ObjectKey = _objectKeys.Count > 0
-                ? _objectKeys.Dequeue()
-                : $"private/kyc-documents/{Guid.NewGuid():N}{Path.GetExtension(originalFileName)}",
-            StoredFileName = originalFileName
-        };
-    }
-}
-
-public class RecordingMediaStorageService : IMediaStorageService
-{
-    public List<MediaUploadRequest> UploadRequests { get; } = new();
-    public List<string> DeletedObjectKeys { get; } = new();
-    public string StoredContentType { get; set; } = "application/pdf";
-
-    public string GetBucketName()
-        => "test-media-bucket";
-
-    public async Task<MediaStoredObjectResult> UploadAsync(MediaUploadRequest request, CancellationToken cancellationToken = default)
-    {
-        UploadRequests.Add(request);
-
-        await using var buffer = new MemoryStream();
-        await request.Content.CopyToAsync(buffer, cancellationToken);
-
-        return new MediaStoredObjectResult
-        {
-            BucketName = "test-media-bucket",
-            ObjectKey = request.ObjectKey,
-            PublicUrl = null,
-            StoredFileName = Path.GetFileName(request.ObjectKey)
-        };
-    }
-
-    public Task<Stream> OpenReadAsync(string objectKey, CancellationToken cancellationToken = default)
-        => Task.FromResult<Stream>(new MemoryStream());
-
-    public Task<bool> ExistsAsync(string objectKey, CancellationToken cancellationToken = default)
-        => Task.FromResult(true);
-
-    public Task<MediaObjectMetadataResult> GetObjectMetadataAsync(string objectKey, CancellationToken cancellationToken = default)
-        => Task.FromResult(new MediaObjectMetadataResult
-        {
-            ObjectKey = objectKey,
-            ContentType = StoredContentType,
-            FileSize = 1
-        });
-
-    public Task<MediaUploadUrlResult> GetUploadUrlAsync(
-        string objectKey,
-        string contentType,
-        TimeSpan ttl,
-        CancellationToken cancellationToken = default)
-        => Task.FromResult(new MediaUploadUrlResult
-        {
-            Url = $"https://example.test/upload/{objectKey}",
-            HttpMethod = "PUT",
-            ExpiresAtUtc = DateTimeOffset.UtcNow.Add(ttl)
-        });
-
-    public Task DeleteAsync(string objectKey, CancellationToken cancellationToken = default)
-    {
-        DeletedObjectKeys.Add(objectKey);
-        return Task.CompletedTask;
-    }
-
-    public Task<string> GetDownloadUrlAsync(string objectKey, TimeSpan ttl, CancellationToken cancellationToken = default)
-        => Task.FromResult($"/media/{objectKey}");
-}
-
 public class FakeVnptEkycClient : IVnptEkycClient
 {
     public Func<VnptEkycVerifyInput, Task<VnptEkycClientResult>> VerifyAsyncFunc { get; set; } = _ => Task.FromResult(new VnptEkycClientResult());
 
     public Task<VnptEkycClientResult> VerifyAsync(VnptEkycVerifyInput input, CancellationToken cancellationToken = default)
         => VerifyAsyncFunc(input);
+}
+
+public sealed class FakeMediaAccessService : IMediaAccessService
+{
+    public Task<MediaAccessResult> OpenReadAsync(
+        Guid mediaAssetId,
+        Guid? actorUserId = null,
+        CancellationToken cancellationToken = default,
+        MediaAuditContext? auditContext = null)
+    {
+        return Task.FromResult(new MediaAccessResult
+        {
+            MediaAsset = new MediaAsset
+            {
+                Id = mediaAssetId,
+                OriginalFileName = $"{mediaAssetId:N}.jpg",
+                ContentType = "image/jpeg"
+            },
+            Stream = new MemoryStream(new byte[] { 1, 2, 3 }),
+            ContentType = "image/jpeg",
+            DownloadFileName = $"{mediaAssetId:N}.jpg"
+        });
+    }
+
+    public Task<string> GetDownloadUrlAsync(
+        Guid mediaAssetId,
+        TimeSpan ttl,
+        Guid? actorUserId = null,
+        CancellationToken cancellationToken = default,
+        MediaAuditContext? auditContext = null)
+    {
+        return Task.FromResult($"/api/media/private/{mediaAssetId:D}");
+    }
 }
 
 public class FakeHashService : IHashService

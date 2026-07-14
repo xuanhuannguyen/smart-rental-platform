@@ -425,8 +425,8 @@ public class BillingServiceTests : IClassFixture<TestDatabaseFixture>
             0,
             "January invoice",
             [
-                new MeterReadingInput(ElectricServiceTypeId, 0, 100, null),
-                new MeterReadingInput(WaterServiceTypeId, 0, 10, null)
+                new MeterReadingInput(ElectricServiceTypeId, 0, 100),
+                new MeterReadingInput(WaterServiceTypeId, 0, 10)
             ]);
 
         var result = await service.GenerateInvoiceWithReadingsAsync(seed.Landlord.Id, request, CancellationToken.None);
@@ -440,7 +440,7 @@ public class BillingServiceTests : IClassFixture<TestDatabaseFixture>
     }
 
     [Fact]
-    public async Task GenerateInvoiceWithReadingsAsync_ShouldLinkProofMediaAsset_WhenProofImageObjectKeyExists()
+    public async Task GenerateInvoiceWithReadingsAsync_ShouldLinkProofMediaAsset_WhenProofMediaAssetIdExists()
     {
         var context = _fixture.Context;
         var seed = await SeedActiveContractGraphAsync();
@@ -475,8 +475,8 @@ public class BillingServiceTests : IClassFixture<TestDatabaseFixture>
             0,
             "January invoice",
             [
-                new MeterReadingInput(ElectricServiceTypeId, 0, 100, proofAsset.ObjectKey, proofAsset.Id),
-                new MeterReadingInput(WaterServiceTypeId, 0, 10, null)
+                new MeterReadingInput(ElectricServiceTypeId, 0, 100, proofAsset.Id),
+                new MeterReadingInput(WaterServiceTypeId, 0, 10)
             ]);
 
         var result = await service.GenerateInvoiceWithReadingsAsync(seed.Landlord.Id, request, CancellationToken.None);

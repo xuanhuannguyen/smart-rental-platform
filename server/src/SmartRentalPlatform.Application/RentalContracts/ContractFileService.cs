@@ -21,7 +21,6 @@ public class ContractFileService : IContractFileService
 
     private readonly IAppDbContext context;
     private readonly IContractPdfRenderer contractPdfRenderer;
-    private readonly IPrivateStorageService privateStorageService;
     private readonly IMediaObjectKeyFactory mediaObjectKeyFactory;
     private readonly IMediaStorageService mediaStorageService;
     private readonly IMediaAssetService mediaAssetService;
@@ -31,7 +30,6 @@ public class ContractFileService : IContractFileService
     public ContractFileService(
         IAppDbContext context,
         IContractPdfRenderer contractPdfRenderer,
-        IPrivateStorageService privateStorageService,
         IMediaObjectKeyFactory mediaObjectKeyFactory,
         IMediaStorageService mediaStorageService,
         IMediaAssetService mediaAssetService,
@@ -40,7 +38,6 @@ public class ContractFileService : IContractFileService
     {
         this.context = context;
         this.contractPdfRenderer = contractPdfRenderer;
-        this.privateStorageService = privateStorageService;
         this.mediaObjectKeyFactory = mediaObjectKeyFactory;
         this.mediaStorageService = mediaStorageService;
         this.mediaAssetService = mediaAssetService;
@@ -157,8 +154,7 @@ public class ContractFileService : IContractFileService
             return (mediaAccess.Stream, mediaAccess.ContentType, mediaAccess.DownloadFileName);
         }
 
-        var stream = await privateStorageService.OpenReadAsync(file.StorageObjectKey, cancellationToken);
-        return (stream, GuessContentType(file.StorageObjectKey), Path.GetFileName(file.StorageObjectKey));
+        throw new InvalidOperationException("Contract file must be linked to a media asset.");
     }
 
     public async Task<ContractFileViewUrlResponse?> GetFileViewUrlAsync(
@@ -194,26 +190,26 @@ public class ContractFileService : IContractFileService
 
         EnsureCanViewFile(userId, contract, file);
 
-        if (file.MediaAssetId.HasValue)
+        if (!file.MediaAssetId.HasValue)
         {
-            try
-            {
-                var url = await mediaAccessService.GetDownloadUrlAsync(
-                    file.MediaAssetId.Value,
-                    ContractFileViewUrlTtl,
-                    userId,
-                    cancellationToken,
-                    BuildAuditContext(contract.Id, file.Id, "GenerateViewUrl"));
-
-                return new ContractFileViewUrlResponse(url, "signed-url");
-            }
-            catch (NotSupportedException)
-            {
-                // Fall back to the authenticated contract file route when presigned access is unavailable.
-            }
+            throw new InvalidOperationException("Contract file must be linked to a media asset.");
         }
 
-        return new ContractFileViewUrlResponse(BuildLegacyDownloadRoute(contract.Id, file.Id), "backend-route");
+        try
+        {
+            var url = await mediaAccessService.GetDownloadUrlAsync(
+                file.MediaAssetId.Value,
+                ContractFileViewUrlTtl,
+                userId,
+                cancellationToken,
+                BuildAuditContext(contract.Id, file.Id, "GenerateViewUrl"));
+
+            return new ContractFileViewUrlResponse(url, "signed-url");
+        }
+        catch (NotSupportedException)
+        {
+            return new ContractFileViewUrlResponse(BuildBackendDownloadRoute(contract.Id, file.Id), "backend-route");
+        }
     }
 
     private IQueryable<RentalContract> BaseContractQuery()
@@ -266,7 +262,7 @@ public class ContractFileService : IContractFileService
         var existingFile = contract.Files
             .Where(x => x.RentalContractAppendixId == null &&
                         x.FileVariant == fileVariant &&
-                        x.StorageObjectKey.EndsWith(".pdf", StringComparison.OrdinalIgnoreCase))
+                        x.MediaAssetId.HasValue)
             .OrderByDescending(x => x.CreatedAt)
             .FirstOrDefault();
 
@@ -277,7 +273,7 @@ public class ContractFileService : IContractFileService
 
         var renderOptions = await BuildSignedFileRenderOptionsAsync(contract, fileVariant, cancellationToken);
         var pdfBytes = contractPdfRenderer.RenderSignedRentalContract(contract, renderOptions);
-        var originalFileName = BuildLegacyFileName(contract, fileVariant, now);
+        var originalFileName = BuildFileName(contract, fileVariant, now);
         var mediaObjectKey = mediaObjectKeyFactory.Create(MediaScope.ContractPdf, MediaVisibility.Private, originalFileName);
 
         MediaStoredObjectResult? storedObject = null;
@@ -302,9 +298,7 @@ public class ContractFileService : IContractFileService
             {
                 Id = contractFileId,
                 RentalContractId = contract.Id,
-                StorageObjectKey = storedObject.ObjectKey,
                 FileVariant = fileVariant,
-                FileUrl = null,
                 CreatedAt = now
             };
 
@@ -718,7 +712,7 @@ public class ContractFileService : IContractFileService
             new { contract.Id });
     }
 
-    private static string BuildLegacyFileName(
+    private static string BuildFileName(
         RentalContract contract,
         ContractFileVariant fileVariant,
         DateTimeOffset now)
@@ -739,9 +733,7 @@ public class ContractFileService : IContractFileService
             RentalContractId = file.RentalContractId,
             RentalContractAppendixId = file.RentalContractAppendixId,
             MediaAssetId = file.MediaAssetId,
-            StorageObjectKey = file.StorageObjectKey,
             FileVariant = file.FileVariant.ToString(),
-            FileUrl = file.FileUrl,
             ViewUrl = file.MediaAssetId.HasValue
                 ? PrivateMediaPathBuilder.Build(file.MediaAssetId.Value)
                 : null,
@@ -749,7 +741,7 @@ public class ContractFileService : IContractFileService
         };
     }
 
-    private static string BuildLegacyDownloadRoute(Guid contractId, Guid fileId)
+    private static string BuildBackendDownloadRoute(Guid contractId, Guid fileId)
     {
         return $"/api/contracts/{contractId:D}/files/{fileId:D}/download";
     }
@@ -768,14 +760,4 @@ public class ContractFileService : IContractFileService
         };
     }
 
-    private static string GuessContentType(string objectKey)
-    {
-        return Path.GetExtension(objectKey).ToLowerInvariant() switch
-        {
-            ".pdf" => PdfContentType,
-            ".html" => "text/html",
-            ".txt" => "text/plain",
-            _ => "application/octet-stream"
-        };
-    }
 }

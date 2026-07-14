@@ -6,8 +6,6 @@ public class UpsertRoomingHouseRuleRequest
 
     public Guid? PdfMediaAssetId { get; set; }
 
-    public string? PdfObjectKey { get; set; }
-
     public string? GeneralRules { get; set; }
 
     public string? QuietHours { get; set; }

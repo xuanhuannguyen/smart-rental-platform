@@ -16,12 +16,6 @@ public class ContractOccupantDocumentResponse
 
     public Guid? ExtraMediaAssetId { get; set; }
 
-    public string FrontImageObjectKey { get; set; } = string.Empty;
-
-    public string? BackImageObjectKey { get; set; }
-
-    public string? ExtraImageObjectKey { get; set; }
-
     public string FrontImageUrl { get; set; } = string.Empty;
 
     public string? BackImageUrl { get; set; }

@@ -19,7 +19,6 @@ namespace SmartRentalPlatform.Api.Controllers.Media;
 public class MediaController : ControllerBase
 {
     private static readonly TimeSpan PrivateDownloadUrlTtl = TimeSpan.FromMinutes(5);
-    private const string PublicObjectKeyCompatibilityHeader = "legacy-public-object-key-route";
 
     private readonly ICurrentUserService _currentUserService;
     private readonly IAppDbContext _dbContext;
@@ -44,24 +43,25 @@ public class MediaController : ControllerBase
         _dbContext = dbContext;
     }
 
-    [HttpGet("public/{**objectKey}")]
-    public async Task<IActionResult> GetPublicObject(
-        string objectKey,
+    [HttpGet("public/{mediaAssetId:guid}")]
+    public async Task<IActionResult> GetPublicAsset(
+        Guid mediaAssetId,
         CancellationToken cancellationToken)
     {
-        if (string.IsNullOrWhiteSpace(objectKey) ||
-            !objectKey.Replace('\\', '/').TrimStart('/').StartsWith("public/", StringComparison.OrdinalIgnoreCase))
+        var mediaAsset = await _mediaAssetService.GetByIdAsync(mediaAssetId, cancellationToken);
+        if (mediaAsset is null ||
+            mediaAsset.Visibility != MediaVisibility.Public ||
+            mediaAsset.Status is MediaStatus.PendingUpload or MediaStatus.Deleted)
         {
             return NotFound();
         }
 
-        AddCompatibilityHeaders(PublicObjectKeyCompatibilityHeader, "public MediaAssetId-based image URLs");
+        var stream = await _mediaStorageService.OpenReadAsync(mediaAsset.ObjectKey, cancellationToken);
+        var fileName = string.IsNullOrWhiteSpace(mediaAsset.StoredFileName)
+            ? Path.GetFileName(mediaAsset.ObjectKey)
+            : mediaAsset.StoredFileName;
 
-        var stream = await _mediaStorageService.OpenReadAsync(objectKey, cancellationToken);
-        var contentType = GuessContentType(objectKey);
-        var fileName = Path.GetFileName(objectKey);
-
-        return File(stream, contentType, fileName, enableRangeProcessing: true);
+        return File(stream, mediaAsset.ContentType, fileName, enableRangeProcessing: true);
     }
 
     [Authorize]
@@ -330,22 +330,4 @@ public class MediaController : ControllerBase
         await _dbContext.SaveChangesAsync(cancellationToken);
     }
 
-    private void AddCompatibilityHeaders(string compatibilityMode, string replacement)
-    {
-        Response.Headers["Deprecation"] = "true";
-        Response.Headers.Append("X-SRP-Media-Compatibility", compatibilityMode);
-        Response.Headers.Append("X-SRP-Media-Replacement", replacement);
-    }
-
-    private static string GuessContentType(string objectKey)
-    {
-        return Path.GetExtension(objectKey).ToLowerInvariant() switch
-        {
-            ".jpg" or ".jpeg" => "image/jpeg",
-            ".png" => "image/png",
-            ".webp" => "image/webp",
-            ".pdf" => "application/pdf",
-            _ => "application/octet-stream"
-        };
-    }
 }

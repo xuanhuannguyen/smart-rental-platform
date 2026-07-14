@@ -143,17 +143,6 @@ function LogoutIcon() {
   );
 }
 
-function resolveLegacyCompatibleAssetUrl(imageUrl?: string | null, objectKey?: string | null) {
-  if (imageUrl?.trim()) {
-    return toAssetUrl(imageUrl);
-  }
-
-  if (objectKey?.trim()) {
-    return toAssetUrl(`/uploads/${objectKey}`);
-  }
-
-  return '';
-}
 
 export function AdminHomePage() {
   const { currentUser, logout } = useAuth();
@@ -1026,31 +1015,22 @@ export function AdminHomePage() {
                                 <span className="media-label">Mặt trước Giấy tờ Pháp lý</span>
                                 <AdminImage
                                   label="Mặt trước Giấy tờ Pháp lý"
-                                  src={resolveLegacyCompatibleAssetUrl(
-                                    selectedHouse.legalDocument.frontImageUrl,
-                                    selectedHouse.legalDocument.frontImageObjectKey
-                                  )}
+                                  src={assetUrl(selectedHouse.legalDocument.frontImageUrl || '')}
                                 />
                               </div>
                               <div className="media-container">
                                 <span className="media-label">Mặt sau Giấy tờ Pháp lý</span>
                                 <AdminImage
                                   label="Mặt sau Giấy tờ Pháp lý"
-                                  src={resolveLegacyCompatibleAssetUrl(
-                                    selectedHouse.legalDocument.backImageUrl,
-                                    selectedHouse.legalDocument.backImageObjectKey
-                                  )}
+                                  src={assetUrl(selectedHouse.legalDocument.backImageUrl || '')}
                                 />
                               </div>
-                              {(selectedHouse.legalDocument.extraImageUrl || selectedHouse.legalDocument.extraImageObjectKey) && (
+                              {selectedHouse.legalDocument.extraImageUrl && (
                                 <div className="media-container">
                                   <span className="media-label">Tài liệu pháp lý bổ sung</span>
                                   <AdminImage
                                     label="Tài liệu bổ sung"
-                                    src={resolveLegacyCompatibleAssetUrl(
-                                      selectedHouse.legalDocument.extraImageUrl,
-                                      selectedHouse.legalDocument.extraImageObjectKey
-                                    )}
+                                    src={assetUrl(selectedHouse.legalDocument.extraImageUrl)}
                                   />
                                 </div>
                               )}
@@ -1270,31 +1250,22 @@ export function AdminHomePage() {
                                 <span className="media-label">Mặt trước Giấy tờ Pháp lý</span>
                                 <AdminImage
                                   label="Mặt trước Giấy tờ Pháp lý"
-                                  src={resolveLegacyCompatibleAssetUrl(
-                                    selectedHouse.legalDocument.frontImageUrl,
-                                    selectedHouse.legalDocument.frontImageObjectKey
-                                  )}
+                                  src={assetUrl(selectedHouse.legalDocument.frontImageUrl || '')}
                                 />
                               </div>
                               <div className="media-container">
                                 <span className="media-label">Mặt sau Giấy tờ Pháp lý</span>
                                 <AdminImage
                                   label="Mặt sau Giấy tờ Pháp lý"
-                                  src={resolveLegacyCompatibleAssetUrl(
-                                    selectedHouse.legalDocument.backImageUrl,
-                                    selectedHouse.legalDocument.backImageObjectKey
-                                  )}
+                                  src={assetUrl(selectedHouse.legalDocument.backImageUrl || '')}
                                 />
                               </div>
-                              {(selectedHouse.legalDocument.extraImageUrl || selectedHouse.legalDocument.extraImageObjectKey) && (
+                              {selectedHouse.legalDocument.extraImageUrl && (
                                 <div className="media-container">
                                   <span className="media-label">Tài liệu pháp lý bổ sung</span>
                                   <AdminImage
                                     label="Tài liệu bổ sung"
-                                    src={resolveLegacyCompatibleAssetUrl(
-                                      selectedHouse.legalDocument.extraImageUrl,
-                                      selectedHouse.legalDocument.extraImageObjectKey
-                                    )}
+                                    src={assetUrl(selectedHouse.legalDocument.extraImageUrl)}
                                   />
                                 </div>
                               )}

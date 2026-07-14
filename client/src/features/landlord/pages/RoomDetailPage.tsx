@@ -1200,7 +1200,6 @@ export default function RoomDetailPage() {
 type ReadingDraft = {
   previousReading: number;
   currentReading: number;
-  proofImageObjectKey: string;
   proofMediaAssetId?: string | null;
   proofImageUrl?: string | null;
 };
@@ -1297,7 +1296,6 @@ function CreateInvoiceWithReadingsModal({
           nextReadings[service.serviceTypeId] = {
             previousReading: latestReading?.currentReading ?? 0,
             currentReading: latestReading?.currentReading ?? 0,
-            proofImageObjectKey: '',
             proofMediaAssetId: null,
             proofImageUrl: null,
           };
@@ -1342,7 +1340,7 @@ function CreateInvoiceWithReadingsModal({
     setReadings((current) => ({
       ...current,
       [serviceTypeId]: {
-        ...(current[serviceTypeId] ?? { previousReading: 0, currentReading: 0, proofImageObjectKey: '', proofMediaAssetId: null, proofImageUrl: null }),
+        ...(current[serviceTypeId] ?? { previousReading: 0, currentReading: 0, proofMediaAssetId: null, proofImageUrl: null }),
         ...patch,
       },
     }));
@@ -1354,7 +1352,6 @@ function CreateInvoiceWithReadingsModal({
     try {
       const uploaded = await uploadImage(file, 'MeterReading');
       updateReading(serviceTypeId, {
-        proofImageObjectKey: uploaded.objectKey,
         proofMediaAssetId: uploaded.mediaAssetId || null,
         proofImageUrl: uploaded.url || null,
       });
@@ -1380,13 +1377,12 @@ function CreateInvoiceWithReadingsModal({
     }
 
     const meterReadings: MeterReadingInput[] = meteredPrices.map((price) => {
-      const draft = readings[price.serviceTypeId] ?? { previousReading: 0, currentReading: 0, proofImageObjectKey: '', proofMediaAssetId: null, proofImageUrl: null };
+      const draft = readings[price.serviceTypeId] ?? { previousReading: 0, currentReading: 0, proofMediaAssetId: null, proofImageUrl: null };
       const latestReading = latestReadingByServiceType[price.serviceTypeId];
       return {
         serviceTypeId: price.serviceTypeId,
         previousReading: latestReading ? null : Number(draft.previousReading),
         currentReading: Number(draft.currentReading),
-        proofImageObjectKey: draft.proofImageObjectKey.trim() || null,
         proofMediaAssetId: draft.proofMediaAssetId || null,
       };
     });
@@ -1489,13 +1485,13 @@ function CreateInvoiceWithReadingsModal({
                   ) : (
                     <div className="invoice-create-meter-list">
                       {meteredPrices.map((price) => {
-                        const draft = readings[price.serviceTypeId] ?? { previousReading: 0, currentReading: 0, proofImageObjectKey: '', proofMediaAssetId: null, proofImageUrl: null };
+                        const draft = readings[price.serviceTypeId] ?? { previousReading: 0, currentReading: 0, proofMediaAssetId: null, proofImageUrl: null };
                         const latestReading = latestReadingByServiceType[price.serviceTypeId];
                         const previousReading = latestReading?.currentReading ?? Number(draft.previousReading);
                         const consumption = Math.max(0, Number(draft.currentReading) - previousReading);
                         const amount = Math.round(consumption * price.unitPrice);
-                        const uploadedProofUrl = resolveMeterProofUrl(draft.proofImageUrl, draft.proofImageObjectKey);
-                        const latestProofUrl = resolveMeterProofUrl(latestReading?.proofImageUrl, null);
+                        const uploadedProofUrl = resolveMeterProofUrl(draft.proofImageUrl);
+                        const latestProofUrl = resolveMeterProofUrl(latestReading?.proofImageUrl);
                         return (
                           <div key={price.serviceTypeId} className="invoice-create-meter-card">
                             <strong>{price.serviceName} ({formatMoneyString(price.unitPrice)} đ / {price.meterUnitName})</strong>
@@ -1869,15 +1865,10 @@ function isRoomEditLocked(room: Room | null) {
   return room?.status === 'Reserved' || room?.status === 'Occupied';
 }
 
-function resolveMeterProofUrl(imageUrl?: string | null, objectKey?: string | null) {
+function resolveMeterProofUrl(imageUrl?: string | null) {
   if (imageUrl?.trim()) {
     return toAssetUrl(imageUrl);
   }
-
-  if (objectKey?.trim()) {
-    return toAssetUrl(objectKey);
-  }
-
   return '';
 }
 

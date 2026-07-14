@@ -2,9 +2,8 @@ namespace SmartRentalPlatform.Application.Common.Media;
 
 public static class PublicMediaPathBuilder
 {
-    public static string Build(string objectKey)
+    public static string Build(Guid mediaAssetId)
     {
-        var normalizedObjectKey = objectKey.Replace('\\', '/').Trim().TrimStart('/');
-        return $"/api/media/public/{normalizedObjectKey}";
+        return $"/api/media/public/{mediaAssetId:D}";
     }
 }

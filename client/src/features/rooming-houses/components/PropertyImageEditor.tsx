@@ -78,9 +78,11 @@ export default function PropertyImageEditor({
       uploadResults.forEach((result, index) => {
         if (result.status !== 'fulfilled') return;
 
+        const uploadedMediaAssetId = result.value.mediaAssetId ?? null;
+        if (!uploadedMediaAssetId) return;
+
         uploadedImages.push({
-          mediaAssetId: result.value.mediaAssetId,
-          objectKey: result.value.objectKey,
+          mediaAssetId: uploadedMediaAssetId,
           imageUrl: result.value.url,
           caption: '',
           isCover: images.length === 0 && index === 0,
@@ -237,7 +239,7 @@ export default function PropertyImageEditor({
         {images.map((image, index) => (
           <article
             className={`property-image-card ${draggedIndex === index ? 'dragging' : ''}`}
-            key={image.id ?? image.objectKey}
+            key={(image.id ?? image.mediaAssetId) || `uploaded-image-${index}`}
             draggable
             onDragStart={(e) => handleCardDragStart(e, index)}
             onDragOver={handleCardDragOver}
@@ -245,7 +247,7 @@ export default function PropertyImageEditor({
           >
             <img
               alt={image.caption || 'Ảnh khu trọ'}
-              src={toPublicAssetUrl(image.imageUrl, image.objectKey)}
+              src={toPublicAssetUrl(image.imageUrl)}
             />
             {image.isCover && <span className="property-image-cover-badge">Ảnh bìa</span>}
             <div className="property-image-card-overlay">

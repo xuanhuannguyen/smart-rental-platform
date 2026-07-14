@@ -10,7 +10,7 @@ public class MockVnptEkycClient : IVnptEkycClient
     {
         await Task.Delay(150, cancellationToken);
 
-        if (input.FrontImageObjectKey.Contains("fail-document", StringComparison.OrdinalIgnoreCase))
+        if (input.FrontImage.FileName.Contains("fail-document", StringComparison.OrdinalIgnoreCase))
         {
             return new VnptEkycClientResult
             {
@@ -23,7 +23,7 @@ public class MockVnptEkycClient : IVnptEkycClient
             };
         }
 
-        if (input.FrontImageObjectKey.Contains("fail-provider", StringComparison.OrdinalIgnoreCase))
+        if (input.FrontImage.FileName.Contains("fail-provider", StringComparison.OrdinalIgnoreCase))
         {
             return new VnptEkycClientResult
             {

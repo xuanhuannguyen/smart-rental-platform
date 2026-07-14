@@ -27,14 +27,13 @@ public class ContractFileServiceTests : IClassFixture<TestDatabaseFixture>
     }
 
     [Fact]
-    public async Task GenerateSignedContractFileAsync_ShouldCreateMediaAssetsAndKeepLegacyStorageObjectKey()
+    public async Task GenerateSignedContractFileAsync_ShouldCreateMediaAssetsAndExposeMediaViewUrl()
     {
         var graph = await SeedContractGraphAsync();
         var mediaStorage = new RecordingMediaStorageService();
         var service = new ContractFileService(
             fixture.Context,
             new FakeContractPdfRenderer(),
-            new FakePrivateStorageService(),
             new QueueMediaObjectKeyFactory(
                 "private/contract-pdfs/2026/07/10/raw.pdf",
                 "private/contract-pdfs/2026/07/10/masked.pdf"),
@@ -47,7 +46,7 @@ public class ContractFileServiceTests : IClassFixture<TestDatabaseFixture>
 
         Assert.NotNull(response);
         Assert.NotNull(response!.MediaAssetId);
-        Assert.Equal("private/contract-pdfs/2026/07/10/raw.pdf", response.StorageObjectKey);
+        Assert.Equal($"/api/media/private/{response.MediaAssetId:D}", response.ViewUrl);
 
         var contractFiles = fixture.Context.ContractFiles
             .Where(x => x.RentalContractId == graph.ContractId && x.RentalContractAppendixId == null)
@@ -72,18 +71,15 @@ public class ContractFileServiceTests : IClassFixture<TestDatabaseFixture>
             Id = Guid.NewGuid(),
             RentalContractId = graph.ContractId,
             MediaAssetId = mediaAssetId,
-            StorageObjectKey = "private/contract-pdfs/2026/07/10/raw.pdf",
             FileVariant = ContractFileVariant.Raw,
             CreatedAt = DateTimeOffset.UtcNow
         });
         await fixture.Context.SaveChangesAsync();
 
-        var privateStorage = new FakePrivateStorageService();
         var mediaAccess = new FakeMediaAccessService();
         var service = new ContractFileService(
             fixture.Context,
             new FakeContractPdfRenderer(),
-            privateStorage,
             new QueueMediaObjectKeyFactory(),
             new RecordingMediaStorageService(),
             new MediaAssetService(fixture.Context),
@@ -97,11 +93,10 @@ public class ContractFileServiceTests : IClassFixture<TestDatabaseFixture>
 
         Assert.NotNull(result);
         Assert.Equal(mediaAssetId, mediaAccess.LastMediaAssetId);
-        Assert.Equal(0, privateStorage.OpenReadCallCount);
     }
 
     [Fact]
-    public async Task OpenFileAsync_WhenLegacyFileHasNoMediaAssetId_ShouldFallbackToPrivateStorage()
+    public async Task OpenFileAsync_WhenFileHasNoMediaAssetId_ShouldThrowInvalidOperationException()
     {
         var graph = await SeedContractGraphAsync();
         var fileId = Guid.NewGuid();
@@ -110,28 +105,22 @@ public class ContractFileServiceTests : IClassFixture<TestDatabaseFixture>
             Id = fileId,
             RentalContractId = graph.ContractId,
             MediaAssetId = null,
-            StorageObjectKey = "contracts/legacy-raw.pdf",
             FileVariant = ContractFileVariant.Raw,
             CreatedAt = DateTimeOffset.UtcNow
         });
         await fixture.Context.SaveChangesAsync();
 
-        var privateStorage = new FakePrivateStorageService();
         var service = new ContractFileService(
             fixture.Context,
             new FakeContractPdfRenderer(),
-            privateStorage,
             new QueueMediaObjectKeyFactory(),
             new RecordingMediaStorageService(),
             new MediaAssetService(fixture.Context),
             new FakeMediaAccessService(),
             new FakeSensitiveDataProtector());
 
-        var result = await service.OpenFileAsync(graph.LandlordId, graph.ContractId, fileId);
-
-        Assert.NotNull(result);
-        Assert.Equal(1, privateStorage.OpenReadCallCount);
-        Assert.Equal("legacy content", await new StreamReader(result!.Value.Content).ReadToEndAsync());
+        await Assert.ThrowsAsync<InvalidOperationException>(() =>
+            service.OpenFileAsync(graph.LandlordId, graph.ContractId, fileId));
     }
 
     private async Task<(Guid ContractId, Guid LandlordId, Guid MainTenantId, Guid OccupantId)> SeedContractGraphAsync()
@@ -277,23 +266,6 @@ public class ContractFileServiceTests : IClassFixture<TestDatabaseFixture>
         public byte[] RenderSignedContractAppendix(ContractAppendix appendix, ContractRenderOptions options)
         {
             return Encoding.UTF8.GetBytes("appendix");
-        }
-    }
-
-    private sealed class FakePrivateStorageService : IPrivateStorageService
-    {
-        public int OpenReadCallCount { get; private set; }
-
-        public Task<string> UploadAsync(Stream content, string contentType, string objectKey, CancellationToken cancellationToken = default)
-        {
-            return Task.FromResult(objectKey);
-        }
-
-        public Task<Stream> OpenReadAsync(string objectKey, CancellationToken cancellationToken = default)
-        {
-            OpenReadCallCount++;
-            Stream stream = new MemoryStream(Encoding.UTF8.GetBytes("legacy content"));
-            return Task.FromResult(stream);
         }
     }
 

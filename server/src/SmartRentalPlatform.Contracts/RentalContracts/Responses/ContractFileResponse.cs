@@ -10,11 +10,7 @@ public class ContractFileResponse
 
     public Guid? MediaAssetId { get; set; }
 
-    public string StorageObjectKey { get; set; } = string.Empty;
-
     public string FileVariant { get; set; } = string.Empty;
-
-    public string? FileUrl { get; set; }
 
     public string? ViewUrl { get; set; }
 

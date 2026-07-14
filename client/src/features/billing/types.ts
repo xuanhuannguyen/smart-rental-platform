@@ -125,7 +125,6 @@ export interface MeterReadingInput {
   serviceTypeId: string;
   previousReading?: number | null;
   currentReading: number;
-  proofImageObjectKey?: string | null;
   proofMediaAssetId?: string | null;
 }
 

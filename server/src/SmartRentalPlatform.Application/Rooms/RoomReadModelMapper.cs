@@ -35,13 +35,13 @@ internal static class RoomReadModelMapper
                 })
                 .ToList(),
             Images = room.Images
+                .Where(x => x.MediaAssetId.HasValue)
                 .OrderBy(x => x.SortOrder)
                 .Select(x => new PropertyImageResponse
                 {
                     Id = x.Id,
                     MediaAssetId = x.MediaAssetId,
-                    ObjectKey = x.ObjectKey,
-                    ImageUrl = BuildImageUrl(x.ObjectKey),
+                    ImageUrl = BuildPublicImageUrl(x.MediaAssetId),
                     Caption = x.Caption,
                     IsCover = x.IsCover,
                     SortOrder = x.SortOrder,
@@ -60,8 +60,11 @@ internal static class RoomReadModelMapper
         };
     }
 
-    public static string BuildImageUrl(string objectKey)
+    private static string BuildPublicImageUrl(Guid? mediaAssetId)
     {
-        return PublicMediaPathBuilder.Build(objectKey);
+        return mediaAssetId.HasValue
+            ? PublicMediaPathBuilder.Build(mediaAssetId.Value)
+            : string.Empty;
     }
+
 }

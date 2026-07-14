@@ -664,7 +664,6 @@ type ActiveInvoiceContract = Pick<
 type ReadingDraft = {
   previousReading: number;
   currentReading: number;
-  proofImageObjectKey: string;
   proofMediaAssetId?: string | null;
   proofImageUrl?: string | null;
 };
@@ -784,7 +783,6 @@ function CentralCreateInvoiceModal({
             nextReadings[price.serviceTypeId] = {
               previousReading: latestReading?.currentReading ?? 0,
               currentReading: latestReading?.currentReading ?? 0,
-              proofImageObjectKey: '',
               proofMediaAssetId: null,
               proofImageUrl: null
             };
@@ -856,7 +854,6 @@ function CentralCreateInvoiceModal({
           nextReadings[service.serviceTypeId] = {
             previousReading: service.latestReading?.currentReading ?? 0,
             currentReading: service.latestReading?.currentReading ?? 0,
-            proofImageObjectKey: '',
             proofMediaAssetId: null,
             proofImageUrl: null
           };
@@ -904,7 +901,7 @@ function CentralCreateInvoiceModal({
     setReadings((current) => ({
       ...current,
       [serviceTypeId]: {
-        ...(current[serviceTypeId] ?? { previousReading: 0, currentReading: 0, proofImageObjectKey: '', proofMediaAssetId: null, proofImageUrl: null }),
+        ...(current[serviceTypeId] ?? { previousReading: 0, currentReading: 0, proofMediaAssetId: null, proofImageUrl: null }),
         ...patch
       }
     }));
@@ -916,7 +913,6 @@ function CentralCreateInvoiceModal({
     try {
       const uploaded = await uploadImage(file, 'MeterReading');
       updateReading(serviceTypeId, {
-        proofImageObjectKey: uploaded.objectKey,
         proofMediaAssetId: uploaded.mediaAssetId || null,
         proofImageUrl: uploaded.url || null
       });
@@ -947,13 +943,12 @@ function CentralCreateInvoiceModal({
     }
 
     const meterReadings: MeterReadingInput[] = meteredPrices.map((price) => {
-      const draft = readings[price.serviceTypeId] ?? { previousReading: 0, currentReading: 0, proofImageObjectKey: '', proofMediaAssetId: null, proofImageUrl: null };
+      const draft = readings[price.serviceTypeId] ?? { previousReading: 0, currentReading: 0, proofMediaAssetId: null, proofImageUrl: null };
       const latestReading = latestReadingByServiceType[price.serviceTypeId];
       return {
         serviceTypeId: price.serviceTypeId,
         previousReading: latestReading ? null : Number(draft.previousReading),
         currentReading: Number(draft.currentReading),
-        proofImageObjectKey: draft.proofImageObjectKey.trim() || null,
         proofMediaAssetId: draft.proofMediaAssetId || null
       };
     });
@@ -1090,13 +1085,13 @@ function CentralCreateInvoiceModal({
                   ) : (
                     <div className="invoice-create-meter-list">
                       {meteredPrices.map((price) => {
-                        const draft = readings[price.serviceTypeId] ?? { previousReading: 0, currentReading: 0, proofImageObjectKey: '', proofMediaAssetId: null, proofImageUrl: null };
+                        const draft = readings[price.serviceTypeId] ?? { previousReading: 0, currentReading: 0, proofMediaAssetId: null, proofImageUrl: null };
                         const latestReading = latestReadingByServiceType[price.serviceTypeId];
                         const previousReading = latestReading?.currentReading ?? Number(draft.previousReading);
                         const consumption = Math.max(0, Number(draft.currentReading) - previousReading);
                         const amount = Math.round(consumption * price.unitPrice);
-                        const uploadedProofUrl = resolveMeterProofUrl(draft.proofImageUrl, draft.proofImageObjectKey);
-                        const latestProofUrl = resolveMeterProofUrl(latestReading?.proofImageUrl, null);
+                        const uploadedProofUrl = resolveMeterProofUrl(draft.proofImageUrl);
+                        const latestProofUrl = resolveMeterProofUrl(latestReading?.proofImageUrl);
                         return (
                           <div key={price.serviceTypeId} className="invoice-create-meter-card">
                             <strong>{price.serviceName} ({formatMoney(price.unitPrice)} / {price.meterUnitName})</strong>
@@ -1837,14 +1832,9 @@ function getInvoiceItemTypeLabel(itemType: string) {
   return labels[itemType] ?? itemType;
 }
 
-function resolveMeterProofUrl(imageUrl?: string | null, objectKey?: string | null) {
+function resolveMeterProofUrl(imageUrl?: string | null) {
   if (imageUrl?.trim()) {
     return toAssetUrl(imageUrl);
   }
-
-  if (objectKey?.trim()) {
-    return toAssetUrl(objectKey);
-  }
-
   return '';
 }

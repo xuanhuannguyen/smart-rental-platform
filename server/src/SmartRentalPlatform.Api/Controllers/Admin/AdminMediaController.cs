@@ -5,7 +5,6 @@ using SmartRentalPlatform.Application.Common.Interfaces;
 using SmartRentalPlatform.Application.Common.Interfaces.Media;
 using SmartRentalPlatform.Application.Common.Media;
 using SmartRentalPlatform.Application.Common.Models.Media;
-using SmartRentalPlatform.Contracts.Common;
 using SmartRentalPlatform.Contracts.Media.Responses;
 using System.Text.Json;
 
@@ -85,29 +84,6 @@ public class AdminMediaController : ControllerBase
             var fallbackUrl = AdminPrivateMediaPathBuilder.Build(mediaAssetId, forceDownload: true);
             return Ok(new PrivateMediaDownloadUrlResponse(fallbackUrl, expiresAtUtc, "backend-route"));
         }
-    }
-
-    [HttpGet("private")]
-    public IActionResult GetLegacyPrivateFile([FromQuery] string objectKey)
-    {
-        if (string.IsNullOrWhiteSpace(objectKey) ||
-            objectKey.Contains("..", StringComparison.Ordinal) ||
-            Path.IsPathRooted(objectKey))
-        {
-            return BadRequest("Invalid object key.");
-        }
-
-        Response.Headers["Deprecation"] = "true";
-        Response.Headers.Append("X-SRP-Media-Compatibility", "legacy-admin-private-object-key-route-disabled");
-        Response.Headers.Append("X-SRP-Media-Replacement", "/api/admin/media/private/{mediaAssetId}");
-
-        return StatusCode(StatusCodes.Status410Gone, new ApiErrorResponse
-        {
-            Success = false,
-            ErrorCode = ErrorCodes.InvalidStatus,
-            Message = "Legacy private object-key route is disabled. Use /api/admin/media/private/{mediaAssetId}.",
-            Details = new { replacement = "/api/admin/media/private/{mediaAssetId}" }
-        });
     }
 
     private MediaAuditContext BuildAuditContext(string action, string disposition)

@@ -34,7 +34,7 @@ namespace SmartRentalPlatform.Application.RentalContracts;
 
 public class RentalContractService : IRentalContractService
 {
-	private sealed record LinkedMediaAssetResolution(Guid MediaAssetId, string ObjectKey);
+	private sealed record LinkedMediaAssetResolution(Guid MediaAssetId);
 
 	private sealed record ContractPreviewViewerAccess(string ViewerMode, bool ShowFullDocumentNumbers, IReadOnlyCollection<Guid>? VisibleOccupantIds);
 
@@ -217,15 +217,12 @@ public class RentalContractService : IRentalContractService
 							CreatedAt = now,
 							UpdatedAt = now
 						};
-						LinkedMediaAssetResolution frontAsset = await EnsureContractOccupantDocumentMediaAssetAsync(tenantUserId, newDoc, documentRequest.FrontMediaAssetId, documentRequest.FrontImageObjectKey, newDoc.FrontMediaAssetId, now, cancellationToken);
-						LinkedMediaAssetResolution? backAsset = await EnsureOptionalContractOccupantDocumentMediaAssetAsync(tenantUserId, newDoc, documentRequest.BackMediaAssetId, documentRequest.BackImageObjectKey, newDoc.BackMediaAssetId, now, cancellationToken);
-						LinkedMediaAssetResolution? extraAsset = await EnsureOptionalContractOccupantDocumentMediaAssetAsync(tenantUserId, newDoc, documentRequest.ExtraMediaAssetId, documentRequest.ExtraImageObjectKey, newDoc.ExtraMediaAssetId, now, cancellationToken);
+						LinkedMediaAssetResolution frontAsset = await EnsureContractOccupantDocumentMediaAssetAsync(tenantUserId, newDoc, documentRequest.FrontMediaAssetId, newDoc.FrontMediaAssetId, nameof(documentRequest.FrontMediaAssetId), now, cancellationToken);
+						LinkedMediaAssetResolution? backAsset = await EnsureOptionalContractOccupantDocumentMediaAssetAsync(tenantUserId, newDoc, documentRequest.BackMediaAssetId, newDoc.BackMediaAssetId, now, cancellationToken);
+						LinkedMediaAssetResolution? extraAsset = await EnsureOptionalContractOccupantDocumentMediaAssetAsync(tenantUserId, newDoc, documentRequest.ExtraMediaAssetId, newDoc.ExtraMediaAssetId, now, cancellationToken);
 						newDoc.FrontMediaAssetId = frontAsset.MediaAssetId;
-						newDoc.FrontImageObjectKey = frontAsset.ObjectKey;
 						newDoc.BackMediaAssetId = backAsset?.MediaAssetId;
-						newDoc.BackImageObjectKey = backAsset?.ObjectKey;
 						newDoc.ExtraMediaAssetId = extraAsset?.MediaAssetId;
-						newDoc.ExtraImageObjectKey = extraAsset?.ObjectKey;
 						occupant.Documents.Add(newDoc);
 						context.ContractOccupantDocuments.Add(newDoc);
 					}
@@ -1439,9 +1436,6 @@ public class RentalContractService : IRentalContractService
 			FrontMediaAssetId = document.FrontMediaAssetId,
 			BackMediaAssetId = document.BackMediaAssetId,
 			ExtraMediaAssetId = document.ExtraMediaAssetId,
-			FrontImageObjectKey = document.FrontMediaAssetId.HasValue ? string.Empty : document.FrontImageObjectKey,
-			BackImageObjectKey = document.BackMediaAssetId.HasValue ? null : document.BackImageObjectKey,
-			ExtraImageObjectKey = document.ExtraMediaAssetId.HasValue ? null : document.ExtraImageObjectKey,
 			FrontImageUrl = BuildPrivateMediaUrl(document.FrontMediaAssetId),
 			BackImageUrl = BuildOptionalPrivateMediaUrl(document.BackMediaAssetId),
 			ExtraImageUrl = BuildOptionalPrivateMediaUrl(document.ExtraMediaAssetId),
@@ -1519,7 +1513,7 @@ public class RentalContractService : IRentalContractService
 			}
 			if (!string.IsNullOrWhiteSpace(occupant.Document.DocumentType) &&
 				!string.IsNullOrWhiteSpace(occupant.Document.DocumentNumber) &&
-				(occupant.Document.FrontMediaAssetId.HasValue || !string.IsNullOrWhiteSpace(occupant.Document.FrontImageObjectKey)))
+				occupant.Document.FrontMediaAssetId.HasValue)
 			{
 				continue;
 			}
@@ -1886,15 +1880,23 @@ public class RentalContractService : IRentalContractService
 		return string.IsNullOrWhiteSpace(value) ? null : value.Trim();
 	}
 
-	private async Task<LinkedMediaAssetResolution> EnsureContractOccupantDocumentMediaAssetAsync(Guid ownerUserId, ContractOccupantDocument document, Guid? requestedMediaAssetId, string? objectKey, Guid? existingMediaAssetId, DateTimeOffset now, CancellationToken cancellationToken)
+	private async Task<LinkedMediaAssetResolution> EnsureContractOccupantDocumentMediaAssetAsync(Guid ownerUserId, ContractOccupantDocument document, Guid? requestedMediaAssetId, Guid? existingMediaAssetId, string requiredFieldName, DateTimeOffset now, CancellationToken cancellationToken)
 	{
-		MediaAsset mediaAsset = await ResolveLinkedMediaAssetAsync(requestedMediaAssetId, objectKey, existingMediaAssetId, ownerUserId, MediaScope.KycDocument, MediaVisibility.Private, nameof(ContractOccupantDocument), document.Id, "legacy-private-storage", now, cancellationToken);
-		return new LinkedMediaAssetResolution(mediaAsset.Id, mediaAsset.ObjectKey);
+		if (!requestedMediaAssetId.HasValue)
+		{
+			throw new BadRequestException("VALIDATION_ERROR", "Media asset là bắt buộc.", new
+			{
+				field = requiredFieldName
+			});
+		}
+
+		MediaAsset mediaAsset = await ResolveLinkedMediaAssetAsync(requestedMediaAssetId.Value, existingMediaAssetId, ownerUserId, MediaScope.KycDocument, MediaVisibility.Private, nameof(ContractOccupantDocument), document.Id, now, cancellationToken);
+		return new LinkedMediaAssetResolution(mediaAsset.Id);
 	}
 
-	private async Task<LinkedMediaAssetResolution?> EnsureOptionalContractOccupantDocumentMediaAssetAsync(Guid ownerUserId, ContractOccupantDocument document, Guid? requestedMediaAssetId, string? objectKey, Guid? existingMediaAssetId, DateTimeOffset now, CancellationToken cancellationToken)
+	private async Task<LinkedMediaAssetResolution?> EnsureOptionalContractOccupantDocumentMediaAssetAsync(Guid ownerUserId, ContractOccupantDocument document, Guid? requestedMediaAssetId, Guid? existingMediaAssetId, DateTimeOffset now, CancellationToken cancellationToken)
 	{
-		if (!requestedMediaAssetId.HasValue && string.IsNullOrWhiteSpace(objectKey))
+		if (!requestedMediaAssetId.HasValue)
 		{
 			if (existingMediaAssetId.HasValue)
 			{
@@ -1909,36 +1911,18 @@ public class RentalContractService : IRentalContractService
 			}
 			return null;
 		}
-		return await EnsureContractOccupantDocumentMediaAssetAsync(ownerUserId, document, requestedMediaAssetId, objectKey, existingMediaAssetId, now, cancellationToken);
+		return await EnsureContractOccupantDocumentMediaAssetAsync(ownerUserId, document, requestedMediaAssetId, existingMediaAssetId, nameof(requestedMediaAssetId), now, cancellationToken);
 	}
 
-	private async Task<MediaAsset> ResolveLinkedMediaAssetAsync(Guid? requestedMediaAssetId, string? objectKey, Guid? existingMediaAssetId, Guid ownerUserId, MediaScope scope, MediaVisibility visibility, string linkedEntityType, Guid linkedEntityId, string fallbackBucketName, DateTimeOffset now, CancellationToken cancellationToken)
+	private async Task<MediaAsset> ResolveLinkedMediaAssetAsync(Guid requestedMediaAssetId, Guid? existingMediaAssetId, Guid ownerUserId, MediaScope scope, MediaVisibility visibility, string linkedEntityType, Guid linkedEntityId, DateTimeOffset now, CancellationToken cancellationToken)
 	{
-		MediaAsset mediaAsset = null;
-		string text;
-		if (requestedMediaAssetId.HasValue)
+		MediaAsset mediaAsset = await context.MediaAssets.FirstOrDefaultAsync((MediaAsset x) => x.Id == requestedMediaAssetId, cancellationToken);
+		if (mediaAsset == null)
 		{
-			mediaAsset = await context.MediaAssets.FirstOrDefaultAsync((MediaAsset x) => x.Id == requestedMediaAssetId.Value, cancellationToken);
-			if (mediaAsset == null)
+			throw new BadRequestException("VALIDATION_ERROR", "Media asset được chọn không tồn tại.", new
 			{
-				throw new BadRequestException("VALIDATION_ERROR", "Media asset được chọn không tồn tại.", new
-				{
-					mediaAssetId = requestedMediaAssetId.Value
-				});
-			}
-			text = mediaAsset.ObjectKey;
-		}
-		else
-		{
-			if (string.IsNullOrWhiteSpace(objectKey))
-			{
-				throw new BadRequestException("VALIDATION_ERROR", "Mã lưu trữ tệp là bắt buộc.", new
-				{
-					field = nameof(objectKey)
-				});
-			}
-			text = NormalizeObjectKey(objectKey);
-			mediaAsset = await context.MediaAssets.FirstOrDefaultAsync((MediaAsset x) => x.ObjectKey == text, cancellationToken);
+				mediaAssetId = requestedMediaAssetId
+			});
 		}
 		if (existingMediaAssetId.HasValue && existingMediaAssetId != mediaAsset?.Id)
 		{
@@ -1950,29 +1934,6 @@ public class RentalContractService : IRentalContractService
 				mediaAsset2.Status = MediaStatus.Uploaded;
 				mediaAsset2.UpdatedAt = now;
 			}
-		}
-		if (mediaAsset == null)
-		{
-			mediaAsset = new MediaAsset
-			{
-				Id = Guid.NewGuid(),
-				OwnerUserId = ownerUserId,
-				BucketName = fallbackBucketName,
-				ObjectKey = text,
-				OriginalFileName = Path.GetFileName(text),
-				StoredFileName = Path.GetFileName(text),
-				ContentType = GuessContentType(text),
-				FileSize = 0,
-				Scope = scope,
-				Visibility = visibility,
-				Status = MediaStatus.Linked,
-				LinkedEntityType = linkedEntityType,
-				LinkedEntityId = linkedEntityId,
-				CreatedAt = now,
-				UpdatedAt = now
-			};
-			context.MediaAssets.Add(mediaAsset);
-			return mediaAsset;
 		}
 		mediaAsset.OwnerUserId = ownerUserId;
 		mediaAsset.Scope = scope;
@@ -2103,23 +2064,6 @@ public class RentalContractService : IRentalContractService
 	private static string NormalizeFieldName(string? value)
 	{
 		return string.IsNullOrWhiteSpace(value) ? string.Empty : value.Replace("_", string.Empty, StringComparison.Ordinal).Trim().ToLowerInvariant();
-	}
-
-	private static string NormalizeObjectKey(string objectKey)
-	{
-		return objectKey.Replace('\\', '/').Trim().TrimStart('/');
-	}
-
-	private static string GuessContentType(string objectKey)
-	{
-		return Path.GetExtension(objectKey).ToLowerInvariant() switch
-		{
-			".jpg" or ".jpeg" => "image/jpeg",
-			".png" => "image/png",
-			".webp" => "image/webp",
-			".pdf" => "application/pdf",
-			_ => "application/octet-stream"
-		};
 	}
 
 	private static int GetSnapshotMaxOccupants(RentalContract contract)

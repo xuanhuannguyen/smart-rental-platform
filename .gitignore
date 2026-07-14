@@ -4,6 +4,7 @@
 !/.gitignore
 !/README.md
 !/docker-compose.yml
+!/quality-gate.ps1
 !/client/
 !/client/**
 !/server/

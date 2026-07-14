@@ -17,9 +17,9 @@ import type {
 
 interface LegalDocumentRequest {
   documentType: string;
-  frontImageObjectKey: string;
-  backImageObjectKey: string;
-  extraImageObjectKey?: string | null;
+  frontMediaAssetId?: string | null;
+  backMediaAssetId?: string | null;
+  extraMediaAssetId?: string | null;
   documentNumber: string;
 }
 

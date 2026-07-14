@@ -29,13 +29,10 @@ interface AppendixChangeForm {
   documentType: string;
   documentNumber: string;
   frontMediaAssetId: string | null;
-  frontImageObjectKey: string;
   frontImageUrl: string;
   backMediaAssetId: string | null;
-  backImageObjectKey: string;
   backImageUrl: string;
   extraMediaAssetId: string | null;
-  extraImageObjectKey: string;
   extraImageUrl: string;
   removeOccupantId: string;
   newMainTenantUserId: string;
@@ -58,13 +55,10 @@ function createEmptyChange(today: string, defaultEndDate: string): AppendixChang
     documentType: 'CCCD',
     documentNumber: '',
     frontMediaAssetId: null,
-    frontImageObjectKey: '',
     frontImageUrl: '',
     backMediaAssetId: null,
-    backImageObjectKey: '',
     backImageUrl: '',
     extraMediaAssetId: null,
-    extraImageObjectKey: '',
     extraImageUrl: '',
     removeOccupantId: '',
     newMainTenantUserId: '',
@@ -174,13 +168,10 @@ function buildAddOccupantForm(newValue: string | null | undefined, today: string
     documentType: toFormString(document.documentType) || 'CCCD',
     documentNumber: toFormString(document.documentNumber),
     frontMediaAssetId,
-    frontImageObjectKey: toFormString(document.frontImageObjectKey),
     frontImageUrl: frontMediaAssetId ? buildPrivateMediaViewUrl(frontMediaAssetId) : '',
     backMediaAssetId,
-    backImageObjectKey: toFormString(document.backImageObjectKey),
     backImageUrl: backMediaAssetId ? buildPrivateMediaViewUrl(backMediaAssetId) : '',
     extraMediaAssetId,
-    extraImageObjectKey: toFormString(document.extraImageObjectKey),
     extraImageUrl: extraMediaAssetId ? buildPrivateMediaViewUrl(extraMediaAssetId) : '',
   };
 }
@@ -235,9 +226,9 @@ export const CreateAppendixModal: React.FC<Props> = ({ contract, appendix, onClo
     () => contract.occupants.filter((occupant) => occupant.status === 'Active'),
     [contract.occupants]
   );
-
-  const removableOccupants = activeOccupants.filter((occupant) => occupant.id !== contract.currentUserOccupantId);
-  const mainTenantCandidates = activeOccupants.filter((occupant) => Boolean(occupant.userId));
+  
+  const removableOccupants = activeOccupants;
+  const mainTenantCandidates = activeOccupants;
 
   const [effectiveDate, setEffectiveDate] = useState(appendix?.effectiveDate ?? today);
   const [changes, setChanges] = useState<AppendixChangeForm[]>(() =>
@@ -301,7 +292,6 @@ export const CreateAppendixModal: React.FC<Props> = ({ contract, appendix, onClo
     try {
       const uploaded = await uploadImage(file, 'LegalDocument');
       updateChange(changeId, `${field}MediaAssetId` as keyof AppendixChangeForm, uploaded.mediaAssetId || null);
-      updateChange(changeId, `${field}ImageObjectKey` as keyof AppendixChangeForm, uploaded.objectKey);
       updateChange(changeId, `${field}ImageUrl` as keyof AppendixChangeForm, uploaded.url);
     } catch (err) {
       setError(getApiErrorMessage(err, 'Không thể tải ảnh giấy tờ lên.'));
@@ -352,7 +342,7 @@ export const CreateAppendixModal: React.FC<Props> = ({ contract, appendix, onClo
             !change.newOccupantDateOfBirth ||
             !change.documentType.trim() ||
             !change.documentNumber.trim() ||
-            (!change.frontMediaAssetId && !change.frontImageObjectKey.trim())
+            !change.frontMediaAssetId
           ) {
             throw new Error(`Thay đổi #${changeNum}: Vui lòng nhập đầy đủ thông tin cá nhân và ảnh mặt trước giấy tờ.`);
           }
@@ -370,11 +360,8 @@ export const CreateAppendixModal: React.FC<Props> = ({ contract, appendix, onClo
                 documentType: change.documentType,
                 documentNumber: change.documentNumber.trim(),
                 frontMediaAssetId: change.frontMediaAssetId || null,
-                frontImageObjectKey: change.frontImageObjectKey.trim(),
                 backMediaAssetId: change.backMediaAssetId || null,
-                backImageObjectKey: change.backImageObjectKey.trim() || null,
-                extraMediaAssetId: change.extraMediaAssetId || null,
-                extraImageObjectKey: change.extraImageObjectKey.trim() || null
+                extraMediaAssetId: change.extraMediaAssetId || null
               }
             })
           });
@@ -559,36 +546,30 @@ export const CreateAppendixModal: React.FC<Props> = ({ contract, appendix, onClo
                           label="Ảnh mặt trước giấy tờ"
                           required
                           imageUrl={change.frontImageUrl}
-                          objectKey={change.frontImageObjectKey}
                           uploading={uploadingField === `${change.id}:front`}
                           onUpload={(file) => void uploadDocumentImage(change.id, 'front', file)}
                           onRemove={() => {
                             updateChange(change.id, 'frontMediaAssetId', null);
-                            updateChange(change.id, 'frontImageObjectKey', '');
                             updateChange(change.id, 'frontImageUrl', '');
                           }}
                         />
                         <DocumentImageUploadField
                           label="Ảnh mặt sau giấy tờ"
                           imageUrl={change.backImageUrl}
-                          objectKey={change.backImageObjectKey}
                           uploading={uploadingField === `${change.id}:back`}
                           onUpload={(file) => void uploadDocumentImage(change.id, 'back', file)}
                           onRemove={() => {
                             updateChange(change.id, 'backMediaAssetId', null);
-                            updateChange(change.id, 'backImageObjectKey', '');
                             updateChange(change.id, 'backImageUrl', '');
                           }}
                         />
                         <DocumentImageUploadField
                           label="Ảnh bổ sung"
                           imageUrl={change.extraImageUrl}
-                          objectKey={change.extraImageObjectKey}
                           uploading={uploadingField === `${change.id}:extra`}
                           onUpload={(file) => void uploadDocumentImage(change.id, 'extra', file)}
                           onRemove={() => {
                             updateChange(change.id, 'extraMediaAssetId', null);
-                            updateChange(change.id, 'extraImageObjectKey', '');
                             updateChange(change.id, 'extraImageUrl', '');
                           }}
                         />
@@ -706,7 +687,6 @@ export const CreateAppendixModal: React.FC<Props> = ({ contract, appendix, onClo
 interface DocumentImageUploadFieldProps {
   label: string;
   imageUrl?: string;
-  objectKey: string;
   required?: boolean;
   uploading: boolean;
   onUpload: (file: File | null) => void;
@@ -716,13 +696,12 @@ interface DocumentImageUploadFieldProps {
 function DocumentImageUploadField({
   label,
   imageUrl,
-  objectKey,
   required = false,
   uploading,
   onUpload,
   onRemove
 }: DocumentImageUploadFieldProps) {
-  const previewSrc = imageUrl || (objectKey ? toAssetUrl(objectKey) : '');
+  const previewSrc = imageUrl || '';
   return (
     <div className="form-group">
       <label>
@@ -741,7 +720,6 @@ function DocumentImageUploadField({
               border: '1px solid #e2e8f0'
             }}
           />
-          {objectKey && <span style={{ fontSize: 12, color: '#64748b', wordBreak: 'break-all' }}>{objectKey}</span>}
         </div>
       ) : (
         <div
@@ -786,7 +764,7 @@ function DocumentImageUploadField({
           </button>
         )}
       </div>
-      {required && <input value={previewSrc || objectKey} onChange={() => undefined} required style={{ display: 'none' }} />}
+      {required && <input value={previewSrc} onChange={() => undefined} required style={{ display: 'none' }} />}
     </div>
   );
 }

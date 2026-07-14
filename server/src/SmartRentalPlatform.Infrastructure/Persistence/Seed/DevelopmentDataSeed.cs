@@ -181,9 +181,6 @@ public static class DevelopmentDataSeed
                 DocumentType = KycDocumentType.CCCD,
                 EkycProvider = EkycProvider.VNPT,
                 EkycSessionId = "dev-approved-tenant-session",
-                FrontImageObjectKey = string.Empty,
-                BackImageObjectKey = string.Empty,
-                SelfieImageObjectKey = string.Empty,
                 SelfieCaptureMethod = SelfieCaptureMethod.Upload,
                 OcrFullName = "Nguyen Tenant Demo",
                 OcrCitizenIdMasked = "079********001",
@@ -418,9 +415,6 @@ public static class DevelopmentDataSeed
             UserId = userId,
             DocumentType = KycDocumentType.CCCD,
             EkycProvider = EkycProvider.VNPT,
-            FrontImageObjectKey = string.Empty,
-            BackImageObjectKey = string.Empty,
-            SelfieImageObjectKey = string.Empty,
             OcrFullName = fullName,
             OcrCitizenIdMasked = citizenIdMasked,
             CitizenIdHash = citizenIdHash,
@@ -473,7 +467,6 @@ public static class DevelopmentDataSeed
             {
                 Id = Guid.Parse("40000000-0000-0000-0000-000000000001"),
                 RoomingHouseId = ApprovedHouseId,
-                ObjectKey = string.Empty,
                 ImageUrl = string.Empty,
                 Caption = "Mặt tiền nhà trọ Hoa Sen",
                 IsCover = true,
@@ -485,8 +478,6 @@ public static class DevelopmentDataSeed
             {
                 RoomingHouseId = ApprovedHouseId,
                 DocumentType = LegalDocumentType.LAND_USE_CERTIFICATE,
-                FrontImageObjectKey = string.Empty,
-                BackImageObjectKey = string.Empty,
                 DocumentNumberMasked = "*****6789",
                 DocumentNumberHash = "demo-hoa-sen-legal-document-hash",
                 UploadedAt = SeededAt,
@@ -672,7 +663,6 @@ public static class DevelopmentDataSeed
         {
             Id = Guid.NewGuid(),
             RoomingHouseId = roomingHouseId,
-            ObjectKey = string.Empty,
             ImageUrl = string.Empty,
             Caption = coverCaption,
             IsCover = true,
@@ -874,7 +864,6 @@ public static class DevelopmentDataSeed
         {
             Id = Guid.NewGuid(),
             RoomId = roomId,
-            ObjectKey = string.Empty,
             ImageUrl = string.Empty,
             Caption = caption,
             IsCover = true,

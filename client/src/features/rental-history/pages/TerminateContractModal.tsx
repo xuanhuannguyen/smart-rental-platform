@@ -495,8 +495,7 @@ export function buildFinalInvoiceMeterReadings(
     return {
       serviceTypeId: service.serviceTypeId,
       previousReading: latestReading ? null : Number(draft.previousReading),
-      currentReading: Number(draft.currentReading),
-      proofImageObjectKey: null
+      currentReading: Number(draft.currentReading)
     };
   });
 }

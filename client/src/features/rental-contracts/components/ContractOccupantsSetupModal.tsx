@@ -28,13 +28,10 @@ interface OccupantForm {
   documentType: string;
   documentNumber: string;
   frontMediaAssetId: string | null;
-  frontImageObjectKey: string;
   frontImageUrl: string;
   backMediaAssetId: string | null;
-  backImageObjectKey: string;
   backImageUrl: string;
   extraMediaAssetId: string | null;
-  extraImageObjectKey: string;
   extraImageUrl: string;
 }
 
@@ -74,13 +71,10 @@ function createMainTenantForm(email?: string | null): OccupantForm {
     documentType: 'CCCD',
     documentNumber: '',
     frontMediaAssetId: null,
-    frontImageObjectKey: '',
     frontImageUrl: '',
     backMediaAssetId: null,
-    backImageObjectKey: '',
     backImageUrl: '',
     extraMediaAssetId: null,
-    extraImageObjectKey: '',
     extraImageUrl: ''
   };
 }
@@ -102,13 +96,10 @@ function createEmptyOccupantForm(moveInDate: string): OccupantForm {
     documentType: 'CCCD',
     documentNumber: '',
     frontMediaAssetId: null,
-    frontImageObjectKey: '',
     frontImageUrl: '',
     backMediaAssetId: null,
-    backImageObjectKey: '',
     backImageUrl: '',
     extraMediaAssetId: null,
-    extraImageObjectKey: '',
     extraImageUrl: ''
   };
 }
@@ -137,13 +128,10 @@ function mapOccupantToForm(
     documentType: occupant.document?.documentType ?? 'CCCD',
     documentNumber: '',
     frontMediaAssetId: occupant.document?.frontMediaAssetId ?? null,
-    frontImageObjectKey: occupant.document?.frontImageObjectKey ?? '',
     frontImageUrl: occupant.document?.frontImageUrl ?? '',
     backMediaAssetId: occupant.document?.backMediaAssetId ?? null,
-    backImageObjectKey: occupant.document?.backImageObjectKey ?? '',
     backImageUrl: occupant.document?.backImageUrl ?? '',
     extraMediaAssetId: occupant.document?.extraMediaAssetId ?? null,
-    extraImageObjectKey: occupant.document?.extraImageObjectKey ?? '',
     extraImageUrl: occupant.document?.extraImageUrl ?? ''
   };
 }
@@ -337,7 +325,7 @@ export function ContractOccupantsSetupModal({
     if (
       !occupant.documentType.trim() ||
       !occupant.documentNumber.trim() ||
-      (!occupant.frontMediaAssetId && !occupant.frontImageObjectKey.trim())
+      !occupant.frontMediaAssetId
     ) {
       return 'Người ở nhập thủ công cần có loại giấy tờ, số giấy tờ và ảnh mặt trước.';
     }
@@ -413,7 +401,6 @@ export function ContractOccupantsSetupModal({
     try {
       const uploaded = await uploadImage(file, 'LegalDocument');
       updateOccupant(occupantId, `${field}MediaAssetId` as keyof OccupantForm, uploaded.mediaAssetId || null);
-      updateOccupant(occupantId, `${field}ImageObjectKey` as keyof OccupantForm, uploaded.objectKey);
       updateOccupant(occupantId, `${field}ImageUrl` as keyof OccupantForm, uploaded.url);
     } catch (err) {
       setError(getApiErrorMessage(err, 'Không thể tải ảnh giấy tờ lên.'));
@@ -460,11 +447,8 @@ export function ContractOccupantsSetupModal({
                 documentType: occupant.documentType,
                 documentNumber: occupant.documentNumber.trim(),
                 frontMediaAssetId: occupant.frontMediaAssetId || null,
-                frontImageObjectKey: occupant.frontImageObjectKey.trim(),
                 backMediaAssetId: occupant.backMediaAssetId || null,
-                backImageObjectKey: occupant.backImageObjectKey.trim() || null,
-                extraMediaAssetId: occupant.extraMediaAssetId || null,
-                extraImageObjectKey: occupant.extraImageObjectKey.trim() || null
+                extraMediaAssetId: occupant.extraMediaAssetId || null
               }
             : null
         }))
@@ -617,12 +601,10 @@ export function ContractOccupantsSetupModal({
                           label="Ảnh mặt trước giấy tờ"
                           required
                           imageUrl={occupant.frontImageUrl}
-                          objectKey={occupant.frontImageObjectKey}
                           uploading={uploadingField === `${occupant.id}:front`}
                           onUpload={(file) => void uploadDocumentImage(occupant.id, 'front', file)}
                           onRemove={() => {
                             updateOccupant(occupant.id, 'frontMediaAssetId', null);
-                            updateOccupant(occupant.id, 'frontImageObjectKey', '');
                             updateOccupant(occupant.id, 'frontImageUrl', '');
                           }}
                         />
@@ -630,12 +612,10 @@ export function ContractOccupantsSetupModal({
                         <DocumentImageUploadField
                           label="Ảnh mặt sau giấy tờ"
                           imageUrl={occupant.backImageUrl}
-                          objectKey={occupant.backImageObjectKey}
                           uploading={uploadingField === `${occupant.id}:back`}
                           onUpload={(file) => void uploadDocumentImage(occupant.id, 'back', file)}
                           onRemove={() => {
                             updateOccupant(occupant.id, 'backMediaAssetId', null);
-                            updateOccupant(occupant.id, 'backImageObjectKey', '');
                             updateOccupant(occupant.id, 'backImageUrl', '');
                           }}
                         />
@@ -643,12 +623,10 @@ export function ContractOccupantsSetupModal({
                         <DocumentImageUploadField
                           label="Ảnh bổ sung"
                           imageUrl={occupant.extraImageUrl}
-                          objectKey={occupant.extraImageObjectKey}
                           uploading={uploadingField === `${occupant.id}:extra`}
                           onUpload={(file) => void uploadDocumentImage(occupant.id, 'extra', file)}
                           onRemove={() => {
                             updateOccupant(occupant.id, 'extraMediaAssetId', null);
-                            updateOccupant(occupant.id, 'extraImageObjectKey', '');
                             updateOccupant(occupant.id, 'extraImageUrl', '');
                           }}
                         />
@@ -716,7 +694,6 @@ export function ContractOccupantsSetupModal({
 interface DocumentImageUploadFieldProps {
   label: string;
   imageUrl?: string;
-  objectKey: string;
   required?: boolean;
   uploading: boolean;
   onUpload: (file: File | null) => void;
@@ -726,13 +703,12 @@ interface DocumentImageUploadFieldProps {
 function DocumentImageUploadField({
   label,
   imageUrl,
-  objectKey,
   required = false,
   uploading,
   onUpload,
   onRemove
 }: DocumentImageUploadFieldProps) {
-  const previewSrc = imageUrl || (objectKey ? toAssetUrl(objectKey) : '');
+  const previewSrc = imageUrl || '';
   return (
     <div className="form-group">
       <label>
@@ -751,7 +727,6 @@ function DocumentImageUploadField({
               border: '1px solid #e2e8f0'
             }}
           />
-          {objectKey && <span style={{ fontSize: 12, color: '#64748b', wordBreak: 'break-all' }}>{objectKey}</span>}
         </div>
       ) : (
         <div
@@ -794,7 +769,7 @@ function DocumentImageUploadField({
           </button>
         )}
       </div>
-      {required && <input value={previewSrc || objectKey} onChange={() => undefined} required style={{ display: 'none' }} />}
+      {required && <input value={previewSrc} onChange={() => undefined} required style={{ display: 'none' }} />}
     </div>
   );
 }

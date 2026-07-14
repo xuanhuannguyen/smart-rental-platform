@@ -14,7 +14,7 @@ public class UserServiceTests : IDisposable
     private readonly TestDatabaseFixture _fixture = new();
 
     [Fact]
-    public async Task UpdateUserProfileAsync_ShouldLinkAvatarMediaAssetAndKeepCompatibilityUrl()
+    public async Task UpdateUserProfileAsync_ShouldLinkAvatarMediaAssetAndResolveMediaAssetUrl()
     {
         var user = TestDataBuilder.BuildUser(email: "avatar-link@unit.test", displayName: "Avatar Link");
         var mediaAsset = new MediaAsset
@@ -44,7 +44,6 @@ public class UserServiceTests : IDisposable
             new UpdateUserProfileRequest
             {
                 DisplayName = "Avatar Link Updated",
-                AvatarUrl = "/api/media/public/public/avatars/2026/07/11/avatar.jpg",
                 AvatarMediaAssetId = mediaAsset.Id
             });
 
@@ -52,8 +51,9 @@ public class UserServiceTests : IDisposable
         var updatedAsset = _fixture.Context.MediaAssets.Single(x => x.Id == mediaAsset.Id);
 
         Assert.Equal(mediaAsset.Id, updatedUser.AvatarMediaAssetId);
-        Assert.Equal("/api/media/public/public/avatars/2026/07/11/avatar.jpg", updatedUser.AvatarUrl);
+        Assert.Null(updatedUser.AvatarUrl);
         Assert.Equal(mediaAsset.Id, result.AvatarMediaAssetId);
+        Assert.Equal($"/api/media/public/{mediaAsset.Id:D}", result.AvatarUrl);
         Assert.Equal(nameof(SmartRentalPlatform.Domain.Entities.Users.User), updatedAsset.LinkedEntityType);
         Assert.Equal(user.Id, updatedAsset.LinkedEntityId);
         Assert.Equal(MediaStatus.Linked, updatedAsset.Status);
@@ -90,11 +90,82 @@ public class UserServiceTests : IDisposable
             new UpdateUserProfileRequest
             {
                 DisplayName = "Avatar Invalid Updated",
-                AvatarUrl = "/api/media/public/public/room-images/2026/07/11/room.jpg",
                 AvatarMediaAssetId = mediaAsset.Id
             }));
 
         Assert.Equal("Media asset được chọn không phải avatar hợp lệ.", exception.Message);
+    }
+
+    [Fact]
+    public async Task GetCurrentUserAsync_ShouldIgnoreLegacyRelativeAvatarUrl_WhenNoMediaAsset()
+    {
+        var user = TestDataBuilder.BuildUser(email: "avatar-legacy@unit.test", displayName: "Avatar Legacy");
+        user.AvatarUrl = "/api/media/public/legacy-avatar-path";
+
+        _fixture.Context.Users.Add(user);
+        await _fixture.Context.SaveChangesAsync();
+
+        var service = CreateService(user.Id);
+
+        var result = await service.GetCurrentUserAsync();
+
+        Assert.Null(result.AvatarUrl);
+        Assert.Null(result.AvatarMediaAssetId);
+    }
+
+    [Fact]
+    public async Task GetCurrentUserAsync_ShouldPreserveExternalAvatarUrl_WhenNoMediaAsset()
+    {
+        var user = TestDataBuilder.BuildUser(email: "avatar-external@unit.test", displayName: "Avatar External");
+        user.AvatarUrl = "https://example.test/avatar.jpg";
+
+        _fixture.Context.Users.Add(user);
+        await _fixture.Context.SaveChangesAsync();
+
+        var service = CreateService(user.Id);
+
+        var result = await service.GetCurrentUserAsync();
+
+        Assert.Equal("https://example.test/avatar.jpg", result.AvatarUrl);
+        Assert.Null(result.AvatarMediaAssetId);
+    }
+
+    [Fact]
+    public async Task GetCurrentUserAsync_ShouldRenderLinkedAvatarMediaAssetUrl_AndIgnoreLegacyAvatarUrl()
+    {
+        var user = TestDataBuilder.BuildUser(email: "avatar-render@unit.test", displayName: "Avatar Render");
+        var avatarAsset = new MediaAsset
+        {
+            Id = Guid.NewGuid(),
+            OwnerUserId = user.Id,
+            BucketName = "test-bucket",
+            ObjectKey = "public/avatars/2026/07/14/avatar-render.jpg",
+            OriginalFileName = "avatar-render.jpg",
+            StoredFileName = "avatar-render.jpg",
+            ContentType = "image/jpeg",
+            FileSize = 1234,
+            Scope = MediaScope.Avatar,
+            Visibility = MediaVisibility.Public,
+            Status = MediaStatus.Linked,
+            LinkedEntityType = nameof(SmartRentalPlatform.Domain.Entities.Users.User),
+            LinkedEntityId = user.Id,
+            CreatedAt = DateTimeOffset.UtcNow,
+            UpdatedAt = DateTimeOffset.UtcNow
+        };
+
+        user.AvatarUrl = "/api/media/public/legacy-avatar-path";
+        user.AvatarMediaAssetId = avatarAsset.Id;
+
+        _fixture.Context.Users.Add(user);
+        _fixture.Context.MediaAssets.Add(avatarAsset);
+        await _fixture.Context.SaveChangesAsync();
+
+        var service = CreateService(user.Id);
+
+        var result = await service.GetCurrentUserAsync();
+
+        Assert.Equal(avatarAsset.Id, result.AvatarMediaAssetId);
+        Assert.Equal($"/api/media/public/{avatarAsset.Id:D}", result.AvatarUrl);
     }
 
     private UserService CreateService(Guid userId)

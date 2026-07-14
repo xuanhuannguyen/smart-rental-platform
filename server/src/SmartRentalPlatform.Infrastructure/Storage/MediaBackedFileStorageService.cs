@@ -129,9 +129,8 @@ public sealed class MediaBackedFileStorageService : IFileStorageService
         return new FileUploadResponse
         {
             MediaAssetId = mediaAsset.Id,
-            ObjectKey = storedObject.ObjectKey,
             Url = visibility == MediaVisibility.Public
-                ? storedObject.PublicUrl ?? PublicMediaPathBuilder.Build(storedObject.ObjectKey)
+                ? PublicMediaPathBuilder.Build(mediaAsset.Id)
                 : PrivateMediaPathBuilder.Build(mediaAsset.Id)
         };
     }

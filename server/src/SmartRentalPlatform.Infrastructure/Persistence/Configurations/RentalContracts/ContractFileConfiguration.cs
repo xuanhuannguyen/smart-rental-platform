@@ -18,14 +18,12 @@ public class ContractFileConfiguration : IEntityTypeConfiguration<ContractFile>
         builder.Property(x => x.RentalContractId).HasColumnName("contract_id").IsRequired();
         builder.Property(x => x.RentalContractAppendixId).HasColumnName("appendix_id");
         builder.Property(x => x.MediaAssetId).HasColumnName("media_asset_id");
-        builder.Property(x => x.StorageObjectKey).HasColumnName("storage_object_key").HasColumnType("text").IsRequired();
         builder.Property(x => x.FileVariant)
             .HasColumnName("file_variant")
             .HasConversion<string>()
             .HasMaxLength(30)
             .HasDefaultValue(ContractFileVariant.Raw)
             .IsRequired();
-        builder.Property(x => x.FileUrl).HasColumnName("file_url").HasColumnType("text");
         builder.Property(x => x.CreatedAt).HasColumnName("created_at").IsRequired();
 
         builder.HasOne(x => x.RentalContract)

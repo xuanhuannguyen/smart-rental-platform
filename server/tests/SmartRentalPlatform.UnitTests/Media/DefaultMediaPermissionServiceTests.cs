@@ -169,8 +169,6 @@ public class DefaultMediaPermissionServiceTests : IClassFixture<TestDatabaseFixt
         fixture.Context.RoomingHouseLegalDocuments.Add(new RoomingHouseLegalDocument
         {
             RoomingHouseId = roomingHouseId,
-            FrontImageObjectKey = "private/legal/front.jpg",
-            BackImageObjectKey = "private/legal/back.jpg",
             DocumentNumberMasked = "123***",
             DocumentNumberHash = "hash",
             UploadedAt = DateTimeOffset.UtcNow,
@@ -381,7 +379,6 @@ public class DefaultMediaPermissionServiceTests : IClassFixture<TestDatabaseFixt
                     RentalContractId = contractId,
                     MediaAssetId = mediaAssetId,
                     MediaAsset = mediaAsset,
-                    StorageObjectKey = mediaAsset.ObjectKey,
                     FileVariant = variant,
                     CreatedAt = DateTimeOffset.UtcNow
                 }
@@ -577,7 +574,6 @@ public class DefaultMediaPermissionServiceTests : IClassFixture<TestDatabaseFixt
                     RentalContractAppendixId = appendixId,
                     MediaAssetId = mediaAssetId,
                     MediaAsset = mediaAsset,
-                    StorageObjectKey = mediaAsset.ObjectKey,
                     FileVariant = variant,
                     CreatedAt = DateTimeOffset.UtcNow
                 }
@@ -736,7 +732,6 @@ public class DefaultMediaPermissionServiceTests : IClassFixture<TestDatabaseFixt
             PreviousReading = 0,
             CurrentReading = 100,
             Consumption = 100,
-            ProofImageObjectKey = mediaAsset.ObjectKey,
             ProofMediaAssetId = mediaAssetId,
             RecordedByLandlordUserId = landlordId,
             ReadingAt = DateTimeOffset.UtcNow,

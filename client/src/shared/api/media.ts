@@ -8,6 +8,7 @@ export type MediaWorkflowScope =
   | 'RoomingHouse'
   | 'Room'
   | 'LegalDocument'
+  | 'KycDocument'
   | 'Avatar'
   | 'HouseRule'
   | 'MeterReading'
@@ -30,10 +31,6 @@ export interface MediaAssetActionResponse {
 
 export interface MediaWorkflowUploadResult {
   mediaAssetId: string;
-  /**
-   * @deprecated Compatibility-only value for legacy forms. New private flows should use mediaAssetId with media routes.
-   */
-  objectKey: string;
   url: string;
   status: string;
 }
@@ -48,6 +45,7 @@ const MEDIA_SCOPE_BY_UPLOAD_SCOPE: Record<MediaWorkflowScope, number> = {
   RoomingHouse: 1,
   Room: 2,
   LegalDocument: 3,
+  KycDocument: 4,
   Avatar: 10,
   HouseRule: 9,
   MeterReading: 7,
@@ -58,6 +56,7 @@ const MEDIA_VISIBILITY_BY_UPLOAD_SCOPE: Record<MediaWorkflowScope, number> = {
   RoomingHouse: 1,
   Room: 1,
   LegalDocument: 2,
+  KycDocument: 2,
   Avatar: 1,
   HouseRule: 2,
   MeterReading: 2,
@@ -129,7 +128,6 @@ export async function uploadFileViaMediaWorkflow(
 
   return {
     mediaAssetId: finalized.mediaAssetId,
-    objectKey: extractObjectKeyFromMediaUrl(finalized.viewUrl) || extractObjectKeyFromMediaUrl(finalized.downloadUrl) || '',
     url: finalized.viewUrl || finalized.downloadUrl || '',
     status: finalized.status,
   };
@@ -173,11 +171,3 @@ function isApiUrl(url: string): boolean {
   return url.startsWith('/api/') || url.startsWith('api/');
 }
 
-function extractObjectKeyFromMediaUrl(url?: string | null): string {
-  if (!url) {
-    return '';
-  }
-
-  const match = url.match(/\/api\/media\/public\/(.+)$/i);
-  return match?.[1] ?? '';
-}

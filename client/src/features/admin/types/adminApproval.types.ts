@@ -78,9 +78,6 @@ export interface AdminRoomingHouseDetail extends AdminRoomingHouseListItem {
     backMediaAssetId?: string | null;
     extraMediaAssetId?: string | null;
     documentType: string;
-    frontImageObjectKey: string;
-    backImageObjectKey: string;
-    extraImageObjectKey?: string | null;
     frontImageUrl?: string | null;
     backImageUrl?: string | null;
     extraImageUrl?: string | null;
@@ -89,7 +86,6 @@ export interface AdminRoomingHouseDetail extends AdminRoomingHouseListItem {
   } | null;
   images: Array<{
     id: string;
-    objectKey: string;
     imageUrl: string;
     caption?: string | null;
     isCover: boolean;

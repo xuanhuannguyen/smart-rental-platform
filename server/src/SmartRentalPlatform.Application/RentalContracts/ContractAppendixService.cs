@@ -22,7 +22,7 @@ public class ContractAppendixService : IContractAppendixService
 {
     private const string PdfContentType = "application/pdf";
     private static readonly JsonSerializerOptions JsonOptions = new(JsonSerializerDefaults.Web);
-    private sealed record LinkedMediaAssetResolution(Guid MediaAssetId, string ObjectKey);
+    private sealed record LinkedMediaAssetResolution(Guid MediaAssetId);
 
     private readonly IAppDbContext context;
     private readonly IContractSignatureOtpService contractSignatureOtpService;
@@ -525,14 +525,14 @@ public class ContractAppendixService : IContractAppendixService
     {
         if (appendix.Files.Any(x =>
                 x.FileVariant == fileVariant &&
-                x.StorageObjectKey.EndsWith(".pdf", StringComparison.OrdinalIgnoreCase)))
+                x.MediaAssetId.HasValue))
         {
             return;
         }
 
         var renderOptions = await BuildAppendixRenderOptionsAsync(appendix, fileVariant, cancellationToken);
         var pdfBytes = contractPdfRenderer.RenderSignedContractAppendix(appendix, renderOptions);
-        var originalFileName = BuildLegacyFileName(appendix, fileVariant, now);
+        var originalFileName = BuildFileName(appendix, fileVariant, now);
         var mediaObjectKey = mediaObjectKeyFactory.Create(MediaScope.ContractAppendixPdf, MediaVisibility.Private, originalFileName);
 
         MediaStoredObjectResult? storedObject = null;
@@ -558,7 +558,6 @@ public class ContractAppendixService : IContractAppendixService
                 Id = contractFileId,
                 RentalContractId = appendix.RentalContractId,
                 RentalContractAppendixId = appendix.Id,
-                StorageObjectKey = storedObject.ObjectKey,
                 FileVariant = fileVariant,
                 CreatedAt = now
             };
@@ -904,15 +903,12 @@ public class ContractAppendixService : IContractAppendixService
                 CreatedAt = now,
                 UpdatedAt = now
             };
-            var frontAsset = await EnsureContractOccupantDocumentMediaAssetAsync(ownerUserId, newDoc, documentRequest.FrontMediaAssetId, documentRequest.FrontImageObjectKey, newDoc.FrontMediaAssetId, now, cancellationToken);
-            var backAsset = await EnsureOptionalContractOccupantDocumentMediaAssetAsync(ownerUserId, newDoc, documentRequest.BackMediaAssetId, documentRequest.BackImageObjectKey, newDoc.BackMediaAssetId, now, cancellationToken);
-            var extraAsset = await EnsureOptionalContractOccupantDocumentMediaAssetAsync(ownerUserId, newDoc, documentRequest.ExtraMediaAssetId, documentRequest.ExtraImageObjectKey, newDoc.ExtraMediaAssetId, now, cancellationToken);
+            var frontAsset = await EnsureContractOccupantDocumentMediaAssetAsync(ownerUserId, newDoc, documentRequest.FrontMediaAssetId, newDoc.FrontMediaAssetId, nameof(documentRequest.FrontMediaAssetId), now, cancellationToken);
+            var backAsset = await EnsureOptionalContractOccupantDocumentMediaAssetAsync(ownerUserId, newDoc, documentRequest.BackMediaAssetId, newDoc.BackMediaAssetId, now, cancellationToken);
+            var extraAsset = await EnsureOptionalContractOccupantDocumentMediaAssetAsync(ownerUserId, newDoc, documentRequest.ExtraMediaAssetId, newDoc.ExtraMediaAssetId, now, cancellationToken);
             newDoc.FrontMediaAssetId = frontAsset.MediaAssetId;
-            newDoc.FrontImageObjectKey = frontAsset.ObjectKey;
             newDoc.BackMediaAssetId = backAsset?.MediaAssetId;
-            newDoc.BackImageObjectKey = backAsset?.ObjectKey;
             newDoc.ExtraMediaAssetId = extraAsset?.MediaAssetId;
-            newDoc.ExtraImageObjectKey = extraAsset?.ObjectKey;
             occupant.Documents.Add(newDoc);
             context.ContractOccupantDocuments.Add(newDoc);
         }
@@ -1592,8 +1588,7 @@ public class ContractAppendixService : IContractAppendixService
 
         if (string.IsNullOrWhiteSpace(occupant.Document.DocumentType) ||
             string.IsNullOrWhiteSpace(occupant.Document.DocumentNumber) ||
-            (!occupant.Document.FrontMediaAssetId.HasValue &&
-             string.IsNullOrWhiteSpace(occupant.Document.FrontImageObjectKey)))
+            !occupant.Document.FrontMediaAssetId.HasValue)
         {
             throw new BadRequestException(
                 ErrorCodes.RentalContractInvalidOccupant,
@@ -2343,7 +2338,7 @@ public class ContractAppendixService : IContractAppendixService
         return Math.Max(months, 1);
     }
 
-    private static string BuildLegacyFileName(
+    private static string BuildFileName(
         ContractAppendix appendix,
         ContractFileVariant fileVariant,
         DateTimeOffset now)
@@ -2423,9 +2418,7 @@ public class ContractAppendixService : IContractAppendixService
             RentalContractId = file.RentalContractId,
             RentalContractAppendixId = file.RentalContractAppendixId,
             MediaAssetId = file.MediaAssetId,
-            StorageObjectKey = file.StorageObjectKey,
             FileVariant = file.FileVariant.ToString(),
-            FileUrl = file.FileUrl,
             ViewUrl = file.MediaAssetId.HasValue
                 ? PrivateMediaPathBuilder.Build(file.MediaAssetId.Value)
                 : null,
@@ -2499,37 +2492,42 @@ public class ContractAppendixService : IContractAppendixService
         Guid ownerUserId,
         ContractOccupantDocument document,
         Guid? requestedMediaAssetId,
-        string? objectKey,
         Guid? existingMediaAssetId,
+        string requiredFieldName,
         DateTimeOffset now,
         CancellationToken cancellationToken)
     {
+        if (!requestedMediaAssetId.HasValue)
+        {
+            throw new BadRequestException(
+                ErrorCodes.ValidationError,
+                "Media asset là bắt buộc.",
+                new { field = requiredFieldName });
+        }
+
         var mediaAsset = await ResolveLinkedMediaAssetAsync(
-            requestedMediaAssetId,
-            objectKey,
+            requestedMediaAssetId.Value,
             existingMediaAssetId,
             ownerUserId,
             MediaScope.KycDocument,
             MediaVisibility.Private,
             nameof(ContractOccupantDocument),
             document.Id,
-            "legacy-private-storage",
             now,
             cancellationToken);
 
-        return new LinkedMediaAssetResolution(mediaAsset.Id, mediaAsset.ObjectKey);
+        return new LinkedMediaAssetResolution(mediaAsset.Id);
     }
 
     private async Task<LinkedMediaAssetResolution?> EnsureOptionalContractOccupantDocumentMediaAssetAsync(
         Guid ownerUserId,
         ContractOccupantDocument document,
         Guid? requestedMediaAssetId,
-        string? objectKey,
         Guid? existingMediaAssetId,
         DateTimeOffset now,
         CancellationToken cancellationToken)
     {
-        if (!requestedMediaAssetId.HasValue && string.IsNullOrWhiteSpace(objectKey))
+        if (!requestedMediaAssetId.HasValue)
         {
             if (existingMediaAssetId.HasValue)
             {
@@ -2552,56 +2550,32 @@ public class ContractAppendixService : IContractAppendixService
             ownerUserId,
             document,
             requestedMediaAssetId,
-            objectKey,
             existingMediaAssetId,
+            nameof(requestedMediaAssetId),
             now,
             cancellationToken);
     }
 
     private async Task<MediaAsset> ResolveLinkedMediaAssetAsync(
-        Guid? requestedMediaAssetId,
-        string? objectKey,
+        Guid requestedMediaAssetId,
         Guid? existingMediaAssetId,
         Guid ownerUserId,
         MediaScope scope,
         MediaVisibility visibility,
         string linkedEntityType,
         Guid linkedEntityId,
-        string fallbackBucketName,
         DateTimeOffset now,
         CancellationToken cancellationToken)
     {
-        MediaAsset? mediaAsset = null;
-        string normalizedObjectKey;
+        var mediaAsset = await context.MediaAssets
+            .FirstOrDefaultAsync(x => x.Id == requestedMediaAssetId, cancellationToken);
 
-        if (requestedMediaAssetId.HasValue)
+        if (mediaAsset is null)
         {
-            mediaAsset = await context.MediaAssets
-                .FirstOrDefaultAsync(x => x.Id == requestedMediaAssetId.Value, cancellationToken);
-
-            if (mediaAsset is null)
-            {
-                throw new BadRequestException(
-                    ErrorCodes.ValidationError,
-                    "Media asset được chọn không tồn tại.",
-                    new { mediaAssetId = requestedMediaAssetId.Value });
-            }
-
-            normalizedObjectKey = mediaAsset.ObjectKey;
-        }
-        else
-        {
-            if (string.IsNullOrWhiteSpace(objectKey))
-            {
-                throw new BadRequestException(
-                    ErrorCodes.ValidationError,
-                    "Mã lưu trữ tệp là bắt buộc.",
-                    new { field = nameof(objectKey) });
-            }
-
-            normalizedObjectKey = NormalizeObjectKey(objectKey);
-            mediaAsset = await context.MediaAssets
-                .FirstOrDefaultAsync(x => x.ObjectKey == normalizedObjectKey, cancellationToken);
+            throw new BadRequestException(
+                ErrorCodes.ValidationError,
+                "Media asset được chọn không tồn tại.",
+                new { mediaAssetId = requestedMediaAssetId });
         }
 
         if (existingMediaAssetId.HasValue && existingMediaAssetId != mediaAsset?.Id)
@@ -2616,31 +2590,6 @@ public class ContractAppendixService : IContractAppendixService
                 currentLinkedAsset.Status = MediaStatus.Uploaded;
                 currentLinkedAsset.UpdatedAt = now;
             }
-        }
-
-        if (mediaAsset is null)
-        {
-            mediaAsset = new MediaAsset
-            {
-                Id = Guid.NewGuid(),
-                OwnerUserId = ownerUserId,
-                BucketName = fallbackBucketName,
-                ObjectKey = normalizedObjectKey,
-                OriginalFileName = Path.GetFileName(normalizedObjectKey),
-                StoredFileName = Path.GetFileName(normalizedObjectKey),
-                ContentType = GuessContentType(normalizedObjectKey),
-                FileSize = 0,
-                Scope = scope,
-                Visibility = visibility,
-                Status = MediaStatus.Linked,
-                LinkedEntityType = linkedEntityType,
-                LinkedEntityId = linkedEntityId,
-                CreatedAt = now,
-                UpdatedAt = now
-            };
-
-            context.MediaAssets.Add(mediaAsset);
-            return mediaAsset;
         }
 
         mediaAsset.OwnerUserId = ownerUserId;
@@ -2660,23 +2609,6 @@ public class ContractAppendixService : IContractAppendixService
         return string.IsNullOrWhiteSpace(value)
             ? string.Empty
             : value.Replace("_", string.Empty, StringComparison.Ordinal).Trim().ToLowerInvariant();
-    }
-
-    private static string NormalizeObjectKey(string objectKey)
-    {
-        return objectKey.Replace('\\', '/').Trim().TrimStart('/');
-    }
-
-    private static string GuessContentType(string objectKey)
-    {
-        return Path.GetExtension(objectKey).ToLowerInvariant() switch
-        {
-            ".jpg" or ".jpeg" => "image/jpeg",
-            ".png" => "image/png",
-            ".webp" => "image/webp",
-            ".pdf" => "application/pdf",
-            _ => "application/octet-stream"
-        };
     }
 
     private static TEnum ParseEnum<TEnum>(string value, string message)

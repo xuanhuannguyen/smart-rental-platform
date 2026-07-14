@@ -13,9 +13,6 @@ public class KycVerification
     public Guid? FrontMediaAssetId { get; set; }
     public Guid? BackMediaAssetId { get; set; }
     public Guid? SelfieMediaAssetId { get; set; }
-    public string FrontImageObjectKey { get; set; } = string.Empty;
-    public string BackImageObjectKey { get; set; } = string.Empty;
-    public string SelfieImageObjectKey { get; set; } = string.Empty;
     public SelfieCaptureMethod SelfieCaptureMethod { get; set; } = SelfieCaptureMethod.Upload;
     public string? OcrFullName { get; set; }
     public string? OcrCitizenIdMasked { get; set; }

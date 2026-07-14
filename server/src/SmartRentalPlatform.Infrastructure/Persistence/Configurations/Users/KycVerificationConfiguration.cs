@@ -20,9 +20,6 @@ public class KycVerificationConfiguration : IEntityTypeConfiguration<KycVerifica
         builder.Property(x => x.FrontMediaAssetId).HasColumnName("front_media_asset_id");
         builder.Property(x => x.BackMediaAssetId).HasColumnName("back_media_asset_id");
         builder.Property(x => x.SelfieMediaAssetId).HasColumnName("selfie_media_asset_id");
-        builder.Property(x => x.FrontImageObjectKey).HasColumnName("front_image_object_key").HasColumnType("text").IsRequired();
-        builder.Property(x => x.BackImageObjectKey).HasColumnName("back_image_object_key").HasColumnType("text").IsRequired();
-        builder.Property(x => x.SelfieImageObjectKey).HasColumnName("selfie_image_object_key").HasColumnType("text").IsRequired();
         builder.Property(x => x.SelfieCaptureMethod).HasColumnName("selfie_capture_method").HasConversion<string>().HasMaxLength(30).IsRequired();
         builder.Property(x => x.OcrFullName).HasColumnName("ocr_full_name").HasMaxLength(150);
         builder.Property(x => x.OcrCitizenIdMasked).HasColumnName("ocr_citizen_id_masked").HasMaxLength(50);

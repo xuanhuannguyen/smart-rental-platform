@@ -21,9 +21,6 @@ namespace SmartRentalPlatform.Infrastructure.Persistence.Configurations.Properti
             builder.Property(x => x.ExtraMediaAssetId).HasColumnName("extra_media_asset_id");
             builder.Property(x => x.DocumentType).HasColumnName("document_type").HasConversion<string>()
                 .HasMaxLength(50).HasDefaultValue(LegalDocumentType.LAND_USE_CERTIFICATE).IsRequired();
-            builder.Property(x => x.FrontImageObjectKey).HasColumnName("front_image_object_key").HasColumnType("text").IsRequired();
-            builder.Property(x => x.BackImageObjectKey).HasColumnName("back_image_object_key").HasColumnType("text").IsRequired();
-            builder.Property(x => x.ExtraImageObjectKey).HasColumnName("extra_image_object_key").HasColumnType("text");
             builder.Property(x => x.DocumentNumberMasked).HasColumnName("document_number_masked").HasMaxLength(100).IsRequired();
             builder.Property(x => x.DocumentNumberHash).HasColumnName("document_number_hash").HasColumnType("text").IsRequired();
             builder.Property(x => x.UploadedAt).HasColumnName("uploaded_at").IsRequired();

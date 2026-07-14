@@ -77,7 +77,6 @@ public static class DependencyInjection
         services.AddDataProtection();
         services.AddMemoryCache();
         services.AddScoped<IConversationCacheService, ConversationCacheService>();
-        services.AddScoped<IPrivateStorageService>(provider => provider.GetRequiredService<S3StorageService>());
         services.AddScoped<IHashService, Sha256HashService>();
         services.AddScoped<ISensitiveDataProtector, DataProtectionSensitiveDataProtector>();
         services.AddHostedService<RoomDepositExpirationWorker>();

@@ -3,7 +3,6 @@ using Amazon.S3;
 using Amazon.S3.Model;
 using Amazon.S3.Util;
 using Microsoft.Extensions.Options;
-using SmartRentalPlatform.Application.Common.Interfaces;
 using SmartRentalPlatform.Application.Common.Interfaces.Media;
 using SmartRentalPlatform.Application.Common.Media;
 using SmartRentalPlatform.Application.Common.Models.Media;
@@ -11,7 +10,7 @@ using SmartRentalPlatform.Infrastructure.Options;
 
 namespace SmartRentalPlatform.Infrastructure.Storage;
 
-public sealed class S3StorageService : IMediaStorageService, IPrivateStorageService
+public sealed class S3StorageService : IMediaStorageService
 {
     private readonly IAmazonS3 _s3Client;
     private readonly S3StorageOptions _options;
@@ -47,34 +46,9 @@ public sealed class S3StorageService : IMediaStorageService, IPrivateStorageServ
         {
             BucketName = _options.BucketName,
             ObjectKey = normalizedObjectKey,
-            PublicUrl = IsPublicObject(normalizedObjectKey)
-                ? PublicMediaPathBuilder.Build(normalizedObjectKey)
-                : null,
+            PublicUrl = null,
             StoredFileName = Path.GetFileName(normalizedObjectKey)
         };
-    }
-
-    public async Task<string> UploadAsync(
-        Stream content,
-        string contentType,
-        string objectKey,
-        CancellationToken cancellationToken = default)
-    {
-        var normalizedObjectKey = NormalizeObjectKey(objectKey);
-
-        var putRequest = new PutObjectRequest
-        {
-            BucketName = _options.BucketName,
-            Key = normalizedObjectKey,
-            InputStream = content,
-            ContentType = contentType,
-            AutoCloseStream = false,
-            AutoResetStreamPosition = content.CanSeek,
-            ServerSideEncryptionMethod = ServerSideEncryptionMethod.AES256
-        };
-
-        await _s3Client.PutObjectAsync(putRequest, cancellationToken);
-        return normalizedObjectKey;
     }
 
     public async Task<Stream> OpenReadAsync(
@@ -165,7 +139,7 @@ public sealed class S3StorageService : IMediaStorageService, IPrivateStorageServ
 
         if (IsPublicObject(normalizedObjectKey))
         {
-            return Task.FromResult(PublicMediaPathBuilder.Build(normalizedObjectKey));
+            throw new NotSupportedException("Public media download URLs must be resolved from a mediaAssetId.");
         }
 
         var url = _s3Client.GetPreSignedURL(new GetPreSignedUrlRequest

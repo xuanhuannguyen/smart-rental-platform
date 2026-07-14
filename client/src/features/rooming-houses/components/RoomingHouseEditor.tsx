@@ -57,11 +57,8 @@ const emptyHouseForm: RoomingHouseBasicInfoRequest = {
 const emptyLegalForm: UpdateLegalDocumentRequest = {
   documentType: '',
   frontMediaAssetId: null,
-  frontImageObjectKey: '',
   backMediaAssetId: null,
-  backImageObjectKey: '',
   extraMediaAssetId: null,
-  extraImageObjectKey: '',
   documentNumber: '',
 };
 
@@ -93,11 +90,8 @@ function buildLegalForm(detail: RoomingHouseDetail | null): UpdateLegalDocumentR
   return {
     documentType: detail.legalDocument?.documentType ?? '',
     frontMediaAssetId: detail.legalDocument?.frontMediaAssetId ?? null,
-    frontImageObjectKey: detail.legalDocument?.frontImageObjectKey ?? '',
     backMediaAssetId: detail.legalDocument?.backMediaAssetId ?? null,
-    backImageObjectKey: detail.legalDocument?.backImageObjectKey ?? '',
     extraMediaAssetId: detail.legalDocument?.extraMediaAssetId ?? null,
-    extraImageObjectKey: detail.legalDocument?.extraImageObjectKey ?? '',
     documentNumber: detail.legalDocument?.documentNumberMasked ?? '',
   };
 }
@@ -372,7 +366,6 @@ export default function RoomingHouseEditor({
       setLegalForm((current) => ({
         ...current,
         [`${fieldName}MediaAssetId`]: uploaded.mediaAssetId || null,
-        [`${fieldName}ImageObjectKey`]: uploaded.objectKey,
       }));
     } catch (error) {
       setMessage(
@@ -388,7 +381,6 @@ export default function RoomingHouseEditor({
     setLegalForm((current) => ({
       ...current,
       [`${fieldName}MediaAssetId`]: null,
-      [`${fieldName}ImageObjectKey`]: '',
     }));
   }
 
@@ -672,7 +664,6 @@ export default function RoomingHouseEditor({
                 <LegalImageField
                   label="Ảnh mặt trước"
                   imageUrl={roomingHouse?.legalDocument?.frontImageUrl ?? ''}
-                  objectKey={legalForm.frontImageObjectKey}
                   readOnly={!canEditLegalDocument}
                   onUpload={(file) => void uploadLegalImage('front', file)}
                   onRemove={() => removeLegalImage('front')}
@@ -680,7 +671,6 @@ export default function RoomingHouseEditor({
                 <LegalImageField
                   label="Ảnh mặt sau"
                   imageUrl={roomingHouse?.legalDocument?.backImageUrl ?? ''}
-                  objectKey={legalForm.backImageObjectKey}
                   readOnly={!canEditLegalDocument}
                   onUpload={(file) => void uploadLegalImage('back', file)}
                   onRemove={() => removeLegalImage('back')}
@@ -688,7 +678,6 @@ export default function RoomingHouseEditor({
                 <LegalImageField
                   label="Ảnh bổ sung"
                   imageUrl={roomingHouse?.legalDocument?.extraImageUrl ?? ''}
-                  objectKey={legalForm.extraImageObjectKey ?? ''}
                   readOnly={!canEditLegalDocument}
                   optional
                   onUpload={(file) => void uploadLegalImage('extra', file)}
@@ -919,23 +908,21 @@ function NumberField({
 function LegalImageField({
   label,
   imageUrl,
-  objectKey,
-  readOnly,
+  readOnly = false,
   optional = false,
   onUpload,
   onRemove,
 }: {
   label: string;
   imageUrl?: string;
-  objectKey: string;
-  readOnly: boolean;
+  readOnly?: boolean;
   optional?: boolean;
   onUpload: (file: File | null) => void;
   onRemove: () => void;
 }) {
   const fileInputRef = useRef<HTMLInputElement | null>(null);
   const [isDragOver, setIsDragOver] = useState(false);
-  const previewSrc = imageUrl || (objectKey ? toAssetUrl(objectKey) : '');
+  const previewSrc = imageUrl || '';
 
   function handleDrop(e: React.DragEvent<HTMLDivElement>) {
     e.preventDefault();

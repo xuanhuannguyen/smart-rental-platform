@@ -43,12 +43,12 @@ public class MediaBackedFileStorageServiceTests : IClassFixture<TestDatabaseFixt
             },
             FileUploadScope.Room);
 
-        Assert.Equal("public/room-images/2026/07/09/room.jpg", response.ObjectKey);
-        Assert.Equal("/uploads/public/room-images/2026/07/09/room.jpg", response.Url);
+        Assert.NotNull(response.MediaAssetId);
+        Assert.Equal($"/api/media/public/{response.MediaAssetId:D}", response.Url);
         Assert.NotNull(storage.LastRequest);
         Assert.Equal(MediaVisibility.Public, storage.LastRequest!.Visibility);
 
-        var asset = await new MediaAssetService(_fixture.Context).GetByObjectKeyAsync(response.ObjectKey);
+        var asset = await _fixture.Context.MediaAssets.FindAsync(response.MediaAssetId!.Value);
         Assert.NotNull(asset);
         Assert.Equal(MediaScope.RoomImage, asset!.Scope);
         Assert.Equal(MediaStatus.Uploaded, asset.Status);
@@ -69,9 +69,9 @@ public class MediaBackedFileStorageServiceTests : IClassFixture<TestDatabaseFixt
         await using var stream = new MemoryStream(Encoding.UTF8.GetBytes("pdf-content"));
         var response = await service.UploadPdfAsync(stream, "house-rule.pdf", FileUploadScope.HouseRule);
 
-        Assert.Equal("public/rooming-house-rule-pdfs/2026/07/09/rule.pdf", response.ObjectKey);
+        Assert.NotNull(response.MediaAssetId);
 
-        var asset = await new MediaAssetService(_fixture.Context).GetByObjectKeyAsync(response.ObjectKey);
+        var asset = await _fixture.Context.MediaAssets.FindAsync(response.MediaAssetId!.Value);
         Assert.NotNull(asset);
         Assert.Equal(MediaScope.RoomingHouseRulePdf, asset!.Scope);
         Assert.Equal("application/pdf", asset.ContentType);
@@ -99,13 +99,12 @@ public class MediaBackedFileStorageServiceTests : IClassFixture<TestDatabaseFixt
             },
             FileUploadScope.ChatAttachment);
 
-        Assert.Equal("private/chat-attachments/2026/07/11/chat.pdf", response.ObjectKey);
         Assert.NotNull(response.MediaAssetId);
         Assert.Equal($"/api/media/private/{response.MediaAssetId}", response.Url);
         Assert.NotNull(storage.LastRequest);
         Assert.Equal(MediaVisibility.Private, storage.LastRequest!.Visibility);
 
-        var asset = await new MediaAssetService(_fixture.Context).GetByObjectKeyAsync(response.ObjectKey);
+        var asset = await _fixture.Context.MediaAssets.FindAsync(response.MediaAssetId!.Value);
         Assert.NotNull(asset);
         Assert.Equal(MediaScope.ChatAttachment, asset!.Scope);
         Assert.Equal(MediaVisibility.Private, asset.Visibility);
@@ -128,7 +127,7 @@ public class MediaBackedFileStorageServiceTests : IClassFixture<TestDatabaseFixt
             {
                 BucketName = "local-media",
                 ObjectKey = request.ObjectKey,
-                PublicUrl = $"/uploads/{request.ObjectKey}",
+                PublicUrl = null,
                 StoredFileName = Path.GetFileName(request.ObjectKey)
             });
         }

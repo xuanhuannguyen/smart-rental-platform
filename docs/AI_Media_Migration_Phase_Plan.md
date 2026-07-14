@@ -14,6 +14,18 @@ Tài liệu này ưu tiên cách làm `foundation-first`, sau đó migrate từn
 
 ## Trạng thái implementation hiện tại
 
+### Final state sau cleanup 2026-07-14
+
+- Runtime hiện dùng `MediaAssetId` làm contract chính cho scope migration đã triển khai; object-key fallback cũ đã bị gỡ khỏi đường chạy business hiện tại.
+- `FilesController`, public route `GET /api/media/public/{**objectKey}`, admin private route `GET /api/admin/media/private?objectKey=...`, `IPrivateStorageService`, `LocalPrivateStorageService`, và `LocalFileStorageService` đã bị xóa khỏi code.
+- KYC submit/provider flow hiện mở file từ `IMediaAccessService` và gửi stream trực tiếp sang VNPT client; không còn giữ object-key fields trong entity/runtime contract.
+- `ContractFile`, appendix file generation, rooming-house rule PDF, property/legal images, meter proof, contract occupant documents, và avatar upload nội bộ đều đi qua media-core path hiện tại.
+- Migration `20260714092159_RemoveLegacyMediaCompatibilityFields` là mốc cleanup schema drop các cột legacy còn lại, gồm cả `meter_readings.proof_image_object_key`.
+- `SmartRentalPlatform.MediaMigrationTool` và `server/data/media-migration/` chỉ thuộc lịch sử migration; sau cleanup này chúng không còn được giữ như công cụ/quy trình vận hành.
+- Ngoại lệ chủ đích duy nhất còn lại là `User.AvatarUrl` cho external avatar; avatar upload nội bộ dùng `AvatarMediaAssetId`.
+
+Lưu ý: các section phase chi tiết bên dưới được giữ lại để tra lịch sử. Nếu mâu thuẫn với section này, hãy tin section này và trạng thái code/migration mới nhất.
+
 ### Mapping to new simplified plan
 
 - `Phase 1 - Thiết kế nền`: đã đạt
@@ -25,9 +37,10 @@ Tài liệu này ưu tiên cách làm `foundation-first`, sau đó migrate từn
 - `Phase 5C - Read Path Cutover`: đã chuyển các read path còn nhạy trong scope 5B sang ưu tiên `MediaAssetId`/media URL và scrub private object key khỏi response khi đã có media id
 - `Phase 5D - Legacy Compatibility Guard/Cleanup Prep`: đã đánh dấu deprecation/compatibility cho upload/route object-key cũ và thêm frontend media-id helper để caller mới không mở rộng object-key usage
 - `Phase 5E - Local Legacy Data Cleanup`: đã cleanup DB local sau khi user xác nhận dữ liệu demo/local không cần giữ; post-check còn 0 legacy references và 0 storage missing
-- `Phase 5F - Legacy API/Frontend Lockdown`: đã chặn legacy upload/admin private object-key route bằng `410 Gone` và bỏ frontend caller/endpoint registry trực tiếp `/api/files`
+- `Phase 5F - Legacy API/Frontend Lockdown`: đã chặn rồi tiến tới xóa legacy upload/admin private object-key route khỏi code; frontend cũng không còn caller/endpoint registry trực tiếp `/api/files`
 - `Phase 5G - Schema & Seed Hygiene`: đã dọn runtime seed khỏi fake legacy object keys, thêm/apply migration cleanup sample refs lịch sử, và xác nhận post-check còn 0 legacy references/storage missing
 - `Phase 5H - Reset/Re-seed & End-to-End Verification`: đã reset DB local, apply full migration chain, chạy API seed thật, post-reseed storage/readiness report sạch, backend/frontend build pass
+- `Phase 5I - Final Legacy Removal`: đã hoàn thành trong cleanup ngày `2026-07-14`, gồm remove runtime fallback, drop legacy fields khỏi model/schema target, retire migration tool/report artifacts, và chốt hướng reseed-thay-compatibility cho local/demo data
 
 Trong file này vẫn giữ phase map chi tiết cũ để tra lịch sử migration, nhưng khi team nói tới
 `Phase 1/Phase 2/Phase 3/Phase 4` theo plan mới rút gọn thì phải hiểu như sau:
@@ -69,7 +82,7 @@ Trạng thái code sau khi hoàn thành `Phase 4` mới:
 - `FinalizeUploadAsync` kiểm object metadata thật từ storage trước khi chuyển sang `Uploaded`
 - `MediaController` validate backend-proxy upload theo session metadata trước khi ghi storage
 - `MediaAccessService` chặn private asset chưa finalize, đã soft-delete, hoặc user không đủ quyền; deny case có audit log riêng
-- compatibility upload cũ vẫn còn giữ song song ở `FilesController`
+- legacy upload cũ không còn giữ song song ở runtime/controller path; caller mới đi qua media workflow
 - một số business flow vẫn còn compatibility/fallback field cũ nên cleanup/rollout vẫn là backlog phase sau
 - Phase 5A đã xác nhận chưa sẵn sàng xóa storage/field cũ; cần Phase 5B migration/backfill dry-run trước
 - Phase 5B hiện đã có:
@@ -82,13 +95,13 @@ Trạng thái code sau khi hoàn thành `Phase 4` mới:
 - DB local `localhost:5444` ngày 2026-07-13 đã reset sạch, apply migration mới nhất đến `20260713064804_InspectRemainingModelChanges`, chạy Phase 5B backfill apply để tạo/link 3 media asset còn thiếu, rồi dry-run lại sạch với 0 planned creates/links
 - Phase 5C đã cutover read path an toàn cho:
   - `RoomingHouseRule` PDF: response chỉ trả `pdfUrl` theo media route khi có `MediaAssetId`; frontend không còn coi `pdfObjectKey` là điều kiện bắt buộc sau upload mới
-  - `ContractOccupantDocument`: response dùng private media URL và scrub `Front/Back/ExtraImageObjectKey` khi đã có media id
+  - `ContractOccupantDocument`: response chỉ còn private media URL + `MediaAssetId`; runtime request path cũng đã bỏ fallback `Front/Back/ExtraImageObjectKey`
   - appendix occupant document editor: khi load change JSON có media id, frontend tự dựng private media view URL để preview thay vì cần object key
-- Phase 5C vẫn giữ request field/fallback object key để không phá compatibility và chưa xóa storage/endpoint/cột legacy
+- Ở mốc Phase 5C ban đầu request field/fallback object key còn được giữ; cleanup sau Phase 5H đã bắt đầu remove fallback ở property image, legal document, rooming-house rule, billing meter proof, và contract occupant document runtime/API path. Legacy column/route vẫn chưa drop.
 - Phase 5D đã thêm guard không-breaking:
   - `FilesController` legacy upload trả header `Deprecation`, `X-SRP-Media-Compatibility`, `X-SRP-Media-Replacement`
   - `FileUploadResponse` có `IsCompatibilityResponse` và `CompatibilityWarning`
-  - public object-key route `GET /api/media/public/{**objectKey}` có deprecation/replacement headers
+  - tại mốc đó, public object-key route `GET /api/media/public/{**objectKey}` có deprecation/replacement headers trước khi bị xóa
   - admin legacy private route `GET /api/admin/media/private?objectKey=...` có deprecation/replacement headers
   - frontend đánh dấu `objectKey` là deprecated trong upload result/type và thêm `toPrivateMediaAssetUrl(mediaAssetId)`
 - Phase 5D chưa remove route/field; đây là cleanup prep để các phase sau có tín hiệu runtime và compile-time rõ hơn
@@ -106,13 +119,14 @@ Trạng thái code sau khi hoàn thành `Phase 4` mới:
   - `POST /api/files/images` và `POST /api/files/pdfs` trả `410 Gone`
   - `GET /api/admin/media/private?objectKey=...` trả `410 Gone`
   - frontend không còn expose/use `ENDPOINTS.FILES`
-  - public object-key route vẫn giữ tạm vì public image URL/listing còn phụ thuộc
+  - cleanup sau đó đã xóa public object-key route; public image URL/listing hiện dùng mediaAssetId route
+  - cleanup ngày 2026-07-14 đã xóa luôn `FilesController` và admin private object-key route khỏi code
 - Phase 5G đã cleanup seed/schema hygiene:
   - runtime seed không còn tạo fake object keys kiểu `demo/...`, `seed/...`, `/uploads/...`
   - migration data-only `20260713153000_CleanupLegacySampleMediaReferences` cleanup các sample refs lịch sử `demo/%`, `kfc-scenario/%`, `seed/%`, `/uploads/%`
   - migration đã apply trên DB local `localhost:5444`
   - post-check với `phase5b --check-storage true` còn 0 legacy references, 0 storage missing, 0 storage errors
-  - legacy columns chưa drop vì DTO/business compatibility/fallback vẫn còn tồn tại
+  - legacy columns chưa drop dù nhiều DTO/runtime fallback đã được gỡ; hiện vẫn còn backlog cleanup ở schema, public route và vài flow hybrid
 - Phase 5H đã verify reset/reseed:
   - DB local `localhost:5444` đã được drop/reset vì dữ liệu local không cần giữ
   - full migration chain apply từ đầu tới `20260713153000_CleanupLegacySampleMediaReferences`
@@ -135,7 +149,7 @@ Theo code hiện có trong repo:
 - `Phase 8 - Legal document migration` đã được implement
 - `Phase 9 - Public property image migration backend` đã được implement
 - `Phase 10 - Public property image migration frontend` đã được implement ở mức public image consumption
-- `Phase 11 - Billing proof image migration` đã được implement ở mức backend/schema/permission foundation
+- `Phase 11 - Billing proof image migration` đã được implement ở mức backend/schema/permission foundation và runtime request/service cutover
 - `Phase 12 - Shared frontend asset API cleanup` đã được implement một phần theo hướng safe cleanup cho public/shared image helpers
 - `Phase 13 - Avatar and low-risk uploads` đã được implement cho avatar media linkage theo hướng compatibility
 
@@ -149,7 +163,7 @@ Các điểm chưa hoàn chỉnh nhưng đã biết từ code hiện tại:
 - upload compatibility vẫn đang trả contract cũ `ObjectKey/Url`
 - contract appendix chưa có migration/backfill cho dữ liệu appendix legacy cũ
 - legal document object cũ có thể vẫn đang nằm ở public object key cũ ở tầng storage thật dù metadata đã được migrate sang private semantics
-- public property image route vẫn đang mở theo `objectKey`; frontend hiện đã ưu tiên `imageUrl` backend trả về nhưng fetch layer public chưa chuyển hẳn sang `MediaAssetId`
+- public property image route nay đã đi qua `mediaAssetId`; frontend ưu tiên `imageUrl` backend trả về và không cần object-key route nữa
 - billing proof image hiện đã có `ProofMediaAssetId`, private access rule và backfill metadata; frontend upload/viewer chuyên biệt vẫn chưa được materialize
 - shared helper frontend hiện đã được tách rõ hơn cho public listing/property image, nhưng helper private/transitional vẫn còn giữ compatibility cũ để tránh lan sửa
 - avatar user-uploaded hiện đã có `AvatarMediaAssetId`, nhưng `AvatarUrl` vẫn được giữ song song để tương thích với external avatar và call site cũ
@@ -639,7 +653,7 @@ Chuẩn hóa việc admin view/download private file qua media layer chung.
 - admin KYC responses đã build URL theo `mediaAssetId` thay vì `objectKey`
 - `MediaAccessService` đã ghi audit `View`/`Download` với `IpAddress`, `UserAgent`, `MetadataJson`
 - `DefaultMediaPermissionService` đã allow admin truy cập private media qua media core
-- legacy endpoint `GET /api/admin/media/private?objectKey=...` vẫn còn giữ tạm cho module legal document chưa migrate xong, sẽ dọn ở Phase 8+
+- legacy endpoint `GET /api/admin/media/private?objectKey=...` đã được dọn sau khi legal/private read path chuyển hẳn sang `mediaAssetId`
 
 ---
 
@@ -815,6 +829,8 @@ Dọn frontend public image theo API mới, giảm phụ thuộc `toAssetUrl(obj
 - `MeterReading` đã có `ProofMediaAssetId`
 - migration `AddMeterReadingProofMediaAssets` đã thêm cột mới và backfill từ `ProofImageObjectKey` sang `media_assets`
 - `BillingService` đã link proof image vào `MediaAsset` khi tạo meter reading mới
+- `MeterReadingInput` hiện chỉ nhận `ProofMediaAssetId`; không còn request `ProofImageObjectKey`
+- `BillingService` không còn tự tạo/link legacy media asset từ object key ở runtime path
 - `LatestMeterReadingResponse` đã expose:
   - `ProofMediaAssetId`
   - `ProofImageUrl`
@@ -897,9 +913,9 @@ Migrate các phần ít rủi ro cuối để tránh làm bẩn context sớm.
   - `FileUploadScope.Avatar`
   - `MediaScope.Avatar`
   - `mediaAssetId` trong upload response
-- nhưng business entity `User` hiện vẫn chỉ lưu `AvatarUrl`
-- frontend profile hiện upload avatar xong lưu `uploadResult.url` vào `avatarUrl`
-- các màn hiển thị avatar hiện vẫn dùng `toAssetUrl`
+- business entity `User` hiện lưu cả `AvatarUrl` lẫn `AvatarMediaAssetId`
+- frontend profile hiện gửi cả `avatarUrl` và `avatarMediaAssetId`
+- avatar media nội bộ hiện resolve public URL từ `AvatarMediaAssetId`; `AvatarUrl` chỉ còn để giữ external/custom URL
 - Google login vẫn có thể set `AvatarUrl` thành external provider URL
 
 ### Kế hoạch an toàn được chốt

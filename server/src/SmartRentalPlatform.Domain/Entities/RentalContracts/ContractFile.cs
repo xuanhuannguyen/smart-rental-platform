@@ -13,11 +13,7 @@ namespace SmartRentalPlatform.Domain.Entities.RentalContracts
 
         public Guid? MediaAssetId { get; set; }
 
-        public string StorageObjectKey { get; set; } = string.Empty;
-
         public ContractFileVariant FileVariant { get; set; } = ContractFileVariant.Raw;
-
-        public string? FileUrl { get; set; }
 
         public DateTimeOffset CreatedAt { get; set; }
 

@@ -3,7 +3,6 @@ import { buildPrivateMediaViewUrl } from './media';
 
 export type PublicPropertyImageSource = {
   imageUrl?: string | null;
-  objectKey?: string | null;
 };
 
 export type AvatarImageSource = {
@@ -11,44 +10,30 @@ export type AvatarImageSource = {
   avatarMediaAssetId?: string | null;
 };
 
-// Generic asset helper for legacy/object-key-based flows and explicit API paths.
-// @deprecated Prefer media-id specific helpers such as toPrivateMediaAssetUrl or public image helpers.
-export function toAssetUrl(objectKeyOrUrl: string): string {
-  if (!objectKeyOrUrl) return '';
-  const trimmed = objectKeyOrUrl.trim();
+export function toAssetUrl(assetUrl: string): string {
+  if (!assetUrl) return '';
+  const trimmed = assetUrl.trim();
   if (trimmed === '' || trimmed === 'null' || trimmed === 'undefined') return '';
 
   if (/^https?:\/\//i.test(trimmed)) return trimmed;
   if (trimmed.startsWith('/api/')) return `${env.apiBaseUrl}${trimmed}`;
-  if (trimmed.startsWith('/uploads/')) return `${env.apiBaseUrl}${trimmed}`;
-  if (trimmed.startsWith('uploads/')) return `${env.apiBaseUrl}/${trimmed}`;
 
-  return `${env.apiBaseUrl}/uploads/${trimmed.replace(/^\/+/, '')}`;
+  return '';
 }
 
-export function toPublicAssetUrl(imageUrl?: string | null, objectKey?: string | null): string {
+export function toPublicAssetUrl(imageUrl?: string | null): string {
   const safeImageUrl = normalizeOptionalValue(imageUrl);
   if (safeImageUrl) {
     return toAssetUrl(safeImageUrl);
   }
 
-  const safeObjectKey = normalizeOptionalValue(objectKey);
-  if (!safeObjectKey) {
-    return '';
-  }
-
-  const normalizedObjectKey = safeObjectKey.replace(/\\/g, '/').replace(/^\/+/, '');
-  if (normalizedObjectKey.startsWith('public/')) {
-    return `${env.apiBaseUrl}/api/media/public/${normalizedObjectKey}`;
-  }
-
-  return toAssetUrl(normalizedObjectKey);
+  return '';
 }
 
 // Public listing/card images only need one field today, but we keep a dedicated helper
 // so future public-image routing changes do not leak back into shared UI code.
 export function toPublicListingImageUrl(imageUrl?: string | null): string {
-  return toPublicAssetUrl(imageUrl, imageUrl);
+  return toPublicAssetUrl(imageUrl);
 }
 
 export function toPublicPropertyImageUrl(image: PublicPropertyImageSource | null | undefined): string {
@@ -56,7 +41,7 @@ export function toPublicPropertyImageUrl(image: PublicPropertyImageSource | null
     return '';
   }
 
-  return toPublicAssetUrl(image.imageUrl, image.objectKey);
+  return toPublicAssetUrl(image.imageUrl);
 }
 
 export function toAvatarImageUrl(avatar?: string | null | AvatarImageSource): string {

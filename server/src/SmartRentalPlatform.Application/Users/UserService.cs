@@ -216,12 +216,15 @@ public class UserService : IUserService
         user.PhoneNumber = request.PhoneNumber?.Trim();
 
         var now = DateTimeOffset.UtcNow;
-        user.AvatarUrl = NormalizeOptionalText(request.AvatarUrl);
         user.AvatarMediaAssetId = await ResolveAvatarMediaAssetAsync(
             userId,
             request.AvatarMediaAssetId,
             now,
             cancellationToken);
+        if (user.AvatarMediaAssetId.HasValue)
+        {
+            user.AvatarUrl = null;
+        }
 
         var profile = await _dbContext.UserProfiles
             .FirstOrDefaultAsync(p => p.UserId == userId, cancellationToken);

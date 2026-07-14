@@ -33,7 +33,7 @@ public class RoomCommandServiceTests : IClassFixture<TestDatabaseFixture>
         var landlord = TestDataBuilder.BuildUser();
         var house = TestDataBuilder.BuildRoomingHouse(landlord.Id);
         var policy = TestDataBuilder.BuildRentalPolicy(house.Id);
-        var rule = new RoomingHouseRule { Id = Guid.NewGuid(), RoomingHouseId = house.Id, PdfObjectKey = "key_rule" };
+        var rule = new RoomingHouseRule { Id = Guid.NewGuid(), RoomingHouseId = house.Id, MediaAssetId = Guid.NewGuid() };
 
         context.Users.Add(landlord);
         context.RoomingHouses.Add(house);
@@ -67,7 +67,7 @@ public class RoomCommandServiceTests : IClassFixture<TestDatabaseFixture>
         var landlord = TestDataBuilder.BuildUser();
         var house = TestDataBuilder.BuildRoomingHouse(landlord.Id);
         var policy = TestDataBuilder.BuildRentalPolicy(house.Id);
-        var rule = new RoomingHouseRule { Id = Guid.NewGuid(), RoomingHouseId = house.Id, PdfObjectKey = "key_rule" };
+        var rule = new RoomingHouseRule { Id = Guid.NewGuid(), RoomingHouseId = house.Id, MediaAssetId = Guid.NewGuid() };
         var servicePrice = new RoomingHouseServicePrice { Id = Guid.NewGuid(), RoomingHouseId = house.Id, IsActive = true };
 
         context.Users.Add(landlord);
@@ -122,7 +122,7 @@ public class RoomCommandServiceTests : IClassFixture<TestDatabaseFixture>
         var landlord = TestDataBuilder.BuildUser(email: "area-landlord@example.com");
         var house = TestDataBuilder.BuildRoomingHouse(landlord.Id);
         var policy = TestDataBuilder.BuildRentalPolicy(house.Id);
-        var rule = new RoomingHouseRule { Id = Guid.NewGuid(), RoomingHouseId = house.Id, PdfObjectKey = "key_rule" };
+        var rule = new RoomingHouseRule { Id = Guid.NewGuid(), RoomingHouseId = house.Id, MediaAssetId = Guid.NewGuid() };
         var servicePrice = new RoomingHouseServicePrice { Id = Guid.NewGuid(), RoomingHouseId = house.Id, IsActive = true };
 
         context.Users.Add(landlord);
@@ -154,7 +154,7 @@ public class RoomCommandServiceTests : IClassFixture<TestDatabaseFixture>
         var landlord = TestDataBuilder.BuildUser(email: "dup-room-landlord@example.com");
         var house = TestDataBuilder.BuildRoomingHouse(landlord.Id);
         var policy = TestDataBuilder.BuildRentalPolicy(house.Id);
-        var rule = new RoomingHouseRule { Id = Guid.NewGuid(), RoomingHouseId = house.Id, PdfObjectKey = "key_rule" };
+        var rule = new RoomingHouseRule { Id = Guid.NewGuid(), RoomingHouseId = house.Id, MediaAssetId = Guid.NewGuid() };
         var servicePrice = new RoomingHouseServicePrice { Id = Guid.NewGuid(), RoomingHouseId = house.Id, IsActive = true };
         var existingRoom = TestDataBuilder.BuildRoom(house.Id, roomNumber: "DUP-01");
 

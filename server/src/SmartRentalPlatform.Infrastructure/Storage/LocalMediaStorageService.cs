@@ -43,9 +43,7 @@ public class LocalMediaStorageService : IMediaStorageService
         {
             BucketName = LocalBucketName,
             ObjectKey = normalizedObjectKey,
-            PublicUrl = normalizedObjectKey.StartsWith("public/", StringComparison.OrdinalIgnoreCase)
-                ? PublicMediaPathBuilder.Build(normalizedObjectKey)
-                : null,
+            PublicUrl = null,
             StoredFileName = Path.GetFileName(normalizedObjectKey)
         };
     }
@@ -134,7 +132,7 @@ public class LocalMediaStorageService : IMediaStorageService
             throw new NotSupportedException("Private media download URLs are not supported by local media storage.");
         }
 
-        return Task.FromResult(PublicMediaPathBuilder.Build(normalizedObjectKey));
+        throw new NotSupportedException("Public media download URLs must be resolved from a mediaAssetId.");
     }
 
     private string GetFullPath(string normalizedObjectKey)

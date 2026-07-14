@@ -79,7 +79,7 @@ public class RoomControllerTests : IClassFixture<CustomWebApplicationFactory>
         {
             Id = Guid.NewGuid(),
             RoomingHouseId = house.Id,
-            PdfObjectKey = "key_rule"
+            MediaAssetId = Guid.NewGuid()
         };
 
         context.Users.Add(landlord);
@@ -145,7 +145,7 @@ public class RoomControllerTests : IClassFixture<CustomWebApplicationFactory>
         {
             Id = Guid.NewGuid(),
             RoomingHouseId = house.Id,
-            PdfObjectKey = "key_rule"
+            MediaAssetId = Guid.NewGuid()
         };
         var servicePrice = new RoomingHouseServicePrice
         {
@@ -191,5 +191,85 @@ public class RoomControllerTests : IClassFixture<CustomWebApplicationFactory>
         var response = await _client.GetAsync($"/api/rooms/{Guid.NewGuid()}");
 
         Assert.Equal(HttpStatusCode.NotFound, response.StatusCode);
+    }
+
+    [Fact]
+    public async Task GetPublicById_ShouldExcludeLegacyPropertyImagesWithoutMediaAssetId()
+    {
+        using var scope = _factory.Services.CreateScope();
+        var context = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+        await DatabaseResetHelper.ResetDatabaseAsync(context);
+
+        var landlordId = Guid.NewGuid();
+        var landlord = new User
+        {
+            Id = landlordId,
+            Email = "public-room-landlord@example.com",
+            NormalizedEmail = "PUBLIC-ROOM-LANDLORD@EXAMPLE.COM",
+            DisplayName = "Public Room Landlord",
+            Status = UserStatus.Active
+        };
+
+        var house = new RoomingHouse
+        {
+            Id = Guid.NewGuid(),
+            LandlordUserId = landlordId,
+            Name = "Public House",
+            AddressLine = "456 Public Street",
+            WardCode = "W1",
+            ProvinceCode = "P1",
+            AddressDisplay = "456 Public Street, W1, P1",
+            ApprovalStatus = RoomingHouseApprovalStatus.Approved,
+            VisibilityStatus = RoomingHouseVisibilityStatus.Visible
+        };
+
+        var room = new Room
+        {
+            Id = Guid.NewGuid(),
+            RoomingHouseId = house.Id,
+            RoomNumber = "201",
+            Floor = 2,
+            AreaM2 = 24,
+            MaxOccupants = 2,
+            Status = RoomStatus.Available
+        };
+
+        var migratedAssetId = Guid.NewGuid();
+
+        context.Users.Add(landlord);
+        context.RoomingHouses.Add(house);
+        context.Rooms.Add(room);
+        context.PropertyImages.AddRange(
+            new PropertyImage
+            {
+                Id = Guid.NewGuid(),
+                RoomId = room.Id,
+                ImageUrl = "/uploads/legacy-room-image.jpg",
+                SortOrder = 0,
+                CreatedAt = DateTimeOffset.UtcNow
+            },
+            new PropertyImage
+            {
+                Id = Guid.NewGuid(),
+                RoomId = room.Id,
+                MediaAssetId = migratedAssetId,
+                ImageUrl = "/uploads/stale-room-image.jpg",
+                SortOrder = 1,
+                CreatedAt = DateTimeOffset.UtcNow
+            });
+        await context.SaveChangesAsync();
+
+        var response = await _client.GetAsync($"/api/public/rooms/{room.Id}");
+
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+
+        var body = await response.Content.ReadFromJsonAsync<ApiResponse<RoomResponse>>();
+        Assert.NotNull(body);
+        Assert.True(body!.Success);
+        Assert.NotNull(body.Data);
+
+        var image = Assert.Single(body.Data!.Images);
+        Assert.Equal(migratedAssetId, image.MediaAssetId);
+        Assert.Equal($"/api/media/public/{migratedAssetId:D}", image.ImageUrl);
     }
 }

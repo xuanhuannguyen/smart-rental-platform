@@ -12,9 +12,6 @@ namespace SmartRentalPlatform.Domain.Entities.Properties
         public Guid? BackMediaAssetId { get; set; }
         public Guid? ExtraMediaAssetId { get; set; }
         public LegalDocumentType DocumentType { get; set; } = LegalDocumentType.LAND_USE_CERTIFICATE;
-        public string FrontImageObjectKey { get; set; } = string.Empty;
-        public string BackImageObjectKey { get; set; } = string.Empty;
-        public string? ExtraImageObjectKey { get; set; }
         public string DocumentNumberMasked { get; set; } = string.Empty;
         public string DocumentNumberHash { get; set; } = string.Empty;
         public DateTimeOffset UploadedAt { get; set; }

@@ -21,7 +21,6 @@ namespace SmartRentalPlatform.Infrastructure.Persistence.Configurations.Properti
             builder.Property(x => x.RoomingHouseId).HasColumnName("rooming_house_id");
             builder.Property(x => x.RoomId).HasColumnName("room_id");
             builder.Property(x => x.MediaAssetId).HasColumnName("media_asset_id");
-            builder.Property(x => x.ObjectKey).HasColumnName("object_key").HasColumnType("text").IsRequired();
             builder.Property(x => x.ImageUrl).HasColumnName("image_url").HasColumnType("text").IsRequired();
             builder.Property(x => x.Caption).HasColumnName("caption").HasMaxLength(255);
             builder.Property(x => x.IsCover).HasColumnName("is_cover").HasDefaultValue(false).IsRequired();

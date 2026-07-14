@@ -109,9 +109,6 @@ public class AdminRoomingHouseApprovalService : IAdminRoomingHouseApprovalServic
                     BackMediaAssetId = house.LegalDocument.BackMediaAssetId,
                     ExtraMediaAssetId = house.LegalDocument.ExtraMediaAssetId,
                     DocumentType = house.LegalDocument.DocumentType.ToString(),
-                    FrontImageObjectKey = house.LegalDocument.FrontImageObjectKey,
-                    BackImageObjectKey = house.LegalDocument.BackImageObjectKey,
-                    ExtraImageObjectKey = house.LegalDocument.ExtraImageObjectKey,
                     FrontImageUrl = BuildPrivateLegalDocumentUrl(house.LegalDocument.FrontMediaAssetId),
                     BackImageUrl = BuildPrivateLegalDocumentUrl(house.LegalDocument.BackMediaAssetId),
                     ExtraImageUrl = BuildOptionalPrivateLegalDocumentUrl(house.LegalDocument.ExtraMediaAssetId),
@@ -121,13 +118,15 @@ public class AdminRoomingHouseApprovalService : IAdminRoomingHouseApprovalServic
                     UpdatedAt = house.LegalDocument.UpdatedAt
                 },
             Images = house.Images
+                .Where(x => x.MediaAssetId.HasValue)
                 .OrderBy(x => x.SortOrder)
                 .Select(x => new PropertyImageResponse
                 {
                     Id = x.Id,
                     MediaAssetId = x.MediaAssetId,
-                    ObjectKey = x.ObjectKey,
-                    ImageUrl = PublicMediaPathBuilder.Build(x.ObjectKey),
+                    ImageUrl = x.MediaAssetId.HasValue
+                        ? PublicMediaPathBuilder.Build(x.MediaAssetId.Value)
+                        : string.Empty,
                     Caption = x.Caption,
                     IsCover = x.IsCover,
                     SortOrder = x.SortOrder,

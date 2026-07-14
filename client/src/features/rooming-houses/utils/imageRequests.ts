@@ -3,7 +3,6 @@ import type { PropertyImageRequest } from '../types';
 type ExistingImage = {
   id: string;
   mediaAssetId?: string | null;
-  objectKey: string;
   imageUrl?: string;
   caption?: string | null;
   isCover: boolean;
@@ -14,7 +13,6 @@ export function toImageRequests(images: ExistingImage[]): PropertyImageRequest[]
   return images.map((image) => ({
     id: image.id,
     mediaAssetId: image.mediaAssetId,
-    objectKey: image.objectKey,
     imageUrl: image.imageUrl,
     caption: image.caption,
     isCover: image.isCover,
@@ -24,10 +22,10 @@ export function toImageRequests(images: ExistingImage[]): PropertyImageRequest[]
 
 export function cleanImages(images: PropertyImageRequest[]) {
   return images
-    .filter((image) => image.objectKey.trim().length > 0)
+    .filter((image) => Boolean(image.mediaAssetId))
     .map((image, index) => ({
       id: image.id,
-      objectKey: image.objectKey.trim(),
+      mediaAssetId: image.mediaAssetId ?? null,
       caption: image.caption,
       isCover: image.isCover,
       sortOrder: image.sortOrder || index + 1,

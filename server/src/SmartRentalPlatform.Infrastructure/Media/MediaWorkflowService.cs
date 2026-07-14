@@ -251,10 +251,10 @@ public class MediaWorkflowService : IMediaWorkflowService
     private static MediaFinalizeUploadResult BuildActionResult(MediaAsset mediaAsset)
     {
         var viewUrl = mediaAsset.Visibility == MediaVisibility.Public
-            ? PublicMediaPathBuilder.Build(mediaAsset.ObjectKey)
+            ? PublicMediaPathBuilder.Build(mediaAsset.Id)
             : PrivateMediaPathBuilder.Build(mediaAsset.Id);
         var downloadUrl = mediaAsset.Visibility == MediaVisibility.Public
-            ? PublicMediaPathBuilder.Build(mediaAsset.ObjectKey)
+            ? PublicMediaPathBuilder.Build(mediaAsset.Id)
             : PrivateMediaPathBuilder.Build(mediaAsset.Id, forceDownload: true);
 
         if (mediaAsset.Status == MediaStatus.Deleted)

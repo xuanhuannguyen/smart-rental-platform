@@ -151,13 +151,11 @@ export function ProfileInfoPage() {
     setIsSavingProfile(true);
 
     try {
-      let finalAvatarUrl = profileForm.avatarUrl;
       let finalAvatarMediaAssetId = profileForm.avatarMediaAssetId;
       if (selectedFile || isCropChanged) {
         const srcToCrop = previewUrl || toAvatarImageUrl(profileForm);
         const croppedFile = await cropAvatar(srcToCrop, cropParams.zoom, cropParams.position);
         const uploadResult = await uploadImage(croppedFile, 'Avatar');
-        finalAvatarUrl = uploadResult.url;
         finalAvatarMediaAssetId = uploadResult.mediaAssetId || null;
       }
 
@@ -166,7 +164,6 @@ export function ProfileInfoPage() {
         phoneNumber: profileForm.phoneNumber.trim() || null,
         emergencyContactName: profileForm.emergencyContactName.trim() || null,
         emergencyContactPhone: profileForm.emergencyContactPhone.trim() || null,
-        avatarUrl: finalAvatarUrl || null,
         avatarMediaAssetId: finalAvatarMediaAssetId || null
       });
 

@@ -16,28 +16,22 @@ namespace SmartRentalPlatform.Application.Kyc;
 public class KycService : IKycService
 {
     private readonly IAppDbContext _context;
-    private readonly IMediaObjectKeyFactory _mediaObjectKeyFactory;
-    private readonly IMediaStorageService _mediaStorageService;
-    private readonly IMediaAssetService _mediaAssetService;
     private readonly IVnptEkycClient _vnptEkycClient;
     private readonly IHashService _hashService;
+    private readonly IMediaAccessService _mediaAccessService;
     private readonly ISensitiveDataProtector _sensitiveDataProtector;
 
     public KycService(
         IAppDbContext context,
-        IMediaObjectKeyFactory mediaObjectKeyFactory,
-        IMediaStorageService mediaStorageService,
-        IMediaAssetService mediaAssetService,
         IVnptEkycClient vnptEkycClient,
         IHashService hashService,
+        IMediaAccessService mediaAccessService,
         ISensitiveDataProtector sensitiveDataProtector)
     {
         _context = context;
-        _mediaObjectKeyFactory = mediaObjectKeyFactory;
-        _mediaStorageService = mediaStorageService;
-        _mediaAssetService = mediaAssetService;
         _vnptEkycClient = vnptEkycClient;
         _hashService = hashService;
+        _mediaAccessService = mediaAccessService;
         _sensitiveDataProtector = sensitiveDataProtector;
     }
 
@@ -84,24 +78,28 @@ public class KycService : IKycService
         if (!Enum.TryParse<SelfieCaptureMethod>(request.SelfieCaptureMethod, ignoreCase: false, out var selfieMethod))
             throw new KycBusinessException(ErrorCodes.SelfieRequired, "Invalid selfie capture method.", 400);
 
-        KycStoredUpload? frontUpload = null;
-        KycStoredUpload? backUpload = null;
-        KycStoredUpload? selfieUpload = null;
         await using var transaction = await _context.BeginTransactionAsync(cancellationToken);
 
         try
         {
-            frontUpload = await UploadImageAsync(userId, request.FrontImage, cancellationToken);
-            backUpload = await UploadImageAsync(userId, request.BackImage, cancellationToken);
-            selfieUpload = await UploadImageAsync(userId, request.SelfieImage, cancellationToken);
+            var frontAsset = await GetAndValidateMediaAssetAsync(userId, request.FrontMediaAssetId, cancellationToken);
+            var backAsset = await GetAndValidateMediaAssetAsync(userId, request.BackMediaAssetId, cancellationToken);
+            var selfieAsset = await GetAndValidateMediaAssetAsync(userId, request.SelfieMediaAssetId, cancellationToken);
+            var frontMedia = await _mediaAccessService.OpenReadAsync(frontAsset.Id, userId, cancellationToken);
+            var backMedia = await _mediaAccessService.OpenReadAsync(backAsset.Id, userId, cancellationToken);
+            var selfieMedia = await _mediaAccessService.OpenReadAsync(selfieAsset.Id, userId, cancellationToken);
+
+            await using var frontStream = frontMedia.Stream;
+            await using var backStream = backMedia.Stream;
+            await using var selfieStream = selfieMedia.Stream;
 
             var ekyc = await _vnptEkycClient.VerifyAsync(new VnptEkycVerifyInput
             {
                 UserId = userId,
                 DocumentType = request.DocumentType,
-                FrontImageObjectKey = frontUpload.StoredObject.ObjectKey,
-                BackImageObjectKey = backUpload.StoredObject.ObjectKey,
-                SelfieImageObjectKey = selfieUpload.StoredObject.ObjectKey,
+                FrontImage = BuildFileInput(frontMedia),
+                BackImage = BuildFileInput(backMedia),
+                SelfieImage = BuildFileInput(selfieMedia),
                 SelfieCaptureMethod = request.SelfieCaptureMethod
             }, cancellationToken);
 
@@ -147,9 +145,6 @@ public class KycService : IKycService
                 DocumentType = documentType,
                 EkycProvider = EkycProvider.VNPT,
                 EkycSessionId = ekyc.SessionId,
-                FrontImageObjectKey = frontUpload.StoredObject.ObjectKey,
-                BackImageObjectKey = backUpload.StoredObject.ObjectKey,
-                SelfieImageObjectKey = selfieUpload.StoredObject.ObjectKey,
                 SelfieCaptureMethod = selfieMethod,
                 OcrFullName = ekyc.OcrFullName,
                 OcrCitizenIdMasked = ocrCitizenIdMasked,
@@ -177,21 +172,13 @@ public class KycService : IKycService
 
             _context.KycVerifications.Add(kyc);
 
-            kyc.FrontMediaAssetId = (await CreateMediaAssetAsync(
-                userId,
-                kyc.Id,
-                frontUpload,
-                cancellationToken)).Id;
-            kyc.BackMediaAssetId = (await CreateMediaAssetAsync(
-                userId,
-                kyc.Id,
-                backUpload,
-                cancellationToken)).Id;
-            kyc.SelfieMediaAssetId = (await CreateMediaAssetAsync(
-                userId,
-                kyc.Id,
-                selfieUpload,
-                cancellationToken)).Id;
+            kyc.FrontMediaAssetId = frontAsset.Id;
+            kyc.BackMediaAssetId = backAsset.Id;
+            kyc.SelfieMediaAssetId = selfieAsset.Id;
+
+            LinkMediaAsset(frontAsset, kyc.Id);
+            LinkMediaAsset(backAsset, kyc.Id);
+            LinkMediaAsset(selfieAsset, kyc.Id);
 
             if (finalStatus == KycVerificationStatus.PendingAdminReview)
             {
@@ -228,9 +215,8 @@ public class KycService : IKycService
         catch
         {
             await transaction.RollbackAsync(cancellationToken);
-            await CleanupUploadAsync(frontUpload, cancellationToken);
-            await CleanupUploadAsync(backUpload, cancellationToken);
-            await CleanupUploadAsync(selfieUpload, cancellationToken);
+            // Revert media asset statuses if needed, though rollback handles DB state.
+            // We don't delete media assets since they are user-uploaded via Media Workflow.
             throw;
         }
     }
@@ -286,82 +272,45 @@ public class KycService : IKycService
 
     private static void ValidateFiles(SubmitKycRequest request)
     {
-        if (request.FrontImage == null || request.FrontImage.Length == 0)
+        if (request.FrontMediaAssetId == Guid.Empty)
             throw new KycBusinessException(ErrorCodes.FrontImageRequired, "Front image is required.", 400);
 
-        if (request.BackImage == null || request.BackImage.Length == 0)
+        if (request.BackMediaAssetId == Guid.Empty)
             throw new KycBusinessException(ErrorCodes.BackImageRequired, "Back image is required.", 400);
 
-        if (request.SelfieImage == null || request.SelfieImage.Length == 0)
+        if (request.SelfieMediaAssetId == Guid.Empty)
             throw new KycBusinessException(ErrorCodes.SelfieRequired, "Selfie image is required.", 400);
     }
 
-    private async Task<KycStoredUpload> UploadImageAsync(
-        Guid userId,
-        IFormFile file,
-        CancellationToken cancellationToken)
+    private async Task<MediaAsset> GetAndValidateMediaAssetAsync(Guid userId, Guid mediaAssetId, CancellationToken cancellationToken)
     {
-        var mediaObjectKey = _mediaObjectKeyFactory.Create(
-            MediaScope.KycDocument,
-            MediaVisibility.Private,
-            file.FileName);
+        var asset = await _context.MediaAssets.FirstOrDefaultAsync(m => m.Id == mediaAssetId, cancellationToken);
+        if (asset == null || asset.OwnerUserId != userId)
+            throw new KycBusinessException(ErrorCodes.ValidationError, "Invalid or unauthorized media asset.", 400);
 
-        await using var stream = file.OpenReadStream();
-        var storedObject = await _mediaStorageService.UploadAsync(
-            new MediaUploadRequest
-            {
-                Content = stream,
-                OriginalFileName = file.FileName,
-                ContentType = file.ContentType,
-                FileSize = file.Length,
-                ObjectKey = mediaObjectKey.ObjectKey,
-                Visibility = MediaVisibility.Private
-            },
-            cancellationToken);
+        if (asset.Status != MediaStatus.Uploaded)
+            throw new KycBusinessException(ErrorCodes.ValidationError, "Media asset must be in Uploaded status to be submitted.", 400);
 
-        return new KycStoredUpload(
-            userId,
-            file.FileName,
-            file.ContentType,
-            file.Length,
-            storedObject);
+        return asset;
     }
 
-    private async Task<MediaAsset> CreateMediaAssetAsync(
-        Guid userId,
-        Guid kycId,
-        KycStoredUpload upload,
-        CancellationToken cancellationToken)
+    private void LinkMediaAsset(MediaAsset asset, Guid kycId)
     {
-        return await _mediaAssetService.CreateAsync(
-            new CreateMediaAssetRequest
-            {
-                OwnerUserId = userId,
-                BucketName = upload.StoredObject.BucketName,
-                ObjectKey = upload.StoredObject.ObjectKey,
-                OriginalFileName = upload.OriginalFileName,
-                StoredFileName = upload.StoredObject.StoredFileName,
-                ContentType = upload.ContentType,
-                FileSize = upload.FileSize,
-                Scope = MediaScope.KycDocument,
-                Visibility = MediaVisibility.Private,
-                Status = MediaStatus.Linked,
-                LinkedEntityType = nameof(KycVerification),
-                LinkedEntityId = kycId
-            },
-            cancellationToken);
+        asset.Status = MediaStatus.Linked;
+        asset.LinkedEntityType = nameof(KycVerification);
+        asset.LinkedEntityId = kycId;
     }
 
-    private async Task CleanupUploadAsync(
-        KycStoredUpload? upload,
-        CancellationToken cancellationToken)
+    private static VnptEkycFileInput BuildFileInput(MediaAccessResult media)
     {
-        if (upload is null)
+        return new VnptEkycFileInput
         {
-            return;
-        }
-
-        await _mediaStorageService.DeleteAsync(upload.StoredObject.ObjectKey, cancellationToken);
+            Content = media.Stream,
+            FileName = string.IsNullOrWhiteSpace(media.DownloadFileName)
+                ? media.MediaAsset.OriginalFileName
+                : media.DownloadFileName,
+            ContentType = media.ContentType
+        };
     }
 
     private static KycStatusResponse MapStatus(KycVerification k) =>
@@ -455,10 +404,5 @@ public class KycService : IKycService
             ? null
             : parsed;
 
-    private sealed record KycStoredUpload(
-        Guid UserId,
-        string OriginalFileName,
-        string ContentType,
-        long FileSize,
-        MediaStoredObjectResult StoredObject);
+
 }

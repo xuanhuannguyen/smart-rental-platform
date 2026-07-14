@@ -23,20 +23,17 @@ public class RealVnptEkycClient : IVnptEkycClient
 
     private readonly IHttpClientFactory _httpClientFactory;
     private readonly VnptEkycOptions _options;
-    private readonly IPrivateStorageService _storage;
     private readonly IMemoryCache _cache;
     private readonly ILogger<RealVnptEkycClient> _logger;
 
     public RealVnptEkycClient(
         IHttpClientFactory httpClientFactory,
         IOptions<VnptEkycOptions> options,
-        IPrivateStorageService storage,
         IMemoryCache cache,
         ILogger<RealVnptEkycClient> logger)
     {
         _httpClientFactory = httpClientFactory;
         _options = options.Value;
-        _storage = storage;
         _cache = cache;
         _logger = logger;
     }
@@ -65,10 +62,10 @@ public class RealVnptEkycClient : IVnptEkycClient
 
             var requestToken = BuildRequestToken(input.UserId);
 
-            var frontHash = await UploadFromStorageAsync(
-                httpClient, input.FrontImageObjectKey, "front", cancellationToken);
-            var backHash = await UploadFromStorageAsync(
-                httpClient, input.BackImageObjectKey, "back", cancellationToken);
+            var frontHash = await UploadImageAsync(
+                httpClient, input.FrontImage, "front", cancellationToken);
+            var backHash = await UploadImageAsync(
+                httpClient, input.BackImage, "back", cancellationToken);
 
             _logger.LogInformation("Document images uploaded successfully. SessionId={SessionId}, UploadElapsedMs={ElapsedMs}",
                 clientSession, sw.ElapsedMilliseconds);
@@ -111,8 +108,13 @@ public class RealVnptEkycClient : IVnptEkycClient
                 return documentOnlyResult;
             }
 
-            var selfieHash = await UploadFromStorageAsync(
-                httpClient, input.SelfieImageObjectKey, "selfie", cancellationToken);
+            if (input.SelfieImage is null)
+            {
+                throw new InvalidOperationException("Selfie image is required when face verification is enabled.");
+            }
+
+            var selfieHash = await UploadImageAsync(
+                httpClient, input.SelfieImage, "selfie", cancellationToken);
 
             var compare = await CallFaceCompareAsync(httpClient, requestToken, frontHash, selfieHash, clientSession, cancellationToken);
             if (compare.IsProviderFailure)
@@ -789,28 +791,25 @@ public class RealVnptEkycClient : IVnptEkycClient
         });
     }
 
-    private async Task<string> UploadFromStorageAsync(
+    private async Task<string> UploadImageAsync(
         HttpClient httpClient,
-        string objectKey,
+        VnptEkycFileInput file,
         string label,
         CancellationToken cancellationToken)
     {
         var sw = System.Diagnostics.Stopwatch.StartNew();
 
-        _logger.LogDebug("Uploading image from storage. ObjectKey={ObjectKey}, Label={Label}", objectKey, label);
-
-        await using var stream = await _storage.OpenReadAsync(objectKey, cancellationToken);
         using var memory = new MemoryStream();
-        await stream.CopyToAsync(memory, cancellationToken);
+        await file.Content.CopyToAsync(memory, cancellationToken);
         memory.Position = 0;
 
-        _logger.LogDebug("Image read from storage. Label={Label}, FileSizeBytes={FileSize}, ReadElapsedMs={ElapsedMs}",
-            label, memory.Length, sw.ElapsedMilliseconds);
+        _logger.LogDebug("Image prepared for VNPT upload. Label={Label}, FileName={FileName}, FileSizeBytes={FileSize}, ReadElapsedMs={ElapsedMs}",
+            label, file.FileName, memory.Length, sw.ElapsedMilliseconds);
 
         using var content = new MultipartFormDataContent();
         var fileContent = new StreamContent(memory);
-        fileContent.Headers.ContentType = new MediaTypeHeaderValue("image/jpeg");
-        content.Add(fileContent, "file", $"{label}.jpg");
+        fileContent.Headers.ContentType = new MediaTypeHeaderValue(NormalizeContentType(file.ContentType));
+        content.Add(fileContent, "file", ResolveUploadFileName(file.FileName, label));
         content.Add(new StringContent($"{label}-image"), "title");
         content.Add(new StringContent($"KYC {label} upload"), "description");
 
@@ -842,6 +841,24 @@ public class RealVnptEkycClient : IVnptEkycClient
             label, parsed.Object.Hash.GetHashCode(), uploadSw.ElapsedMilliseconds, sw.ElapsedMilliseconds);
 
         return parsed.Object.Hash;
+    }
+
+    private static string ResolveUploadFileName(string? fileName, string label)
+    {
+        var trimmed = fileName?.Trim();
+        if (!string.IsNullOrWhiteSpace(trimmed))
+        {
+            return Path.GetFileName(trimmed);
+        }
+
+        return $"{label}.jpg";
+    }
+
+    private static string NormalizeContentType(string? contentType)
+    {
+        return string.IsNullOrWhiteSpace(contentType)
+            ? "application/octet-stream"
+            : contentType.Trim();
     }
 
     private Task AddAuthHeadersAsync(HttpRequestMessage request, HttpClient httpClient, CancellationToken ct)

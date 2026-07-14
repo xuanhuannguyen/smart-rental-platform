@@ -8,7 +8,6 @@ export interface Amenity {
 export interface PropertyImage {
   id: string;
   mediaAssetId?: string | null;
-  objectKey: string;
   imageUrl: string;
   caption?: string | null;
   isCover: boolean;
@@ -22,9 +21,6 @@ export interface LegalDocument {
   backMediaAssetId?: string | null;
   extraMediaAssetId?: string | null;
   documentType: string;
-  frontImageObjectKey: string;
-  backImageObjectKey: string;
-  extraImageObjectKey?: string | null;
   frontImageUrl?: string | null;
   backImageUrl?: string | null;
   extraImageUrl?: string | null;
@@ -49,7 +45,6 @@ export interface RentalPolicy {
 }
 
 export interface FileUploadResponse {
-  objectKey: string;
   url: string;
   mediaAssetId?: string | null;
 }

@@ -986,7 +986,6 @@ public class BillingService : IBillingService
         RoomingHouseServicePrice Price,
         decimal PreviousReading,
         decimal CurrentReading,
-        string? ProofImageObjectKey,
         Guid? ProofMediaAssetId);
 
     private sealed record ResolvedBillingPeriod(
@@ -1435,7 +1434,6 @@ public class BillingService : IBillingService
                 PreviousReading = input.PreviousReading,
                 CurrentReading = input.CurrentReading,
                 Consumption = consumption,
-                ProofImageObjectKey = input.ProofImageObjectKey,
                 RecordedByLandlordUserId = landlordUserId,
                 ReadingAt = now,
                 CreatedAt = now,
@@ -1445,7 +1443,6 @@ public class BillingService : IBillingService
             reading.ProofMediaAssetId = await EnsureMeterReadingProofMediaAssetAsync(
                 reading.Id,
                 landlordUserId,
-                input.ProofImageObjectKey,
                 input.ProofMediaAssetId,
                 now,
                 cancellationToken);
@@ -1646,7 +1643,6 @@ public class BillingService : IBillingService
                 price,
                 previousReading.Value,
                 input.CurrentReading,
-                input.ProofImageObjectKey,
                 input.ProofMediaAssetId));
         }
 
@@ -2327,7 +2323,6 @@ public class BillingService : IBillingService
     private async Task<Guid?> EnsureMeterReadingProofMediaAssetAsync(
         Guid meterReadingId,
         Guid landlordUserId,
-        string? objectKey,
         Guid? proofMediaAssetId,
         DateTimeOffset now,
         CancellationToken cancellationToken)
@@ -2351,66 +2346,7 @@ public class BillingService : IBillingService
             }
         }
 
-        if (string.IsNullOrWhiteSpace(objectKey))
-        {
-            return null;
-        }
-
-        var normalizedObjectKey = NormalizeObjectKey(objectKey);
-        var mediaAsset = await context.MediaAssets
-            .FirstOrDefaultAsync(x => x.ObjectKey == normalizedObjectKey, cancellationToken);
-
-        if (mediaAsset is null)
-        {
-            mediaAsset = new MediaAsset
-            {
-                Id = Guid.NewGuid(),
-                OwnerUserId = landlordUserId,
-                BucketName = "legacy-private-storage",
-                ObjectKey = normalizedObjectKey,
-                OriginalFileName = Path.GetFileName(normalizedObjectKey),
-                StoredFileName = Path.GetFileName(normalizedObjectKey),
-                ContentType = GuessContentType(normalizedObjectKey),
-                FileSize = 0,
-                Scope = MediaScope.MeterReadingImage,
-                Visibility = MediaVisibility.Private,
-                Status = MediaStatus.Linked,
-                LinkedEntityType = nameof(MeterReading),
-                LinkedEntityId = meterReadingId,
-                CreatedAt = now,
-                UpdatedAt = now
-            };
-
-            context.MediaAssets.Add(mediaAsset);
-            return mediaAsset.Id;
-        }
-
-        mediaAsset.OwnerUserId = landlordUserId;
-        mediaAsset.Scope = MediaScope.MeterReadingImage;
-        mediaAsset.Visibility = MediaVisibility.Private;
-        mediaAsset.Status = MediaStatus.Linked;
-        mediaAsset.LinkedEntityType = nameof(MeterReading);
-        mediaAsset.LinkedEntityId = meterReadingId;
-        mediaAsset.DeletedAt = null;
-        mediaAsset.UpdatedAt = now;
-
-        return mediaAsset.Id;
-    }
-
-    private static string NormalizeObjectKey(string objectKey)
-    {
-        return objectKey.Replace('\\', '/').Trim().TrimStart('/');
-    }
-
-    private static string GuessContentType(string objectKey)
-    {
-        return Path.GetExtension(objectKey).ToLowerInvariant() switch
-        {
-            ".jpg" or ".jpeg" => "image/jpeg",
-            ".png" => "image/png",
-            ".webp" => "image/webp",
-            _ => "application/octet-stream"
-        };
+        return null;
     }
 
     private static string? BuildPrivateProofImageUrl(Guid? mediaAssetId)
