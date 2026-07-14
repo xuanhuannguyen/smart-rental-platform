@@ -331,8 +331,8 @@ namespace SmartRentalPlatform.Infrastructure.Persistence.Migrations
 
             InsertRows(migrationBuilder, "contract_signatures",
                 ["id", "contract_id", "appendix_id", "signer_user_id", "signer_role", "signature_method", "signature_text", "signed_at", "ip_address", "user_agent", "created_at"],
-                [Id("KFC-SCENARIO-SIGNATURE-LANDLORD"), Contract101, null, Landlord, "Landlord", "EmailOtp", "Nguyễn Xuân Huấn đã ký hợp đồng thuê phòng KFC-101 - Khu trọ KFC Riverside.", Utc(2026, 4, 15, 14), "127.0.0.42", "KFC Riverside fixture", Utc(2026, 4, 15, 14)],
-                [Id("KFC-SCENARIO-SIGNATURE-TENANT"), Contract101, null, MainTenant, "Tenant", "EmailOtp", "Lê Quang Linh đã ký hợp đồng thuê phòng KFC-101 - Khu trọ KFC Riverside.", Utc(2026, 4, 15, 15), "127.0.0.42", "KFC Riverside fixture", Utc(2026, 4, 15, 15)]);
+                [Id("KFC-SCENARIO-SIGNATURE-LANDLORD"), Contract101, null, Landlord, "Landlord", "ClickToSign", null, Utc(2026, 4, 15, 14), "127.0.0.42", "KFC Riverside fixture", Utc(2026, 4, 15, 14)],
+                [Id("KFC-SCENARIO-SIGNATURE-TENANT"), Contract101, null, MainTenant, "Tenant", "ClickToSign", null, Utc(2026, 4, 15, 15), "127.0.0.42", "KFC Riverside fixture", Utc(2026, 4, 15, 15)]);
         }
 
         private static void SeedBilling(MigrationBuilder migrationBuilder)
