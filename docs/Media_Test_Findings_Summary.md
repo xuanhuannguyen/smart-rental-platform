@@ -18,9 +18,9 @@
 | MT-001 | NON_MEDIA | P1 | OPEN | Search render `<button>` long trong `<button>`. |
 | MT-002 | MEDIA | P1 | FIXED - VERIFIED | Backend chan anh khu tro/phong thu 11. |
 | MT-003 | NON_MEDIA | P1 | OPEN | `PageHeader` dat React node dang `<div>` vao trong `<p>`. |
-| MT-004 | MEDIA | P1 | OPEN | KYC status khong tra va khong render lai ba anh private. |
+| MT-004 | MEDIA | P1 | FIXED - VERIFIED | KYC status tra du ba media asset ID va UI render lai ba anh private sau reload. |
 | MT-005 | MEDIA | P1 | FIXED - VERIFIED | Direct chat map avatar tu `AvatarMediaAssetId`. |
-| MT-006 | MEDIA | P1 | OPEN | Khong the go avatar conversation bang `avatarMediaAssetId: null`. |
+| MT-006 | MEDIA | P1 | FIXED - VERIFIED | `clearAvatar` go reference, retire avatar cu va giu ket qua sau reload. |
 | MT-007 | MEDIA | P1 | FIXED - VERIFIED | Landlord invoice detail render meter proof private. |
 | MT-008 | MEDIA | P1 | OPEN | Soft delete chi xoa logic trong DB, khong xoa object S3. |
 | MT-009 | MEDIA | P1 | OPEN | Upload session het han khong duoc cleanup. |
@@ -45,6 +45,8 @@ Tong cong: `7 MEDIA`, `2 NON_MEDIA`.
 
 - Hien tuong: owner van mo truc tiep private media voi HTTP `200`, nhung `/me/kyc/status` va `KycStatusPage` khong hien mat truoc, mat sau, selfie.
 - Nguyen nhan: `KycStatusResponse` khong co media asset ID/view URL; `MapStatus` chi map status/OCR va UI cung khong co khoi render `PrivateMediaImage`.
+- Xu ly: them ba media asset ID vao status contract/mapper, render ba anh bang `PrivateMediaImage` va bo sung regression assertion cho read path sau reload.
+- Xac minh: `KycServiceTests` 8/8 PASS, client Vitest 9/9 PASS, production build PASS; browser reload tai du ba blob private `720x460` va khong co media console error.
 - Bang chung code:
   - `server/src/SmartRentalPlatform.Contracts/Kyc/Responses/KycStatusResponse.cs:3`
   - `server/src/SmartRentalPlatform.Application/Kyc/KycService.cs:325`
@@ -71,6 +73,8 @@ Tong cong: `7 MEDIA`, `2 NON_MEDIA`.
 - Bang chung code: `server/src/SmartRentalPlatform.Application/Chat/ChatService.cs:189`.
 - Anh huong: thay avatar duoc, nhung khong the go avatar va retire asset cu.
 - Huong xu ly: them co `clearAvatar` hoac optional-field contract co presence semantics; khi clear phai null reference va retire asset cu trong cung transaction.
+- Da xu ly: contract them `clearAvatar`; service tu choi payload vua clear vua replace, null ca media/legacy reference va retire asset cu trong cung `SaveChanges`; UI them nut `Go anh dai dien`.
+- Xac minh: ChatService tests 18/18 PASS, client Vitest 10/10 PASS va production build PASS; browser xac nhan avatar bien mat o list/header/panel, asset `Deleted` va khong quay lai sau reload.
 
 ### MT-007 - Landlord invoice detail khong render meter proof
 
@@ -164,6 +168,6 @@ Tong cong: `7 MEDIA`, `2 NON_MEDIA`.
 ## Thu tu xu ly de on dinh PR
 
 1. `MT-008`, `MT-009`: storage lifecycle va cleanup, rui ro data retention/orphan.
-2. `MT-004`, `MT-006`: hoan tat KYC read path va explicit clear group avatar sau media cutover.
+2. `MT-004`, `MT-006` da fix va browser verified.
 3. `MT-001`, `MT-003`: tach khoi media neu muon giu PR gon, nhung van can sua truoc khi release UI.
 4. `NU1903`, duplicate key va SignalR: theo doi/tach issue rieng, khong tron vao root cause cua media migration.

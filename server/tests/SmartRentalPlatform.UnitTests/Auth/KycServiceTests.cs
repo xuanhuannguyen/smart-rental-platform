@@ -301,6 +301,9 @@ public class KycServiceTests : IClassFixture<TestDatabaseFixture>
     {
         var context = _fixture.Context;
         var user = TestDataBuilder.BuildUser(email: "status-kyc@example.com");
+        var frontAsset = new MediaAsset { Id = Guid.NewGuid(), ObjectKey = "private/kyc-documents/status-front.jpg", OriginalFileName = "front.jpg", OwnerUserId = user.Id, Scope = MediaScope.KycDocument, Visibility = MediaVisibility.Private, Status = MediaStatus.Linked };
+        var backAsset = new MediaAsset { Id = Guid.NewGuid(), ObjectKey = "private/kyc-documents/status-back.jpg", OriginalFileName = "back.jpg", OwnerUserId = user.Id, Scope = MediaScope.KycDocument, Visibility = MediaVisibility.Private, Status = MediaStatus.Linked };
+        var selfieAsset = new MediaAsset { Id = Guid.NewGuid(), ObjectKey = "private/kyc-documents/status-selfie.jpg", OriginalFileName = "selfie.jpg", OwnerUserId = user.Id, Scope = MediaScope.KycDocument, Visibility = MediaVisibility.Private, Status = MediaStatus.Linked };
         var kyc = new KycVerification
         {
             Id = Guid.NewGuid(),
@@ -313,12 +316,16 @@ public class KycServiceTests : IClassFixture<TestDatabaseFixture>
             EkycResult = EkycResult.NeedReview,
             RiskLevel = KycRiskLevel.Medium,
             Status = KycVerificationStatus.PendingAdminReview,
+            FrontMediaAssetId = frontAsset.Id,
+            BackMediaAssetId = backAsset.Id,
+            SelfieMediaAssetId = selfieAsset.Id,
             SubmittedAt = DateTimeOffset.UtcNow,
             CreatedAt = DateTimeOffset.UtcNow,
             UpdatedAt = DateTimeOffset.UtcNow
         };
 
         context.Users.Add(user);
+        context.MediaAssets.AddRange(frontAsset, backAsset, selfieAsset);
         context.KycVerifications.Add(kyc);
         await context.SaveChangesAsync();
 
@@ -329,6 +336,9 @@ public class KycServiceTests : IClassFixture<TestDatabaseFixture>
         Assert.True(result.HasSubmission);
         Assert.Equal(kyc.Id, result.KycId);
         Assert.Equal("NGUYEN VAN B", result.OcrFullName);
+        Assert.Equal(frontAsset.Id, result.FrontMediaAssetId);
+        Assert.Equal(backAsset.Id, result.BackMediaAssetId);
+        Assert.Equal(selfieAsset.Id, result.SelfieMediaAssetId);
     }
 
     [Fact]

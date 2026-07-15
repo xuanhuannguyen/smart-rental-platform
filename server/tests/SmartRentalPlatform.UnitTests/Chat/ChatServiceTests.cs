@@ -143,6 +143,91 @@ public sealed class ChatServiceTests : IDisposable
     }
 
     [Fact]
+    public async Task UpdateConversationAsync_ClearAvatar_ShouldRemoveReferenceAndRetireAsset()
+    {
+        var landlord = SeedUser(RoleName.Landlord, "landlord-clear-avatar@test.local");
+        var avatar = BuildAvatarMediaAsset(landlord.Id, "clear-avatar.jpg");
+        fixture.Context.MediaAssets.Add(avatar);
+        await fixture.Context.SaveChangesAsync();
+        var service = CreateService();
+        var created = await service.CreateGroupConversationAsync(
+            landlord.Id,
+            new CreateGroupConversationRequest
+            {
+                Title = "Clear avatar group",
+                AvatarMediaAssetId = avatar.Id
+            });
+
+        var updated = await service.UpdateConversationAsync(
+            landlord.Id,
+            created.Id,
+            new UpdateConversationRequest { ClearAvatar = true });
+
+        fixture.Context.ChangeTracker.Clear();
+        var savedConversation = await fixture.Context.Conversations.SingleAsync(x => x.Id == created.Id);
+        var savedAvatar = await fixture.Context.MediaAssets.SingleAsync(x => x.Id == avatar.Id);
+
+        Assert.Null(updated.AvatarMediaAssetId);
+        Assert.Null(updated.AvatarUrl);
+        Assert.Null(savedConversation.AvatarMediaAssetId);
+        Assert.Null(savedConversation.AvatarUrl);
+        Assert.Equal(MediaStatus.Deleted, savedAvatar.Status);
+        Assert.NotNull(savedAvatar.DeletedAt);
+        Assert.Null(savedAvatar.LinkedEntityType);
+        Assert.Null(savedAvatar.LinkedEntityId);
+    }
+
+    [Fact]
+    public async Task UpdateConversationAsync_OmittedAvatarFields_ShouldKeepCurrentAvatar()
+    {
+        var landlord = SeedUser(RoleName.Landlord, "landlord-keep-avatar@test.local");
+        var avatar = BuildAvatarMediaAsset(landlord.Id, "keep-avatar.jpg");
+        fixture.Context.MediaAssets.Add(avatar);
+        await fixture.Context.SaveChangesAsync();
+        var service = CreateService();
+        var created = await service.CreateGroupConversationAsync(
+            landlord.Id,
+            new CreateGroupConversationRequest
+            {
+                Title = "Original title",
+                AvatarMediaAssetId = avatar.Id
+            });
+
+        var updated = await service.UpdateConversationAsync(
+            landlord.Id,
+            created.Id,
+            new UpdateConversationRequest { Title = "Updated title" });
+
+        Assert.Equal(avatar.Id, updated.AvatarMediaAssetId);
+        Assert.Equal($"/api/media/public/{avatar.Id:D}", updated.AvatarUrl);
+        Assert.Equal(MediaStatus.Linked, avatar.Status);
+        Assert.Null(avatar.DeletedAt);
+    }
+
+    [Fact]
+    public async Task UpdateConversationAsync_ClearAndReplaceAvatar_ShouldRejectConflict()
+    {
+        var landlord = SeedUser(RoleName.Landlord, "landlord-avatar-conflict@test.local");
+        await fixture.Context.SaveChangesAsync();
+        var service = CreateService();
+        var created = await service.CreateGroupConversationAsync(
+            landlord.Id,
+            new CreateGroupConversationRequest { Title = "Conflict group" });
+
+        var exception = await Assert.ThrowsAsync<BadRequestException>(() =>
+            service.UpdateConversationAsync(
+                landlord.Id,
+                created.Id,
+                new UpdateConversationRequest
+                {
+                    ClearAvatar = true,
+                    AvatarMediaAssetId = Guid.NewGuid()
+                }));
+
+        Assert.Equal("CHAT_AVATAR_UPDATE_CONFLICT", exception.ErrorCode);
+    }
+
+    [Fact]
     public async Task GetLandlordQuickContactsAsync_ReturnsScopedTenantsAndDeduplicates()
     {
         var landlord = SeedUser(RoleName.Landlord, "landlord@test.local");

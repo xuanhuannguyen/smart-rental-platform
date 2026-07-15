@@ -60,7 +60,7 @@
 
 - [x] Tenant upload mat truoc, mat sau va selfie; ca ba asset finalize `Uploaded` dung scope `KycDocument`.
 - [x] Submit KYC happy path thanh cong voi mock eKYC; ket qua `PendingAdminReview`, `Passed`, risk `Low`.
-- [ ] Reload trang KYC va ba anh private van render cho chu so huu. FAIL `MT-004`: `/me/kyc/status` khong tra ve va khong render anh; owner van mo truc tiep private media voi `200`.
+- [x] Reload trang KYC va ba anh private van render cho chu so huu. `MT-004` FIXED - VERIFIED; ca ba anh tai qua authenticated blob va giu nguyen sau full-page reload.
 - [x] Admin/reviewer mo duoc du ba anh KYC tren UI; PNG/JPEG/WebP deu render dung.
 - [x] Anonymous va user khac bi `401/403` khi mo anh KYC; chu so huu va admin nhan `200`.
 - [x] Thay anh KYC cu; candidate cu khong co KYC reference va da duoc cleanup sang `Deleted`.
@@ -84,7 +84,7 @@
 - [x] Anonymous mo duoc avatar public voi `200 image/jpeg`.
 - [ ] Upload/thay avatar conversation va reload chat. PARTIAL: `/api/chat/avatars` va PATCH conversation thanh cong, replacement dung; in-app browser khong automation duoc file chooser.
 - [x] Avatar conversation render trong list va chat header; ca hai dung cung public asset moi 256px sau reload.
-- [ ] Xoa avatar conversation khong lam hong conversation. FAIL `MT-006`: PATCH `avatarMediaAssetId: null` tra thanh cong nhung giu nguyen avatar; UI cung khong co thao tac xoa.
+- [x] Xoa avatar conversation khong lam hong conversation. `MT-006` FIXED - VERIFIED; list/header/panel doi sang placeholder, asset cu `Deleted` va avatar khong quay lai sau reload.
 
 ## Cum 7 - Chat attachment
 
@@ -150,9 +150,9 @@
 | MT-001 | P1 | `/search` | OPEN | React bao `<button>` khong duoc long trong `<button>`: card ket qua dang boc `FavoriteButton`; co nguy co hydration va click khong on dinh. |
 | MT-002 | P1 | `PUT /api/rooming-houses/{id}/images` | FIXED - VERIFIED | Backend enforce toi da 10 anh cho khu tro/phong; payload 11 anh tra `400 VALIDATION_ERROR`, `max: 10`. |
 | MT-003 | P1 | Landlord rooming-house/room detail | OPEN | `PageHeader` render `eyebrow` trong `<p>` nhung `RoomingHouseDetailPage` va `RoomDetailPage` truyen `<div>`, gay React DOM/hydration error. |
-| MT-004 | P1 | `/me/kyc/status` | OPEN | `KycStatusResponse` khong co media ID/URL va `KycStatusPage` khong render mat truoc, mat sau, selfie sau reload; private media route cua owner van hoat dong. |
+| MT-004 | P1 | `/me/kyc/status` | FIXED - VERIFIED | Status tra du ba media asset ID; browser reload render du ba anh private blob `720x460`; KYC tests, Vitest va client build PASS. |
 | MT-005 | P1 | `/messages` direct chat | FIXED - VERIFIED | `ChatService.MapParticipant` uu tien public path tu `AvatarMediaAssetId`; API conversation va regression test deu PASS. |
-| MT-006 | P1 | `/messages` group avatar | OPEN | PATCH conversation voi `avatarMediaAssetId: null` bi bo qua do service chi xu ly khi `HasValue`; UI khong co nut xoa nen avatar group khong the go bo. |
+| MT-006 | P1 | `/messages` group avatar | FIXED - VERIFIED | UI go avatar thanh cong; conversation null reference, asset cu `Deleted`; list/header/panel giu placeholder sau reload; automated tests va build PASS. |
 | MT-007 | P1 | `/landlord/invoices/{id}` | FIXED - VERIFIED | Landlord detail render nut proof va lightbox `PrivateMediaImage`; browser xac nhan blob private media tai xong. |
 | MT-008 | P1 | `DELETE /api/media/{id}` | OPEN | `SoftDeleteAsync` chi doi status DB sang `Deleted`, khong goi storage delete. API chan asset sau delete nhung signed S3 URL da cap van tra `200`, nen object cu con ton tai va truy cap duoc den khi URL het han. |
 | MT-009 | P1 | Media upload lifecycle | OPEN | Khong co cleanup cho upload session het han; DB con 8 asset `PendingUpload` tao luc 11:50-12:02 UTC, da qua TTL 15 phut nhieu gio nhung chua bi danh dau/xoa. |

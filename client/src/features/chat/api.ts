@@ -89,12 +89,13 @@ export async function createGroupConversation(
 export async function updateConversation(
   id: string,
   title?: string,
-  avatarMediaAssetId?: string | null
+  avatarMediaAssetId?: string | null,
+  clearAvatar = false
 ): Promise<Conversation> {
   const response = await apiClient<ApiResponse<Conversation>>(ENDPOINTS.CHAT.CONVERSATION(id), {
     method: 'PATCH',
     auth: true,
-    body: { title, avatarMediaAssetId }
+    body: { title, avatarMediaAssetId, clearAvatar }
   });
   return response.data;
 }

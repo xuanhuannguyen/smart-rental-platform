@@ -1,6 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { apiClient } from '../../shared/api/apiClient';
-import { downloadChatFile, getChatImage, uploadChatAvatar, uploadChatFile, uploadChatImage } from './api';
+import { downloadChatFile, getChatImage, updateConversation, uploadChatAvatar, uploadChatFile, uploadChatImage } from './api';
 
 vi.mock('../../shared/api/apiClient', () => ({
   apiClient: vi.fn(),
@@ -83,6 +83,25 @@ describe('chat media api', () => {
     expect(apiClientMock).toHaveBeenCalledWith(
       '/api/chat/avatars',
       expect.objectContaining({ method: 'POST', auth: true })
+    );
+  });
+
+  it('uses explicit clear semantics when removing a group avatar', async () => {
+    apiClientMock.mockResolvedValue({ data: { id: 'conversation-id' } } as never);
+
+    await updateConversation('conversation-id', undefined, undefined, true);
+
+    expect(apiClientMock).toHaveBeenCalledWith(
+      '/api/chat/conversations/conversation-id',
+      {
+        method: 'PATCH',
+        auth: true,
+        body: {
+          title: undefined,
+          avatarMediaAssetId: undefined,
+          clearAvatar: true,
+        }
+      }
     );
   });
 });

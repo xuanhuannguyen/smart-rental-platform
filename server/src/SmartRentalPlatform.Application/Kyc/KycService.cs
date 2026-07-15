@@ -331,6 +331,9 @@ public class KycService : IKycService
             EkycResult = k.EkycResult.ToString(),
             RiskLevel = k.RiskLevel.ToString(),
             DocumentType = k.DocumentType.ToString(),
+            FrontMediaAssetId = k.FrontMediaAssetId,
+            BackMediaAssetId = k.BackMediaAssetId,
+            SelfieMediaAssetId = k.SelfieMediaAssetId,
             OcrFullName = k.OcrFullName,
             OcrCitizenIdMasked = k.OcrCitizenIdMasked,
             OcrDateOfBirth = k.OcrDateOfBirth.HasValue

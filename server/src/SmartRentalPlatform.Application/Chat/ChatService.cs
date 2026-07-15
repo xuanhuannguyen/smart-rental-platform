@@ -181,12 +181,37 @@ public sealed class ChatService : IChatService
         EnsureOwner(currentUserId, conversation);
         EnsureGroup(conversation);
 
+        if (request.ClearAvatar &&
+            (request.AvatarMediaAssetId.HasValue || request.AvatarUrl is not null))
+        {
+            throw new BadRequestException(
+                "CHAT_AVATAR_UPDATE_CONFLICT",
+                "Không thể đồng thời xóa và cập nhật avatar nhóm.");
+        }
+
         if (request.Title is not null)
         {
             conversation.Title = NormalizeTitle(request.Title, conversation.Title ?? "Nhóm trò chuyện");
         }
 
-        if (request.AvatarMediaAssetId.HasValue)
+        if (request.ClearAvatar)
+        {
+            var now = DateTimeOffset.UtcNow;
+            var previousAvatarMediaAssetId = conversation.AvatarMediaAssetId;
+
+            conversation.AvatarMediaAssetId = null;
+            conversation.AvatarUrl = null;
+
+            if (previousAvatarMediaAssetId.HasValue)
+            {
+                await RetireConversationAvatarAsync(
+                    previousAvatarMediaAssetId.Value,
+                    conversation.Id,
+                    now,
+                    cancellationToken);
+            }
+        }
+        else if (request.AvatarMediaAssetId.HasValue)
         {
             var now = DateTimeOffset.UtcNow;
             var previousAvatarMediaAssetId = conversation.AvatarMediaAssetId;

@@ -1339,6 +1339,20 @@ function MemberPanel({
     }
   };
 
+  const handleClearAvatar = async () => {
+    if (!window.confirm('Gỡ ảnh đại diện hiện tại của nhóm?')) return;
+
+    setUpdatingGroup(true);
+    try {
+      const updated = await updateConversation(conversation.id, undefined, undefined, true);
+      onUpdateConversation(updated);
+    } catch (err) {
+      alert('Gỡ ảnh đại diện nhóm thất bại: ' + (err instanceof Error ? err.message : ''));
+    } finally {
+      setUpdatingGroup(false);
+    }
+  };
+
   const isAdminOrOwner = conversation.isCurrentUserOwner;
 
   const loadRequests = useCallback(async () => {
@@ -1542,6 +1556,26 @@ function MemberPanel({
               </button>
             </div>
           </div>
+          {(conversation.avatarMediaAssetId || conversation.avatarUrl) && (
+            <button
+              type="button"
+              onClick={() => void handleClearAvatar()}
+              disabled={updatingGroup}
+              style={{
+                alignSelf: 'flex-start',
+                padding: '4px 8px',
+                border: '1px solid #fecaca',
+                borderRadius: '4px',
+                backgroundColor: '#fff',
+                color: '#dc2626',
+                fontSize: '12px',
+                fontWeight: 600,
+                cursor: updatingGroup ? 'not-allowed' : 'pointer'
+              }}
+            >
+              Gỡ ảnh đại diện
+            </button>
+          )}
         </div>
       )}
 
