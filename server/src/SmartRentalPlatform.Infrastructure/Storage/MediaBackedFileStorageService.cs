@@ -62,10 +62,20 @@ public sealed class MediaBackedFileStorageService : IFileStorageService
         FileUploadScope scope,
         CancellationToken cancellationToken = default)
     {
+        return UploadFileAsync(content, fileName, "application/pdf", scope, cancellationToken);
+    }
+
+    public Task<FileUploadResponse> UploadFileAsync(
+        Stream content,
+        string fileName,
+        string? contentType,
+        FileUploadScope scope,
+        CancellationToken cancellationToken = default)
+    {
         return UploadAsync(
             content,
             fileName,
-            "application/pdf",
+            ResolveContentType(contentType),
             null,
             scope,
             cancellationToken);
@@ -144,8 +154,9 @@ public sealed class MediaBackedFileStorageService : IFileStorageService
             FileUploadScope.LegalDocument => MediaScope.RoomingHouseLegalDocument,
             FileUploadScope.Avatar => MediaScope.Avatar,
             FileUploadScope.HouseRule => MediaScope.RoomingHouseRulePdf,
+            FileUploadScope.ChatImage => MediaScope.ChatAttachment,
             FileUploadScope.MeterReading => MediaScope.MeterReadingImage,
-            FileUploadScope.ChatAttachment => MediaScope.ChatAttachment,
+            FileUploadScope.ChatFile => MediaScope.ChatAttachment,
             _ => throw new ArgumentOutOfRangeException(nameof(scope), scope, "Unsupported file upload scope.")
         };
     }
@@ -156,10 +167,18 @@ public sealed class MediaBackedFileStorageService : IFileStorageService
         {
             FileUploadScope.LegalDocument => MediaVisibility.Private,
             FileUploadScope.HouseRule => MediaVisibility.Private,
+            FileUploadScope.ChatImage => MediaVisibility.Private,
             FileUploadScope.MeterReading => MediaVisibility.Private,
-            FileUploadScope.ChatAttachment => MediaVisibility.Private,
+            FileUploadScope.ChatFile => MediaVisibility.Private,
             _ => MediaVisibility.Public
         };
+    }
+
+    private static string ResolveContentType(string? contentType)
+    {
+        return string.IsNullOrWhiteSpace(contentType)
+            ? "application/octet-stream"
+            : contentType.Trim();
     }
 
     private static long TryGetFileSize(Stream content)

@@ -18,12 +18,17 @@ public class ContractFileConfiguration : IEntityTypeConfiguration<ContractFile>
         builder.Property(x => x.RentalContractId).HasColumnName("contract_id").IsRequired();
         builder.Property(x => x.RentalContractAppendixId).HasColumnName("appendix_id");
         builder.Property(x => x.MediaAssetId).HasColumnName("media_asset_id");
-        builder.Property(x => x.FileVariant)
-            .HasColumnName("file_variant")
+        builder.Property(x => x.Purpose)
+            .HasColumnName("purpose")
             .HasConversion<string>()
-            .HasMaxLength(30)
-            .HasDefaultValue(ContractFileVariant.Raw)
+            .HasMaxLength(50)
+            .HasDefaultValue(ContractFilePurpose.Preview)
             .IsRequired();
+        builder.Property(x => x.ContentType).HasColumnName("content_type").HasMaxLength(100).IsRequired();
+        builder.Property(x => x.FileUrl).HasColumnName("file_url").HasColumnType("text");
+        builder.Property(x => x.Sha256Hash).HasColumnName("sha256_hash").HasMaxLength(64);
+        builder.Property(x => x.IsLegallySigned).HasColumnName("is_legally_signed").IsRequired();
+        builder.Property(x => x.ContractSigningEnvelopeId).HasColumnName("signing_envelope_id");
         builder.Property(x => x.CreatedAt).HasColumnName("created_at").IsRequired();
 
         builder.HasOne(x => x.RentalContract)
@@ -40,10 +45,17 @@ public class ContractFileConfiguration : IEntityTypeConfiguration<ContractFile>
             .WithMany()
             .HasForeignKey(x => x.MediaAssetId)
             .OnDelete(DeleteBehavior.Restrict);
+        
+        builder.HasOne(x => x.ContractSigningEnvelope)
+            .WithMany()
+            .HasForeignKey(x => x.ContractSigningEnvelopeId)
+            .OnDelete(DeleteBehavior.SetNull);
 
         builder.HasIndex(x => x.RentalContractId);
         builder.HasIndex(x => x.RentalContractAppendixId);
         builder.HasIndex(x => x.MediaAssetId);
-        builder.HasIndex(x => new { x.RentalContractId, x.RentalContractAppendixId, x.FileVariant });
+        builder.HasIndex(x => new { x.RentalContractId, x.RentalContractAppendixId, x.Purpose });
+        builder.HasIndex(x => x.ContractSigningEnvelopeId);
+        builder.HasIndex(x => x.Sha256Hash);
     }
 }

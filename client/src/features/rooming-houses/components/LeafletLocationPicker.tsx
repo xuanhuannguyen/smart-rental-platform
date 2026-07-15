@@ -1,3 +1,4 @@
+import { Alert } from '../../../shared/components/ui/Alert';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import L from 'leaflet';
 import 'leaflet/dist/leaflet.css';
@@ -264,7 +265,7 @@ export default function LeafletLocationPicker({
             Bấm Tìm vị trí để lấy tọa độ. Nếu marker lệch, bấm Chỉnh vị trí rồi kéo marker hoặc click lên bản đồ.
           </p>
         )}
-        {error && <p className="leaflet-location-picker__error">{error}</p>}
+        {error && <Alert type="error">{error}</Alert>}
       </div>
     </section>
   );

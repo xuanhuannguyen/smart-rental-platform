@@ -21,9 +21,10 @@ public class PaymentRowLockService : IPaymentRowLockService
         string providerOrderCode,
         CancellationToken cancellationToken = default)
     {
-        var paymentTransaction = await context.PaymentTransactions
+        var results = await context.PaymentTransactions
             .FromSqlInterpolated($"SELECT * FROM payment_transactions WHERE provider_order_code = {providerOrderCode} FOR UPDATE")
-            .FirstOrDefaultAsync(cancellationToken);
+            .ToListAsync(cancellationToken);
+        var paymentTransaction = results.FirstOrDefault();
 
         return await ReloadAfterLockAsync(paymentTransaction, cancellationToken);
     }
@@ -32,20 +33,46 @@ public class PaymentRowLockService : IPaymentRowLockService
         string idempotencyKey,
         CancellationToken cancellationToken = default)
     {
-        var paymentTransaction = await context.PaymentTransactions
+        var results = await context.PaymentTransactions
             .FromSqlInterpolated($"SELECT * FROM payment_transactions WHERE idempotency_key = {idempotencyKey} FOR UPDATE")
-            .FirstOrDefaultAsync(cancellationToken);
+            .ToListAsync(cancellationToken);
+        var paymentTransaction = results.FirstOrDefault();
 
         return await ReloadAfterLockAsync(paymentTransaction, cancellationToken);
+    }
+
+    public async Task<WithdrawalRequest?> LockWithdrawalRequestByProviderOrderCodeAsync(
+        string providerOrderCode,
+        CancellationToken cancellationToken = default)
+    {
+        var results = await context.WithdrawalRequests
+            .FromSqlInterpolated($"SELECT * FROM withdrawal_requests WHERE provider_order_code = {providerOrderCode} FOR UPDATE")
+            .ToListAsync(cancellationToken);
+        var withdrawalRequest = results.FirstOrDefault();
+
+        return await ReloadAfterLockAsync(withdrawalRequest, cancellationToken);
+    }
+
+    public async Task<WithdrawalRequest?> LockWithdrawalRequestByIdempotencyKeyAsync(
+        string idempotencyKey,
+        CancellationToken cancellationToken = default)
+    {
+        var results = await context.WithdrawalRequests
+            .FromSqlInterpolated($"SELECT * FROM withdrawal_requests WHERE idempotency_key = {idempotencyKey} FOR UPDATE")
+            .ToListAsync(cancellationToken);
+        var withdrawalRequest = results.FirstOrDefault();
+
+        return await ReloadAfterLockAsync(withdrawalRequest, cancellationToken);
     }
 
     public async Task<WalletAccount?> LockWalletAccountAsync(
         Guid walletAccountId,
         CancellationToken cancellationToken = default)
     {
-        var wallet = await context.WalletAccounts
+        var results = await context.WalletAccounts
             .FromSqlInterpolated($"SELECT * FROM wallet_accounts WHERE id = {walletAccountId} FOR UPDATE")
-            .FirstOrDefaultAsync(cancellationToken);
+            .ToListAsync(cancellationToken);
+        var wallet = results.FirstOrDefault();
 
         return await ReloadAfterLockAsync(wallet, cancellationToken);
     }
@@ -54,9 +81,10 @@ public class PaymentRowLockService : IPaymentRowLockService
         Guid invoiceId,
         CancellationToken cancellationToken = default)
     {
-        var invoice = await context.Invoices
+        var results = await context.Invoices
             .FromSqlInterpolated($"SELECT * FROM invoices WHERE id = {invoiceId} FOR UPDATE")
-            .FirstOrDefaultAsync(cancellationToken);
+            .ToListAsync(cancellationToken);
+        var invoice = results.FirstOrDefault();
 
         return await ReloadAfterLockAsync(invoice, cancellationToken);
     }
@@ -65,9 +93,10 @@ public class PaymentRowLockService : IPaymentRowLockService
         Guid userId,
         CancellationToken cancellationToken = default)
     {
-        var user = await context.Users
+        var results = await context.Users
             .FromSqlInterpolated($"SELECT * FROM users WHERE id = {userId} FOR UPDATE")
-            .FirstOrDefaultAsync(cancellationToken);
+            .ToListAsync(cancellationToken);
+        var user = results.FirstOrDefault();
 
         return await ReloadAfterLockAsync(user, cancellationToken);
     }
@@ -76,9 +105,10 @@ public class PaymentRowLockService : IPaymentRowLockService
         Guid roomDepositId,
         CancellationToken cancellationToken = default)
     {
-        var deposit = await context.RoomDeposits
+        var results = await context.RoomDeposits
             .FromSqlInterpolated($"SELECT * FROM room_deposits WHERE id = {roomDepositId} FOR UPDATE")
-            .FirstOrDefaultAsync(cancellationToken);
+            .ToListAsync(cancellationToken);
+        var deposit = results.FirstOrDefault();
 
         return await ReloadAfterLockAsync(deposit, cancellationToken);
     }
@@ -87,9 +117,10 @@ public class PaymentRowLockService : IPaymentRowLockService
         Guid contractId,
         CancellationToken cancellationToken = default)
     {
-        var contract = await context.RentalContracts
+        var results = await context.RentalContracts
             .FromSqlInterpolated($"SELECT * FROM contracts WHERE id = {contractId} FOR UPDATE")
-            .FirstOrDefaultAsync(cancellationToken);
+            .ToListAsync(cancellationToken);
+        var contract = results.FirstOrDefault();
 
         return await ReloadAfterLockAsync(contract, cancellationToken);
     }

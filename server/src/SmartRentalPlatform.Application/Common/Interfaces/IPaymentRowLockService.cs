@@ -16,6 +16,14 @@ public interface IPaymentRowLockService
         string idempotencyKey,
         CancellationToken cancellationToken = default);
 
+    Task<WithdrawalRequest?> LockWithdrawalRequestByProviderOrderCodeAsync(
+        string providerOrderCode,
+        CancellationToken cancellationToken = default);
+
+    Task<WithdrawalRequest?> LockWithdrawalRequestByIdempotencyKeyAsync(
+        string idempotencyKey,
+        CancellationToken cancellationToken = default);
+
     Task<WalletAccount?> LockWalletAccountAsync(
         Guid walletAccountId,
         CancellationToken cancellationToken = default);

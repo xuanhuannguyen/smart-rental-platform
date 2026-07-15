@@ -1,8 +1,19 @@
 export interface PagedResponse<T> {
   items: T[];
-  totalCount: number;
+  totalItems: number;
   pageSize: number;
   pageNumber: number;
+}
+
+export interface AdminReviewReportListItem {
+  id: string;
+  roomingHouseReviewId: string;
+  reporterUserId: string;
+  reporterDisplayName: string;
+  reason: string;
+  status: string;
+  createdAt: string;
+  roomingHouseName: string;
 }
 
 export interface AdminUserListItem {
@@ -61,6 +72,30 @@ export interface AdminRoomingHouseListItem {
   approvalStatus: string;
   visibilityStatus: string;
   createdAt: string;
+}
+
+export interface AdminReviewReportDetail extends AdminReviewReportListItem {
+  adminNote?: string | null;
+  resolvedAt?: string | null;
+  review?: {
+    id: string;
+    tenantUserId: string;
+    tenantDisplayName: string;
+    tenantAvatarUrl?: string | null;
+    rating: number;
+    comment?: string | null;
+    landlordReply?: string | null;
+    landlordReplyCreatedAt?: string | null;
+    createdAt: string;
+    updatedAt?: string | null;
+    images: Array<{
+      id: string;
+      imageUrl: string;
+      caption?: string;
+      isCover: boolean;
+      sortOrder: number;
+    }>;
+  };
 }
 
 export interface AdminRoomingHouseDetail extends AdminRoomingHouseListItem {

@@ -36,6 +36,27 @@ public class BillingServiceTests : IClassFixture<TestDatabaseFixture>
         _walletPaymentService = new FakeInvoiceWalletPaymentService();
     }
 
+    private BillingService CreateBillingService(IAppDbContext context)
+    {
+        var periodResolver = new BillingPeriodResolver(context);
+        var invoiceBuilder = new BillingInvoiceBuilder(context);
+        var queryLoader = new InvoiceQueryLoader(context);
+        var contractContextResolver = new BillingContractContextResolver(context);
+        var meterReadingInputResolver = new MeterReadingInputResolver(context);
+        var workflowGuard = new BillingWorkflowGuard(context, _contractReadService);
+
+        return new BillingService(
+            context,
+            _contractReadService,
+            _walletPaymentService,
+            periodResolver,
+            invoiceBuilder,
+            queryLoader,
+            contractContextResolver,
+            meterReadingInputResolver,
+            workflowGuard);
+    }
+
     [Fact]
     public async Task GetRoomBillingContextAsync_ShouldThrowNotFoundException_WhenNoActiveContractExists()
     {
@@ -50,7 +71,7 @@ public class BillingServiceTests : IClassFixture<TestDatabaseFixture>
         context.Rooms.Add(room);
         await context.SaveChangesAsync();
 
-        var service = new BillingService(context, _contractReadService, _walletPaymentService);
+        var service = CreateBillingService(context);
 
         // Act & Assert
         await Assert.ThrowsAsync<NotFoundException>(() => service.GetRoomBillingContextAsync(landlord.Id, room.Id, CancellationToken.None));
@@ -63,7 +84,7 @@ public class BillingServiceTests : IClassFixture<TestDatabaseFixture>
     {
         var context = _fixture.Context;
         var seed = await SeedActiveContractGraphAsync();
-        var service = new BillingService(context, _contractReadService, _walletPaymentService);
+        var service = CreateBillingService(context);
 
         var result = await service.GetRoomBillingContextAsync(seed.Landlord.Id, seed.Room.Id, CancellationToken.None);
 
@@ -77,7 +98,7 @@ public class BillingServiceTests : IClassFixture<TestDatabaseFixture>
     public async Task GetRoomInvoicePreviewAsync_ShouldThrowBadRequestException_WhenPeriodEndBeforeStart()
     {
         var context = _fixture.Context;
-        var service = new BillingService(context, _contractReadService, _walletPaymentService);
+        var service = CreateBillingService(context);
 
         await Assert.ThrowsAsync<BadRequestException>(() => service.GetRoomInvoicePreviewAsync(
             Guid.NewGuid(),
@@ -91,7 +112,7 @@ public class BillingServiceTests : IClassFixture<TestDatabaseFixture>
     public async Task GetRoomInvoicePreviewAsync_ShouldThrowBadRequestException_WhenPeriodSpansMultipleMonths()
     {
         var context = _fixture.Context;
-        var service = new BillingService(context, _contractReadService, _walletPaymentService);
+        var service = CreateBillingService(context);
 
         await Assert.ThrowsAsync<BadRequestException>(() => service.GetRoomInvoicePreviewAsync(
             Guid.NewGuid(),
@@ -105,7 +126,7 @@ public class BillingServiceTests : IClassFixture<TestDatabaseFixture>
     public async Task GetRoomInvoicePreviewAsync_ShouldThrowNotFoundException_WhenNoActiveContractExists()
     {
         var context = _fixture.Context;
-        var service = new BillingService(context, _contractReadService, _walletPaymentService);
+        var service = CreateBillingService(context);
 
         await Assert.ThrowsAsync<NotFoundException>(() => service.GetRoomInvoicePreviewAsync(
             Guid.NewGuid(),
@@ -120,7 +141,7 @@ public class BillingServiceTests : IClassFixture<TestDatabaseFixture>
     {
         var context = _fixture.Context;
         var seed = await SeedActiveContractGraphAsync();
-        var service = new BillingService(context, _contractReadService, _walletPaymentService);
+        var service = CreateBillingService(context);
 
         var result = await service.GetRoomInvoicePreviewAsync(
             seed.Landlord.Id,
@@ -142,7 +163,7 @@ public class BillingServiceTests : IClassFixture<TestDatabaseFixture>
         AddDefaultServicePrices(seed.House.Id);
         await context.SaveChangesAsync();
 
-        var service = new BillingService(context, _contractReadService, _walletPaymentService);
+        var service = CreateBillingService(context);
 
         var result = await service.GetRoomInvoicePreviewAsync(
             seed.Landlord.Id,
@@ -179,7 +200,7 @@ public class BillingServiceTests : IClassFixture<TestDatabaseFixture>
         context.Invoices.Add(invoice);
         await context.SaveChangesAsync();
 
-        var service = new BillingService(context, _contractReadService, _walletPaymentService);
+        var service = CreateBillingService(context);
 
         var result = await service.IssueInvoiceAsync(landlord.Id, invoice.Id, CancellationToken.None);
 
@@ -211,7 +232,7 @@ public class BillingServiceTests : IClassFixture<TestDatabaseFixture>
         context.Invoices.Add(invoice);
         await context.SaveChangesAsync();
 
-        var service = new BillingService(context, _contractReadService, _walletPaymentService);
+        var service = CreateBillingService(context);
 
         await Assert.ThrowsAsync<BadRequestException>(() => service.IssueInvoiceAsync(landlord.Id, invoice.Id, CancellationToken.None));
 
@@ -228,7 +249,7 @@ public class BillingServiceTests : IClassFixture<TestDatabaseFixture>
             new BillingServiceType { Id = Guid.NewGuid(), Name = "Inactive", IsActive = false });
         await context.SaveChangesAsync();
 
-        var service = new BillingService(context, _contractReadService, _walletPaymentService);
+        var service = CreateBillingService(context);
 
         var result = await service.GetBillingServiceTypesAsync(CancellationToken.None);
 
@@ -250,7 +271,7 @@ public class BillingServiceTests : IClassFixture<TestDatabaseFixture>
         context.Invoices.Add(otherInvoice);
         await context.SaveChangesAsync();
 
-        var service = new BillingService(context, _contractReadService, _walletPaymentService);
+        var service = CreateBillingService(context);
 
         var result = await service.GetLandlordInvoicesAsync(seed.Landlord.Id, status: "Issued", search: seed.Invoice.InvoiceNo, contractId: seed.Contract.Id, CancellationToken.None);
 
@@ -263,7 +284,7 @@ public class BillingServiceTests : IClassFixture<TestDatabaseFixture>
     {
         var context = _fixture.Context;
         var seed = await SeedInvoiceGraphAsync(status: InvoiceStatus.Issued);
-        var service = new BillingService(context, _contractReadService, _walletPaymentService);
+        var service = CreateBillingService(context);
 
         await Assert.ThrowsAsync<ForbiddenException>(() => service.GetLandlordInvoiceAsync(Guid.NewGuid(), seed.Invoice.Id, CancellationToken.None));
     }
@@ -273,7 +294,7 @@ public class BillingServiceTests : IClassFixture<TestDatabaseFixture>
     {
         var context = _fixture.Context;
         var seed = await SeedInvoiceGraphAsync(status: InvoiceStatus.Issued);
-        var service = new BillingService(context, _contractReadService, _walletPaymentService);
+        var service = CreateBillingService(context);
 
         var result = await service.CancelInvoiceAsync(seed.Landlord.Id, seed.Invoice.Id, "  tenant moved out  ", CancellationToken.None);
 
@@ -288,7 +309,7 @@ public class BillingServiceTests : IClassFixture<TestDatabaseFixture>
     {
         var context = _fixture.Context;
         var seed = await SeedInvoiceGraphAsync(status: InvoiceStatus.Paid);
-        var service = new BillingService(context, _contractReadService, _walletPaymentService);
+        var service = CreateBillingService(context);
 
         await Assert.ThrowsAsync<BadRequestException>(() => service.CancelInvoiceAsync(seed.Landlord.Id, seed.Invoice.Id, "reason", CancellationToken.None));
     }
@@ -303,7 +324,7 @@ public class BillingServiceTests : IClassFixture<TestDatabaseFixture>
         context.Invoices.Add(draft);
         await context.SaveChangesAsync();
 
-        var service = new BillingService(context, _contractReadService, _walletPaymentService);
+        var service = CreateBillingService(context);
 
         var result = await service.GetMyInvoicesAsync(seed.Tenant.Id, CancellationToken.None);
 
@@ -316,7 +337,7 @@ public class BillingServiceTests : IClassFixture<TestDatabaseFixture>
     {
         var context = _fixture.Context;
         var seed = await SeedInvoiceGraphAsync(status: InvoiceStatus.Draft);
-        var service = new BillingService(context, _contractReadService, _walletPaymentService);
+        var service = CreateBillingService(context);
 
         await Assert.ThrowsAsync<NotFoundException>(() => service.GetMyInvoiceAsync(seed.Tenant.Id, seed.Invoice.Id, CancellationToken.None));
     }
@@ -327,7 +348,7 @@ public class BillingServiceTests : IClassFixture<TestDatabaseFixture>
         var context = _fixture.Context;
         var seed = await SeedInvoiceGraphAsync(status: InvoiceStatus.Issued);
         _walletPaymentService.Result = new InvoiceWalletPaymentResult(true, Guid.NewGuid(), null);
-        var service = new BillingService(context, _contractReadService, _walletPaymentService);
+        var service = CreateBillingService(context);
 
         var result = await service.PayInvoiceAsync(seed.Tenant.Id, seed.Invoice.Id, CancellationToken.None);
 
@@ -340,7 +361,7 @@ public class BillingServiceTests : IClassFixture<TestDatabaseFixture>
         var context = _fixture.Context;
         var seed = await SeedInvoiceGraphAsync(status: InvoiceStatus.Issued);
         _walletPaymentService.Result = new InvoiceWalletPaymentResult(false, null, "No balance");
-        var service = new BillingService(context, _contractReadService, _walletPaymentService);
+        var service = CreateBillingService(context);
 
         await Assert.ThrowsAsync<BadRequestException>(() => service.PayInvoiceAsync(seed.Tenant.Id, seed.Invoice.Id, CancellationToken.None));
     }
@@ -349,7 +370,7 @@ public class BillingServiceTests : IClassFixture<TestDatabaseFixture>
     public async Task GenerateInvoiceWithReadingsAsync_ShouldThrowBadRequestException_WhenPeriodEndBeforeStart()
     {
         var context = _fixture.Context;
-        var service = new BillingService(context, _contractReadService, _walletPaymentService);
+        var service = CreateBillingService(context);
         var request = new GenerateInvoiceWithReadingsRequest(
             Guid.NewGuid(),
             new DateOnly(2026, 6, 10),
@@ -365,7 +386,7 @@ public class BillingServiceTests : IClassFixture<TestDatabaseFixture>
     public async Task GenerateInvoiceWithReadingsAsync_ShouldThrowBadRequestException_WhenPeriodSpansMultipleMonths()
     {
         var context = _fixture.Context;
-        var service = new BillingService(context, _contractReadService, _walletPaymentService);
+        var service = CreateBillingService(context);
         var request = new GenerateInvoiceWithReadingsRequest(
             Guid.NewGuid(),
             new DateOnly(2026, 6, 1),
@@ -381,7 +402,7 @@ public class BillingServiceTests : IClassFixture<TestDatabaseFixture>
     public async Task GenerateInvoiceWithReadingsAsync_ShouldThrowBadRequestException_WhenDiscountIsNegative()
     {
         var context = _fixture.Context;
-        var service = new BillingService(context, _contractReadService, _walletPaymentService);
+        var service = CreateBillingService(context);
         var request = new GenerateInvoiceWithReadingsRequest(
             Guid.NewGuid(),
             new DateOnly(2026, 6, 1),
@@ -397,7 +418,7 @@ public class BillingServiceTests : IClassFixture<TestDatabaseFixture>
     public async Task GenerateInvoiceWithReadingsAsync_ShouldThrowBadRequestException_WhenMeterReadingsIsNull()
     {
         var context = _fixture.Context;
-        var service = new BillingService(context, _contractReadService, _walletPaymentService);
+        var service = CreateBillingService(context);
         var request = new GenerateInvoiceWithReadingsRequest(
             Guid.NewGuid(),
             new DateOnly(2026, 6, 1),
@@ -417,7 +438,7 @@ public class BillingServiceTests : IClassFixture<TestDatabaseFixture>
         AddDefaultServicePrices(seed.House.Id);
         await context.SaveChangesAsync();
         _contractReadService.ActiveContract = BuildContractSnapshot(seed, terminationDate: null, terminationType: null);
-        var service = new BillingService(context, _contractReadService, _walletPaymentService);
+        var service = CreateBillingService(context);
         var request = new GenerateInvoiceWithReadingsRequest(
             seed.Contract.Id,
             new DateOnly(2026, 1, 1),
@@ -467,7 +488,7 @@ public class BillingServiceTests : IClassFixture<TestDatabaseFixture>
         await context.SaveChangesAsync();
 
         _contractReadService.ActiveContract = BuildContractSnapshot(seed, terminationDate: null, terminationType: null);
-        var service = new BillingService(context, _contractReadService, _walletPaymentService);
+        var service = CreateBillingService(context);
         var request = new GenerateInvoiceWithReadingsRequest(
             seed.Contract.Id,
             new DateOnly(2026, 1, 1),
@@ -496,7 +517,7 @@ public class BillingServiceTests : IClassFixture<TestDatabaseFixture>
     public async Task GetLandlordInvoiceAsync_ShouldThrowNotFoundException_WhenInvoiceDoesNotExist()
     {
         var context = _fixture.Context;
-        var service = new BillingService(context, _contractReadService, _walletPaymentService);
+        var service = CreateBillingService(context);
 
         await Assert.ThrowsAsync<NotFoundException>(() => service.GetLandlordInvoiceAsync(Guid.NewGuid(), Guid.NewGuid(), CancellationToken.None));
     }
@@ -505,7 +526,7 @@ public class BillingServiceTests : IClassFixture<TestDatabaseFixture>
     public async Task GetTerminationInvoicePreviewAsync_ShouldThrowNotFoundException_WhenContractSnapshotMissing()
     {
         var context = _fixture.Context;
-        var service = new BillingService(context, _contractReadService, _walletPaymentService);
+        var service = CreateBillingService(context);
 
         await Assert.ThrowsAsync<NotFoundException>(() => service.GetTerminationInvoicePreviewAsync(Guid.NewGuid(), Guid.NewGuid(), CancellationToken.None));
     }
@@ -516,7 +537,7 @@ public class BillingServiceTests : IClassFixture<TestDatabaseFixture>
         var context = _fixture.Context;
         var seed = await SeedActiveContractGraphAsync();
         _contractReadService.Contract = BuildContractSnapshot(seed, terminationDate: null, terminationType: null);
-        var service = new BillingService(context, _contractReadService, _walletPaymentService);
+        var service = CreateBillingService(context);
 
         await Assert.ThrowsAsync<ConflictException>(() => service.GetTerminationInvoicePreviewAsync(seed.Landlord.Id, seed.Contract.Id, CancellationToken.None));
     }
@@ -527,7 +548,7 @@ public class BillingServiceTests : IClassFixture<TestDatabaseFixture>
         var context = _fixture.Context;
         var seed = await SeedActiveContractGraphAsync();
         _contractReadService.Contract = BuildContractSnapshot(seed, terminationDate: new DateOnly(2026, 5, 20), terminationType: ContractTerminationType.TenantUnilateral);
-        var service = new BillingService(context, _contractReadService, _walletPaymentService);
+        var service = CreateBillingService(context);
 
         await Assert.ThrowsAsync<ForbiddenException>(() => service.GetTerminationInvoicePreviewAsync(Guid.NewGuid(), seed.Contract.Id, CancellationToken.None));
     }
@@ -538,7 +559,7 @@ public class BillingServiceTests : IClassFixture<TestDatabaseFixture>
         var context = _fixture.Context;
         var seed = await SeedActiveContractGraphAsync();
         _contractReadService.Contract = BuildContractSnapshot(seed, terminationDate: null, terminationType: null);
-        var service = new BillingService(context, _contractReadService, _walletPaymentService);
+        var service = CreateBillingService(context);
         var request = new CreateTerminationInvoiceRequest(0, null, []);
 
         await Assert.ThrowsAsync<ConflictException>(() => service.CreateNextTerminationInvoiceAsync(seed.Landlord.Id, seed.Contract.Id, request, CancellationToken.None));
@@ -548,7 +569,7 @@ public class BillingServiceTests : IClassFixture<TestDatabaseFixture>
     public async Task CreateFinalInvoiceForTerminationAsync_ShouldThrowBadRequestException_WhenDiscountIsNegative()
     {
         var context = _fixture.Context;
-        var service = new BillingService(context, _contractReadService, _walletPaymentService);
+        var service = CreateBillingService(context);
 
         await Assert.ThrowsAsync<BadRequestException>(() => service.CreateFinalInvoiceForTerminationAsync(
             Guid.NewGuid(),
@@ -564,7 +585,7 @@ public class BillingServiceTests : IClassFixture<TestDatabaseFixture>
     public async Task CreateFinalInvoiceForTerminationAsync_ShouldThrowBadRequestException_WhenMeterReadingsIsNull()
     {
         var context = _fixture.Context;
-        var service = new BillingService(context, _contractReadService, _walletPaymentService);
+        var service = CreateBillingService(context);
 
         await Assert.ThrowsAsync<BadRequestException>(() => service.CreateFinalInvoiceForTerminationAsync(
             Guid.NewGuid(),

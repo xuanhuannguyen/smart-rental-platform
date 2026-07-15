@@ -23,3 +23,7 @@ global using SmartRentalPlatform.Contracts.Rooms.Requests;
 global using SmartRentalPlatform.Contracts.Rooms.Responses;
 global using SmartRentalPlatform.Contracts.Users.Requests;
 global using SmartRentalPlatform.Contracts.Users.Responses;
+global using SmartRentalPlatform.Contracts.RoomingHouseReviews.Requests;
+global using SmartRentalPlatform.Contracts.RoomingHouseReviews.Responses;
+global using SmartRentalPlatform.Contracts.ReviewReports.Requests;
+global using SmartRentalPlatform.Contracts.ReviewReports.Responses;

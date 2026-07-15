@@ -1,10 +1,13 @@
+import { Alert } from '../../../shared/components/ui/Alert';
+import { toAssetUrl } from '../../../shared/api/assets';
 import { useState, useEffect, useMemo, type FormEvent } from 'react';
 import { useParams, useNavigate, useLocation } from 'react-router-dom';
 import { useAuth } from '../../../app/providers/AuthProvider';
 import { ROUTE_PATHS } from '../../../app/router/routePaths';
 import { getApiErrorMessage } from '../../../shared/api/apiError';
-import { toAssetUrl } from '../../../shared/api/assets';
 import { Button } from '../../../shared/components/ui/Button';
+import { Tabs } from '../../../shared/components/ui/Tabs';
+import { PageHeader } from '../../../shared/components/ui/PageHeader';
 import { formatStatus, getStatusToneClass } from '../../../shared/utils/status';
 import { contractApi } from '../../contracts/api';
 import { getRoomingHouseDetail } from '../../rooming-houses/api';
@@ -51,7 +54,7 @@ import { formatDateVi, formatMoneyString, parseMoneyString } from '../../../shar
 import { TerminateContractModal } from '../../rental-history/pages/TerminateContractModal';
 import { AppendixPreviewModal } from '../../rental-history/components/AppendixPreviewModal';
 import { billingApi } from '../../billing/api';
-import { uploadImage } from '../../files/api';
+import { Toast } from '../../../shared/components/ui/Toast';
 import type {
   FixedServicePreview,
   Invoice,
@@ -85,7 +88,8 @@ export default function RoomDetailPage() {
   const [house, setHouse] = useState<RoomingHouseDetail | null>(null);
   const [loading, setLoading] = useState(true);
   const [actionLoading, setActionLoading] = useState(false);
-  const [message, setMessage] = useState('');
+  const [pageError, setPageError] = useState('');
+  const [toast, setToast] = useState<{ message: string; type: 'success' | 'error' | 'info' } | null>(null);
 
   const location = useLocation();
 
@@ -105,7 +109,7 @@ export default function RoomDetailPage() {
 
   const [activeContract, setActiveContract] = useState<ContractDetailResponse | null>(null);
   const [activeTenants, setActiveTenants] = useState<ContractOccupantResponse[]>([]);
-  const [occupantFilter, setOccupantFilter] = useState<'all' | 'active' | 'left'>('all');
+  const [occupantFilter, setOccupantFilter] = useState<'all' | 'active' | 'pending' | 'left'>('all');
   const [tabLoading, setTabLoading] = useState(false);
   const [contractActionError, setContractActionError] = useState<string | null>(null);
   const [isFileActionLoading, setIsFileActionLoading] = useState(false);
@@ -121,6 +125,35 @@ export default function RoomDetailPage() {
   const [invoiceTabLoading, setInvoiceTabLoading] = useState(false);
   const [isCreateInvoiceModalOpen, setIsCreateInvoiceModalOpen] = useState(false);
 
+  const pendingChangesAlertInfo = useMemo(() => {
+    if (!appendices) return null;
+    const dueAppendices = appendices.filter((a) => a.status === 'Active' && !a.appliedAt);
+    if (dueAppendices.length === 0) return null;
+
+    let hasPendingOccupantChanges = false;
+    let hasPendingContractChanges = false;
+    let earliestPendingDate: string | null = null;
+
+    for (const appendix of dueAppendices) {
+      if (!earliestPendingDate || new Date(appendix.effectiveDate) < new Date(earliestPendingDate)) {
+        earliestPendingDate = appendix.effectiveDate;
+      }
+      for (const change of appendix.changes) {
+        if (change.targetType === 'ContractOccupant' || change.fieldName === 'MainTenantUserId') {
+          hasPendingOccupantChanges = true;
+        } else if (change.targetType === 'Contract') {
+          hasPendingContractChanges = true;
+        }
+      }
+    }
+
+    return {
+      hasPendingOccupantChanges,
+      hasPendingContractChanges,
+      earliestPendingDate,
+    };
+  }, [appendices]);
+
   useEffect(() => {
     if (!id) return;
     loadData();
@@ -131,7 +164,7 @@ export default function RoomDetailPage() {
 
     if (mainTab !== 'tenants' && mainTab !== 'contracts' && mainTab !== 'invoices') return;
 
-    if (selectedRoom.status !== 'Occupied') {
+    if (selectedRoom.status !== 'Occupied' && selectedRoom.status !== 'Reserved') {
       setActiveContract(null);
       setActiveTenants([]);
       setAppendices(null);
@@ -145,7 +178,7 @@ export default function RoomDetailPage() {
 
     async function loadActiveRoomContractData() {
       setTabLoading(true);
-      setMessage('');
+      setToast(null);
 
       try {
         if (mainTab === 'tenants') {
@@ -157,6 +190,7 @@ export default function RoomDetailPage() {
           if (isCancelled) return;
           setActiveContract(contract);
           setActiveTenants(tenants);
+          await refreshAppendices(contract.id);
           return;
         }
 
@@ -180,7 +214,7 @@ export default function RoomDetailPage() {
         setContractInvoices([]);
         setAppendices([]);
         setAppendicesError(getApiErrorMessage(err, 'Không thể tải danh sách phụ lục.'));
-        setMessage(getApiErrorMessage(err, 'Không thể tải dữ liệu hợp đồng đang active của phòng.'));
+        setToast({ message: getApiErrorMessage(err, 'Không thể tải dữ liệu hợp đồng đang active của phòng.'), type: 'error' });
       } finally {
         if (!isCancelled) {
           setTabLoading(false);
@@ -197,18 +231,18 @@ export default function RoomDetailPage() {
 
   async function loadData() {
     setLoading(true);
-    setMessage('');
+    setToast(null);
     try {
       const houseData = await getRoomingHouseDetail(id!);
 
       if (houseData.approvalStatus !== 'Approved') {
-        setMessage('Khu trọ này chưa được quản trị viên phê duyệt. Không thể truy cập quản lý phòng.');
+        setPageError('Khu trọ này chưa được quản trị viên phê duyệt. Không thể truy cập quản lý phòng.');
         setHouse(null);
         return;
       }
 
       if (!houseData.rentalPolicy || !houseData.houseRule) {
-        setMessage('Vui lòng hoàn thành Chính Sách Thuê và Luật Khu Trọ trước khi truy cập trang này.');
+        setPageError('Vui lòng hoàn thành Chính Sách Thuê và Luật Khu Trọ trước khi truy cập trang này.');
         setHouse(houseData);
         return;
       }
@@ -222,6 +256,13 @@ export default function RoomDetailPage() {
       if (roomId) {
         const roomDetail = await getRoomDetail(roomId);
         setSelectedRoom(roomDetail);
+
+        try {
+          const contract = await getActiveContractByRoomId(roomId);
+          setActiveContract(contract);
+        } catch {
+          setActiveContract(null);
+        }
 
         setRoomForm({
           roomNumber: roomDetail.roomNumber,
@@ -242,7 +283,7 @@ export default function RoomDetailPage() {
         );
       }
     } catch (err) {
-      setMessage(getApiErrorMessage(err, 'Không thể tải thông tin phòng.'));
+      setToast({ message: getApiErrorMessage(err, 'Không thể tải thông tin phòng.'), type: 'error' });
     } finally {
       setLoading(false);
     }
@@ -255,7 +296,7 @@ export default function RoomDetailPage() {
       setContractInvoices(response.data);
     } catch (err) {
       setContractInvoices([]);
-      setMessage(getApiErrorMessage(err, 'Không thể tải danh sách hóa đơn của hợp đồng.'));
+      setToast({ message: getApiErrorMessage(err, 'Không thể tải danh sách hóa đơn của hợp đồng.'), type: 'error' });
     } finally {
       setInvoiceTabLoading(false);
     }
@@ -264,19 +305,19 @@ export default function RoomDetailPage() {
   async function handleSaveRoomBasic() {
     if (!house) return;
     if (isRoomEditLocked(selectedRoom)) {
-      setMessage('Không thể chỉnh sửa thông tin phòng khi phòng đang được giữ chỗ hoặc đang được thuê.');
+      setToast({ message: 'Không thể chỉnh sửa thông tin phòng khi phòng đang được giữ chỗ hoặc đang được thuê.', type: 'info' });
       return;
     }
     setActionLoading(true);
-    setMessage('');
+    setToast(null);
     try {
       if (selectedRoom) {
         const updated = await updateRoom(selectedRoom.id, roomForm);
         setSelectedRoom(updated);
-        setMessage('Đã lưu thông tin cơ bản phòng.');
+        setToast({ message: 'Đã lưu thông tin cơ bản phòng.', type: 'success' });
       }
     } catch (err) {
-      setMessage(getApiErrorMessage(err, 'Không thể lưu thông tin phòng.'));
+      setToast({ message: getApiErrorMessage(err, 'Không thể lưu thông tin phòng.'), type: 'error' });
     } finally {
       setActionLoading(false);
     }
@@ -285,14 +326,14 @@ export default function RoomDetailPage() {
   async function handleSaveRoomImages() {
     if (!selectedRoom) return;
     setActionLoading(true);
-    setMessage('');
+    setToast(null);
     try {
       const updated = await updateRoomImages(selectedRoom.id, cleanImages(roomImages));
       setSelectedRoom(updated);
       setRoomImages(toImageRequests(updated.images));
-      setMessage('Đã lưu ảnh phòng thành công.');
+      setToast({ message: 'Đã lưu ảnh phòng thành công.', type: 'success' });
     } catch (err) {
-      setMessage(getApiErrorMessage(err, 'Không thể lưu ảnh phòng.'));
+      setToast({ message: getApiErrorMessage(err, 'Không thể lưu ảnh phòng.'), type: 'error' });
     } finally {
       setActionLoading(false);
     }
@@ -301,14 +342,14 @@ export default function RoomDetailPage() {
   async function handleSaveRoomAmenities() {
     if (!selectedRoom) return;
     setActionLoading(true);
-    setMessage('');
+    setToast(null);
     try {
       const updated = await updateRoomAmenities(selectedRoom.id, roomAmenityIds);
       setSelectedRoom(updated);
       setRoomAmenityIds(updated.amenities.map(a => a.id));
-      setMessage('Đã cập nhật tiện ích phòng thành công.');
+      setToast({ message: 'Đã cập nhật tiện ích phòng thành công.', type: 'success' });
     } catch (err) {
-      setMessage(getApiErrorMessage(err, 'Không thể lưu tiện ích phòng.'));
+      setToast({ message: getApiErrorMessage(err, 'Không thể lưu tiện ích phòng.'), type: 'error' });
     } finally {
       setActionLoading(false);
     }
@@ -317,18 +358,18 @@ export default function RoomDetailPage() {
   async function handleSaveRoomPrice() {
     if (!selectedRoom) return;
     if (isRoomEditLocked(selectedRoom)) {
-      setMessage('Không thể chỉnh sửa bảng giá phòng khi phòng đang được giữ chỗ hoặc đang được thuê.');
+      setToast({ message: 'Không thể chỉnh sửa bảng giá phòng khi phòng đang được giữ chỗ hoặc đang được thuê.', type: 'info' });
       return;
     }
     setActionLoading(true);
-    setMessage('');
+    setToast(null);
     try {
       const updated = await updateRoomPriceTiers(selectedRoom.id, priceTiers);
       setSelectedRoom(updated);
       setPriceTiers(updated.priceTiers.map(t => ({ occupantCount: t.occupantCount, monthlyRent: t.monthlyRent, isActive: t.isActive })));
-      setMessage('Đã cập nhật bảng giá phòng thành công.');
+      setToast({ message: 'Đã cập nhật bảng giá phòng thành công.', type: 'success' });
     } catch (err) {
-      setMessage(getApiErrorMessage(err, 'Không thể lưu bảng giá phòng.'));
+      setToast({ message: getApiErrorMessage(err, 'Không thể lưu bảng giá phòng.'), type: 'error' });
     } finally {
       setActionLoading(false);
     }
@@ -337,13 +378,13 @@ export default function RoomDetailPage() {
   async function handlePublishRoom() {
     if (!selectedRoom) return;
     setActionLoading(true);
-    setMessage('');
+    setToast(null);
     try {
       const updated = await submitRoom(selectedRoom.id);
       setSelectedRoom(updated);
-      setMessage('Phòng đã được hiển thị hoạt động và sẵn sàng cho thuê.');
+      setToast({ message: 'Phòng đã được hiển thị hoạt động và sẵn sàng cho thuê.', type: 'success' });
     } catch (err) {
-      setMessage(getApiErrorMessage(err, 'Không thể hiển thị hoạt động phòng.'));
+      setToast({ message: getApiErrorMessage(err, 'Không thể hiển thị hoạt động phòng.'), type: 'error' });
     } finally {
       setActionLoading(false);
     }
@@ -354,15 +395,13 @@ export default function RoomDetailPage() {
 
     const nextStatus = selectedRoom.status === 'Available' ? 'Maintenance' : 'Available';
     setActionLoading(true);
-    setMessage('');
+    setToast(null);
     try {
       const updated = await updateRoomStatus(selectedRoom.id, nextStatus);
       setSelectedRoom(updated);
-      setMessage(nextStatus === 'Maintenance'
-        ? 'Phòng đã được tạm ngưng hiển thị.'
-        : 'Phòng đã được mở lại và có thể nhận thuê.');
+      setToast({ message: nextStatus === 'Maintenance' ? 'Phòng đã được tạm ngưng hiển thị.' : 'Phòng đã được mở lại và có thể nhận thuê.', type: 'success' });
     } catch (err) {
-      setMessage(getApiErrorMessage(err, 'Không thể cập nhật trạng thái phòng.'));
+      setToast({ message: getApiErrorMessage(err, 'Không thể cập nhật trạng thái phòng.'), type: 'error' });
     } finally {
       setActionLoading(false);
     }
@@ -415,7 +454,7 @@ export default function RoomDetailPage() {
       const url = URL.createObjectURL(blob);
       const link = document.createElement('a');
       link.href = url;
-      link.download = `${activeContract.contractNumber}-${file.fileVariant.toLowerCase()}.pdf`;
+      link.download = `${activeContract.contractNumber}-${file.purpose.toLowerCase()}.pdf`;
       document.body.appendChild(link);
       link.click();
       link.remove();
@@ -436,18 +475,18 @@ export default function RoomDetailPage() {
   const roomEditLocked = isRoomEditLocked(selectedRoom);
   const canToggleRoomMaintenance = selectedRoom?.status === 'Available' || selectedRoom?.status === 'Maintenance';
 
-  const displayMessage = message || (
+  const displayMessage = (
     selectedRoom?.status === 'Available'
       ? 'Phòng đã được hiển thị hoạt động và sẵn sàng cho thuê.'
       : selectedRoom?.status === 'Maintenance'
-      ? 'Phòng đang tạm ngưng hiển thị.'
-      : selectedRoom?.status === 'Hidden'
-      ? 'Phòng đang ẩn và chưa sẵn sàng cho thuê.'
-      : selectedRoom?.status === 'Occupied'
-      ? 'Phòng đang được thuê và hoạt động bình thường.'
-      : selectedRoom?.status === 'Reserved'
-      ? 'Phòng đã được giữ chỗ.'
-      : ''
+        ? 'Phòng đang tạm ngưng hiển thị.'
+        : selectedRoom?.status === 'Hidden'
+          ? 'Phòng đang ẩn và chưa sẵn sàng cho thuê.'
+          : selectedRoom?.status === 'Occupied'
+            ? 'Phòng đang được thuê và hoạt động bình thường.'
+            : selectedRoom?.status === 'Reserved'
+              ? 'Phòng đã được giữ chỗ.'
+              : ''
   );
 
   if (loading) {
@@ -466,7 +505,7 @@ export default function RoomDetailPage() {
         <main className="dashboard-main">
           <div className="empty-panel">
             <h2>Lỗi truy cập</h2>
-            <p>{message || 'Không thể truy cập thông tin phòng.'}</p>
+            <p>{pageError || 'Không thể truy cập thông tin phòng.'}</p>
             <button className="primary-action" onClick={() => navigate(ROUTE_PATHS.LANDLORD.ROOMING_HOUSE_DETAIL(id!))}>
               Quay lại danh sách phòng
             </button>
@@ -479,179 +518,232 @@ export default function RoomDetailPage() {
   return (
     <div className="rooming-house-detail-page" style={{ display: 'contents' }}>
       <main className="dashboard-main">
-        <section className="overview-band">
-          <div className="overview-header-title-area">
-            <button
-              type="button"
-              className="back-icon-btn"
-              onClick={() => navigate(ROUTE_PATHS.LANDLORD.ROOMING_HOUSE_DETAIL(id!))}
-              title="Quay về danh sách phòng"
-            >
-              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
-                <line x1="19" y1="12" x2="5" y2="12" />
-                <polyline points="12 19 5 12 12 5" />
+        <PageHeader
+          className="page-header-band--flat-bottom"
+          onBack={() => navigate(ROUTE_PATHS.LANDLORD.ROOMING_HOUSE_DETAIL(id!))}
+          icon={
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+              <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#2563eb" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z" />
+                <polyline points="9 22 9 12 15 12 15 22" />
+                <rect x="10" y="14" width="4" height="4" />
               </svg>
-            </button>
-            <div className="overview-left">
-              <p className="eyebrow" style={{ display: 'flex', alignItems: 'center', gap: '4px', textTransform: 'uppercase', fontSize: '11px', color: '#64748b', fontWeight: 600 }}>
-                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
-                  <path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z" />
-                  <circle cx="12" cy="10" r="3" />
-                </svg>
-                {house.addressDisplay}
-              </p>
-              <h2 style={{ color: '#0f172a' }}>
-                {`Phòng ${selectedRoom?.roomNumber} - ${house.name}`}
-              </h2>
-              <div className="overview-meta-list" style={{ display: 'flex', alignItems: 'center', gap: '16px', flexWrap: 'wrap', marginTop: '6px' }}>
-                <span className="meta-item" style={{ display: 'inline-flex', alignItems: 'center', gap: '6px', fontSize: '13.5px', color: '#64748b' }}>
-                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                    <rect x="3" y="3" width="18" height="18" rx="2" ry="2" />
-                    <line x1="9" y1="3" x2="9" y2="21" />
-                    <line x1="15" y1="3" x2="15" y2="21" />
-                    <line x1="3" y1="9" x2="21" y2="9" />
-                    <line x1="3" y1="15" x2="21" y2="15" />
-                  </svg>
-                  Diện tích: <strong>{selectedRoom?.areaM2 ? `${selectedRoom.areaM2} m²` : 'Chưa nhập'}</strong>
-                </span>
-                <span style={{ color: '#cbd5e1' }}>|</span>
-                <span className="meta-item" style={{ display: 'inline-flex', alignItems: 'center', gap: '6px', fontSize: '13.5px', color: '#64748b' }}>
-                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                    <rect x="4" y="2" width="16" height="20" rx="2" ry="2" />
-                    <line x1="9" y1="22" x2="9" y2="16" />
-                    <line x1="9" y1="16" x2="15" y2="16" />
-                    <line x1="15" y1="16" x2="15" y2="22" />
-                    <line x1="12" y1="6" x2="12" y2="6.01" strokeWidth="2" />
-                    <line x1="12" y1="10" x2="12" y2="10.01" strokeWidth="2" />
-                  </svg>
-                  Tầng: <strong>{selectedRoom?.floor}</strong>
-                </span>
-                <span style={{ color: '#cbd5e1' }}>|</span>
-                <span className="meta-item" style={{ display: 'inline-flex', alignItems: 'center', gap: '6px', fontSize: '13.5px', color: '#64748b' }}>
-                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                    <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2" />
-                    <circle cx="9" cy="7" r="4" />
-                    <path d="M23 21v-2a4 4 0 0 0-3-3.87" />
-                    <path d="M16 3.13a4 4 0 0 1 0 7.75" />
-                  </svg>
-                  Tối đa: <strong>{selectedRoom?.maxOccupants} người</strong>
-                </span>
-              </div>
             </div>
-          </div>
-
-          <div className="overview-right">
-            <div className="overview-stats" style={{ display: 'flex', justifyContent: 'flex-end', alignItems: 'center', gap: '8px', marginBottom: '12px' }}>
-              <span 
-                className={`status-pill ${getStatusToneClass(selectedRoom.status)}`} 
-                style={{ 
-                  display: 'inline-flex',
-                  alignItems: 'center',
-                  padding: '6px 14px', 
-                  fontSize: '13.5px', 
-                  fontWeight: 600, 
-                  borderRadius: '999px',
-                  border: '1px solid currentColor',
-                  gap: '6px',
-                  background: selectedRoom.status === 'Available' ? '#effaf3' : undefined,
-                  color: selectedRoom.status === 'Available' ? '#10b981' : undefined,
-                  borderColor: selectedRoom.status === 'Available' ? '#a7f3d0' : 'currentColor',
-                }}
-              >
-                <span style={{ 
-                  width: '6px', 
-                  height: '6px', 
-                  borderRadius: '50%', 
-                  backgroundColor: 'currentColor', 
-                  display: 'inline-block' 
-                }} />
-                {formatStatus(selectedRoom.status)}
+          }
+          eyebrow={
+            <div style={{ display: 'flex', alignItems: 'center', gap: '4px', color: '#2563eb', fontSize: '11px', fontWeight: 600, textTransform: 'uppercase', marginBottom: '4px' }}>
+              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                <path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z" />
+                <circle cx="12" cy="10" r="3" />
+              </svg>
+              {house.addressDisplay}
+            </div>
+          }
+          title={`Phòng ${selectedRoom?.roomNumber} - ${house.name}`}
+          description={
+            <div className="overview-meta-list" style={{ display: 'flex', alignItems: 'center', gap: '16px', flexWrap: 'wrap', marginTop: '6px' }}>
+              <span className="meta-item" style={{ display: 'inline-flex', alignItems: 'center', gap: '6px', fontSize: '13.5px', color: '#64748b' }}>
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                  <rect x="3" y="3" width="18" height="18" rx="2" ry="2" />
+                  <line x1="9" y1="3" x2="9" y2="21" />
+                  <line x1="15" y1="3" x2="15" y2="21" />
+                  <line x1="3" y1="9" x2="21" y2="9" />
+                  <line x1="3" y1="15" x2="21" y2="15" />
+                </svg>
+                Diện tích: <strong>{selectedRoom?.areaM2 ? `${selectedRoom.areaM2} m²` : 'Chưa nhập'}</strong>
               </span>
-              {canToggleRoomMaintenance && (
-                <Button
-                  type="button"
-                  variant="outline"
-                  onClick={handleToggleRoomMaintenance}
-                  disabled={actionLoading}
+              <span style={{ color: '#cbd5e1' }}>|</span>
+              <span className="meta-item" style={{ display: 'inline-flex', alignItems: 'center', gap: '6px', fontSize: '13.5px', color: '#64748b' }}>
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                  <rect x="4" y="2" width="16" height="20" rx="2" ry="2" />
+                  <line x1="9" y1="22" x2="9" y2="16" />
+                  <line x1="9" y1="16" x2="15" y2="16" />
+                  <line x1="15" y1="16" x2="15" y2="22" />
+                  <line x1="12" y1="6" x2="12" y2="6.01" strokeWidth="2" />
+                  <line x1="12" y1="10" x2="12" y2="10.01" strokeWidth="2" />
+                </svg>
+                Tầng: <strong>{selectedRoom?.floor}</strong>
+              </span>
+              <span style={{ color: '#cbd5e1' }}>|</span>
+              <span className="meta-item" style={{ display: 'inline-flex', alignItems: 'center', gap: '6px', fontSize: '13.5px', color: '#64748b' }}>
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                  <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2" />
+                  <circle cx="9" cy="7" r="4" />
+                  <path d="M23 21v-2a4 4 0 0 0-3-3.87" />
+                  <path d="M16 3.13a4 4 0 0 1 0 7.75" />
+                </svg>
+                Tối đa: <strong>{selectedRoom?.maxOccupants} người</strong>
+              </span>
+            </div>
+          }
+          rightContent={
+            <div className="overview-right">
+              <div className="overview-stats" style={{ display: 'flex', justifyContent: 'flex-end', alignItems: 'center', gap: '8px', marginBottom: '12px' }}>
+                <span
+                  className={`status-pill ${getStatusToneClass(selectedRoom.status)}`}
                   style={{
                     display: 'inline-flex',
                     alignItems: 'center',
-                    gap: '6px',
-                    borderColor: '#cbd5e1',
-                    color: '#0f172a',
+                    padding: '6px 14px',
                     fontSize: '13.5px',
                     fontWeight: 600,
-                    padding: '6px 14px',
                     borderRadius: '999px',
-                    minHeight: '34px',
-                    backgroundColor: '#ffffff'
+                    border: '1px solid currentColor',
+                    gap: '6px',
+                    background: selectedRoom.status === 'Available' ? '#effaf3' : undefined,
+                    color: selectedRoom.status === 'Available' ? '#10b981' : undefined,
+                    borderColor: selectedRoom.status === 'Available' ? '#a7f3d0' : 'currentColor',
                   }}
                 >
-                  {selectedRoom.status === 'Available' ? (
-                    <>
-                      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
-                        <circle cx="12" cy="12" r="10" />
-                        <line x1="10" y1="9" x2="10" y2="15" />
-                        <line x1="14" y1="9" x2="14" y2="15" />
-                      </svg>
-                      Tạm ngưng
-                    </>
-                  ) : (
-                    <>
-                      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
-                        <circle cx="12" cy="12" r="10" />
-                        <polygon points="10 8 16 12 10 16 10 8" />
-                      </svg>
-                      Mở lại phòng
-                    </>
-                  )}
-                </Button>
-              )}
+                  <span style={{
+                    width: '6px',
+                    height: '6px',
+                    borderRadius: '50%',
+                    backgroundColor: 'currentColor',
+                    display: 'inline-block'
+                  }} />
+                  {formatStatus(selectedRoom.status)}
+                </span>
+                {selectedRoom.status === 'Hidden' ? (
+                  <Button
+                    type="button"
+                    variant="outline"
+                    onClick={handlePublishRoom}
+                    disabled={actionLoading}
+                    style={{
+                      display: 'inline-flex',
+                      alignItems: 'center',
+                      gap: '6px',
+                      borderColor: '#cbd5e1',
+                      color: '#0f172a',
+                      fontSize: '13.5px',
+                      fontWeight: 600,
+                      padding: '6px 14px',
+                      borderRadius: '999px',
+                      minHeight: '34px',
+                      backgroundColor: '#ffffff',
+                      whiteSpace: 'nowrap',
+                    }}
+                  >
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                      <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z" />
+                      <circle cx="12" cy="12" r="3" />
+                    </svg>
+                    Hiển thị phòng
+                  </Button>
+                ) : canToggleRoomMaintenance ? (
+                  <Button
+                    type="button"
+                    variant="outline"
+                    onClick={handleToggleRoomMaintenance}
+                    disabled={actionLoading}
+                    style={{
+                      display: 'inline-flex',
+                      alignItems: 'center',
+                      gap: '6px',
+                      borderColor: '#cbd5e1',
+                      color: '#0f172a',
+                      fontSize: '13.5px',
+                      fontWeight: 600,
+                      padding: '6px 14px',
+                      borderRadius: '999px',
+                      minHeight: '34px',
+                      backgroundColor: '#ffffff',
+                      whiteSpace: 'nowrap',
+                    }}
+                  >
+                    {selectedRoom.status === 'Available' ? (
+                      <>
+                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                          <circle cx="12" cy="12" r="10" />
+                          <line x1="10" y1="9" x2="10" y2="15" />
+                          <line x1="14" y1="9" x2="14" y2="15" />
+                        </svg>
+                        Tạm ngưng
+                      </>
+                    ) : (
+                      <>
+                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                          <circle cx="12" cy="12" r="10" />
+                          <polygon points="10 8 16 12 10 16 10 8" />
+                        </svg>
+                        Mở lại phòng
+                      </>
+                    )}
+                  </Button>
+                ) : null}
+              </div>
             </div>
+          }
+        />
 
-            <div className="room-detail-main-tabs" style={{ display: 'flex', alignItems: 'center', marginTop: '20px', marginBottom: 0 }}>
-              <button
-                className={mainTab === 'room-info' ? 'active' : ''}
-                onClick={() => setMainTab('room-info')}
-              >
-                Thông tin phòng
-              </button>
-              <button
-                className={mainTab === 'tenants' ? 'active' : ''}
-                onClick={() => setMainTab('tenants')}
-                disabled={selectedRoom.status !== 'Occupied'}
-                title={selectedRoom.status !== 'Occupied' ? 'Phòng phải ở trạng thái Đang cho thuê mới có thể quản lý người ở' : ''}
-              >
-                Người ở
-              </button>
-              <button
-                className={mainTab === 'contracts' ? 'active' : ''}
-                onClick={() => setMainTab('contracts')}
-                disabled={selectedRoom.status !== 'Occupied'}
-                title={selectedRoom.status !== 'Occupied' ? 'Phòng phải ở trạng thái Đang cho thuê mới có hợp đồng active' : ''}
-              >
-                Hợp đồng
-              </button>
-              <button
-                className={mainTab === 'invoices' ? 'active' : ''}
-                onClick={() => setMainTab('invoices')}
-                disabled={selectedRoom.status !== 'Occupied'}
-                title={selectedRoom.status !== 'Occupied' ? 'Phòng phải ở trạng thái Đang cho thuê mới có thể quản lý hóa đơn' : ''}
-              >
-                Hóa đơn
-              </button>
-            </div>
-          </div>
-        </section>
+        {/* === TAB CẤP 1 (dính vào dưới header) === */}
+        <Tabs
+          className="attached-top"
+          variant="segmented-primary"
+          activeId={mainTab}
+          onChange={(id) => setMainTab(id as RoomMainTab)}
+          items={[
+            {
+              id: 'room-info',
+              label: 'Thông tin phòng',
+              icon: (
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                  <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" />
+                  <polyline points="14 2 14 8 20 8" />
+                  <line x1="16" y1="13" x2="8" y2="13" />
+                  <line x1="16" y1="17" x2="8" y2="17" />
+                </svg>
+              ),
+            },
+            {
+              id: 'tenants',
+              label: 'Người ở',
+              disabled: !activeContract,
+              title: !activeContract ? 'Phòng phải có hợp đồng đang hiệu lực mới có thể quản lý người ở' : undefined,
+              icon: (
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                  <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2" />
+                  <circle cx="9" cy="7" r="4" />
+                  <path d="M23 21v-2a4 4 0 0 0-3-3.87" />
+                  <path d="M16 3.13a4 4 0 0 1 0 7.75" />
+                </svg>
+              ),
+            },
+            {
+              id: 'contracts',
+              label: 'Hợp đồng',
+              disabled: !activeContract,
+              title: !activeContract ? 'Phòng phải có hợp đồng đang hiệu lực mới có thể xem' : undefined,
+              icon: (
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                  <path d="M9 11l3 3L22 4" />
+                  <path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11" />
+                </svg>
+              ),
+            },
+            {
+              id: 'invoices',
+              label: 'Hóa đơn',
+              disabled: !activeContract,
+              title: !activeContract ? 'Phòng phải có hợp đồng đang hiệu lực mới có thể quản lý hóa đơn' : undefined,
+              icon: (
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                  <line x1="12" y1="1" x2="12" y2="23" />
+                  <path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6" />
+                </svg>
+              ),
+            },
+          ]}
+        />
 
         {displayMessage && (
-          <div className={`rooming-house-rule-editor__alert ${
-            displayMessage.toLowerCase().includes('không thể') || displayMessage.toLowerCase().includes('lỗi')
-              ? 'rooming-house-rule-editor__alert--danger'
-              : displayMessage.toLowerCase().includes('vui lòng') || displayMessage.toLowerCase().includes('chưa') || displayMessage.toLowerCase().includes('phòng đã được') || displayMessage.toLowerCase().includes('tạm ngưng')
+          <div className={`rooming-house-rule-editor__alert ${displayMessage.toLowerCase().includes('không thể') || displayMessage.toLowerCase().includes('lỗi')
+            ? 'rooming-house-rule-editor__alert--danger'
+            : displayMessage.toLowerCase().includes('vui lòng') || displayMessage.toLowerCase().includes('chưa') || displayMessage.toLowerCase().includes('phòng đã được') || displayMessage.toLowerCase().includes('tạm ngưng')
               ? 'rooming-house-rule-editor__alert--warning'
               : 'rooming-house-rule-editor__alert--success'
-          }`} style={{ marginTop: '20px', marginBottom: '10px' }}>
+            }`} style={{ marginTop: '20px', marginBottom: '10px' }}>
             {displayMessage.toLowerCase().includes('không thể') || displayMessage.toLowerCase().includes('lỗi') ? (
               <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" style={{ flexShrink: 0 }}>
                 <circle cx="12" cy="12" r="10" />
@@ -676,60 +768,63 @@ export default function RoomDetailPage() {
         {actionLoading && <p className="dashboard-message" style={{ background: '#dbeafe', color: '#1e40af', marginTop: '10px' }}>Đang lưu thay đổi...</p>}
 
         {mainTab === 'room-info' && (
-          <div className="editor-panel" style={{ marginTop: '20px' }}>
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px' }}>
-              <div className="room-detail-sub-tabs" style={{ marginBottom: 0 }}>
-                <button className={roomActiveTab === 'basic' ? 'active' : ''} onClick={() => setRoomActiveTab('basic')}>
+          <Tabs
+            className="attached-bottom"
+            variant="segmented-secondary"
+            activeId={roomActiveTab}
+            onChange={(id) => setRoomActiveTab(id as RoomTab)}
+            items={[
+              {
+                id: 'basic',
+                label: 'Th\u00f4ng tin c\u01a1 b\u1ea3n',
+                icon: (
                   <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                     <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" />
                     <polyline points="14 2 14 8 20 8" />
                     <line x1="16" y1="13" x2="8" y2="13" />
                     <line x1="16" y1="17" x2="8" y2="17" />
-                    <polyline points="10 9 9 9 8 9" />
                   </svg>
-                  Thông tin cơ bản
-                </button>
-                <button
-                  className={roomActiveTab === 'images' ? 'active' : ''}
-                  onClick={() => setRoomActiveTab('images')}
-                >
+                ),
+              },
+              {
+                id: 'images',
+                label: '\u1ea2nh ph\u00f2ng',
+                icon: (
                   <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                     <rect x="3" y="3" width="18" height="18" rx="2" ry="2" />
                     <circle cx="8.5" cy="8.5" r="1.5" />
                     <polyline points="21 15 16 10 5 21" />
                   </svg>
-                  Ảnh phòng
-                </button>
-                <button
-                  className={roomActiveTab === 'amenities' ? 'active' : ''}
-                  onClick={() => setRoomActiveTab('amenities')}
-                >
+                ),
+              },
+              {
+                id: 'amenities',
+                label: 'Ti\u1ec7n \u00edch ph\u00f2ng',
+                icon: (
                   <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                     <rect x="3" y="3" width="7" height="7" />
                     <rect x="14" y="3" width="7" height="7" />
                     <rect x="14" y="14" width="7" height="7" />
                     <rect x="3" y="14" width="7" height="7" />
                   </svg>
-                  Tiện ích phòng
-                </button>
-                <button
-                  className={roomActiveTab === 'price' ? 'active' : ''}
-                  onClick={() => setRoomActiveTab('price')}
-                >
+                ),
+              },
+              {
+                id: 'price',
+                label: 'B\u1ea3ng gi\u00e1',
+                icon: (
                   <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                     <path d="M20.59 13.41l-7.17 7.17a2 2 0 0 1-2.83 0L2 12V2h10l8.59 8.59a2 2 0 0 1 0 2.82z" />
                     <line x1="7" y1="7" x2="7.01" y2="7" strokeWidth="2.5" />
                   </svg>
-                  Bảng giá
-                </button>
-              </div>
+                ),
+              },
+            ]}
+          />
+        )}
 
-              {selectedRoom && selectedRoom.status === 'Hidden' && (
-                <button className="primary-action" onClick={handlePublishRoom}>
-                  Hiển thị phòng (Hoạt động)
-                </button>
-              )}
-            </div>
+        {mainTab === 'room-info' && (
+          <div className="editor-panel tab-attached-panel tab-attached-panel--compact">
 
             {/* ROOM TAB 1: THÔNG TIN CƠ BẢN PHÒNG */}
             {roomActiveTab === 'basic' && (
@@ -858,6 +953,18 @@ export default function RoomDetailPage() {
             {tabLoading && <p>Đang tải danh sách người ở...</p>}
             {!tabLoading && (
               <div>
+                {pendingChangesAlertInfo?.hasPendingOccupantChanges && (
+                  <div style={{ backgroundColor: '#fffbeb', border: '1px solid #fde68a', color: '#b45309', padding: '12px 16px', borderRadius: '8px', marginBottom: '16px', display: 'flex', alignItems: 'flex-start', gap: '8px' }}>
+                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ flexShrink: 0, marginTop: '2px' }}>
+                      <circle cx="12" cy="12" r="10"></circle>
+                      <line x1="12" y1="8" x2="12" y2="12"></line>
+                      <line x1="12" y1="16" x2="12.01" y2="16"></line>
+                    </svg>
+                    <div>
+                      <strong>Thay đổi chờ áp dụng:</strong> Đang có phụ lục thay đổi thông tin người ở đã có hiệu lực nhưng chưa được hệ thống cập nhật. Hệ thống sẽ tự động cập nhật trong ít phút tới.
+                    </div>
+                  </div>
+                )}
                 <div className="occupants-filter">
                   <button
                     className={`occupant-filter-btn ${occupantFilter === 'all' ? 'active' : ''}`}
@@ -872,10 +979,16 @@ export default function RoomDetailPage() {
                     Đang ở ({activeTenants.filter((occupant) => occupant.status === 'Active').length})
                   </button>
                   <button
+                    className={`occupant-filter-btn ${occupantFilter === 'pending' ? 'active' : ''}`}
+                    onClick={() => setOccupantFilter('pending')}
+                  >
+                    Chờ dọn vào ({activeTenants.filter((occupant) => occupant.status === 'PendingMoveIn').length})
+                  </button>
+                  <button
                     className={`occupant-filter-btn ${occupantFilter === 'left' ? 'active' : ''}`}
                     onClick={() => setOccupantFilter('left')}
                   >
-                    Đã rời đi ({activeTenants.filter((occupant) => occupant.status !== 'Active' || occupant.moveOutDate).length})
+                    Đã rời đi / Đã hủy ({activeTenants.filter((occupant) => occupant.status !== 'Active' && occupant.status !== 'PendingMoveIn').length})
                   </button>
                 </div>
 
@@ -883,7 +996,8 @@ export default function RoomDetailPage() {
                   {activeTenants
                     .filter((occupant) => {
                       if (occupantFilter === 'active') return occupant.status === 'Active';
-                      if (occupantFilter === 'left') return occupant.status !== 'Active' || occupant.moveOutDate !== null;
+                      if (occupantFilter === 'pending') return occupant.status === 'PendingMoveIn';
+                      if (occupantFilter === 'left') return occupant.status !== 'Active' && occupant.status !== 'PendingMoveIn';
                       return true;
                     })
                     .map((occupant) => (
@@ -895,8 +1009,8 @@ export default function RoomDetailPage() {
                         </div>
                         <div className="occupant-dates">
                           <div style={{ marginBottom: '6px' }}>
-                            <span className={`status-badge ${occupant.status === 'Active' ? 'success' : 'danger'}`} style={{ padding: '2px 8px', fontSize: '0.75rem' }}>
-                              {occupant.status === 'Active' ? 'Đang ở' : 'Đã rời đi'}
+                            <span className={`status-badge ${occupant.status === 'Active' ? 'success' : occupant.status === 'PendingMoveIn' ? 'warning' : 'danger'}`} style={{ padding: '2px 8px', fontSize: '0.75rem' }}>
+                              {occupant.status === 'Active' ? 'Đang ở' : occupant.status === 'PendingMoveIn' ? 'Chờ dọn vào' : occupant.status === 'Voided' ? 'Đã hủy' : 'Đã rời đi'}
                             </span>
                           </div>
                           <div><strong>Vào:</strong> {formatDateVi(occupant.moveInDate)}</div>
@@ -917,135 +1031,151 @@ export default function RoomDetailPage() {
 
         {/* TAB 3: HỢP ĐỒNG */}
         {mainTab === 'contracts' && (
-          <div className="history-detail-content" style={{ marginTop: '20px' }}>
+          <div style={{ marginTop: '20px' }}>
             {tabLoading && <p>Đang tải thông tin hợp đồng...</p>}
             {!tabLoading && activeContract && (
-              <div>
-                <div className="contract-info-grid">
-                  <div className="contract-info-block">
-                    <h3>Thông tin cơ bản</h3>
-                    <div className="contract-info-item">
-                      <span className="label">Người thuê chính:</span>
-                      <span className="value">{activeContract.mainTenantName}</span>
-                    </div>
-                    <div className="contract-info-item">
-                      <span className="label">Ngày bắt đầu:</span>
-                      <span className="value">{formatDateVi(activeContract.startDate)}</span>
-                    </div>
-                    <div className="contract-info-item">
-                      <span className="label">Ngày kết thúc:</span>
-                      <span className="value">{formatDateVi(activeContract.endDate)}</span>
-                    </div>
-                  </div>
-                  <div className="contract-info-block">
-                    <h3>Thông tin tài chính</h3>
-                    <div className="contract-info-item">
-                      <span className="label">Tiền thuê hằng tháng:</span>
-                      <span className="value">{formatMoneyString(activeContract.monthlyRent)} đ</span>
-                    </div>
-                    <div className="contract-info-item">
-                      <span className="label">Tiền cọc:</span>
-                      <span className="value">{formatMoneyString(activeContract.depositAmount)} đ</span>
-                    </div>
-                    <div className="contract-info-item">
-                      <span className="label">Ngày thanh toán hằng tháng:</span>
-                      <span className="value">Ngày {activeContract.paymentDay}</span>
-                    </div>
-                  </div>
-                </div>
-
-                <div className="contract-actions">
-                  <Button variant="outline" onClick={handleDownloadContract} disabled={isFileActionLoading}>
-                    Tải hợp đồng
-                  </Button>
-                  <Button variant="outline" onClick={handleViewContract} disabled={isFileActionLoading}>
-                    Xem hợp đồng
-                  </Button>
-                  <Button variant="danger" onClick={() => setIsTerminateModalOpen(true)}>
-                    Chấm dứt hợp đồng
-                  </Button>
-                </div>
-
-                {contractActionError && (
-                  <div style={{ color: '#b91c1c', marginTop: '12px' }}>
-                    {contractActionError}
-                  </div>
-                )}
-
-                <div className="appendices-header" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: '28px', marginBottom: '16px' }}>
-                  <h3 style={{ margin: 0 }}>Danh sách phụ lục</h3>
-                  <Button
-                    style={{ whiteSpace: 'nowrap' }}
-                    onClick={() => setIsAppendixModalOpen(true)}
-                    disabled={hasBlockingAppendix}
-                    title={hasBlockingAppendix ? 'Không thể tạo phụ lục mới khi đang có phụ lục chờ ký hoặc đang yêu cầu sửa.' : ''}
-                  >
-                    Tạo phụ lục
-                  </Button>
-                </div>
-
-                {appendicesError && (
-                  <div style={{ color: '#b91c1c', marginBottom: '16px', padding: '12px', background: '#fef2f2', borderRadius: '8px' }}>
-                    {appendicesError}
-                  </div>
-                )}
-                {appendixFilesError && (
-                  <div style={{ color: '#b91c1c', marginBottom: '16px', padding: '12px', background: '#fef2f2', borderRadius: '8px' }}>
-                    {appendixFilesError}
-                  </div>
-                )}
-
-                <div className="appendices-list">
-                  {visibleAppendices === null ? (
-                    <div style={{ padding: '20px', color: '#64748b' }}>Đang tải danh sách phụ lục...</div>
-                  ) : visibleAppendices.length === 0 ? (
-                    <div style={{ textAlign: 'center', padding: '20px', color: '#64748b', background: '#f8fafc', borderRadius: '8px' }}>Hợp đồng này chưa có phụ lục nào.</div>
-                  ) : (
-                    visibleAppendices.map((appendix) => (
-                      <div key={appendix.id} className="appendix-item">
-                        <div className="appendix-info">
-                          <h4>Phụ lục số {appendix.appendixNumber}</h4>
-                          <div className="appendix-dates" style={{ textAlign: 'left', marginTop: '4px' }}>
-                            <div><strong>Ngày hiệu lực:</strong> {formatDateVi(appendix.effectiveDate)}</div>
-                          </div>
-                          <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap', marginTop: '10px' }}>
-                            {appendix.status === 'TenantRevisionRequested' && (
-                              <Button
-                                style={{ padding: '6px 12px', fontSize: '0.85rem' }}
-                                onClick={() => setEditingAppendix(appendix)}
-                              >
-                                Sửa phụ lục
-                              </Button>
-                            )}
-                            {canLandlordOpenAppendixForSigning(appendix) && (
-                              <Button
-                                style={{ padding: '6px 12px', fontSize: '0.85rem' }}
-                                onClick={() => setSigningAppendixId(appendix.id)}
-                              >
-                                Xem và ký phụ lục
-                              </Button>
-                            )}
-                          </div>
-                          <AppendixFileActions
-                            contractId={activeContract.id}
-                            contractNumber={activeContract.contractNumber}
-                            appendix={appendix}
-                            file={findAccessibleAppendixFile(accessibleContractFiles, appendix.id)}
-                          />
-                        </div>
-                        <div className="appendix-status-badge" style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: '8px' }}>
-                          <span className={`status-badge ${getAppendixStatusClass(appendix.status)}`} style={{ padding: '6px 16px', fontSize: '0.85rem' }}>
-                            {formatAppendixStatus(appendix, 'Landlord')}
-                          </span>
-                        </div>
+              <>
+                <div className="history-detail-content">
+                  {pendingChangesAlertInfo?.hasPendingContractChanges && (
+                    <div style={{ backgroundColor: '#fffbeb', border: '1px solid #fde68a', color: '#b45309', padding: '12px 16px', borderRadius: '8px', marginBottom: '16px', display: 'flex', alignItems: 'flex-start', gap: '8px' }}>
+                      <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ flexShrink: 0, marginTop: '2px' }}>
+                        <circle cx="12" cy="12" r="10"></circle>
+                        <line x1="12" y1="8" x2="12" y2="12"></line>
+                        <line x1="12" y1="16" x2="12.01" y2="16"></line>
+                      </svg>
+                      <div>
+                        <strong>Thay đổi chờ áp dụng:</strong> Đang có phụ lục thay đổi thông tin hợp đồng/tài chính đã có hiệu lực nhưng chưa được hệ thống cập nhật. Hệ thống sẽ tự động cập nhật trong ít phút tới.
                       </div>
-                    ))
+                    </div>
+                  )}
+                  <div className="contract-info-grid">
+                    <div className="contract-info-block">
+                      <h3>Thông tin cơ bản</h3>
+                      <div className="contract-info-item">
+                        <span className="label">Người thuê chính:</span>
+                        <span className="value">{activeContract.mainTenantName}</span>
+                      </div>
+                      <div className="contract-info-item">
+                        <span className="label">Ngày bắt đầu:</span>
+                        <span className="value">{formatDateVi(activeContract.startDate)}</span>
+                      </div>
+                      <div className="contract-info-item">
+                        <span className="label">Ngày kết thúc:</span>
+                        <span className="value">{formatDateVi(activeContract.endDate)}</span>
+                      </div>
+                    </div>
+                    <div className="contract-info-block">
+                      <h3>Thông tin tài chính</h3>
+                      <div className="contract-info-item">
+                        <span className="label">Tiền thuê hằng tháng:</span>
+                        <span className="value">{formatMoneyString(activeContract.monthlyRent)} đ</span>
+                      </div>
+                      <div className="contract-info-item">
+                        <span className="label">Tiền cọc:</span>
+                        <span className="value">{formatMoneyString(activeContract.depositAmount)} đ</span>
+                      </div>
+                      <div className="contract-info-item">
+                        <span className="label">Ngày thanh toán hằng tháng:</span>
+                        <span className="value">Ngày {activeContract.paymentDay}</span>
+                      </div>
+                    </div>
+                  </div>
+
+                  <div className="contract-actions">
+                    <Button variant="outline" onClick={handleDownloadContract} disabled={isFileActionLoading}>
+                      Tải hợp đồng
+                    </Button>
+                    <Button variant="outline" onClick={handleViewContract} disabled={isFileActionLoading}>
+                      Xem hợp đồng
+                    </Button>
+                    <Button variant="danger" onClick={() => setIsTerminateModalOpen(true)}>
+                      Chấm dứt hợp đồng
+                    </Button>
+                  </div>
+
+                  {contractActionError && (
+                    <div style={{ color: '#b91c1c', marginTop: '12px' }}>
+                      {contractActionError}
+                    </div>
                   )}
                 </div>
-              </div>
+
+                <div className="history-detail-content" style={{ marginTop: '20px' }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px' }}>
+                    <h2 style={{ margin: 0, fontSize: '1.25rem' }}>Danh sách phụ lục</h2>
+                    <Button
+                      style={{ whiteSpace: 'nowrap' }}
+                      onClick={() => setIsAppendixModalOpen(true)}
+                      disabled={hasBlockingAppendix}
+                      title={hasBlockingAppendix ? 'Không thể tạo phụ lục mới khi đang có phụ lục chờ ký hoặc đang yêu cầu sửa.' : ''}
+                    >
+                      Tạo phụ lục
+                    </Button>
+                  </div>
+
+                  {appendicesError && (
+                    <div style={{ color: '#b91c1c', marginBottom: '16px', padding: '12px', background: '#fef2f2', borderRadius: '8px' }}>
+                      {appendicesError}
+                    </div>
+                  )}
+                  {appendixFilesError && (
+                    <div style={{ color: '#b91c1c', marginBottom: '16px', padding: '12px', background: '#fef2f2', borderRadius: '8px' }}>
+                      {appendixFilesError}
+                    </div>
+                  )}
+
+                  <div className="appendices-list">
+                    {visibleAppendices === null ? (
+                      <div style={{ padding: '20px', color: '#64748b' }}>Đang tải danh sách phụ lục...</div>
+                    ) : visibleAppendices.length === 0 ? (
+                      <div style={{ textAlign: 'center', padding: '20px', color: '#64748b', background: '#f8fafc', borderRadius: '8px' }}>Hợp đồng này chưa có phụ lục nào.</div>
+                    ) : (
+                      visibleAppendices.map((appendix) => (
+                        <div key={appendix.id} className="appendix-item">
+                          <div className="appendix-info">
+                            <h4>Phụ lục số {appendix.appendixNumber}</h4>
+                            <div className="appendix-dates" style={{ textAlign: 'left', marginTop: '4px' }}>
+                              <div><strong>Ngày hiệu lực:</strong> {formatDateVi(appendix.effectiveDate)}</div>
+                            </div>
+                            <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap', marginTop: '10px' }}>
+                              {appendix.status === 'TenantRevisionRequested' && (
+                                <Button
+                                  style={{ padding: '6px 12px', fontSize: '0.85rem' }}
+                                  onClick={() => setEditingAppendix(appendix)}
+                                >
+                                  Sửa phụ lục
+                                </Button>
+                              )}
+                              {canLandlordOpenAppendixForSigning(appendix) && (
+                                <Button
+                                  style={{ padding: '6px 12px', fontSize: '0.85rem' }}
+                                  onClick={() => setSigningAppendixId(appendix.id)}
+                                >
+                                  Xem và ký phụ lục
+                                </Button>
+                              )}
+                            </div>
+                            <AppendixFileActions
+                              contractId={activeContract.id}
+                              contractNumber={activeContract.contractNumber}
+                              appendix={appendix}
+                              file={findAccessibleAppendixFile(accessibleContractFiles, appendix.id)}
+                            />
+                          </div>
+                          <div className="appendix-status-badge" style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: '8px' }}>
+                            <span className={`status-badge ${getAppendixStatusClass(appendix.status)}`} style={{ padding: '6px 16px', fontSize: '0.85rem' }}>
+                              {formatAppendixStatus(appendix, 'Landlord')}
+                            </span>
+                          </div>
+                        </div>
+                      ))
+                    )}
+                  </div>
+                </div>
+              </>
             )}
             {!tabLoading && !activeContract && (
-              <div className="empty-panel">
+              <div className="history-detail-content empty-panel">
                 <p>Không tìm thấy hợp đồng đang active cho phòng này.</p>
               </div>
             )}
@@ -1137,7 +1267,7 @@ export default function RoomDetailPage() {
             setSelectedRoom((current) => current ? { ...current, status: 'Available' } : current);
             setMainTab('room-info');
             setIsTerminateModalOpen(false);
-            setMessage('Đã chấm dứt hợp đồng.');
+            setToast({ message: 'Đã chấm dứt hợp đồng.', type: 'success' });
           }}
         />
       )}
@@ -1149,7 +1279,7 @@ export default function RoomDetailPage() {
           onClose={() => setIsCreateInvoiceModalOpen(false)}
           onCreated={(invoice) => {
             setIsCreateInvoiceModalOpen(false);
-            setMessage(`Đã tạo hóa đơn nháp ${invoice.invoiceNo}.`);
+            setToast({ message: `Đã tạo hóa đơn nháp ${invoice.invoiceNo}.`, type: 'success' });
             void loadContractInvoices(activeContract.id);
           }}
         />
@@ -1191,6 +1321,7 @@ export default function RoomDetailPage() {
           }}
         />
       )}
+      {toast && <Toast message={toast.message} type={toast.type} onClose={() => setToast(null)} />}
     </div>
   );
 }
@@ -1201,7 +1332,18 @@ type ReadingDraft = {
   previousReading: number;
   currentReading: number;
   proofMediaAssetId?: string | null;
-  proofImageUrl?: string | null;
+  aiReading: number | null;
+  aiRawText: string;
+  proofImageUrl: string;
+};
+
+const emptyInvoiceReadingDraft: ReadingDraft = {
+  previousReading: 0,
+  currentReading: 0,
+  proofMediaAssetId: null,
+  aiReading: null,
+  aiRawText: '',
+  proofImageUrl: '',
 };
 
 function CreateInvoiceWithReadingsModal({
@@ -1224,8 +1366,8 @@ function CreateInvoiceWithReadingsModal({
   const [note, setNote] = useState('');
   const [loading, setLoading] = useState(true);
   const [submitting, setSubmitting] = useState(false);
-  const [uploadingProofServiceId, setUploadingProofServiceId] = useState<string | null>(null);
   const [error, setError] = useState('');
+  const [uploadingServiceId, setUploadingServiceId] = useState('');
   const latestReadingByServiceType = Object.fromEntries(
     (preview?.meteredServices ?? []).map((service) => [service.serviceTypeId, service.latestReading ?? null])
   );
@@ -1294,10 +1436,10 @@ function CreateInvoiceWithReadingsModal({
         response.data.meteredServices.forEach((service) => {
           const latestReading = service.latestReading;
           nextReadings[service.serviceTypeId] = {
+            ...emptyInvoiceReadingDraft,
             previousReading: latestReading?.currentReading ?? 0,
             currentReading: latestReading?.currentReading ?? 0,
             proofMediaAssetId: null,
-            proofImageUrl: null,
           };
         });
         setReadings(nextReadings);
@@ -1340,25 +1482,43 @@ function CreateInvoiceWithReadingsModal({
     setReadings((current) => ({
       ...current,
       [serviceTypeId]: {
-        ...(current[serviceTypeId] ?? { previousReading: 0, currentReading: 0, proofMediaAssetId: null, proofImageUrl: null }),
+        ...(current[serviceTypeId] ?? emptyInvoiceReadingDraft),
         ...patch,
       },
     }));
   }
 
-  async function handleProofUpload(serviceTypeId: string, file: File) {
-    setUploadingProofServiceId(serviceTypeId);
+  async function handleMeterImage(serviceTypeId: string, file?: File) {
+    if (!file || !period) return;
+    if (!['image/jpeg', 'image/png'].includes(file.type)) {
+      setError('Chỉ hỗ trợ ảnh đồng hồ định dạng JPG hoặc PNG.');
+      return;
+    }
+    if (file.size > 5 * 1024 * 1024) {
+      setError('Dung lượng ảnh đồng hồ không được vượt quá 5MB.');
+      return;
+    }
+
+    setUploadingServiceId(serviceTypeId);
     setError('');
     try {
-      const uploaded = await uploadImage(file, 'MeterReading');
+      const response = await billingApi.readMeterImage({
+        contractId: contract.id,
+        serviceTypeId,
+        billingPeriodStart: period.start,
+        file,
+      });
       updateReading(serviceTypeId, {
-        proofMediaAssetId: uploaded.mediaAssetId || null,
-        proofImageUrl: uploaded.url || null,
+        currentReading: response.data.reading,
+        aiReading: response.data.reading,
+        aiRawText: response.data.rawText,
+        proofMediaAssetId: response.data.proofMediaAssetId ?? null,
+        proofImageUrl: response.data.proofImageUrl,
       });
     } catch (err) {
-      setError(getApiErrorMessage(err, 'Không thể tải ảnh công tơ lên.'));
+      setError(getApiErrorMessage(err, 'Không thể đọc chỉ số từ ảnh. Vui lòng thử ảnh rõ hơn.'));
     } finally {
-      setUploadingProofServiceId(null);
+      setUploadingServiceId('');
     }
   }
 
@@ -1377,17 +1537,23 @@ function CreateInvoiceWithReadingsModal({
     }
 
     const meterReadings: MeterReadingInput[] = meteredPrices.map((price) => {
-      const draft = readings[price.serviceTypeId] ?? { previousReading: 0, currentReading: 0, proofMediaAssetId: null, proofImageUrl: null };
+      const draft = readings[price.serviceTypeId] ?? emptyInvoiceReadingDraft;
       const latestReading = latestReadingByServiceType[price.serviceTypeId];
       return {
         serviceTypeId: price.serviceTypeId,
         previousReading: latestReading ? null : Number(draft.previousReading),
         currentReading: Number(draft.currentReading),
         proofMediaAssetId: draft.proofMediaAssetId || null,
+        aiReading: draft.aiReading,
+        aiRawText: draft.aiRawText.trim() || null,
       };
     });
 
     for (const reading of meterReadings) {
+      if (!reading.proofMediaAssetId || reading.aiReading === null || reading.aiReading === undefined || !reading.aiRawText) {
+        setError('Vui lòng upload và đọc ảnh cho tất cả dịch vụ tính theo chỉ số.');
+        return;
+      }
       const latestReading = latestReadingByServiceType[reading.serviceTypeId];
       const previousReading = latestReading?.currentReading ?? reading.previousReading;
       if (previousReading !== null && previousReading !== undefined && reading.currentReading < previousReading) {
@@ -1424,16 +1590,16 @@ function CreateInvoiceWithReadingsModal({
 
         <form onSubmit={handleSubmit}>
           <div className="history-modal-body">
-            {error && <div className="billing-alert error" style={{ marginBottom: '12px' }}>{error}</div>}
+            {error && <Alert type="error">{error}</Alert>}
             {loading ? (
               <p>Đang tải dữ liệu...</p>
             ) : (
               <div className="invoice-create-stack">
                 {periodValidationMessage && (
-                  <div className="billing-alert error" style={{ marginTop: '16px', marginBottom: '-4px' }}>{periodValidationMessage}</div>
+                  <Alert type="error">{periodValidationMessage}</Alert>
                 )}
                 {previewBlockReason && (
-                  <div className="billing-alert error" style={{ marginTop: '16px', marginBottom: '-4px' }}>{previewBlockReason}</div>
+                  <Alert type="error">{previewBlockReason}</Alert>
                 )}
                 <div className="invoice-create-grid">
                   <div className="invoice-create-field">
@@ -1485,79 +1651,52 @@ function CreateInvoiceWithReadingsModal({
                   ) : (
                     <div className="invoice-create-meter-list">
                       {meteredPrices.map((price) => {
-                        const draft = readings[price.serviceTypeId] ?? { previousReading: 0, currentReading: 0, proofMediaAssetId: null, proofImageUrl: null };
+                        const draft = readings[price.serviceTypeId] ?? emptyInvoiceReadingDraft;
                         const latestReading = latestReadingByServiceType[price.serviceTypeId];
                         const previousReading = latestReading?.currentReading ?? Number(draft.previousReading);
                         const consumption = Math.max(0, Number(draft.currentReading) - previousReading);
                         const amount = Math.round(consumption * price.unitPrice);
-                        const uploadedProofUrl = resolveMeterProofUrl(draft.proofImageUrl);
-                        const latestProofUrl = resolveMeterProofUrl(latestReading?.proofImageUrl);
                         return (
                           <div key={price.serviceTypeId} className="invoice-create-meter-card">
-                            <strong>{price.serviceName} ({formatMoneyString(price.unitPrice)} đ / {price.meterUnitName})</strong>
-                            <div className="invoice-create-grid">
-                              {latestReading ? (
+                            <div className="meter-reading-main">
+                              <strong className="meter-reading-title">{price.serviceName} ({formatMoneyString(price.unitPrice)} đ / {price.meterUnitName})</strong>
+                              <div className="meter-reading-fields">
                                 <div className="invoice-create-field">
                                   <span className="label">Chỉ số cũ</span>
-                                  <strong>{latestReading.currentReading}</strong>
+                                  <strong>{previousReading} {price.meterUnitName}</strong>
+                                  <small>Giữ nguyên từ kỳ trước</small>
                                 </div>
-                              ) : (
+                                <div className="invoice-create-field">
+                                  <span className="label">Chỉ số mới (AI)</span>
+                                  <strong>{draft.aiReading ?? '--'} {draft.aiReading !== null ? price.meterUnitName : ''}</strong>
+                                  <small>{draft.aiReading !== null ? 'Đọc từ ảnh' : 'Chưa upload ảnh'}</small>
+                                </div>
                                 <label className="invoice-create-field">
-                                  <span className="label">Chỉ số cũ</span>
-                                  <input
-                                    type="number"
-                                    min="0"
-                                    value={draft.previousReading}
-                                    onChange={(event) => updateReading(price.serviceTypeId, { previousReading: Number(event.target.value) })}
-                                  />
+                                  <span className="label">Chỉ số xác nhận cuối cùng</span>
+                                  <input type="number" min="0" value={draft.currentReading} disabled={draft.aiReading === null} onChange={(event) => updateReading(price.serviceTypeId, { currentReading: Number(event.target.value) })} />
+                                  {draft.aiReading !== null && (
+                                    <small className={draft.currentReading === draft.aiReading ? 'meter-ok' : 'meter-edited'}>
+                                      {draft.currentReading === draft.aiReading ? '✓ Không chỉnh sửa' : '✓ Đã chỉnh sửa kết quả AI'}
+                                    </small>
+                                  )}
                                 </label>
-                              )}
-                              <label className="invoice-create-field">
-                                <span className="label">Chỉ số mới</span>
-                                <input
-                                  type="number"
-                                  min="0"
-                                  value={draft.currentReading}
-                                  onChange={(event) => updateReading(price.serviceTypeId, { currentReading: Number(event.target.value) })}
-                                />
-                              </label>
-                              <div className="invoice-create-field invoice-create-total">
-                                <span className="label">Tạm tính</span>
-                                <strong>{formatMoneyString(consumption)} x {formatMoneyString(price.unitPrice)} = {formatMoneyString(amount)} đ</strong>
+                              </div>
+                              <div className="meter-calculation">
+                                <span><small>TIÊU THỤ</small><strong>{formatMoneyString(consumption)} {price.meterUnitName}</strong></span>
+                                <b>×</b>
+                                <span><small>ĐƠN GIÁ</small><strong>{formatMoneyString(price.unitPrice)} / {price.meterUnitName}</strong></span>
+                                <b>=</b>
+                                <span><small>TẠM TÍNH</small><strong className="meter-amount">{formatMoneyString(amount)} đ</strong></span>
                               </div>
                             </div>
-                            <div className="invoice-create-grid" style={{ marginTop: '12px' }}>
-                              <label className="invoice-create-field" style={{ gridColumn: '1 / -1' }}>
-                                <span className="label">Ảnh công tơ kỳ này</span>
-                                <input
-                                  type="file"
-                                  accept="image/png,image/jpeg,image/webp"
-                                  onChange={(event) => {
-                                    const file = event.target.files?.[0];
-                                    if (file) {
-                                      void handleProofUpload(price.serviceTypeId, file);
-                                      event.target.value = '';
-                                    }
-                                  }}
-                                  disabled={uploadingProofServiceId === price.serviceTypeId}
-                                />
+                            <div className="meter-image-panel">
+                              <span className="label">ẢNH ĐỒNG HỒ {price.serviceName.toUpperCase()}</span>
+                              {draft.proofImageUrl ? <img src={toAssetUrl(draft.proofImageUrl)} alt={`Đồng hồ ${price.serviceName}`} /> : <div className="meter-image-empty">Chưa có ảnh đồng hồ</div>}
+                              <label className="meter-upload-button">
+                                {uploadingServiceId === price.serviceTypeId ? 'AI đang đọc ảnh...' : draft.proofImageUrl ? 'Thay ảnh' : 'Upload & đọc ảnh'}
+                                <input type="file" accept="image/jpeg,image/png" disabled={uploadingServiceId !== ''} onChange={(event) => { void handleMeterImage(price.serviceTypeId, event.target.files?.[0]); event.currentTarget.value = ''; }} />
                               </label>
-                              {uploadedProofUrl && (
-                                <div className="invoice-create-field" style={{ gridColumn: '1 / -1' }}>
-                                  <span className="label">Ảnh đã chọn</span>
-                                  <a href={uploadedProofUrl} target="_blank" rel="noreferrer">
-                                    Xem ảnh công tơ vừa tải lên
-                                  </a>
-                                </div>
-                              )}
-                              {latestProofUrl && (
-                                <div className="invoice-create-field" style={{ gridColumn: '1 / -1' }}>
-                                  <span className="label">Ảnh công tơ kỳ trước</span>
-                                  <a href={latestProofUrl} target="_blank" rel="noreferrer">
-                                    Xem ảnh công tơ gần nhất
-                                  </a>
-                                </div>
-                              )}
+                              <small>JPG, PNG · tối đa 5MB</small>
                             </div>
                           </div>
                         );
@@ -1586,7 +1725,7 @@ function CreateInvoiceWithReadingsModal({
 
           <div className="history-modal-footer">
             <Button variant="outline" type="button" onClick={onClose} disabled={submitting}>Đóng</Button>
-            <Button type="submit" disabled={loading || submitting || !period || !preview || Boolean(previewBlockReason)}>{submitting ? 'Đang tạo...' : 'Tạo hóa đơn nháp'}</Button>
+            <Button type="submit" disabled={loading || submitting || uploadingServiceId !== '' || !period || !preview || Boolean(previewBlockReason)}>{submitting ? 'Đang tạo...' : 'Tạo hóa đơn nháp'}</Button>
           </div>
         </form>
       </div>
@@ -1596,12 +1735,12 @@ function CreateInvoiceWithReadingsModal({
 
 async function resolveRawContractFile(contractId: string): Promise<ContractFileResponse> {
   const response = await contractApi.getContractFiles(contractId);
-  let file = findContractFile(response.data ?? [], 'Raw');
+  let file = findContractFile(response.data ?? [], 'SignedLegalDocument') ?? findContractFile(response.data ?? [], 'Preview');
 
   if (!file) {
     await contractApi.generateContractFile(contractId);
     const refreshedResponse = await contractApi.getContractFiles(contractId);
-    file = findContractFile(refreshedResponse.data ?? [], 'Raw');
+    file = findContractFile(refreshedResponse.data ?? [], 'SignedLegalDocument') ?? findContractFile(refreshedResponse.data ?? [], 'Preview');
   }
 
   if (!file) {
@@ -1611,9 +1750,9 @@ async function resolveRawContractFile(contractId: string): Promise<ContractFileR
   return file;
 }
 
-function findContractFile(files: ContractFileResponse[], fileVariant: string) {
+function findContractFile(files: ContractFileResponse[], purpose: string) {
   return files
-    .filter((file) => !file.rentalContractAppendixId && file.fileVariant === fileVariant)
+    .filter((file) => !file.rentalContractAppendixId && file.purpose === purpose)
     .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime())[0];
 }
 

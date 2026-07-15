@@ -102,6 +102,71 @@
   gap: 20px;
 }
 
+.appointments-grid.tenant-appointment-list {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  width: 100%;
+}
+
+.tenant-appointment-span-full {
+  grid-column: 1 / -1;
+}
+
+.tenant-appointment-note {
+  border-radius: 10px;
+  font-size: 13.5px;
+  line-height: 1.5;
+  padding: 10px 12px;
+}
+
+.tenant-appointment-note--tenant {
+  background: #f8fafc;
+  border: 1px solid #e2e8f0;
+  color: #475569;
+}
+
+.tenant-appointment-note--landlord {
+  background: #f0f9ff;
+  border: 1px solid #bae6fd;
+  color: #0369a1;
+}
+
+.tenant-appointment-chat-action {
+  display: flex;
+  justify-content: flex-end;
+}
+
+.tenant-appointment-chat-action__button {
+  min-height: 38px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  border: 1px solid #246bfe;
+  border-radius: 10px;
+  padding: 0 14px;
+  background: #246bfe;
+  color: #ffffff;
+  font: inherit;
+  font-size: 13px;
+  font-weight: 800;
+  cursor: pointer;
+  box-shadow: 0 6px 14px rgba(36, 107, 254, 0.18);
+  transition: background-color 0.2s ease, transform 0.2s ease, box-shadow 0.2s ease;
+}
+
+.tenant-appointment-chat-action__button:hover:not(:disabled) {
+  background: #1a5ce0;
+  transform: translateY(-1px);
+  box-shadow: 0 8px 18px rgba(36, 107, 254, 0.25);
+}
+
+.tenant-appointment-chat-action__button:disabled {
+  cursor: not-allowed;
+  opacity: 0.65;
+}
+
 .appointment-card {
   background-color: #ffffff;
   border-radius: 12px;

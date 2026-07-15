@@ -29,14 +29,14 @@ public sealed class GeminiRoomingHouseRecommendationReranker : IRoomingHouseReco
     {
         if (!options.Enabled ||
             !options.UseAiGuestRecommendations ||
-            string.IsNullOrWhiteSpace(options.ApiKey) ||
+            !options.HasCredential() ||
             candidates.Count == 0)
         {
             logger.LogInformation(
-                "AI recommendation reranker skipped. Enabled={Enabled}, UseAiGuestRecommendations={UseAiGuestRecommendations}, HasApiKey={HasApiKey}, CandidateCount={CandidateCount}",
+                "AI recommendation reranker skipped. Enabled={Enabled}, UseAiGuestRecommendations={UseAiGuestRecommendations}, HasCredential={HasCredential}, CandidateCount={CandidateCount}",
                 options.Enabled,
                 options.UseAiGuestRecommendations,
-                !string.IsNullOrWhiteSpace(options.ApiKey),
+                options.HasCredential(),
                 candidates.Count);
             return null;
         }
@@ -141,7 +141,7 @@ public sealed class GeminiRoomingHouseRecommendationReranker : IRoomingHouseReco
                 rankedIds = new
                 {
                     type = "array",
-                    items = new { type = "string", format = "uuid" }
+                    items = new { type = "string" }
                 },
                 reasons = new
                 {
@@ -151,7 +151,7 @@ public sealed class GeminiRoomingHouseRecommendationReranker : IRoomingHouseReco
                     type = "object",
                     properties = new
                     {
-                            id = new { type = "string", format = "uuid" },
+                            id = new { type = "string" },
                             reason = new { type = "string" }
                         },
                         required = new[] { "id", "reason" }

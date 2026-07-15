@@ -32,7 +32,7 @@ public class RentalContractExpirationWorker : BackgroundService
                 var expiredCount = await rentalContractService.ExpireOverdueTenantSignaturesAsync(stoppingToken);
                 if (expiredCount > 0)
                 {
-                    logger.LogInformation("Đã xử lý {ExpiredCount} hợp đồng quá hạn ký.", expiredCount);
+                    logger.SafeLogInformation("Đã xử lý {ExpiredCount} hợp đồng quá hạn ký.", expiredCount);
                 }
             }
             catch (OperationCanceledException) when (stoppingToken.IsCancellationRequested)
@@ -41,7 +41,7 @@ public class RentalContractExpirationWorker : BackgroundService
             }
             catch (Exception ex)
             {
-                logger.LogError(ex, "Không thể xử lý các hợp đồng quá hạn ký.");
+                logger.SafeLogError(ex, "Không thể xử lý các hợp đồng quá hạn ký.");
             }
 
             await Task.Delay(Interval, stoppingToken);

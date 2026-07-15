@@ -5,7 +5,7 @@ import { ROUTE_PATHS } from '../../../app/router/routePaths';
 import { Alert } from '../../../shared/components/ui/Alert';
 import { Button } from '../../../shared/components/ui/Button';
 import { Toast } from '../../../shared/components/ui/Toast';
-import { toAvatarImageUrl, toPublicListingImageUrl } from '../../../shared/api/assets';
+import { toPublicListingImageUrl } from '../../../shared/api/assets';
 import { getProvinces, getWardsByProvince } from '../../administrative/api';
 import type { Province, Ward } from '../../administrative/types';
 import {
@@ -18,9 +18,11 @@ import type { GuestRoomingHouseRecommendationRequest, RoomingHouseListingItem, R
 import SearchSuggestionBox from '../../rooming-houses/components/SearchSuggestionBox';
 import { LocationFilterPanel } from '../../rooming-houses/components/LocationFilterPanel';
 import RentalAiChatbot from '../../rooming-houses/components/RentalAiChatbot';
+import FavoriteButton from '../../rooming-houses/components/FavoriteButton';
 import { saveRoomingHouseView, saveSearchBehavior, toGuestRecommendationRequest } from '../../rooming-houses/rentalBehaviorStorage';
 import { saveRecentSearch } from '../../rooming-houses/searchRecentStorage';
 import { NotificationBell } from '../../notifications/components/NotificationBell';
+import { HomeHeader } from '../../../shared/components/layout/HomeHeader';
 import './MePage.css';
 
 type HeaderLocationMode = 'area' | 'nearby' | null;
@@ -37,6 +39,8 @@ type HomeListingItem = {
   maxAreaM2?: number | null;
   amenities?: string[];
   createdAt?: string;
+  averageRating?: number;
+  totalReviews?: number;
 };
 
 type HomeListingCategory = {
@@ -376,163 +380,57 @@ export function MePage() {
     <div className="home-container">
       {toastMessage && <Toast message={toastMessage} onClose={() => setToastMessage(null)} />}
 
-      {/* Header */}
-      <header className="home-header">
-        <div className="header-logo" onClick={() => navigate(ROUTE_PATHS.ME.ROOT)}>
-          <div className="logo-icon-container">
-            <svg viewBox="0 0 24 24" fill="none" stroke="#ffffff" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" className="logo-svg-icon">
-              <path d="m3 9 9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z" />
-              <polyline points="9 22 9 12 15 12 15 22" />
-            </svg>
-          </div>
-          <span className="logo-text">Smart Rental</span>
-        </div>
-        <form className="home-header-search-form" onSubmit={handleSearchSubmit}>
-          <svg className="search-form-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
-            <circle cx="11" cy="11" r="8"></circle>
-            <line x1="21" y1="21" x2="16.65" y2="16.65"></line>
-          </svg>
-          <SearchSuggestionBox
-            placeholder="Tìm khu vực, trường, giá thuê..."
-            value={searchQuery}
-            onChange={setSearchQuery}
-            onSearch={handleSuggestionSearch}
-          />
-          <button type="submit" className="search-submit-btn">Tìm</button>
-        </form>
-        <div className="home-header-location">
-          <button
-            type="button"
-            className={`home-location-button ${activeLocationMode ? 'is-active' : ''}`}
-            onClick={() => setActiveLocationMode((current) => (current ? null : 'area'))}
-            aria-expanded={activeLocationMode != null}
-          >
-            <svg className="location-pin-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
-              <path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z" />
-              <circle cx="12" cy="10" r="3" />
-            </svg>
-            <span className="location-btn-label">{locationButtonLabel}</span>
-            <svg className="location-chevron-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
-              <polyline points="6 9 12 15 18 9" />
-            </svg>
-          </button>
+      <HomeHeader
+        centerContent={
+          <>
+            <form className="home-header-search-form" onSubmit={handleSearchSubmit}>
+              <svg className="search-form-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                <circle cx="11" cy="11" r="8"></circle>
+                <line x1="21" y1="21" x2="16.65" y2="16.65"></line>
+              </svg>
+              <SearchSuggestionBox
+                placeholder="Tìm khu vực, trường, giá thuê..."
+                value={searchQuery}
+                onChange={setSearchQuery}
+                onSearch={handleSuggestionSearch}
+              />
+              <button type="submit" className="search-submit-btn">Tìm</button>
+            </form>
+            <div className="home-header-location">
+              <button
+                type="button"
+                className={`home-location-button ${activeLocationMode ? 'is-active' : ''}`}
+                onClick={() => setActiveLocationMode((current) => (current ? null : 'area'))}
+                aria-expanded={activeLocationMode != null}
+              >
+                <svg className="location-pin-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                  <path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z" />
+                  <circle cx="12" cy="10" r="3" />
+                </svg>
+                <span className="location-btn-label">{locationButtonLabel}</span>
+                <svg className="location-chevron-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                  <polyline points="6 9 12 15 18 9" />
+                </svg>
+              </button>
 
-          {activeLocationMode && (
-            <LocationFilterPanel
-              initialProvinceCode={localProvinceCode}
-              initialWardCode={localWardCode}
-              initialRadiusKm={nearbyRadiusKm}
-              initialAddress={nearbyAddress}
-              initialLatitude={centerLat}
-              initialLongitude={centerLng}
-              initialTab={activeLocationMode === 'nearby' ? 'nearby' : 'area'}
-              onClose={() => setActiveLocationMode(null)}
-              onApply={handleLocationApply}
-              onClear={handleLocationClear}
-            />
-          )}
-        </div>
-        <div className="header-auth" style={{ display: 'flex', alignItems: 'center', gap: '16px' }}>
-          {currentUser ? (
-            <>
-              <div className="header-role-action">
-                {isAdmin ? (
-                  <Button type="button" className="admin-channel-btn" onClick={() => navigate(ROUTE_PATHS.ADMIN.ROOT)}>
-                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" className="btn-icon">
-                      <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z" />
-                    </svg>
-                    Duyệt hồ sơ
-                  </Button>
-                ) : isLandlord ? (
-                  <Button type="button" className="landlord-channel-btn" onClick={() => navigate(ROUTE_PATHS.LANDLORD.DASHBOARD)}>
-                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" className="btn-icon">
-                      <path d="m3 9 9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z" />
-                      <polyline points="9 22 9 12 15 12 15 22" />
-                    </svg>
-                    Kênh chủ trọ
-                  </Button>
-                ) : (
-                  <Button
-                    type="button"
-                    className="landlord-register-btn"
-                    disabled={isCheckingLandlord}
-                    onClick={handleLandlordRegister}
-                  >
-                    {isCheckingLandlord ? 'Đang xử lý...' : 'Đăng ký làm chủ trọ'}
-                  </Button>
-                )}
-              </div>
-              <NotificationBell />
-              <div className="avatar-wrapper" ref={dropdownRef}>
-                <button className="avatar-btn" onClick={() => setShowDropdown(!showDropdown)}>
-                  {currentUser.avatarUrl && currentUser.avatarUrl.trim() !== '' ? (
-                    <img src={toAvatarImageUrl(currentUser)} alt="Avatar" className="avatar-image" />
-                  ) : (
-                    <span className="avatar-initials">{avatarInitials}</span>
-                  )}
-                  <span className="avatar-name">{currentUser.displayName}</span>
-                  <svg className="avatar-chevron" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
-                    <polyline points="6 9 12 15 18 9" />
-                  </svg>
-                </button>
-                {showDropdown && (
-                  <div className="avatar-dropdown">
-                    <div className="dropdown-info">
-                      <strong>{currentUser.displayName}</strong>
-                      <span>{currentUser.email}</span>
-                    </div>
-                    <button className="dropdown-item" onClick={() => { setShowDropdown(false); navigate(ROUTE_PATHS.ACCOUNT.PROFILE); }}>
-                      Chỉnh sửa thông tin
-                    </button>
-                    <button className="dropdown-item" onClick={() => { setShowDropdown(false); navigate(ROUTE_PATHS.ACCOUNT.SECURITY); }}>
-                      Bảo mật
-                    </button>
-                    <button className="dropdown-item" onClick={() => { setShowDropdown(false); navigate(ROUTE_PATHS.ACCOUNT.WALLET); }}>
-                      Nạp ví
-                    </button>
-                    <button className="dropdown-item" onClick={() => { setShowDropdown(false); navigate(ROUTE_PATHS.ACCOUNT.INVOICES); }}>
-                      Hóa đơn
-                    </button>
-                    <button className="dropdown-item" onClick={() => { setShowDropdown(false); navigate(ROUTE_PATHS.ACCOUNT.RENTAL_REQUESTS); }}>
-                      Yêu cầu thuê
-                    </button>
-                    <button className="dropdown-item" onClick={() => { setShowDropdown(false); navigate(ROUTE_PATHS.ACCOUNT.RENTAL_HISTORY); }}>
-                      Lịch sử thuê
-                    </button>
-                    <button className="dropdown-item" onClick={() => { setShowDropdown(false); navigate(ROUTE_PATHS.ACCOUNT.VIEWING_APPOINTMENTS); }}>
-                      Lịch xem phòng
-                    </button>
-                    <div className="dropdown-divider" />
-                    {isAdmin && (
-                      <button className="dropdown-item" onClick={() => { setShowDropdown(false); navigate(ROUTE_PATHS.ADMIN.ROOT); }}>
-                        Duyệt hồ sơ
-                      </button>
-                    )}
-                    {isLandlord && (
-                      <button className="dropdown-item" onClick={() => { setShowDropdown(false); navigate(ROUTE_PATHS.LANDLORD.DASHBOARD); }}>
-                        Kênh chủ trọ
-                      </button>
-                    )}
-                    <div className="dropdown-divider" />
-                    <button className="dropdown-item dropdown-item--danger" onClick={() => { setShowDropdown(false); logout(); }}>
-                      Đăng xuất
-                    </button>
-                  </div>
-                )}
-              </div>
-            </>
-          ) : (
-            <div className="auth-buttons">
-              <Button type="button" variant="secondary" onClick={() => navigate(ROUTE_PATHS.AUTH.LOGIN)}>
-                Đăng nhập
-              </Button>
-              <Button type="button" onClick={() => navigate(ROUTE_PATHS.AUTH.REGISTER)}>
-                Đăng ký
-              </Button>
+              {activeLocationMode && (
+                <LocationFilterPanel
+                  initialProvinceCode={localProvinceCode}
+                  initialWardCode={localWardCode}
+                  initialRadiusKm={nearbyRadiusKm}
+                  initialAddress={nearbyAddress}
+                  initialLatitude={centerLat}
+                  initialLongitude={centerLng}
+                  initialTab={activeLocationMode === 'nearby' ? 'nearby' : 'area'}
+                  onClose={() => setActiveLocationMode(null)}
+                  onApply={handleLocationApply}
+                  onClear={handleLocationClear}
+                />
+              )}
             </div>
-          )}
-        </div>
-      </header>
+          </>
+        }
+      />
 
       <section className="home-listings-section">
         {error && <Alert type="error">{error}</Alert>}
@@ -612,13 +510,23 @@ function HomeListingCard({ house, onOpen }: { house: HomeListingItem; onOpen: ()
     : 'Liên hệ chủ';
 
   return (
-    <button className="home-listing-card" type="button" onClick={onOpen}>
+    <article
+      className="home-listing-card"
+      onClick={onOpen}
+      onKeyDown={e => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); onOpen(); } }}
+      role="button"
+      tabIndex={0}
+      aria-label={`Xem chi tiết ${house.name}`}
+    >
       <div className="card-image-wrapper">
         {house.coverImageUrl ? (
           <img alt={house.name} src={toPublicListingImageUrl(house.coverImageUrl)} className="card-image" />
         ) : (
           <div className="home-listing-card__placeholder">Chưa có ảnh</div>
         )}
+        <div style={{ position: 'absolute', top: '12px', right: '12px', zIndex: 2 }}>
+          <FavoriteButton roomingHouseId={house.id} />
+        </div>
       </div>
       <div className="card-content-wrapper">
         <h3 className="card-title">{house.name}</h3>
@@ -637,7 +545,7 @@ function HomeListingCard({ house, onOpen }: { house: HomeListingItem; onOpen: ()
             </svg>
             <span>{roomsText}</span>
           </span>
-          
+
           <span className="card-badge badge-orange">
             <svg className="badge-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
               <path d="M12 2H2v10l9.29 9.29a1 1 0 0 0 1.41 0l7.29-7.29a1 1 0 0 0 0-1.41L12 2z" />
@@ -669,9 +577,20 @@ function HomeListingCard({ house, onOpen }: { house: HomeListingItem; onOpen: ()
           </>
         )}
 
-
+        <hr className="card-divider" style={{ marginTop: '12px', marginBottom: '8px' }} />
+        <div className="card-rating-footer" style={{ display: 'flex', alignItems: 'center', gap: '2px', fontSize: '13px', color: '#64748b' }}>
+          <span style={{ fontWeight: 600, color: '#334155' }}>
+            {house.averageRating ? house.averageRating.toFixed(1) : '0.0'}/5
+          </span>
+          <svg style={{ width: '16px', height: '16px', color: '#fbbf24', fill: 'currentColor', marginLeft: '2px', marginRight: '4px' }} viewBox="0 0 20 20">
+            <path d="M9.049 2.927c.3-.921 1.603-.921 1.902 0l1.07 3.292a1 1 0 00.95.69h3.462c.969 0 1.371 1.24.588 1.81l-2.8 2.034a1 1 0 00-.364 1.118l1.07 3.292c.3.921-.755 1.688-1.54 1.118l-2.8-2.034a1 1 0 00-1.175 0l-2.8 2.034c-.784.57-1.838-.197-1.539-1.118l1.07-3.292a1 1 0 00-.364-1.118L2.98 8.72c-.783-.57-.38-1.81.588-1.81h3.461a1 1 0 00.951-.69l1.07-3.292z" />
+          </svg>
+          <span>
+            {house.totalReviews || 0} đánh giá
+          </span>
+        </div>
       </div>
-    </button>
+    </article>
   );
 }
 
@@ -744,6 +663,8 @@ function mapListingItemToHomeItem(item: RoomingHouseListingItem): HomeListingIte
     maxAreaM2: item.maxAreaM2,
     amenities: item.amenities.map((a) => a.name),
     createdAt: item.createdAt,
+    averageRating: item.averageRating,
+    totalReviews: item.totalReviews,
   };
 }
 
@@ -757,10 +678,12 @@ function mapSearchItemToHomeItem(item: RoomingHouseSearchItem, reason?: string):
     minMonthlyRent: item.minMonthlyRent,
     maxMonthlyRent: item.maxMonthlyRent,
     minAreaM2: item.minAreaM2,
-    maxAreaM2: item.maxAreaM2,
-    amenities: item.amenities.map((a) => a.name),
-    createdAt: item.createdAt,
+    maxAreaM2: (item as any).maxAreaM2,
+    amenities: (item as any).amenities?.map((a: any) => a.name) || [],
+    createdAt: (item as any).createdAt,
     reason,
+    averageRating: item.averageRating,
+    totalReviews: item.totalReviews,
   };
 }
 
@@ -825,7 +748,6 @@ function buildListingCategories(items: HomeListingItem[], personalized: boolean)
         </svg>
       ),
       items: newest,
-      compact: true,
     });
   }
 
@@ -849,7 +771,6 @@ function buildListingCategories(items: HomeListingItem[], personalized: boolean)
         </svg>
       ),
       items: manyRooms,
-      compact: true,
     });
   }
 
@@ -871,7 +792,6 @@ function buildListingCategories(items: HomeListingItem[], personalized: boolean)
         </svg>
       ),
       items: affordable,
-      compact: true,
     });
   }
 

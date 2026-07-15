@@ -21,6 +21,9 @@ public class MeterReadingConfiguration : IEntityTypeConfiguration<MeterReading>
         builder.Property(x => x.CurrentReading).HasColumnName("current_reading").HasPrecision(12, 2).IsRequired();
         builder.Property(x => x.Consumption).HasColumnName("consumption").HasPrecision(12, 2).IsRequired();
         builder.Property(x => x.ProofMediaAssetId).HasColumnName("proof_media_asset_id");
+        builder.Property(x => x.AiReading).HasColumnName("ai_reading").HasPrecision(12, 2);
+        builder.Property(x => x.AiRawText).HasColumnName("ai_raw_text").HasColumnType("text");
+        builder.Property(x => x.WasManuallyCorrected).HasColumnName("was_manually_corrected").IsRequired();
         builder.Property(x => x.RecordedByLandlordUserId).HasColumnName("recorded_by_landlord_user_id").IsRequired();
         builder.Property(x => x.ReadingAt).HasColumnName("reading_at").IsRequired();
         builder.Property(x => x.CreatedAt).HasColumnName("created_at").IsRequired();

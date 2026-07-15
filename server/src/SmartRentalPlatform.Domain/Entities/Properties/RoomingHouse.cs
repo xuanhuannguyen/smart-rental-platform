@@ -22,6 +22,8 @@ namespace SmartRentalPlatform.Domain.Entities.Properties
         public string? GoogleMapUrl { get; set; }
         public RoomingHouseApprovalStatus ApprovalStatus { get; set; } = RoomingHouseApprovalStatus.Pending;
         public RoomingHouseVisibilityStatus VisibilityStatus { get; set; } = RoomingHouseVisibilityStatus.Hidden;
+        public double AverageRating { get; set; }
+        public int TotalReviews { get; set; }
         public string? RejectedReason {  get; set; }
         public Guid? ReviewedByAdminId { get; set; }
         public DateTimeOffset? ReviewedAt { get; set; }
@@ -39,5 +41,6 @@ namespace SmartRentalPlatform.Domain.Entities.Properties
         public RoomingHouseLegalDocument LegalDocument { get; set; } = null!;
         public RoomingHouseRule? HouseRule { get; set; }
         public RentalPolicy? RentalPolicy { get; set; }
+        public ICollection<RoomingHouseServicePrice> ServicePrices { get; set; } = new List<RoomingHouseServicePrice>();
     }
 }

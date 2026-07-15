@@ -140,9 +140,14 @@
 
 /* ── Grid ── */
 .rr-grid {
-  display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(340px, 1fr));
-  gap: 20px;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  width: 100%;
+}
+
+.rr-price-value {
+  color: #0f172a;
 }
 
 /* ── Card ── */
@@ -258,18 +263,17 @@
 
 /* ── Card Body — Info Rows ── */
 .rr-card__body {
-  padding: 14px 20px;
   display: flex;
   flex-direction: column;
-  gap: 10px;
+  gap: 14px;
   flex: 1;
 }
 
 .rr-info-row {
   display: flex;
   align-items: center;
-  gap: 8px;
-  font-size: 14px;
+  gap: 10px;
+  font-size: 16px;
 }
 
 .rr-info-row__icon {
@@ -282,13 +286,13 @@
 .rr-info-row__label {
   color: #64748b;
   white-space: nowrap;
-  font-weight: 500;
-  min-width: 100px;
+  font-weight: 600;
+  min-width: 132px;
 }
 
 .rr-info-row__value {
-  color: #1e293b;
-  font-weight: 600;
+  color: #0f172a;
+  font-weight: 800;
   margin-left: auto;
   text-align: right;
 }
@@ -300,8 +304,7 @@
 
 /* ── Card Footer ── */
 .rr-card__footer {
-  padding: 14px 20px 18px;
-  border-top: 1px solid #f1f5f9;
+  border-top: 0;
 }
 
 .rr-btn-detail {
@@ -310,12 +313,13 @@
   justify-content: center;
   gap: 8px;
   width: 100%;
-  padding: 11px 20px;
+  min-height: 50px;
+  padding: 12px 20px;
   background: #246bfe;
   color: #ffffff;
   border: none;
   border-radius: 10px;
-  font-size: 14px;
+  font-size: 16px;
   font-weight: 700;
   cursor: pointer;
   transition: all 0.2s ease;

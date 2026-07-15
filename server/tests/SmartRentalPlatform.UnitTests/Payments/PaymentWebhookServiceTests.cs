@@ -211,6 +211,16 @@ public class PaymentWebhookServiceTests : IDisposable
         {
             return IsValid;
         }
+
+        public bool VerifyPayment(string rawPayload, string? signatureHeader)
+        {
+            return Verify(rawPayload, signatureHeader);
+        }
+
+        public bool VerifyPayout(string rawPayload, string? signatureHeader)
+        {
+            return Verify(rawPayload, signatureHeader);
+        }
     }
 
     private sealed class FakePaymentRowLockService : IPaymentRowLockService
@@ -230,6 +240,16 @@ public class PaymentWebhookServiceTests : IDisposable
         public Task<PaymentTransaction?> LockPaymentTransactionByIdempotencyKeyAsync(string idempotencyKey, CancellationToken cancellationToken = default)
         {
             return _context.Set<PaymentTransaction>().FirstOrDefaultAsync(x => x.IdempotencyKey == idempotencyKey, cancellationToken);
+        }
+
+        public Task<WithdrawalRequest?> LockWithdrawalRequestByProviderOrderCodeAsync(string providerOrderCode, CancellationToken cancellationToken = default)
+        {
+            return Task.FromResult<WithdrawalRequest?>(null);
+        }
+
+        public Task<WithdrawalRequest?> LockWithdrawalRequestByIdempotencyKeyAsync(string idempotencyKey, CancellationToken cancellationToken = default)
+        {
+            return Task.FromResult<WithdrawalRequest?>(null);
         }
 
         public Task<WalletAccount?> LockWalletAccountAsync(Guid walletAccountId, CancellationToken cancellationToken = default)

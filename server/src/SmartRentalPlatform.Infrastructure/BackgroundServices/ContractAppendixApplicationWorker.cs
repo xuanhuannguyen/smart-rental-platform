@@ -32,7 +32,7 @@ public class ContractAppendixApplicationWorker : BackgroundService
                 var appliedCount = await contractAppendixService.ApplyDueAppendicesAsync(stoppingToken);
                 if (appliedCount > 0)
                 {
-                    logger.LogInformation("Applied {AppliedCount} due contract appendices.", appliedCount);
+                    logger.SafeLogInformation("Applied {AppliedCount} due contract appendices.", appliedCount);
                 }
             }
             catch (OperationCanceledException) when (stoppingToken.IsCancellationRequested)
@@ -41,7 +41,7 @@ public class ContractAppendixApplicationWorker : BackgroundService
             }
             catch (Exception ex)
             {
-                logger.LogError(ex, "Could not apply due contract appendices.");
+                logger.SafeLogError(ex, "Could not apply due contract appendices.");
             }
 
             await Task.Delay(Interval, stoppingToken);

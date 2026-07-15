@@ -32,7 +32,7 @@ public class PaymentTransactionExpirationWorker : BackgroundService
                 var expiredCount = await topUpService.ExpireOverduePendingTopUpsAsync(stoppingToken);
                 if (expiredCount > 0)
                 {
-                    logger.LogInformation("Expired {ExpiredCount} overdue pending wallet top-up transactions.", expiredCount);
+                    logger.SafeLogInformation("Expired {ExpiredCount} overdue pending wallet top-up transactions.", expiredCount);
                 }
             }
             catch (OperationCanceledException) when (stoppingToken.IsCancellationRequested)
@@ -41,7 +41,7 @@ public class PaymentTransactionExpirationWorker : BackgroundService
             }
             catch (Exception ex)
             {
-                logger.LogError(ex, "Could not expire overdue pending wallet top-up transactions.");
+                logger.SafeLogError(ex, "Could not expire overdue pending wallet top-up transactions.");
             }
 
             await Task.Delay(Interval, stoppingToken);

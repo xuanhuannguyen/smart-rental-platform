@@ -32,7 +32,7 @@ public class RoomDepositExpirationWorker : BackgroundService
                 var expiredCount = await roomDepositService.ExpireOverdueAsync(stoppingToken);
                 if (expiredCount > 0)
                 {
-                    logger.LogInformation("Đã xử lý {ExpiredCount} khoản cọc quá hạn.", expiredCount);
+                    logger.SafeLogInformation("Đã xử lý {ExpiredCount} khoản cọc quá hạn.", expiredCount);
                 }
             }
             catch (OperationCanceledException) when (stoppingToken.IsCancellationRequested)
@@ -41,7 +41,7 @@ public class RoomDepositExpirationWorker : BackgroundService
             }
             catch (Exception ex)
             {
-                logger.LogError(ex, "Không thể xử lý các khoản cọc quá hạn.");
+                logger.SafeLogError(ex, "Không thể xử lý các khoản cọc quá hạn.");
             }
 
             await Task.Delay(Interval, stoppingToken);

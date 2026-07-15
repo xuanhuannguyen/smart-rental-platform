@@ -1,6 +1,7 @@
 using Microsoft.EntityFrameworkCore;
 using SmartRentalPlatform.Application.Common.Interfaces;
 using SmartRentalPlatform.Application.Common.Interfaces.Media;
+using SmartRentalPlatform.Application.RentalContracts;
 using SmartRentalPlatform.Domain.Entities.Billing;
 using SmartRentalPlatform.Domain.Entities.Media;
 using SmartRentalPlatform.Domain.Entities.Properties;
@@ -295,11 +296,24 @@ public class DefaultMediaPermissionService : IMediaPermissionService
 
     private static bool CanViewContractFile(Guid userId, RentalContract contract, ContractFile file)
     {
+        if (file.Purpose is ContractFilePurpose.ProviderEvidence or ContractFilePurpose.Preview)
+        {
+            return false;
+        }
+
+        if (file.Purpose == ContractFilePurpose.UnsignedForESign)
+        {
+            return ContractDocumentAccessPolicy.CanOpenUnsignedWorkflowFile(
+                userId,
+                contract.Room.RoomingHouse.LandlordUserId,
+                GetCurrentMainTenantUserId(contract));
+        }
+
         if (file.RentalContractAppendixId is null)
         {
-            return file.FileVariant == ContractFileVariant.Raw
-                ? CanViewRawContractFile(userId, contract)
-                : CanViewMaskedContractFile(userId, contract);
+            return file.Purpose == ContractFilePurpose.MaskedReference
+                ? CanViewMaskedContractFile(userId, contract)
+                : CanViewRawContractFile(userId, contract);
         }
 
         var appendix = contract.Appendices.FirstOrDefault(x => x.Id == file.RentalContractAppendixId);
@@ -308,9 +322,9 @@ public class DefaultMediaPermissionService : IMediaPermissionService
             return false;
         }
 
-        return file.FileVariant == ContractFileVariant.Raw
-            ? CanViewRawAppendixFile(userId, contract, appendix)
-            : CanViewMaskedAppendixFile(userId, contract, appendix);
+        return file.Purpose == ContractFilePurpose.MaskedReference
+            ? CanViewMaskedAppendixFile(userId, contract, appendix)
+            : CanViewRawAppendixFile(userId, contract, appendix);
     }
 
     private static bool CanViewRawContractFile(Guid userId, RentalContract contract)
@@ -321,8 +335,7 @@ public class DefaultMediaPermissionService : IMediaPermissionService
 
     private static bool CanViewMaskedContractFile(Guid userId, RentalContract contract)
     {
-        return !CanViewRawContractFile(userId, contract) &&
-               contract.Occupants.Any(x => x.UserId == userId);
+        return ContractDocumentAccessPolicy.CanViewMaskedContract(userId, contract);
     }
 
     private static bool CanViewRawAppendixFile(Guid userId, RentalContract contract, ContractAppendix appendix)
@@ -347,14 +360,7 @@ public class DefaultMediaPermissionService : IMediaPermissionService
 
     private static bool CanViewMaskedAppendixFile(Guid userId, RentalContract contract, ContractAppendix appendix)
     {
-        if (CanViewRawAppendixFile(userId, contract, appendix))
-        {
-            return false;
-        }
-
-        return contract.Occupants.Any(occupant =>
-            occupant.UserId == userId &&
-            (occupant.MoveOutDate is null || appendix.EffectiveDate <= occupant.MoveOutDate.Value));
+        return ContractDocumentAccessPolicy.CanViewMaskedAppendix(userId, contract, appendix);
     }
 
     private static Guid GetMainTenantUserIdBeforeAppendix(

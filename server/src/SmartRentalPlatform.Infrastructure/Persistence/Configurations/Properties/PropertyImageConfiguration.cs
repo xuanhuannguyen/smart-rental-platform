@@ -13,7 +13,9 @@ namespace SmartRentalPlatform.Infrastructure.Persistence.Configurations.Properti
             {
                 table.HasCheckConstraint(
                     "ck_property_images_owner_exclusive",
-                    "(rooming_house_id IS NOT NULL AND room_id IS NULL) OR (rooming_house_id IS NULL AND room_id IS NOT NULL)");
+                    "(rooming_house_id IS NOT NULL AND room_id IS NULL AND rooming_house_review_id IS NULL) OR " +
+                    "(rooming_house_id IS NULL AND room_id IS NOT NULL AND rooming_house_review_id IS NULL) OR " +
+                    "(rooming_house_id IS NULL AND room_id IS NULL AND rooming_house_review_id IS NOT NULL)");
             });
 
             builder.HasKey(x => x.Id);
@@ -21,6 +23,7 @@ namespace SmartRentalPlatform.Infrastructure.Persistence.Configurations.Properti
             builder.Property(x => x.RoomingHouseId).HasColumnName("rooming_house_id");
             builder.Property(x => x.RoomId).HasColumnName("room_id");
             builder.Property(x => x.MediaAssetId).HasColumnName("media_asset_id");
+            builder.Property(x => x.RoomingHouseReviewId).HasColumnName("rooming_house_review_id");
             builder.Property(x => x.ImageUrl).HasColumnName("image_url").HasColumnType("text").IsRequired();
             builder.Property(x => x.Caption).HasColumnName("caption").HasMaxLength(255);
             builder.Property(x => x.IsCover).HasColumnName("is_cover").HasDefaultValue(false).IsRequired();
@@ -43,6 +46,7 @@ namespace SmartRentalPlatform.Infrastructure.Persistence.Configurations.Properti
                 .OnDelete(DeleteBehavior.SetNull);
 
             builder.HasIndex(x => x.MediaAssetId);
+            builder.HasOne(x => x.RoomingHouseReview).WithMany(x => x.Images).HasForeignKey(x => x.RoomingHouseReviewId).OnDelete(DeleteBehavior.Cascade);
         }
     }
 }

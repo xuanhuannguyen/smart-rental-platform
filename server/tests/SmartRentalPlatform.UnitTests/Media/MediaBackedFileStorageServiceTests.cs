@@ -79,25 +79,25 @@ public class MediaBackedFileStorageServiceTests : IClassFixture<TestDatabaseFixt
     }
 
     [Fact]
-    public async Task UploadPdfAsync_ShouldStorePrivateChatAttachmentAndCreateMediaAsset()
+    public async Task UploadImageAsync_ShouldStorePrivateChatImageAndCreateMediaAsset()
     {
         var storage = new RecordingMediaStorageService();
         var service = new MediaBackedFileStorageService(
-            new FixedMediaObjectKeyFactory("private/chat-attachments/2026/07/11/chat.pdf", "chat.pdf"),
+            new FixedMediaObjectKeyFactory("private/chat-attachments/2026/07/11/chat.png", "chat.png"),
             storage,
             new MediaAssetService(_fixture.Context),
             new FakeCurrentUserService(Guid.Parse("22222222-2222-2222-2222-222222222222")));
 
-        await using var stream = new MemoryStream(Encoding.UTF8.GetBytes("chat-attachment"));
-        var response = await service.UploadPdfAsync(
+        await using var stream = new MemoryStream(Encoding.UTF8.GetBytes("chat-image"));
+        var response = await service.UploadImageAsync(
             new ImageUploadFile
             {
                 Content = stream,
-                FileName = "chat.pdf",
-                ContentType = "application/pdf",
+                FileName = "chat.png",
+                ContentType = "image/png",
                 Length = stream.Length
             },
-            FileUploadScope.ChatAttachment);
+            FileUploadScope.ChatImage);
 
         Assert.NotNull(response.MediaAssetId);
         Assert.Equal($"/api/media/private/{response.MediaAssetId}", response.Url);
@@ -109,6 +109,70 @@ public class MediaBackedFileStorageServiceTests : IClassFixture<TestDatabaseFixt
         Assert.Equal(MediaScope.ChatAttachment, asset!.Scope);
         Assert.Equal(MediaVisibility.Private, asset.Visibility);
         Assert.Equal(Guid.Parse("22222222-2222-2222-2222-222222222222"), asset.OwnerUserId);
+    }
+
+    [Fact]
+    public async Task UploadFileAsync_ShouldStorePrivateChatFileAndPreserveContentType()
+    {
+        var storage = new RecordingMediaStorageService();
+        var service = new MediaBackedFileStorageService(
+            new FixedMediaObjectKeyFactory("private/chat-attachments/2026/07/11/chat.txt", "chat.txt"),
+            storage,
+            new MediaAssetService(_fixture.Context),
+            new FakeCurrentUserService(Guid.Parse("33333333-3333-3333-3333-333333333333")));
+
+        await using var stream = new MemoryStream(Encoding.UTF8.GetBytes("chat-file"));
+        var response = await service.UploadFileAsync(
+            stream,
+            "chat.txt",
+            "text/plain",
+            FileUploadScope.ChatFile);
+
+        Assert.NotNull(response.MediaAssetId);
+        Assert.Equal($"/api/media/private/{response.MediaAssetId}", response.Url);
+        Assert.NotNull(storage.LastRequest);
+        Assert.Equal(MediaVisibility.Private, storage.LastRequest!.Visibility);
+        Assert.Equal("text/plain", storage.LastRequest.ContentType);
+
+        var asset = await _fixture.Context.MediaAssets.FindAsync(response.MediaAssetId!.Value);
+        Assert.NotNull(asset);
+        Assert.Equal(MediaScope.ChatAttachment, asset!.Scope);
+        Assert.Equal("text/plain", asset.ContentType);
+        Assert.Equal(MediaVisibility.Private, asset.Visibility);
+        Assert.Equal(Guid.Parse("33333333-3333-3333-3333-333333333333"), asset.OwnerUserId);
+    }
+
+    [Fact]
+    public async Task UploadImageAsync_ShouldStorePrivateMeterReadingAndCreateMediaAsset()
+    {
+        var storage = new RecordingMediaStorageService();
+        var service = new MediaBackedFileStorageService(
+            new FixedMediaObjectKeyFactory("private/meter-reading-images/2026/07/11/meter.jpg", "meter.jpg"),
+            storage,
+            new MediaAssetService(_fixture.Context),
+            new FakeCurrentUserService(Guid.Parse("44444444-4444-4444-4444-444444444444")));
+
+        await using var stream = new MemoryStream(Encoding.UTF8.GetBytes("meter-image"));
+        var response = await service.UploadImageAsync(
+            new ImageUploadFile
+            {
+                Content = stream,
+                FileName = "meter.jpg",
+                ContentType = "image/jpeg",
+                Length = stream.Length
+            },
+            FileUploadScope.MeterReading);
+
+        Assert.NotNull(response.MediaAssetId);
+        Assert.Equal($"/api/media/private/{response.MediaAssetId}", response.Url);
+        Assert.NotNull(storage.LastRequest);
+        Assert.Equal(MediaVisibility.Private, storage.LastRequest!.Visibility);
+
+        var asset = await _fixture.Context.MediaAssets.FindAsync(response.MediaAssetId!.Value);
+        Assert.NotNull(asset);
+        Assert.Equal(MediaScope.MeterReadingImage, asset!.Scope);
+        Assert.Equal(MediaVisibility.Private, asset.Visibility);
+        Assert.Equal(Guid.Parse("44444444-4444-4444-4444-444444444444"), asset.OwnerUserId);
     }
 
     private sealed class RecordingMediaStorageService : IMediaStorageService

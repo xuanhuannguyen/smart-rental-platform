@@ -13,14 +13,26 @@ namespace SmartRentalPlatform.Domain.Entities.RentalContracts
 
         public Guid? MediaAssetId { get; set; }
 
-        public ContractFileVariant FileVariant { get; set; } = ContractFileVariant.Raw;
+        public ContractFilePurpose Purpose { get; set; } = ContractFilePurpose.Preview;
 
+        public string ContentType { get; set; } = "application/pdf";
+        
+        public string? FileUrl { get; set; }
+
+        public string? Sha256Hash { get; set; }
+
+        public bool IsLegallySigned { get; set; }
+
+        public Guid? ContractSigningEnvelopeId { get; set; }
+        
         public DateTimeOffset CreatedAt { get; set; }
 
         public RentalContract RentalContract { get; set; } = null!;
 
         public ContractAppendix? RentalContractAppendix { get; set; }
-
+        
         public MediaAsset? MediaAsset { get; set; }
+
+        public ContractSigningEnvelope? ContractSigningEnvelope { get; set; }
     }
 }

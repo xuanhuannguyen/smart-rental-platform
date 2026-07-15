@@ -18,7 +18,7 @@ public interface IEmailSender
         string email,
         string displayName,
         string contractNumber,
-        string signerRole,
+        string role,
         string otp,
         CancellationToken cancellationToken = default);
 }

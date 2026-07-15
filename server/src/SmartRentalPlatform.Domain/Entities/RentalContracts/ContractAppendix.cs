@@ -1,4 +1,4 @@
-﻿using SmartRentalPlatform.Domain.Entities.Users;
+using SmartRentalPlatform.Domain.Entities.Users;
 using SmartRentalPlatform.Domain.Enums.RentalContracts;
 
 namespace SmartRentalPlatform.Domain.Entities.RentalContracts
@@ -36,5 +36,7 @@ namespace SmartRentalPlatform.Domain.Entities.RentalContracts
         public ICollection<ContractFile> Files { get; set; } = new List<ContractFile>();
 
         public ICollection<ContractSignature> Signatures { get; set; } = new List<ContractSignature>();
+
+        public ICollection<ContractSigningEnvelope> SigningEnvelopes { get; set; } = new List<ContractSigningEnvelope>();
     }
 }

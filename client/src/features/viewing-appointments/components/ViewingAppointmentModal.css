@@ -111,16 +111,6 @@
   font-weight: 700;
 }
 
-.viewing-modal-error {
-  background: #fef2f2;
-  border: 1px solid #fca5a5;
-  color: #b91c1c;
-  border-radius: 8px;
-  padding: 10px 14px;
-  font-size: 13px;
-  font-weight: 600;
-}
-
 /* Form Fields */
 .viewing-modal-field {
   display: flex;

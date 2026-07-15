@@ -126,6 +126,15 @@ export interface MeterReadingInput {
   previousReading?: number | null;
   currentReading: number;
   proofMediaAssetId?: string | null;
+  aiReading?: number | null;
+  aiRawText?: string | null;
+}
+
+export interface MeterAiResponse {
+  reading: number;
+  rawText: string;
+  proofMediaAssetId?: string | null;
+  proofImageUrl: string;
 }
 
 export interface GenerateInvoiceWithReadingsRequest {
@@ -135,6 +144,39 @@ export interface GenerateInvoiceWithReadingsRequest {
   discountAmount: number;
   note?: string | null;
   meterReadings: MeterReadingInput[];
+}
+
+export interface BulkInvoiceRoomInput {
+  contractId: string;
+  discountAmount: number;
+  note?: string | null;
+  meterReadings: MeterReadingInput[];
+}
+
+export interface GenerateBulkInvoicesRequest {
+  roomingHouseId: string;
+  billingPeriodStart: string;
+  billingPeriodEnd: string;
+  rooms: BulkInvoiceRoomInput[];
+}
+
+export type BulkInvoiceRoomStatus = 'Created' | 'Skipped' | 'MissingData';
+
+export interface BulkInvoiceRoomResult {
+  roomId: string;
+  contractId: string;
+  roomNumber: string;
+  status: BulkInvoiceRoomStatus;
+  message: string;
+  invoice?: Invoice | null;
+}
+
+export interface BulkInvoiceResult {
+  totalActiveRooms: number;
+  createdCount: number;
+  skippedCount: number;
+  missingDataCount: number;
+  rooms: BulkInvoiceRoomResult[];
 }
 
 export interface CreateTerminationInvoiceRequest {

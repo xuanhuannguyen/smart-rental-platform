@@ -89,6 +89,8 @@ public static class ErrorCodes
     public const string ContractAppendixInvalidStatus = "CONTRACT_APPENDIX_INVALID_STATUS";
     public const string ContractAppendixAlreadySigned = "CONTRACT_APPENDIX_ALREADY_SIGNED";
     public const string ContractAppendixCreatorMustSignFirst = "CONTRACT_APPENDIX_CREATOR_MUST_SIGN_FIRST";
+    public const string ESignSignatureImageInvalid = "ESIGN_SIGNATURE_IMAGE_INVALID";
+    public const string ESignProviderError = "ESIGN_PROVIDER_ERROR";
 
     // Billing
     public const string BillingServiceInvalid = "BILLING_SERVICE_INVALID";
@@ -107,6 +109,8 @@ public static class ErrorCodes
 
     // Viewing Appointment
     public const string ViewingAppointmentNotFound = "VIEWING_APPOINTMENT_NOT_FOUND";
+
+
     public const string ViewingAppointmentInvalidStatus = "VIEWING_APPOINTMENT_INVALID_STATUS";
     public const string ViewingAppointmentTimeInPast = "VIEWING_APPOINTMENT_TIME_IN_PAST";
     public const string ViewingAppointmentReasonRequired = "VIEWING_APPOINTMENT_REASON_REQUIRED";
@@ -115,4 +119,12 @@ public static class ErrorCodes
     public const string ViewingAppointmentDuplicate = "VIEWING_APPOINTMENT_DUPLICATE";
     public const string HouseRuleRequired = "HOUSE_RULE_REQUIRED";
     public const string HouseRuleInvalid = "HOUSE_RULE_INVALID";
+
+    // Reviews & Reports
+    public const string ReviewNotFound = "REVIEW_NOT_FOUND";
+    public const string ReviewAlreadyExists = "REVIEW_ALREADY_EXISTS";
+    public const string ReviewNotEligible = "REVIEW_NOT_ELIGIBLE";
+    public const string ReviewForbidden = "REVIEW_FORBIDDEN";
+    public const string ReportNotFound = "REPORT_NOT_FOUND";
+    public const string ReportAlreadyExists = "REPORT_ALREADY_EXISTS";
 }

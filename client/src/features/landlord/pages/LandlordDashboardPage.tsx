@@ -1,3 +1,4 @@
+import { Alert } from '../../../shared/components/ui/Alert';
 import { useEffect, useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { ROUTE_PATHS } from '../../../app/router/routePaths';
@@ -8,6 +9,7 @@ import { formatStatus, getCreateHouseBlockedMessage, getStatusToneClass } from '
 import { getMyRoomingHouseOnboarding, getMyRoomingHouses } from '../../rooming-houses/api';
 import type { RoomingHouseOnboarding, RoomingHouseSummary } from '../../rooming-houses/types';
 import './LandlordDashboardPage.css';
+import { PageHeader } from '../../../shared/components/ui/PageHeader';
 
 const fallbackImage = 'https://images.unsplash.com/photo-1564013799919-ab600027ffc6?auto=format&fit=crop&w=600&q=80';
 
@@ -93,49 +95,49 @@ export default function LandlordDashboardPage() {
   return (
     <div className="landlord-dashboard-page" style={{ display: 'contents' }}>
       <main className="dashboard-main">
-        <section className="overview-band">
-          <div className="overview-left">
-            <p className="eyebrow">Quản lý</p>
-            <h2>Khu trọ của tôi</h2>
-            <p className="overview-description">Quản lý danh sách các khu trọ của bạn.</p>
-          </div>
+        <PageHeader
+          icon={<BuildingIcon />}
+          eyebrow="Quản lý"
+          title="Khu trọ của tôi"
+          description="Quản lý danh sách các khu trọ của bạn."
+          rightContent={
+            <div className="overview-right">
+              <div className="overview-stats">
+                <div className="stat-item stat-item--total">
+                  <BuildingIcon />
+                  <span>Tổng khu trọ</span>
+                  <strong className="stat-badge">{houseStats.total}</strong>
+                </div>
+                <div className="stat-item stat-item--approved">
+                  <CheckCircleIcon />
+                  <span>Đã duyệt</span>
+                  <strong className="stat-badge">{houseStats.approved}</strong>
+                </div>
+                <div className="stat-item stat-item--pending">
+                  <ClockIcon />
+                  <span>Chờ duyệt</span>
+                  <strong className="stat-badge">{houseStats.pending}</strong>
+                </div>
+                <div className="stat-item stat-item--rejected">
+                  <BanIcon />
+                  <span>Bản nháp / lỗi</span>
+                  <strong className="stat-badge">{houseStats.draft + houseStats.rejected}</strong>
+                </div>
+              </div>
 
-          <div className="overview-right">
-            <div className="overview-stats">
-              <div className="stat-item stat-item--total">
-                <BuildingIcon />
-                <span>Tổng khu trọ</span>
-                <strong className="stat-badge">{houseStats.total}</strong>
-              </div>
-              <div className="stat-item stat-item--approved">
-                <CheckCircleIcon />
-                <span>Đã duyệt</span>
-                <strong className="stat-badge">{houseStats.approved}</strong>
-              </div>
-              <div className="stat-item stat-item--pending">
-                <ClockIcon />
-                <span>Chờ duyệt</span>
-                <strong className="stat-badge">{houseStats.pending}</strong>
-              </div>
-              <div className="stat-item stat-item--rejected">
-                <BanIcon />
-                <span>Bản nháp / lỗi</span>
-                <strong className="stat-badge">{houseStats.draft + houseStats.rejected}</strong>
+              <div className="overview-actions">
+                <button
+                  className="primary-action"
+                  disabled={!canCreateNew}
+                  onClick={handleCreateNewHouse}
+                  title={blockingHouse ? getCreateHouseBlockedMessage(blockingHouse.approvalStatus) : 'Tạo khu trọ mới'}
+                >
+                  + Tạo khu trọ mới
+                </button>
               </div>
             </div>
-
-            <div className="overview-actions">
-              <button
-                className="primary-action"
-                disabled={!canCreateNew}
-                onClick={handleCreateNewHouse}
-                title={blockingHouse ? getCreateHouseBlockedMessage(blockingHouse.approvalStatus) : 'Tạo khu trọ mới'}
-              >
-                + Tạo khu trọ mới
-              </button>
-            </div>
-          </div>
-        </section>
+          }
+        />
 
         {message && <p className="dashboard-message">{message}</p>}
 
@@ -228,9 +230,7 @@ export default function LandlordDashboardPage() {
                   </div>
 
                   {house.rejectedReason && (
-                    <div className="card-error-row">
-                      <p className="warning-text">Lý do từ chối: {house.rejectedReason}</p>
-                    </div>
+                    <Alert type="error"><p className="warning-text">Lý do từ chối: {house.rejectedReason}</p></Alert>
                   )}
 
                   <div className="card-footer-alert-banner">

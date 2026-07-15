@@ -11,14 +11,18 @@ import type {
   ContractHistoryItemResponse,
   ContractPreviewResponse,
   RejectContractRequest,
-  RequestContractSignatureOtpResponse,
   RequestContractRevisionRequest,
-  SignContractRequest,
   SubmitContractOccupantsRequest,
   TerminateContractRequest,
   UpdateContractTermsRequest,
   ContractAppendixResponse,
-  CreateContractAppendixRequest
+  CreateContractAppendixRequest,
+  StartESignEnvelopeRequest,
+  StartESignEnvelopeResponse,
+  ESignEnvelopeResponse,
+  ESignOtpMethod,
+  RequestESignOtpResponse,
+  SubmitESignOtpRequest
 } from './types';
 
 export const contractApi = {
@@ -56,32 +60,6 @@ export const contractApi = {
   updateContractTerms: (id: string, payload: UpdateContractTermsRequest) =>
     apiClient<ApiResponse<ContractDetailResponse>>(ENDPOINTS.CONTRACTS.TERMS(id), {
       method: 'PUT',
-      auth: true,
-      body: payload
-    }),
-
-  requestLandlordSignOtp: (id: string) =>
-    apiClient<ApiResponse<RequestContractSignatureOtpResponse>>(ENDPOINTS.CONTRACTS.LANDLORD_SIGN_OTP(id), {
-      method: 'POST',
-      auth: true
-    }),
-
-  landlordSignContract: (id: string, payload: SignContractRequest) =>
-    apiClient<ApiResponse<ContractDetailResponse>>(ENDPOINTS.CONTRACTS.LANDLORD_SIGN(id), {
-      method: 'POST',
-      auth: true,
-      body: payload
-    }),
-
-  requestTenantSignOtp: (id: string) =>
-    apiClient<ApiResponse<RequestContractSignatureOtpResponse>>(ENDPOINTS.CONTRACTS.TENANT_SIGN_OTP(id), {
-      method: 'POST',
-      auth: true
-    }),
-
-  tenantSignContract: (id: string, payload: SignContractRequest) =>
-    apiClient<ApiResponse<ContractDetailResponse>>(ENDPOINTS.CONTRACTS.TENANT_SIGN(id), {
-      method: 'POST',
       auth: true,
       body: payload
     }),
@@ -199,19 +177,6 @@ export const contractApi = {
     return response.blob();
   },
 
-  requestAppendixSignOtp: (id: string, appendixId: string) =>
-    apiClient<ApiResponse<RequestContractSignatureOtpResponse>>(ENDPOINTS.CONTRACTS.APPENDIX_SIGN_OTP(id, appendixId), {
-      method: 'POST',
-      auth: true
-    }),
-
-  signAppendix: (id: string, appendixId: string, payload: SignContractRequest) =>
-    apiClient<ApiResponse<ContractAppendixResponse>>(ENDPOINTS.CONTRACTS.APPENDIX_SIGN(id, appendixId), {
-      method: 'POST',
-      auth: true,
-      body: payload
-    }),
-
   rejectAppendix: (id: string, appendixId: string, payload: RejectContractRequest) =>
     apiClient<ApiResponse<ContractAppendixResponse>>(ENDPOINTS.CONTRACTS.APPENDIX_REJECT(id, appendixId), {
       method: 'POST',
@@ -221,6 +186,54 @@ export const contractApi = {
 
   requestAppendixRevision: (id: string, appendixId: string, payload: RequestContractRevisionRequest) =>
     apiClient<ApiResponse<ContractAppendixResponse>>(ENDPOINTS.CONTRACTS.APPENDIX_REVISION_REQUEST(id, appendixId), {
+      method: 'POST',
+      auth: true,
+      body: payload
+    }),
+
+  startESignEnvelope: (id: string, payload: StartESignEnvelopeRequest) =>
+    apiClient<ApiResponse<StartESignEnvelopeResponse>>(ENDPOINTS.CONTRACTS.ESIGN_ENVELOPE(id), {
+      method: 'POST',
+      auth: true,
+      body: payload
+    }),
+
+  requestESignOtp: (id: string, method: ESignOtpMethod) =>
+    apiClient<ApiResponse<RequestESignOtpResponse>>(ENDPOINTS.CONTRACTS.ESIGN_REQUEST_OTP(id), {
+      method: 'POST',
+      auth: true,
+      body: { method }
+    }),
+
+  submitESignOtp: (id: string, payload: SubmitESignOtpRequest) =>
+    apiClient<ApiResponse<boolean>>(ENDPOINTS.CONTRACTS.ESIGN_SUBMIT_OTP(id), {
+      method: 'POST',
+      auth: true,
+      body: payload
+    }),
+
+  getESignEnvelopeStatus: (id: string, envelopeId: string) =>
+    apiClient<ApiResponse<ESignEnvelopeResponse>>(ENDPOINTS.CONTRACTS.ESIGN_ENVELOPE_STATUS(id, envelopeId), {
+      method: 'GET',
+      auth: true
+    }),
+
+  startAppendixESignEnvelope: (id: string, appendixId: string, payload: StartESignEnvelopeRequest) =>
+    apiClient<ApiResponse<StartESignEnvelopeResponse>>(ENDPOINTS.CONTRACTS.APPENDIX_ESIGN_ENVELOPE(id, appendixId), {
+      method: 'POST',
+      auth: true,
+      body: payload
+    }),
+
+  requestAppendixESignOtp: (id: string, appendixId: string, method: ESignOtpMethod) =>
+    apiClient<ApiResponse<RequestESignOtpResponse>>(ENDPOINTS.CONTRACTS.APPENDIX_ESIGN_REQUEST_OTP(id, appendixId), {
+      method: 'POST',
+      auth: true,
+      body: { method }
+    }),
+
+  submitAppendixESignOtp: (id: string, appendixId: string, payload: SubmitESignOtpRequest) =>
+    apiClient<ApiResponse<boolean>>(ENDPOINTS.CONTRACTS.APPENDIX_ESIGN_SUBMIT_OTP(id, appendixId), {
       method: 'POST',
       auth: true,
       body: payload

@@ -11,14 +11,21 @@ using SmartRentalPlatform.Infrastructure.Persistence;
 using SmartRentalPlatform.Infrastructure.Persistence.Seed;
 using SmartRentalPlatform.Infrastructure.Persistence.Seeders;
 using QuestPDF.Infrastructure;
+using SmartRentalPlatform.Api.Hubs;
 
 var builder = WebApplication.CreateBuilder(args);
 builder.Configuration.AddJsonFile("appsettings.Local.json", optional: true, reloadOnChange: true);
+
+builder.Configuration.AddJsonFile("appsettings.Local.json", optional: true, reloadOnChange: true);
+builder.Logging.ClearProviders();
+builder.Logging.AddConsole();
+builder.Logging.AddDebug();
 
 QuestPDF.Settings.License = LicenseType.Community;
 
 // Đăng ký controller để dùng mô hình API Controller.
 builder.Services.AddControllers();
+builder.Services.AddSignalR();
 
 // Đăng ký Swagger để test API trên trình duyệt.
 builder.Services.AddSwaggerDocumentation();
@@ -151,6 +158,7 @@ if (app.Environment.IsDevelopment())
 }
 
 app.MapControllers();
+app.MapHub<ChatHub>("/hubs/chat");
 
 app.Run();
 

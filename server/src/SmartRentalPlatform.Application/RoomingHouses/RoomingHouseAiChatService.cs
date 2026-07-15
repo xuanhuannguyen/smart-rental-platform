@@ -17,20 +17,20 @@ public sealed class RoomingHouseAiChatService : IRoomingHouseAiChatService
 
     private readonly IRoomingHouseQueryService queryService;
     private readonly IVietMapService vietMapService;
-    private readonly IAiStructuredOutputService aiService;
+    private readonly IChatAiStructuredOutputService chatAiService;
     private readonly IConversationCacheService conversationCache;
     private readonly ILogger<RoomingHouseAiChatService> logger;
 
     public RoomingHouseAiChatService(
         IRoomingHouseQueryService queryService,
         IVietMapService vietMapService,
-        IAiStructuredOutputService aiService,
+        IChatAiStructuredOutputService chatAiService,
         IConversationCacheService conversationCache,
         ILogger<RoomingHouseAiChatService> logger)
     {
         this.queryService = queryService;
         this.vietMapService = vietMapService;
-        this.aiService = aiService;
+        this.chatAiService = chatAiService;
         this.conversationCache = conversationCache;
         this.logger = logger;
     }
@@ -198,7 +198,7 @@ public sealed class RoomingHouseAiChatService : IRoomingHouseAiChatService
                     : null
             };
 
-            var plan = await aiService.CreateJsonAsync<ChatPlan>(
+            var plan = await chatAiService.CreateJsonAsync<ChatPlan>(
                 "rooming_house_chat_plan",
                 schema,
                 instructions,
@@ -608,7 +608,7 @@ public sealed class RoomingHouseAiChatService : IRoomingHouseAiChatService
 
         try
         {
-            return await aiService.CreateJsonAsync<ChatAnswer>(
+            return await chatAiService.CreateJsonAsync<ChatAnswer>(
                 "rooming_house_chat_answer",
                 schema,
                 instructions,

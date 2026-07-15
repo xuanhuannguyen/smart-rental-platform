@@ -23,6 +23,14 @@ import type {
   UpdateRentalPolicyRequest,
   UpdateLegalDocumentRequest,
   UpsertRoomingHouseRuleRequest,
+  RoomingHouseReviewListResponse,
+  ReviewEligibilityResponse,
+  CreateRoomingHouseReviewRequest,
+  RoomingHouseReviewResponse,
+  UpdateRoomingHouseReviewRequest,
+  ReplyRoomingHouseReviewRequest,
+  CreateReviewReportRequest,
+  RoomingHouseReviewEligibilitySummaryResponse
 } from './types';
 
 export async function getMyRoomingHouses(): Promise<RoomingHouseSummary[]> {
@@ -303,4 +311,142 @@ function normalizeRentalPrice(value: unknown) {
   }
 
   return value;
+}
+
+// Reviews APIs
+export async function getRoomingHouseReviews(
+  roomingHouseId: string,
+  page = 1,
+  pageSize = 10
+): Promise<RoomingHouseReviewListResponse> {
+  const data = await apiClient<ApiResponse<RoomingHouseReviewListResponse>>(
+    `/api/rooming-houses/${roomingHouseId}/reviews?page=${page}&pageSize=${pageSize}`
+  );
+  return data.data;
+}
+
+export async function checkReviewEligibility(contractId: string): Promise<ReviewEligibilityResponse> {
+  const data = await apiClient<ApiResponse<ReviewEligibilityResponse>>(
+    `/api/rooming-houses/contracts/${contractId}/review-eligibility`,
+    { auth: true }
+  );
+  return data.data;
+}
+
+export async function checkRoomingHouseReviewEligibility(roomingHouseId: string): Promise<RoomingHouseReviewEligibilitySummaryResponse> {
+  const data = await apiClient<ApiResponse<RoomingHouseReviewEligibilitySummaryResponse>>(
+    `/api/rooming-houses/${roomingHouseId}/review-eligibility-summary`,
+    { auth: true }
+  );
+  return data.data;
+}
+
+export async function createRoomingHouseReview(
+  contractId: string,
+  request: CreateRoomingHouseReviewRequest
+): Promise<RoomingHouseReviewResponse> {
+  const formData = new FormData();
+  formData.append('rating', request.rating.toString());
+  if (request.comment) {
+    formData.append('comment', request.comment);
+  }
+  if (request.images) {
+    request.images.forEach(img => formData.append('images', img));
+  }
+
+  const data = await apiClient<ApiResponse<RoomingHouseReviewResponse>>(
+    `/api/rooming-houses/contracts/${contractId}/reviews`,
+    {
+      method: 'POST',
+      auth: true,
+      body: formData,
+    }
+  );
+  return data.data;
+}
+
+export async function updateRoomingHouseReview(
+  reviewId: string,
+  request: UpdateRoomingHouseReviewRequest
+): Promise<RoomingHouseReviewResponse> {
+  const formData = new FormData();
+  formData.append('rating', request.rating.toString());
+  if (request.comment) {
+    formData.append('comment', request.comment);
+  }
+  if (request.retainedImageIds) {
+    request.retainedImageIds.forEach(id => formData.append('retainedImageIds', id));
+  }
+  if (request.newImages) {
+    request.newImages.forEach(img => formData.append('newImages', img));
+  }
+
+  const data = await apiClient<ApiResponse<RoomingHouseReviewResponse>>(
+    `/api/rooming-houses/reviews/${reviewId}`,
+    {
+      method: 'PUT',
+      auth: true,
+      body: formData,
+    }
+  );
+  return data.data;
+}
+
+export async function deleteRoomingHouseReview(reviewId: string): Promise<void> {
+  await apiClient(
+    `/api/rooming-houses/reviews/${reviewId}`,
+    { method: 'DELETE', auth: true }
+  );
+}
+
+export async function replyRoomingHouseReview(
+  reviewId: string,
+  request: ReplyRoomingHouseReviewRequest
+): Promise<void> {
+  await apiClient(
+    `/api/rooming-houses/reviews/${reviewId}/reply`,
+    { method: 'POST', auth: true, body: request }
+  );
+}
+
+export async function deleteRoomingHouseReviewReply(reviewId: string): Promise<void> {
+  await apiClient(
+    `/api/rooming-houses/reviews/${reviewId}/reply`,
+    { method: 'DELETE', auth: true }
+  );
+}
+
+export async function reportRoomingHouseReview(
+  reviewId: string,
+  request: CreateReviewReportRequest
+): Promise<void> {
+  await apiClient(
+    `/api/rooming-houses/reviews/${reviewId}/report`,
+    { method: 'POST', auth: true, body: request }
+  );
+}
+
+// Favorites APIs
+export async function getFavoriteRoomingHouseIds(): Promise<string[]> {
+  const data = await apiClient<ApiResponse<string[]>>(
+    '/api/favorite-rooming-houses/ids',
+    { auth: true }
+  );
+  return data.data;
+}
+
+export async function toggleFavoriteRoomingHouse(roomingHouseId: string): Promise<boolean> {
+  const data = await apiClient<ApiResponse<boolean>>(
+    `/api/favorite-rooming-houses/${roomingHouseId}`,
+    { method: 'POST', auth: true }
+  );
+  return data.data;
+}
+
+export async function getFavoriteRoomingHouses(pageNumber = 1, pageSize = 20): Promise<PagedResult<RoomingHouseListingItem>> {
+  const data = await apiClient<ApiResponse<PagedResult<RoomingHouseListingItem>>>(
+    `/api/favorite-rooming-houses?pageNumber=${pageNumber}&pageSize=${pageSize}`,
+    { auth: true }
+  );
+  return data.data;
 }

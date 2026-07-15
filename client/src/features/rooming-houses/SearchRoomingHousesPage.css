@@ -945,8 +945,9 @@
 .search-results-section {
   display: grid;
   gap: 24px;
-  max-width: 928px;
-  margin: 0 auto;
+  width: 100%;
+  max-width: 1480px;
+  margin: 0;
 }
 
 /* Map view */
@@ -1094,7 +1095,7 @@
 /* Results Grid & Cards */
 .search-results__grid {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+  grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
   gap: 20px;
 }
 
@@ -1363,12 +1364,6 @@
   box-shadow: 0 4px 12px rgba(15, 23, 42, 0.02);
 }
 
-.search-page__state--error {
-  border-color: #fecaca;
-  background: #fef2f2;
-  color: #b91c1c;
-}
-
 /* Mobile responsive layout */
 @media (max-width: 960px) {
   .search-page-container {
@@ -1468,5 +1463,11 @@
 
   .search-results__grid {
     grid-template-columns: 1fr;
+  }
+}
+
+@media (min-width: 1800px) {
+  .search-results-section {
+    max-width: 1680px;
   }
 }

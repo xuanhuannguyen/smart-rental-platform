@@ -11,6 +11,7 @@ namespace SmartRentalPlatform.Application.ViewingAppointments
             {
                 Id = entity.Id,
                 RoomId = entity.RoomId,
+                RoomingHouseId = entity.Room?.RoomingHouseId,
                 TenantUserId = entity.TenantUserId,
                 CreatedByUserId = entity.CreatedByUserId,
                 ScheduledAt = entity.ScheduledAt,

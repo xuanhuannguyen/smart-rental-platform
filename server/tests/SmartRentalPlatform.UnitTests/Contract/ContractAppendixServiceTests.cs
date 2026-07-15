@@ -44,13 +44,13 @@ public class ContractAppendixServiceTests : IClassFixture<TestDatabaseFixture>
 
         var files = fixture.Context.ContractFiles
             .Where(x => x.RentalContractAppendixId == appendix.Id)
-            .OrderBy(x => x.FileVariant)
+            .OrderBy(x => x.Purpose)
             .ToList();
 
         Assert.Equal(2, files.Count);
         Assert.All(files, x => Assert.NotNull(x.MediaAssetId));
-        Assert.Contains(files, x => x.FileVariant == ContractFileVariant.Raw);
-        Assert.Contains(files, x => x.FileVariant == ContractFileVariant.Masked);
+        Assert.Contains(files, x => x.Purpose == ContractFilePurpose.SignedLegalDocument);
+        Assert.Contains(files, x => x.Purpose == ContractFilePurpose.MaskedReference);
         Assert.Equal(2, fixture.Context.MediaAssets.Count());
         Assert.All(fixture.Context.MediaAssets, x => Assert.Equal(MediaScope.ContractAppendixPdf, x.Scope));
         Assert.Equal(2, mediaStorage.UploadRequests.Count);
@@ -237,11 +237,11 @@ public class ContractAppendixServiceTests : IClassFixture<TestDatabaseFixture>
     {
         return new ContractAppendixService(
             fixture.Context,
-            new FakeContractSignatureOtpService(),
             new FakeContractPdfRenderer(),
             mediaObjectKeyFactory ?? new QueueMediaObjectKeyFactory(),
             mediaStorageService ?? new RecordingMediaStorageService(),
             new MediaAssetService(fixture.Context),
+            new FakeContractPreviewAttachmentService(),
             new FakeHashService(),
             new FakeSensitiveDataProtector());
     }
@@ -263,11 +263,42 @@ public class ContractAppendixServiceTests : IClassFixture<TestDatabaseFixture>
 
     private sealed class FakeContractPdfRenderer : IContractPdfRenderer
     {
-        public byte[] RenderSignedRentalContract(RentalContract contract, ContractRenderOptions options)
+        public byte[] RenderRentalContractPreview(ContractDocumentModel document, ContractRenderOptions options)
+            => Encoding.UTF8.GetBytes("contract-preview");
+
+        public byte[] RenderContractAppendixPreview(ContractAppendix appendix, ContractRenderOptions options)
+            => Encoding.UTF8.GetBytes($"appendix-preview-{appendix.Id}-{options.ViewerMode}");
+
+        public byte[] RenderSignedRentalContract(ContractDocumentModel document, ContractRenderOptions options)
             => Encoding.UTF8.GetBytes("contract");
 
         public byte[] RenderSignedContractAppendix(ContractAppendix appendix, ContractRenderOptions options)
             => Encoding.UTF8.GetBytes($"appendix-{appendix.Id}-{options.ViewerMode}");
+
+        public PdfRenderResult RenderRentalContractForESign(ContractDocumentModel document, ContractRenderOptions options)
+            => new() { PdfBytes = RenderSignedRentalContract(document, options) };
+
+        public PdfRenderResult RenderContractAppendixForESign(ContractAppendix appendix, ContractRenderOptions options)
+            => new() { PdfBytes = RenderSignedContractAppendix(appendix, options) };
+    }
+
+    private sealed class FakeContractPreviewAttachmentService : IContractPreviewAttachmentService
+    {
+        public Task<IReadOnlyList<ContractReviewAttachment>> LoadForContractAsync(
+            Guid viewerUserId,
+            RentalContract contract,
+            CancellationToken cancellationToken = default)
+        {
+            return Task.FromResult<IReadOnlyList<ContractReviewAttachment>>([]);
+        }
+
+        public Task<IReadOnlyList<ContractReviewAttachment>> LoadForAppendixAsync(
+            Guid viewerUserId,
+            ContractAppendix appendix,
+            CancellationToken cancellationToken = default)
+        {
+            return Task.FromResult<IReadOnlyList<ContractReviewAttachment>>([]);
+        }
     }
 
     private sealed class QueueMediaObjectKeyFactory : IMediaObjectKeyFactory

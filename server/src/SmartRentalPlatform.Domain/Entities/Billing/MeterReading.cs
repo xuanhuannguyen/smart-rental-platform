@@ -17,6 +17,9 @@ public class MeterReading
     public decimal CurrentReading { get; set; }
     public decimal Consumption { get; set; }
     public Guid? ProofMediaAssetId { get; set; }
+    public decimal? AiReading { get; set; }
+    public string? AiRawText { get; set; }
+    public bool WasManuallyCorrected { get; set; }
     public Guid RecordedByLandlordUserId { get; set; }
     public DateTimeOffset ReadingAt { get; set; }
     public DateTimeOffset CreatedAt { get; set; }

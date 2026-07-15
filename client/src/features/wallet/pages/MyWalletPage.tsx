@@ -1,17 +1,31 @@
 import React, { useEffect, useState } from 'react';
 import { walletApi } from '../api';
-import type { WalletResponse, WalletTopUpResponse, WalletTopUpStatus } from '../types';
+import type { WalletResponse, WalletTopUpResponse, WalletTopUpStatus, WithdrawalRequestResponse } from '../types';
 import './Wallet.css';
 import { formatMoneyString } from '../../../shared/utils/format';
 import { Button } from '../../../shared/components/ui/Button';
 import { Alert } from '../../../shared/components/ui/Alert';
+import { Toast } from '../../../shared/components/ui/Toast';
 import { ROUTE_PATHS } from '../../../app/router/routePaths';
+import { profileApi } from '../../profile/services/profileApi';
+
+const normalizeName = (name: string) => {
+  return name
+    .toLowerCase()
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .replace(/đ/g, "d")
+    .replace(/[^a-z0-9 ]/g, "")
+    .trim()
+    .replace(/\s+/g, " ");
+};
 
 const TOP_UP_PAGE_SIZE = 10;
 
 export const MyWalletPage: React.FC = () => {
   const [wallet, setWallet] = useState<WalletResponse | null>(null);
   const [topUps, setTopUps] = useState<WalletTopUpResponse[]>([]);
+  const [withdrawals, setWithdrawals] = useState<WithdrawalRequestResponse[]>([]);
   const [topUpPage, setTopUpPage] = useState(1);
   const [hasMoreTopUps, setHasMoreTopUps] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
@@ -20,6 +34,21 @@ export const MyWalletPage: React.FC = () => {
   const [showTopUp, setShowTopUp] = useState(false);
   const [topUpAmount, setTopUpAmount] = useState<number | ''>('');
   const [isSubmitting, setIsSubmitting] = useState(false);
+
+  // Withdraw state
+  const [showWithdraw, setShowWithdraw] = useState(false);
+  const [withdrawAmount, setWithdrawAmount] = useState<number | ''>('');
+  const [withdrawBankBin, setWithdrawBankBin] = useState('');
+  const [customBankBin, setCustomBankBin] = useState('');
+  const [withdrawAccountNumber, setWithdrawAccountNumber] = useState('');
+  const [withdrawAccountName, setWithdrawAccountName] = useState('');
+  const [isWithdrawing, setIsWithdrawing] = useState(false);
+  const [withdrawError, setWithdrawError] = useState<string | null>(null);
+
+  // Toast state
+  const [toastMessage, setToastMessage] = useState<string | null>(null);
+  const [toastType, setToastType] = useState<'success' | 'error' | 'info'>('success');
+  const [verifiedKycName, setVerifiedKycName] = useState('');
 
   useEffect(() => {
     fetchInitialData();
@@ -31,10 +60,46 @@ export const MyWalletPage: React.FC = () => {
 
     await Promise.all([
       fetchWallet(),
-      fetchTopUps(1, true)
+      fetchTransactions(1, true),
+      fetchProfile()
     ]);
 
     setIsLoading(false);
+  };
+
+  const fetchProfile = async () => {
+    try {
+      const res = await profileApi.getProfile();
+      if (res.success && res.data) {
+        setVerifiedKycName(res.data.fullName || res.data.displayName || '');
+      }
+    } catch (err) {
+      console.error('Failed to fetch profile', err);
+    }
+  };
+
+  const fetchTransactions = async (pageNumber: number, reset: boolean = false) => {
+    try {
+      setIsTopUpsLoading(true);
+      const [topUpRes, withdrawRes] = await Promise.all([
+        walletApi.getTopUps(pageNumber, TOP_UP_PAGE_SIZE),
+        walletApi.getMyWithdrawals(pageNumber, TOP_UP_PAGE_SIZE)
+      ]);
+
+      if (topUpRes.success && topUpRes.data) {
+        setTopUps(prev => reset ? topUpRes.data!.items : [...prev, ...topUpRes.data!.items]);
+        setTopUpPage(pageNumber);
+        setHasMoreTopUps(topUpRes.data.page < topUpRes.data.totalPages);
+      }
+      
+      if (withdrawRes.success && withdrawRes.data) {
+        setWithdrawals(prev => reset ? withdrawRes.data!.items : [...prev, ...withdrawRes.data!.items]);
+      }
+    } catch (err: any) {
+      setError(err.message || 'Đã xảy ra lỗi khi tải lịch sử giao dịch.');
+    } finally {
+      setIsTopUpsLoading(false);
+    }
   };
 
   const fetchWallet = async () => {
@@ -50,24 +115,6 @@ export const MyWalletPage: React.FC = () => {
     }
   };
 
-  const fetchTopUps = async (pageNumber: number, reset: boolean = false) => {
-    try {
-      setIsTopUpsLoading(true);
-      const res = await walletApi.getTopUps(pageNumber, TOP_UP_PAGE_SIZE);
-
-      if (res.success && res.data) {
-        setTopUps(prev => reset ? res.data!.items : [...prev, ...res.data!.items]);
-        setTopUpPage(pageNumber);
-        setHasMoreTopUps(res.data.page < res.data.totalPages);
-      } else {
-        setError(res.message || 'Không thể tải lịch sử yêu cầu nạp ví.');
-      }
-    } catch (err: any) {
-      setError(err.message || 'Đã xảy ra lỗi khi tải lịch sử yêu cầu nạp ví.');
-    } finally {
-      setIsTopUpsLoading(false);
-    }
-  };
 
   const handleTopUpSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -95,6 +142,60 @@ export const MyWalletPage: React.FC = () => {
     } catch (err: any) {
       setError(err.message || 'Đã xảy ra lỗi khi tạo yêu cầu nạp tiền.');
       setIsSubmitting(false);
+    }
+  };
+
+  const handleWithdrawSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!withdrawAmount || withdrawAmount < 10000 || !Number.isInteger(Number(withdrawAmount))) {
+      setWithdrawError('Số tiền rút tối thiểu là 10.000đ và phải là số nguyên.');
+      return;
+    }
+    const finalBankBin = withdrawBankBin === 'other' ? customBankBin : withdrawBankBin;
+    if (!finalBankBin.trim() || !withdrawAccountNumber.trim() || !withdrawAccountName.trim()) {
+      setWithdrawError('Vui lòng nhập đầy đủ thông tin tài khoản ngân hàng.');
+      return;
+    }
+
+    const normalizedInputName = normalizeName(withdrawAccountName);
+    const normalizedKycName = normalizeName(verifiedKycName);
+
+    if (normalizedInputName !== normalizedKycName) {
+      setWithdrawError('Tên chủ tài khoản không khớp với tên xác thực KYC của bạn.');
+      return;
+    }
+
+    const payloadName = normalizedInputName.toUpperCase();
+
+    try {
+      setIsWithdrawing(true);
+      setWithdrawError(null);
+      const res = await walletApi.requestWithdrawal({
+        amount: Number(withdrawAmount),
+        bankBin: finalBankBin,
+        accountNumber: withdrawAccountNumber,
+        accountName: payloadName
+      });
+
+      if (res.success) {
+        setShowWithdraw(false);
+        setWithdrawAmount('');
+        setWithdrawBankBin('');
+        setCustomBankBin('');
+        setWithdrawAccountNumber('');
+        setWithdrawAccountName('');
+        setToastMessage('Yêu cầu rút tiền đã được gửi thành công.');
+        setToastType('success');
+        fetchInitialData();
+      } else {
+        setWithdrawError(res.message || 'Không thể tạo yêu cầu rút tiền.');
+      }
+    } catch (err: any) {
+      console.error('Lỗi khi rút tiền:', err);
+      const apiMessage = err.response?.data?.message || err.message;
+      setWithdrawError(apiMessage || 'Đã xảy ra lỗi khi tạo yêu cầu rút tiền.');
+    } finally {
+      setIsWithdrawing(false);
     }
   };
 
@@ -155,10 +256,18 @@ export const MyWalletPage: React.FC = () => {
     return new Date(dateString).toLocaleString('vi-VN');
   };
 
-  const continueTopUpPayment = (topUp: WalletTopUpResponse) => {
-    if (topUp.providerCheckoutUrl) {
-      window.location.href = topUp.providerCheckoutUrl;
+  const continueTopUpPayment = (url?: string | null) => {
+    if (url) {
+      window.location.href = url;
     }
+  };
+
+  const getCombinedTransactions = () => {
+    const combined = [
+      ...topUps.map(t => ({ ...t, _type: 'TopUp' as const })),
+      ...withdrawals.map(w => ({ ...w, _type: 'Withdrawal' as const }))
+    ];
+    return combined.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
   };
 
   const formatCurrency = (value: number) => `${formatMoneyString(value) || '0'} đ`;
@@ -275,6 +384,16 @@ export const MyWalletPage: React.FC = () => {
               </div>
 
               <Button
+                variant="outline"
+                className="wallet-topup-btn"
+                onClick={() => setShowWithdraw(true)}
+                disabled={wallet.status !== 'Active'}
+                style={{ marginRight: '10px' }}
+              >
+                Rút tiền
+              </Button>
+
+              <Button
                 variant="primary"
                 className="wallet-topup-btn"
                 onClick={() => setShowTopUp(true)}
@@ -358,6 +477,152 @@ export const MyWalletPage: React.FC = () => {
             </div>
           </div>
         )}
+
+        {showWithdraw && (
+          <div
+            className="wallet-modal-backdrop"
+            onMouseDown={(event) => {
+              if (event.target === event.currentTarget && !isWithdrawing) {
+                setShowWithdraw(false);
+              }
+            }}
+          >
+            <div className="wallet-topup-modal" role="dialog" aria-modal="true" aria-labelledby="withdraw-modal-title">
+              <div className="wallet-topup-modal-header">
+                <div>
+                  <p className="wallet-modal-eyebrow">Rút tiền</p>
+                  <h3 id="withdraw-modal-title">Thông tin rút tiền</h3>
+                </div>
+                <button
+                  type="button"
+                  className="wallet-modal-close"
+                  onClick={() => setShowWithdraw(false)}
+                  disabled={isWithdrawing}
+                  aria-label="Đóng"
+                >
+                  ×
+                </button>
+              </div>
+
+              {withdrawError && <Alert type="error">{withdrawError}</Alert>}
+
+              <form onSubmit={handleWithdrawSubmit} className="wallet-topup-form" style={{ marginTop: withdrawError ? '16px' : '0' }}>
+                <div className="form-group mb-3">
+                  <label htmlFor="withdrawAmount">Số tiền muốn rút (VNĐ)</label>
+                  <input
+                    id="withdrawAmount"
+                    type="number"
+                    className="form-control"
+                    value={withdrawAmount}
+                    onChange={(e) => setWithdrawAmount(e.target.value ? Number(e.target.value) : '')}
+                    placeholder="Ví dụ: 100000"
+                    min={10000}
+                    step={1000}
+                    required
+                    disabled={isWithdrawing}
+                  />
+                </div>
+                <div className="form-group mb-3">
+                  <label htmlFor="withdrawBankBin">Ngân hàng</label>
+                  <select
+                    id="withdrawBankBin"
+                    className="form-control"
+                    value={withdrawBankBin}
+                    onChange={(e) => {
+                      setWithdrawBankBin(e.target.value);
+                      if (e.target.value !== 'other') {
+                        setCustomBankBin('');
+                      }
+                    }}
+                    required
+                    disabled={isWithdrawing}
+                  >
+                    <option value="" disabled>Chọn ngân hàng</option>
+                    <option value="970436">Vietcombank</option>
+                    <option value="970415">VietinBank</option>
+                    <option value="970418">BIDV</option>
+                    <option value="970405">Agribank</option>
+                    <option value="970407">Techcombank</option>
+                    <option value="970422">MBBank</option>
+                    <option value="970416">ACB</option>
+                    <option value="970423">TPBank</option>
+                    <option value="970432">VPBank</option>
+                    <option value="970403">Sacombank</option>
+                    <option value="970441">VIB</option>
+                    <option value="970437">HDBank</option>
+                    <option value="970443">SHB</option>
+                    <option value="970440">SeABank</option>
+                    <option value="970426">MSB</option>
+                    <option value="970448">OCB</option>
+                    <option value="970431">Eximbank</option>
+                    <option value="970449">LienVietPostBank</option>
+                    <option value="other">Khác</option>
+                  </select>
+                </div>
+                
+                <div
+                  className="form-group overflow-hidden"
+                  style={{
+                    transition: 'all 0.3s ease-in-out',
+                    maxHeight: withdrawBankBin === 'other' ? '120px' : '0',
+                    opacity: withdrawBankBin === 'other' ? 1 : 0,
+                    marginBottom: withdrawBankBin === 'other' ? '1rem' : '0',
+                    visibility: withdrawBankBin === 'other' ? 'visible' : 'hidden'
+                  }}
+                >
+                  <label htmlFor="customBankBin">Nhập mã BIN ngân hàng</label>
+                  <input
+                    id="customBankBin"
+                    type="text"
+                    className="form-control"
+                    value={customBankBin}
+                    onChange={(e) => setCustomBankBin(e.target.value)}
+                    placeholder="Ví dụ: 970436"
+                    required={withdrawBankBin === 'other'}
+                    disabled={isWithdrawing || withdrawBankBin !== 'other'}
+                  />
+                  <small className="text-muted mt-1 d-block" style={{ fontStyle: 'italic', fontSize: '0.85em' }}>
+                    Vui lòng nhập mã BIN của ngân hàng để thực hiện rút tiền.
+                  </small>
+                </div>
+                <div className="form-group mb-3">
+                  <label htmlFor="withdrawAccountNumber">Số tài khoản</label>
+                  <input
+                    id="withdrawAccountNumber"
+                    type="text"
+                    className="form-control"
+                    value={withdrawAccountNumber}
+                    onChange={(e) => setWithdrawAccountNumber(e.target.value)}
+                    placeholder="Nhập số tài khoản"
+                    required
+                    disabled={isWithdrawing}
+                  />
+                </div>
+                <div className="form-group mb-3">
+                  <label htmlFor="withdrawAccountName">Tên chủ tài khoản</label>
+                  <input
+                    id="withdrawAccountName"
+                    type="text"
+                    className="form-control"
+                    value={withdrawAccountName}
+                    onChange={(e) => setWithdrawAccountName(e.target.value)}
+                    placeholder="Ví dụ: Nguyễn Văn A"
+                    required
+                    disabled={isWithdrawing}
+                  />
+                </div>
+                <Button
+                  type="submit"
+                  variant="primary"
+                  disabled={isWithdrawing}
+                  className="w-100"
+                >
+                  {isWithdrawing ? 'Đang xử lý...' : 'Xác nhận rút tiền'}
+                </Button>
+              </form>
+            </div>
+          </div>
+        )}
         </>
       )}
 
@@ -371,14 +636,14 @@ export const MyWalletPage: React.FC = () => {
               </svg>
             </div>
             <div className="topup-history-header-text">
-              <h3>Lịch sử yêu cầu nạp ví</h3>
-              <p className="text-secondary">Theo dõi các yêu cầu nạp tiền đang chờ, đã hết hạn hoặc đã hoàn tất</p>
+              <h3>Lịch sử giao dịch</h3>
+              <p className="text-secondary">Theo dõi các giao dịch Nạp tiền và Rút tiền gần đây</p>
             </div>
           </div>
           <button
             type="button"
             className="wallet-refresh-btn"
-            onClick={() => fetchTopUps(1, true)}
+            onClick={() => fetchTransactions(1, true)}
             disabled={isTopUpsLoading}
           >
             <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" style={{ marginRight: '6px' }} className={isTopUpsLoading ? 'spin' : ''}>
@@ -401,29 +666,36 @@ export const MyWalletPage: React.FC = () => {
               </tr>
             </thead>
             <tbody>
-              {topUps.length === 0 ? (
+              {getCombinedTransactions().length === 0 ? (
                 <tr>
-                  <td colSpan={6} className="text-center py-4">Chưa có yêu cầu nạp ví nào</td>
+                  <td colSpan={6} className="text-center py-4">Chưa có giao dịch nào</td>
                 </tr>
               ) : (
-                topUps.map(topUp => (
-                  <tr key={topUp.id}>
-                    <td>{formatDateTime(topUp.createdAt)}</td>
-                    <td>{topUp.providerOrderCode || topUp.id.substring(0, 8)}</td>
-                    <td>{formatCurrency(topUp.amount)}</td>
+                getCombinedTransactions().slice(0, 3).map(tx => (
+                  <tr key={`${tx._type}-${tx.id}`}>
+                    <td>{formatDateTime(tx.createdAt)}</td>
                     <td>
-                      <span className={`wallet-status-badge ${getTopUpStatusClass(topUp.status)}`}>
-                        {getTopUpStatusIcon(topUp.status)}
-                        {getTopUpStatusText(topUp.status)}
+                      <div>{tx.providerOrderCode || tx.id.substring(0, 8)}</div>
+                      <div style={{ fontSize: '11px', color: tx._type === 'TopUp' ? '#3b82f6' : '#f97316', fontWeight: 'bold' }}>
+                        {tx._type === 'TopUp' ? 'NẠP VÍ' : 'RÚT VÍ'}
+                      </div>
+                    </td>
+                    <td style={{ color: tx._type === 'TopUp' ? '#16a34a' : '#ea580c', fontWeight: 'bold' }}>
+                      {tx._type === 'TopUp' ? '+' : '-'}{formatCurrency(tx.amount)}
+                    </td>
+                    <td>
+                      <span className={`wallet-status-badge ${getTopUpStatusClass(tx.status as WalletTopUpStatus)}`}>
+                        {getTopUpStatusIcon(tx.status as WalletTopUpStatus)}
+                        {tx._type === 'TopUp' ? getTopUpStatusText(tx.status as WalletTopUpStatus) : tx.status}
                       </span>
                     </td>
-                    <td>{formatDateTime(topUp.expiresAt)}</td>
+                    <td>{tx._type === 'TopUp' ? formatDateTime((tx as WalletTopUpResponse).expiresAt) : '-'}</td>
                     <td>
-                      {topUp.status === 'Pending' && topUp.providerCheckoutUrl ? (
+                      {tx._type === 'TopUp' && tx.status === 'Pending' && (tx as WalletTopUpResponse).providerCheckoutUrl ? (
                         <button
                           type="button"
                           className="wallet-refresh-btn"
-                          onClick={() => continueTopUpPayment(topUp)}
+                          onClick={() => continueTopUpPayment((tx as WalletTopUpResponse).providerCheckoutUrl)}
                           style={{ padding: '6px 12px', fontSize: '12px' }}
                         >
                           Tiếp tục thanh toán
@@ -444,7 +716,7 @@ export const MyWalletPage: React.FC = () => {
             <Button
               variant="outline"
               type="button"
-              onClick={() => fetchTopUps(topUpPage + 1)}
+              onClick={() => fetchTransactions(topUpPage + 1)}
               disabled={isTopUpsLoading}
             >
               {isTopUpsLoading ? 'Đang tải...' : 'Xem thêm'}
@@ -452,6 +724,14 @@ export const MyWalletPage: React.FC = () => {
           </div>
         )}
       </div>
+
+      {toastMessage && (
+        <Toast
+          message={toastMessage}
+          type={toastType}
+          onClose={() => setToastMessage(null)}
+        />
+      )}
     </div>
   );
 };

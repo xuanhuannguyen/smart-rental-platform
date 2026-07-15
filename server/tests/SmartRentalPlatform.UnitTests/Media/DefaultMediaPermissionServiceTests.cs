@@ -27,7 +27,7 @@ public class DefaultMediaPermissionServiceTests : IClassFixture<TestDatabaseFixt
     [Fact]
     public async Task CanViewAsync_ForRawContractFile_ShouldAllowMainTenantAndDenyOccupant()
     {
-        var graph = await SeedContractFileGraphAsync(ContractFileVariant.Raw);
+        var graph = await SeedContractFileGraphAsync(ContractFilePurpose.SignedLegalDocument);
         var service = new DefaultMediaPermissionService(fixture.Context);
 
         var mainTenantAllowed = await service.CanViewAsync(graph.MainTenantId, graph.MediaAsset);
@@ -38,14 +38,16 @@ public class DefaultMediaPermissionServiceTests : IClassFixture<TestDatabaseFixt
     }
 
     [Fact]
-    public async Task CanViewAsync_ForMaskedContractFile_ShouldAllowOccupant()
+    public async Task CanViewAsync_ForMaskedContractFile_ShouldAllowMainTenantAndOccupant()
     {
-        var graph = await SeedContractFileGraphAsync(ContractFileVariant.Masked);
+        var graph = await SeedContractFileGraphAsync(ContractFilePurpose.MaskedReference);
         var service = new DefaultMediaPermissionService(fixture.Context);
 
+        var mainTenantAllowed = await service.CanViewAsync(graph.MainTenantId, graph.MediaAsset);
         var occupantAllowed = await service.CanViewAsync(graph.OccupantId, graph.MediaAsset);
         var outsiderAllowed = await service.CanViewAsync(Guid.NewGuid(), graph.MediaAsset);
 
+        Assert.True(mainTenantAllowed);
         Assert.True(occupantAllowed);
         Assert.False(outsiderAllowed);
     }
@@ -53,7 +55,7 @@ public class DefaultMediaPermissionServiceTests : IClassFixture<TestDatabaseFixt
     [Fact]
     public async Task CanViewAsync_ForRawAppendixFile_ShouldAllowPreviousMainTenantAndDenyOccupant()
     {
-        var graph = await SeedAppendixFileGraphAsync(ContractFileVariant.Raw);
+        var graph = await SeedAppendixFileGraphAsync(ContractFilePurpose.SignedLegalDocument);
         var service = new DefaultMediaPermissionService(fixture.Context);
 
         var previousMainTenantAllowed = await service.CanViewAsync(graph.PreviousMainTenantId, graph.MediaAsset);
@@ -66,7 +68,7 @@ public class DefaultMediaPermissionServiceTests : IClassFixture<TestDatabaseFixt
     [Fact]
     public async Task CanViewAsync_ForMaskedAppendixFile_ShouldAllowOccupantAndDenyOutsider()
     {
-        var graph = await SeedAppendixFileGraphAsync(ContractFileVariant.Masked);
+        var graph = await SeedAppendixFileGraphAsync(ContractFilePurpose.MaskedReference);
         var service = new DefaultMediaPermissionService(fixture.Context);
 
         var occupantAllowed = await service.CanViewAsync(graph.OccupantId, graph.MediaAsset);
@@ -232,7 +234,7 @@ public class DefaultMediaPermissionServiceTests : IClassFixture<TestDatabaseFixt
         Assert.True(occupantAllowed);
     }
 
-    private async Task<(Guid MainTenantId, Guid OccupantId, MediaAsset MediaAsset)> SeedContractFileGraphAsync(ContractFileVariant variant)
+    private async Task<(Guid MainTenantId, Guid OccupantId, MediaAsset MediaAsset)> SeedContractFileGraphAsync(ContractFilePurpose purpose)
     {
         var landlordId = Guid.NewGuid();
         var mainTenantId = Guid.NewGuid();
@@ -379,7 +381,7 @@ public class DefaultMediaPermissionServiceTests : IClassFixture<TestDatabaseFixt
                     RentalContractId = contractId,
                     MediaAssetId = mediaAssetId,
                     MediaAsset = mediaAsset,
-                    FileVariant = variant,
+                    Purpose = purpose,
                     CreatedAt = DateTimeOffset.UtcNow
                 }
             ]
@@ -396,7 +398,7 @@ public class DefaultMediaPermissionServiceTests : IClassFixture<TestDatabaseFixt
         return (mainTenantId, occupantId, mediaAsset);
     }
 
-    private async Task<(Guid PreviousMainTenantId, Guid CurrentMainTenantId, Guid OccupantId, MediaAsset MediaAsset)> SeedAppendixFileGraphAsync(ContractFileVariant variant)
+    private async Task<(Guid PreviousMainTenantId, Guid CurrentMainTenantId, Guid OccupantId, MediaAsset MediaAsset)> SeedAppendixFileGraphAsync(ContractFilePurpose purpose)
     {
         var landlordId = Guid.NewGuid();
         var previousMainTenantId = Guid.NewGuid();
@@ -574,7 +576,7 @@ public class DefaultMediaPermissionServiceTests : IClassFixture<TestDatabaseFixt
                     RentalContractAppendixId = appendixId,
                     MediaAssetId = mediaAssetId,
                     MediaAsset = mediaAsset,
-                    FileVariant = variant,
+                    Purpose = purpose,
                     CreatedAt = DateTimeOffset.UtcNow
                 }
             ]

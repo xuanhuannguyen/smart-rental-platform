@@ -11,6 +11,27 @@ namespace SmartRentalPlatform.Infrastructure.Persistence.Migrations
         /// <inheritdoc />
         protected override void Up(MigrationBuilder migrationBuilder)
         {
+            migrationBuilder.Sql("""
+                DELETE FROM property_images;
+                """);
+
+            migrationBuilder.Sql("""
+                DELETE FROM contract_occupant_documents;
+                """);
+
+            migrationBuilder.Sql("""
+                UPDATE users
+                SET avatar_url = NULL
+                WHERE avatar_url LIKE '/uploads/%'
+                   OR avatar_url LIKE 'uploads/%'
+                   OR avatar_url LIKE '/api/media/public/%'
+                   OR avatar_url LIKE 'api/media/public/%'
+                   OR avatar_url LIKE 'public/%'
+                   OR avatar_url LIKE 'demo/%'
+                   OR avatar_url LIKE 'kfc-scenario/%'
+                   OR avatar_url LIKE 'seed/%';
+                """);
+
             migrationBuilder.DropColumn(
                 name: "pdf_object_key",
                 table: "rooming_house_rules");
@@ -48,6 +69,18 @@ namespace SmartRentalPlatform.Infrastructure.Persistence.Migrations
                 table: "kyc_verifications");
 
             migrationBuilder.DropColumn(
+                name: "evidence_file_object_key",
+                table: "contract_signing_envelopes");
+
+            migrationBuilder.DropColumn(
+                name: "signed_file_object_key",
+                table: "contract_signing_envelopes");
+
+            migrationBuilder.DropColumn(
+                name: "unsigned_file_object_key",
+                table: "contract_signing_envelopes");
+
+            migrationBuilder.DropColumn(
                 name: "back_image_object_key",
                 table: "contract_occupant_documents");
 
@@ -60,12 +93,13 @@ namespace SmartRentalPlatform.Infrastructure.Persistence.Migrations
                 table: "contract_occupant_documents");
 
             migrationBuilder.DropColumn(
-                name: "file_url",
-                table: "contract_files");
-
-            migrationBuilder.DropColumn(
                 name: "storage_object_key",
                 table: "contract_files");
+
+            migrationBuilder.RenameColumn(
+                name: "FileUrl",
+                table: "contract_files",
+                newName: "file_url");
 
             migrationBuilder.AddColumn<Guid>(
                 name: "avatar_media_asset_id",
@@ -124,6 +158,24 @@ namespace SmartRentalPlatform.Infrastructure.Persistence.Migrations
             migrationBuilder.AddColumn<Guid>(
                 name: "selfie_media_asset_id",
                 table: "kyc_verifications",
+                type: "uuid",
+                nullable: true);
+
+            migrationBuilder.AddColumn<Guid>(
+                name: "evidence_file_media_asset_id",
+                table: "contract_signing_envelopes",
+                type: "uuid",
+                nullable: true);
+
+            migrationBuilder.AddColumn<Guid>(
+                name: "signed_file_media_asset_id",
+                table: "contract_signing_envelopes",
+                type: "uuid",
+                nullable: true);
+
+            migrationBuilder.AddColumn<Guid>(
+                name: "unsigned_file_media_asset_id",
+                table: "contract_signing_envelopes",
                 type: "uuid",
                 nullable: true);
 
@@ -254,6 +306,21 @@ namespace SmartRentalPlatform.Infrastructure.Persistence.Migrations
                 column: "selfie_media_asset_id");
 
             migrationBuilder.CreateIndex(
+                name: "IX_contract_signing_envelopes_evidence_file_media_asset_id",
+                table: "contract_signing_envelopes",
+                column: "evidence_file_media_asset_id");
+
+            migrationBuilder.CreateIndex(
+                name: "IX_contract_signing_envelopes_signed_file_media_asset_id",
+                table: "contract_signing_envelopes",
+                column: "signed_file_media_asset_id");
+
+            migrationBuilder.CreateIndex(
+                name: "IX_contract_signing_envelopes_unsigned_file_media_asset_id",
+                table: "contract_signing_envelopes",
+                column: "unsigned_file_media_asset_id");
+
+            migrationBuilder.CreateIndex(
                 name: "IX_contract_occupant_documents_back_media_asset_id",
                 table: "contract_occupant_documents",
                 column: "back_media_asset_id");
@@ -357,6 +424,30 @@ namespace SmartRentalPlatform.Infrastructure.Persistence.Migrations
                 onDelete: ReferentialAction.SetNull);
 
             migrationBuilder.AddForeignKey(
+                name: "FK_contract_signing_envelopes_media_assets_evidence_file_media~",
+                table: "contract_signing_envelopes",
+                column: "evidence_file_media_asset_id",
+                principalTable: "media_assets",
+                principalColumn: "id",
+                onDelete: ReferentialAction.Restrict);
+
+            migrationBuilder.AddForeignKey(
+                name: "FK_contract_signing_envelopes_media_assets_signed_file_media_a~",
+                table: "contract_signing_envelopes",
+                column: "signed_file_media_asset_id",
+                principalTable: "media_assets",
+                principalColumn: "id",
+                onDelete: ReferentialAction.Restrict);
+
+            migrationBuilder.AddForeignKey(
+                name: "FK_contract_signing_envelopes_media_assets_unsigned_file_media~",
+                table: "contract_signing_envelopes",
+                column: "unsigned_file_media_asset_id",
+                principalTable: "media_assets",
+                principalColumn: "id",
+                onDelete: ReferentialAction.Restrict);
+
+            migrationBuilder.AddForeignKey(
                 name: "FK_kyc_verifications_media_assets_back_media_asset_id",
                 table: "kyc_verifications",
                 column: "back_media_asset_id",
@@ -457,6 +548,18 @@ namespace SmartRentalPlatform.Infrastructure.Persistence.Migrations
                 table: "contract_occupant_documents");
 
             migrationBuilder.DropForeignKey(
+                name: "FK_contract_signing_envelopes_media_assets_evidence_file_media~",
+                table: "contract_signing_envelopes");
+
+            migrationBuilder.DropForeignKey(
+                name: "FK_contract_signing_envelopes_media_assets_signed_file_media_a~",
+                table: "contract_signing_envelopes");
+
+            migrationBuilder.DropForeignKey(
+                name: "FK_contract_signing_envelopes_media_assets_unsigned_file_media~",
+                table: "contract_signing_envelopes");
+
+            migrationBuilder.DropForeignKey(
                 name: "FK_kyc_verifications_media_assets_back_media_asset_id",
                 table: "kyc_verifications");
 
@@ -543,6 +646,18 @@ namespace SmartRentalPlatform.Infrastructure.Persistence.Migrations
                 table: "kyc_verifications");
 
             migrationBuilder.DropIndex(
+                name: "IX_contract_signing_envelopes_evidence_file_media_asset_id",
+                table: "contract_signing_envelopes");
+
+            migrationBuilder.DropIndex(
+                name: "IX_contract_signing_envelopes_signed_file_media_asset_id",
+                table: "contract_signing_envelopes");
+
+            migrationBuilder.DropIndex(
+                name: "IX_contract_signing_envelopes_unsigned_file_media_asset_id",
+                table: "contract_signing_envelopes");
+
+            migrationBuilder.DropIndex(
                 name: "IX_contract_occupant_documents_back_media_asset_id",
                 table: "contract_occupant_documents");
 
@@ -599,6 +714,18 @@ namespace SmartRentalPlatform.Infrastructure.Persistence.Migrations
                 table: "kyc_verifications");
 
             migrationBuilder.DropColumn(
+                name: "evidence_file_media_asset_id",
+                table: "contract_signing_envelopes");
+
+            migrationBuilder.DropColumn(
+                name: "signed_file_media_asset_id",
+                table: "contract_signing_envelopes");
+
+            migrationBuilder.DropColumn(
+                name: "unsigned_file_media_asset_id",
+                table: "contract_signing_envelopes");
+
+            migrationBuilder.DropColumn(
                 name: "back_media_asset_id",
                 table: "contract_occupant_documents");
 
@@ -613,6 +740,11 @@ namespace SmartRentalPlatform.Infrastructure.Persistence.Migrations
             migrationBuilder.DropColumn(
                 name: "media_asset_id",
                 table: "contract_files");
+
+            migrationBuilder.RenameColumn(
+                name: "file_url",
+                table: "contract_files",
+                newName: "FileUrl");
 
             migrationBuilder.AddColumn<string>(
                 name: "pdf_object_key",
@@ -676,6 +808,24 @@ namespace SmartRentalPlatform.Infrastructure.Persistence.Migrations
                 defaultValue: "");
 
             migrationBuilder.AddColumn<string>(
+                name: "evidence_file_object_key",
+                table: "contract_signing_envelopes",
+                type: "text",
+                nullable: true);
+
+            migrationBuilder.AddColumn<string>(
+                name: "signed_file_object_key",
+                table: "contract_signing_envelopes",
+                type: "text",
+                nullable: true);
+
+            migrationBuilder.AddColumn<string>(
+                name: "unsigned_file_object_key",
+                table: "contract_signing_envelopes",
+                type: "text",
+                nullable: true);
+
+            migrationBuilder.AddColumn<string>(
                 name: "back_image_object_key",
                 table: "contract_occupant_documents",
                 type: "text",
@@ -693,12 +843,6 @@ namespace SmartRentalPlatform.Infrastructure.Persistence.Migrations
                 type: "text",
                 nullable: false,
                 defaultValue: "");
-
-            migrationBuilder.AddColumn<string>(
-                name: "file_url",
-                table: "contract_files",
-                type: "text",
-                nullable: true);
 
             migrationBuilder.AddColumn<string>(
                 name: "storage_object_key",

@@ -5,6 +5,7 @@ import { contractApi } from '../../contracts/api';
 import type { ContractDetailResponse, ContractHistoryItemResponse } from '../../contracts/types';
 import { billingApi } from '../../billing/api';
 import type { FixedServicePreview, LatestMeterReading, MeterReadingInput, RoomInvoicePreview } from '../../billing/types';
+import { Toast } from '../../../shared/components/ui/Toast';
 import './HistoryModals.css';
 
 interface Props {
@@ -36,6 +37,7 @@ export const TerminateContractModal: React.FC<Props> = ({
   const [loadingFinalInvoicePreview, setLoadingFinalInvoicePreview] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [toast, setToast] = useState<{ message: string; type: 'success' | 'error' | 'info' } | null>(null);
   const [previewError, setPreviewError] = useState<string | null>(null);
   const today = useMemo(() => getTodayDateOnly(), []);
   const isNormalExpiration = terminationActor === 'Landlord' && landlordTerminationType === 'NormalExpiration';
@@ -139,6 +141,7 @@ export const TerminateContractModal: React.FC<Props> = ({
     try {
       setIsSubmitting(true);
       setError(null);
+      setToast(null);
       const terminationType = terminationActor === 'Landlord'
         ? landlordTerminationType
         : 'TenantUnilateral';
@@ -192,7 +195,7 @@ export const TerminateContractModal: React.FC<Props> = ({
       onTerminated?.(response.data);
       onClose();
     } catch (err) {
-      setError(getApiErrorMessage(err, 'Không thể gửi yêu cầu chấm dứt hợp đồng. Vui lòng thử lại sau.'));
+      setToast({ message: getApiErrorMessage(err, 'Không thể gửi yêu cầu chấm dứt hợp đồng. Vui lòng thử lại sau.'), type: 'error' });
     } finally {
       setIsSubmitting(false);
     }
@@ -328,6 +331,7 @@ export const TerminateContractModal: React.FC<Props> = ({
           </div>
         </form>
       </div>
+      {toast && <Toast message={toast.message} type={toast.type} onClose={() => setToast(null)} />}
     </div>
   );
 };

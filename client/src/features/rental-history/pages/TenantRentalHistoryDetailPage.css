@@ -89,6 +89,19 @@
   min-height: 200px;
 }
 
+.history-detail-secondary-section {
+  margin-top: 20px;
+}
+
+.history-detail-section-heading {
+  margin-bottom: 16px;
+}
+
+.history-detail-section-heading h2,
+.history-detail-section-heading p {
+  margin-top: 0;
+}
+
 /* Occupants Tab */
 .occupants-filter {
   display: flex;
@@ -324,23 +337,10 @@
   color: #ffffff;
 }
 
-.invoice-inline-message {
-  border-radius: 12px;
-  padding: 12px 16px;
-  font-weight: 600;
-  font-size: 13.5px;
-}
-
 .invoice-inline-message.success {
   background: #ecfdf5;
   color: #047857;
   border: 1px solid #a7f3d0;
-}
-
-.invoice-inline-message.error {
-  background: #fef2f2;
-  color: #b91c1c;
-  border: 1px solid #fecaca;
 }
 
 .contract-invoice-list {
@@ -505,4 +505,11 @@
     padding-top: 10px;
     width: 100%;
   }
+}
+
+/* Adjust header to stick with attached-top tabs */
+.contract-header-wrapper .invoice-overview-band {
+  margin-bottom: 0 !important;
+  border-bottom-left-radius: 0 !important;
+  border-bottom-right-radius: 0 !important;
 }

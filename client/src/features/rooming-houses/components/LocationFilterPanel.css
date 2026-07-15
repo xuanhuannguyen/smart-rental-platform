@@ -358,12 +358,6 @@
 
 .location-panel-summary,
 .location-panel-error,
-.nearby-error-text {
-  margin: 0;
-  font-size: 12px;
-  font-weight: 600;
-  line-height: 1.45;
-}
 
 .location-panel-summary {
   color: #246bfe;
@@ -374,9 +368,6 @@
 }
 
 .location-panel-error,
-.nearby-error-text {
-  color: #b91c1c;
-}
 
 .location-panel-actions {
   display: grid;

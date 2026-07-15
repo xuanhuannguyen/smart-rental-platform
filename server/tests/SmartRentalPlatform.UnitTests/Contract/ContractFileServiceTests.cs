@@ -40,6 +40,7 @@ public class ContractFileServiceTests : IClassFixture<TestDatabaseFixture>
             mediaStorage,
             new MediaAssetService(fixture.Context),
             new FakeMediaAccessService(),
+            new FakeContractDocumentModelFactory(),
             new FakeSensitiveDataProtector());
 
         var response = await service.GenerateSignedContractFileAsync(graph.LandlordId, graph.ContractId);
@@ -50,13 +51,13 @@ public class ContractFileServiceTests : IClassFixture<TestDatabaseFixture>
 
         var contractFiles = fixture.Context.ContractFiles
             .Where(x => x.RentalContractId == graph.ContractId && x.RentalContractAppendixId == null)
-            .OrderBy(x => x.FileVariant)
+            .OrderBy(x => x.Purpose)
             .ToList();
 
         Assert.Equal(2, contractFiles.Count);
         Assert.All(contractFiles, x => Assert.NotNull(x.MediaAssetId));
-        Assert.Contains(contractFiles, x => x.FileVariant == ContractFileVariant.Raw);
-        Assert.Contains(contractFiles, x => x.FileVariant == ContractFileVariant.Masked);
+        Assert.Contains(contractFiles, x => x.Purpose == ContractFilePurpose.SignedLegalDocument);
+        Assert.Contains(contractFiles, x => x.Purpose == ContractFilePurpose.MaskedReference);
         Assert.Equal(2, fixture.Context.MediaAssets.Count());
         Assert.Equal(2, mediaStorage.UploadRequests.Count);
     }
@@ -71,7 +72,7 @@ public class ContractFileServiceTests : IClassFixture<TestDatabaseFixture>
             Id = Guid.NewGuid(),
             RentalContractId = graph.ContractId,
             MediaAssetId = mediaAssetId,
-            FileVariant = ContractFileVariant.Raw,
+            Purpose = ContractFilePurpose.SignedLegalDocument,
             CreatedAt = DateTimeOffset.UtcNow
         });
         await fixture.Context.SaveChangesAsync();
@@ -84,6 +85,7 @@ public class ContractFileServiceTests : IClassFixture<TestDatabaseFixture>
             new RecordingMediaStorageService(),
             new MediaAssetService(fixture.Context),
             mediaAccess,
+            new FakeContractDocumentModelFactory(),
             new FakeSensitiveDataProtector());
 
         var result = await service.OpenFileAsync(
@@ -105,7 +107,7 @@ public class ContractFileServiceTests : IClassFixture<TestDatabaseFixture>
             Id = fileId,
             RentalContractId = graph.ContractId,
             MediaAssetId = null,
-            FileVariant = ContractFileVariant.Raw,
+            Purpose = ContractFilePurpose.SignedLegalDocument,
             CreatedAt = DateTimeOffset.UtcNow
         });
         await fixture.Context.SaveChangesAsync();
@@ -117,6 +119,7 @@ public class ContractFileServiceTests : IClassFixture<TestDatabaseFixture>
             new RecordingMediaStorageService(),
             new MediaAssetService(fixture.Context),
             new FakeMediaAccessService(),
+            new FakeContractDocumentModelFactory(),
             new FakeSensitiveDataProtector());
 
         await Assert.ThrowsAsync<InvalidOperationException>(() =>
@@ -131,6 +134,8 @@ public class ContractFileServiceTests : IClassFixture<TestDatabaseFixture>
         var roomingHouseId = Guid.NewGuid();
         var roomId = Guid.NewGuid();
         var contractId = Guid.NewGuid();
+        var rentalRequestId = Guid.NewGuid();
+        var roomDepositId = Guid.NewGuid();
 
         var landlord = new User
         {
@@ -187,11 +192,24 @@ public class ContractFileServiceTests : IClassFixture<TestDatabaseFixture>
             UpdatedAt = DateTimeOffset.UtcNow
         };
 
+        var rentalRequest = TestDataBuilder.BuildRentalRequest(
+            mainTenantId,
+            roomId,
+            rentalRequestId);
+        var roomDeposit = TestDataBuilder.BuildRoomDeposit(
+            rentalRequestId,
+            roomId,
+            mainTenantId,
+            landlordId,
+            roomDepositId);
+
         var contract = new RentalContract
         {
             Id = contractId,
-            RentalRequestId = Guid.NewGuid(),
-            RoomDepositId = Guid.NewGuid(),
+            RentalRequestId = rentalRequestId,
+            RentalRequest = rentalRequest,
+            RoomDepositId = roomDepositId,
+            RoomDeposit = roomDeposit,
             RoomId = roomId,
             MainTenantUserId = mainTenantId,
             MainTenantUser = mainTenant,
@@ -230,6 +248,7 @@ public class ContractFileServiceTests : IClassFixture<TestDatabaseFixture>
                     SignerUserId = landlordId,
                     SignerRole = ContractSignerRole.Landlord,
                     SignatureMethod = ContractSignatureMethod.EmailOtp,
+                    Status = ContractSignatureStatus.Signed,
                     SignedAt = DateTimeOffset.UtcNow,
                     CreatedAt = DateTimeOffset.UtcNow
                 },
@@ -240,6 +259,7 @@ public class ContractFileServiceTests : IClassFixture<TestDatabaseFixture>
                     SignerUserId = mainTenantId,
                     SignerRole = ContractSignerRole.Tenant,
                     SignatureMethod = ContractSignatureMethod.EmailOtp,
+                    Status = ContractSignatureStatus.Signed,
                     SignedAt = DateTimeOffset.UtcNow,
                     CreatedAt = DateTimeOffset.UtcNow
                 }
@@ -249,6 +269,8 @@ public class ContractFileServiceTests : IClassFixture<TestDatabaseFixture>
         fixture.Context.Users.AddRange(landlord, mainTenant, occupant);
         fixture.Context.RoomingHouses.Add(roomingHouse);
         fixture.Context.Rooms.Add(room);
+        fixture.Context.RentalRequests.Add(rentalRequest);
+        fixture.Context.RoomDeposits.Add(roomDeposit);
         fixture.Context.RentalContracts.Add(contract);
         await fixture.Context.SaveChangesAsync();
         fixture.Context.ChangeTracker.Clear();
@@ -258,14 +280,34 @@ public class ContractFileServiceTests : IClassFixture<TestDatabaseFixture>
 
     private sealed class FakeContractPdfRenderer : IContractPdfRenderer
     {
-        public byte[] RenderSignedRentalContract(RentalContract contract, ContractRenderOptions options)
+        public byte[] RenderRentalContractPreview(ContractDocumentModel document, ContractRenderOptions options)
         {
-            return Encoding.UTF8.GetBytes($"pdf-{contract.Id}-{options.ViewerMode}");
+            return Encoding.UTF8.GetBytes($"preview-{document.ContractNumber}-{options.ViewerMode}");
+        }
+
+        public byte[] RenderContractAppendixPreview(ContractAppendix appendix, ContractRenderOptions options)
+        {
+            return Encoding.UTF8.GetBytes($"appendix-preview-{appendix.Id}-{options.ViewerMode}");
+        }
+
+        public byte[] RenderSignedRentalContract(ContractDocumentModel document, ContractRenderOptions options)
+        {
+            return Encoding.UTF8.GetBytes($"pdf-{document.ContractNumber}-{options.ViewerMode}");
         }
 
         public byte[] RenderSignedContractAppendix(ContractAppendix appendix, ContractRenderOptions options)
         {
             return Encoding.UTF8.GetBytes("appendix");
+        }
+
+        public PdfRenderResult RenderRentalContractForESign(ContractDocumentModel document, ContractRenderOptions options)
+        {
+            return new PdfRenderResult { PdfBytes = RenderSignedRentalContract(document, options) };
+        }
+
+        public PdfRenderResult RenderContractAppendixForESign(ContractAppendix appendix, ContractRenderOptions options)
+        {
+            return new PdfRenderResult { PdfBytes = RenderSignedContractAppendix(appendix, options) };
         }
     }
 
@@ -391,6 +433,21 @@ public class ContractFileServiceTests : IClassFixture<TestDatabaseFixture>
             MediaAuditContext? auditContext = null)
         {
             return Task.FromResult($"/download/{mediaAssetId}");
+        }
+    }
+
+    private sealed class FakeContractDocumentModelFactory : IContractDocumentModelFactory
+    {
+        public Task<ContractDocumentModel> BuildAsync(
+            RentalContract contract,
+            ContractDocumentBuildMode mode,
+            ContractSigningEnvelope? targetEnvelope = null,
+            CancellationToken cancellationToken = default)
+        {
+            return Task.FromResult(new ContractDocumentModel
+            {
+                ContractNumber = contract.ContractNumber
+            });
         }
     }
 

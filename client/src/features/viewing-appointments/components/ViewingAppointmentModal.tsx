@@ -1,6 +1,8 @@
+import { Alert } from '../../../shared/components/ui/Alert';
 import { useState } from 'react';
 import { createViewingAppointment } from '../api';
 import { getApiErrorMessage } from '../../../shared/api/apiError';
+import { Toast } from '../../../shared/components/ui/Toast';
 import './ViewingAppointmentModal.css';
 
 interface ViewingAppointmentModalProps {
@@ -24,6 +26,7 @@ export default function ViewingAppointmentModal({
   const [tenantNote, setTenantNote] = useState('');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
+  const [toast, setToast] = useState<{ message: string; type: 'success' | 'error' | 'info' } | null>(null);
 
   // Get current date formatted for date input min attribute
   const getMinDate = () => {
@@ -65,7 +68,7 @@ export default function ViewingAppointmentModal({
       onSuccess('Đặt lịch xem phòng thành công! Vui lòng chờ chủ trọ xác nhận.');
       onClose();
     } catch (err) {
-      setError(getApiErrorMessage(err, 'Không thể đặt lịch xem phòng. Vui lòng thử lại.'));
+      setToast({ message: getApiErrorMessage(err, 'Không thể đặt lịch xem phòng. Vui lòng thử lại.'), type: 'error' });
     } finally {
       setLoading(false);
     }
@@ -98,7 +101,7 @@ export default function ViewingAppointmentModal({
             </div>
           </div>
 
-          {error && <div className="viewing-modal-error">{error}</div>}
+          {error && <Alert type="error">{error}</Alert>}
 
           <div className="viewing-modal-field">
             <label>Thời gian xem phòng <span className="required">*</span></label>
@@ -212,6 +215,8 @@ export default function ViewingAppointmentModal({
           </footer>
         </form>
       </div>
+
+      {toast && <Toast message={toast.message} type={toast.type} onClose={() => setToast(null)} />}
     </div>
   );
 }

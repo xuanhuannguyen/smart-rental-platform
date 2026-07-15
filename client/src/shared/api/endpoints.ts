@@ -26,7 +26,8 @@ export const ENDPOINTS = {
     TRANSACTIONS: '/api/me/wallet/transactions',
     TOP_UPS: '/api/me/wallet/topups',
     TOP_UP_BY_ID: (id: string) => `/api/me/wallet/topups/${id}`,
-    CREATE_PAYOS_TOPUP: '/api/me/wallet/topups/payos'
+    CREATE_PAYOS_TOPUP: '/api/me/wallet/topups/payos',
+    WITHDRAWALS: '/api/me/wallet/withdrawals'
   },
   KYC: {
     SUBMISSIONS: '/api/kyc/submissions',
@@ -59,6 +60,9 @@ export const ENDPOINTS = {
     RENTAL_POLICY: (id: string) => `/api/rooming-houses/${id}/rental-policy`,
     SUBMIT: (id: string) => `/api/rooming-houses/${id}/submit`
   },
+  LANDLORD_DASHBOARD: {
+    ROOT: '/api/landlord/dashboard'
+  },
   BILLING: {
     SERVICE_TYPES: '/api/billing/service-types',
     SERVICE_PRICES: (roomingHouseId: string) => `/api/rooming-houses/${roomingHouseId}/service-prices`,
@@ -68,6 +72,8 @@ export const ENDPOINTS = {
     CREATE_TERMINATION_INVOICE: (contractId: string) => `/api/landlord/contracts/${contractId}/termination-invoices`,
     LANDLORD_INVOICES: '/api/landlord/invoices',
     GENERATE_WITH_READINGS: '/api/landlord/invoices/generate-with-readings',
+    GENERATE_BULK: '/api/landlord/invoices/generate-bulk',
+    METER_READING_AI: '/api/landlord/meter-readings/ai',
     LANDLORD_INVOICE: (id: string) => `/api/landlord/invoices/${id}`,
     ISSUE_INVOICE: (id: string) => `/api/landlord/invoices/${id}/issue`,
     CANCEL_INVOICE: (id: string) => `/api/landlord/invoices/${id}/cancel`,
@@ -121,7 +127,14 @@ export const ENDPOINTS = {
     APPENDIX_SIGN_OTP: (id: string, appendixId: string) => `/api/contracts/${id}/appendices/${appendixId}/sign/otp`,
     APPENDIX_SIGN: (id: string, appendixId: string) => `/api/contracts/${id}/appendices/${appendixId}/sign`,
     APPENDIX_REJECT: (id: string, appendixId: string) => `/api/contracts/${id}/appendices/${appendixId}/reject`,
-    APPENDIX_REVISION_REQUEST: (id: string, appendixId: string) => `/api/contracts/${id}/appendices/${appendixId}/revision-request`
+    APPENDIX_REVISION_REQUEST: (id: string, appendixId: string) => `/api/contracts/${id}/appendices/${appendixId}/revision-request`,
+    ESIGN_ENVELOPE: (id: string) => `/api/contracts/${id}/esign-envelope`,
+    ESIGN_REQUEST_OTP: (id: string) => `/api/contracts/${id}/esign-envelope/request-otp`,
+    ESIGN_SUBMIT_OTP: (id: string) => `/api/contracts/${id}/esign-envelope/submit-otp`,
+    ESIGN_ENVELOPE_STATUS: (id: string, envelopeId: string) => `/api/contracts/${id}/esign-envelopes/${envelopeId}/status`,
+    APPENDIX_ESIGN_ENVELOPE: (id: string, appendixId: string) => `/api/contracts/${id}/appendices/${appendixId}/esign-envelope`,
+    APPENDIX_ESIGN_REQUEST_OTP: (id: string, appendixId: string) => `/api/contracts/${id}/appendices/${appendixId}/esign-envelope/request-otp`,
+    APPENDIX_ESIGN_SUBMIT_OTP: (id: string, appendixId: string) => `/api/contracts/${id}/appendices/${appendixId}/esign-envelope/submit-otp`
   },
   ADMIN: {
     KYC_PENDING: '/api/admin/kyc/pending',
@@ -135,7 +148,11 @@ export const ENDPOINTS = {
     ROOMING_HOUSE_APPROVE: (id: string) => `/api/admin/rooming-houses/${id}/approve`,
     ROOMING_HOUSE_REJECT: (id: string) => `/api/admin/rooming-houses/${id}/reject`,
     USERS: '/api/admin/users',
-    USER_DETAIL: (id: string) => `/api/admin/users/${id}`
+    USER_DETAIL: (id: string) => `/api/admin/users/${id}`,
+    REVIEW_REPORTS: '/api/admin/review-reports',
+    REVIEW_REPORT_DETAIL: (id: string) => `/api/admin/review-reports/${id}`,
+    REVIEW_REPORT_PROCESS: (id: string) => `/api/admin/review-reports/${id}/resolve`,
+    REVIEW_DELETE: (id: string) => `/api/admin/reviews/${id}`
   },
   VIEWING_APPOINTMENTS: {
     CREATE: '/api/viewing-appointments',
@@ -156,5 +173,26 @@ export const ENDPOINTS = {
     MARK_READ: (id: string) => `/api/notifications/${id}/read`,
     MARK_ALL_READ: '/api/notifications/read-all',
     DELETE: (id: string) => `/api/notifications/${id}`,
+  },
+  CHAT: {
+    CONVERSATIONS: '/api/chat/conversations',
+    CONVERSATIONS_RECENT: '/api/chat/conversations/recent',
+    CONVERSATION_COUNTS: '/api/chat/conversation-counts',
+    DIRECT: '/api/chat/conversations/direct',
+    GROUPS: '/api/chat/conversations/groups',
+    CONVERSATION: (id: string) => `/api/chat/conversations/${id}`,
+    LEAVE: (id: string) => `/api/chat/conversations/${id}/leave`,
+    CLOSE: (id: string) => `/api/chat/conversations/${id}/close`,
+    PARTICIPANTS: (id: string) => `/api/chat/conversations/${id}/participants`,
+    PARTICIPANT: (id: string, userId: string) => `/api/chat/conversations/${id}/participants/${userId}`,
+    MESSAGES: (id: string) => `/api/chat/conversations/${id}/messages`,
+    READ: (id: string) => `/api/chat/conversations/${id}/read`,
+    IMAGES: '/api/chat/images',
+    FILES: '/api/chat/files',
+    DELETE_MESSAGE: (conversationId: string, messageId: string) => `/api/chat/conversations/${conversationId}/messages/${messageId}`,
+    QUICK_CONTACTS: '/api/chat/landlord/quick-contacts',
+    SEARCH_USERS: '/api/chat/users/search',
+    UNREAD_COUNT: '/api/chat/unread-count',
+    FILTER_ROOMING_HOUSES: '/api/chat/filters/rooming-houses'
   }
 } as const;

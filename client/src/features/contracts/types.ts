@@ -42,26 +42,19 @@ export interface UpdateContractTermsRequest {
   paymentDay: number;
 }
 
-export interface SignContractRequest {
-  otp: string;
-  signatureText?: string | null;
-}
-
-export interface RequestContractSignatureOtpResponse {
-  contractId: string;
-  signerRole: string;
-  expiresAt: string;
-  maskedEmail: string;
-}
-
-export type ContractFileVariant = 'Raw' | 'Masked';
+export type ContractFilePurpose =
+  | 'Preview'
+  | 'UnsignedForESign'
+  | 'SignedLegalDocument'
+  | 'ProviderEvidence'
+  | 'MaskedReference';
 
 export interface ContractFileResponse {
   id: string;
   rentalContractId: string;
   rentalContractAppendixId?: string | null;
   mediaAssetId?: string | null;
-  fileVariant: ContractFileVariant;
+  purpose: ContractFilePurpose;
   viewUrl?: string | null;
   createdAt: string;
 }
@@ -148,6 +141,7 @@ export interface ContractDetailResponse {
   monthlyRent: number;
   depositAmount: number;
   paymentDay: number;
+  maxOccupants: number;
   status: string;
   roomSnapshot?: string | null;
   signatureDeadlineAt?: string | null;
@@ -264,4 +258,63 @@ export interface ContractAppendixResponse {
   files: ContractFileResponse[];
   createdAt: string;
   updatedAt: string;
+}
+
+export interface ESignParticipantResponse {
+  userId: string;
+  signerRole: string;
+  fullName: string;
+  email: string;
+  phoneNumber: string;
+  signingOrder: number;
+  signingUrl?: string | null;
+  hasSigned: boolean;
+  signedAt?: string | null;
+  providerParticipantId?: string | null;
+}
+
+export interface ESignEnvelopeResponse {
+  envelopeId: string;
+  providerEnvelopeId: string;
+  rentalContractId: string;
+  rentalContractAppendixId?: string | null;
+  title: string;
+  status: string;
+  unsignedFileObjectKey: string;
+  signedFileObjectKey?: string | null;
+  sentAt?: string | null;
+  completedAt?: string | null;
+  expiresAt?: string | null;
+  participants: ESignParticipantResponse[];
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface StartESignEnvelopeRequest {
+  agreedToTerms: boolean;
+  returnUrl?: string | null;
+}
+
+export type ESignOtpMethod = 2 | 3;
+
+export interface RequestESignOtpResponse {
+  method: ESignOtpMethod;
+  methodName: string;
+  maskedDestination: string;
+  expiresAt?: string | null;
+}
+
+export interface SubmitESignOtpRequest {
+  otpCode: string;
+  signatureImageBase64: string;
+}
+
+export interface StartESignEnvelopeResponse {
+  envelopeId: string;
+  contractId: string;
+  appendixId?: string;
+  provider: string;
+  status: string;
+  requiresOtp: boolean;
+  participants: ESignParticipantResponse[];
 }

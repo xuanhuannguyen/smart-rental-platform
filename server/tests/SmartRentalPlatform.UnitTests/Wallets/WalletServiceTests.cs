@@ -294,6 +294,8 @@ public class WalletServiceTests : IDisposable
 
         public Task<PaymentTransaction?> LockPaymentTransactionByProviderOrderCodeAsync(string providerOrderCode, CancellationToken cancellationToken = default) => Task.FromResult<PaymentTransaction?>(null);
         public Task<PaymentTransaction?> LockPaymentTransactionByIdempotencyKeyAsync(string idempotencyKey, CancellationToken cancellationToken = default) => Task.FromResult<PaymentTransaction?>(null);
+        public Task<WithdrawalRequest?> LockWithdrawalRequestByProviderOrderCodeAsync(string providerOrderCode, CancellationToken cancellationToken = default) => Task.FromResult<WithdrawalRequest?>(null);
+        public Task<WithdrawalRequest?> LockWithdrawalRequestByIdempotencyKeyAsync(string idempotencyKey, CancellationToken cancellationToken = default) => Task.FromResult<WithdrawalRequest?>(null);
         public Task<BillingInvoice?> LockInvoiceAsync(Guid invoiceId, CancellationToken cancellationToken = default) => Task.FromResult<BillingInvoice?>(null);
         public Task<RoomDeposit?> LockRoomDepositAsync(Guid roomDepositId, CancellationToken cancellationToken = default) => Task.FromResult<RoomDeposit?>(null);
         public Task<RentalContract?> LockRentalContractAsync(Guid contractId, CancellationToken cancellationToken = default) => Task.FromResult<RentalContract?>(null);
