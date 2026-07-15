@@ -57,8 +57,13 @@ public class RoomingHouseQueryService : IRoomingHouseQueryService
         Guid landlordUserId,
         CancellationToken cancellationToken = default)
     {
-        var houses = await BuildRoomingHouseQuery()
+        var houses = await context.RoomingHouses
+            .AsNoTracking()
             .Where(x => x.LandlordUserId == landlordUserId && x.DeletedAt == null)
+            .Select(x => new RoomingHouseOnboardingSnapshot(
+                x.Id,
+                x.ApprovalStatus,
+                x.UpdatedAt))
             .ToListAsync(cancellationToken);
 
         var house = houses
@@ -79,16 +84,20 @@ public class RoomingHouseQueryService : IRoomingHouseQueryService
             };
         }
 
+        var needsDetail = house.ApprovalStatus is not RoomingHouseApprovalStatus.Approved;
+
         return new RoomingHouseOnboardingResponse
         {
             Status = house.ApprovalStatus.ToString(),
             HasRoomingHouse = true,
-            CanCreateDraft = CanCreateDraft(houses),
-            CanEdit = CanEditRejectedOrDraft(house),
-            CanSubmit = CanSubmit(house),
+            CanCreateDraft = CanCreateDraft(houses.Select(x => x.ApprovalStatus)),
+            CanEdit = CanEditRejectedOrDraft(house.ApprovalStatus),
+            CanSubmit = CanSubmit(house.ApprovalStatus),
             CanEnterLandlordDashboard = houses.Any(x => x.ApprovalStatus == RoomingHouseApprovalStatus.Approved),
             RoomingHouseId = house.Id,
-            RoomingHouse = RoomingHouseReadModelMapper.ToDetailResponse(house)
+            RoomingHouse = needsDetail
+                ? await GetByIdAsync(house.Id, cancellationToken)
+                : null
         };
     }
 
@@ -723,12 +732,36 @@ public class RoomingHouseQueryService : IRoomingHouseQueryService
         Guid landlordUserId,
         CancellationToken cancellationToken = default)
     {
-        var houses = await BuildRoomingHouseQuery()
+        return await context.RoomingHouses
+            .AsNoTracking()
             .Where(x => x.LandlordUserId == landlordUserId && x.DeletedAt == null)
             .OrderByDescending(x => x.CreatedAt)
+            .Select(x => new RoomingHouseResponse
+            {
+                Id = x.Id,
+                LandlordUserId = x.LandlordUserId,
+                Name = x.Name,
+                AddressDisplay = x.Ward != null && x.Province != null
+                    ? x.AddressLine + ", " + x.Ward.Name + ", " + x.Province.Name
+                    : x.AddressDisplay,
+                ApprovalStatus = x.ApprovalStatus.ToString(),
+                VisibilityStatus = x.VisibilityStatus.ToString(),
+                RejectedReason = x.RejectedReason,
+                CreatedAt = x.CreatedAt,
+                UpdatedAt = x.UpdatedAt,
+                CoverImageUrl = x.Images
+                    .OrderByDescending(image => image.IsCover)
+                    .ThenBy(image => image.SortOrder)
+                    .Select(image => image.ImageUrl)
+                    .FirstOrDefault(),
+                TotalRooms = x.Rooms.Count(room => room.DeletedAt == null),
+                AvailableRooms = x.Rooms.Count(room =>
+                    room.Status == RoomStatus.Available &&
+                    room.DeletedAt == null),
+                AverageRating = x.AverageRating,
+                TotalReviews = x.TotalReviews
+            })
             .ToListAsync(cancellationToken);
-
-        return houses.Select(RoomingHouseReadModelMapper.ToResponse).ToList();
     }
 
     public async Task<RoomingHouseDetailResponse?> GetByIdAsync(
@@ -1401,23 +1434,28 @@ public class RoomingHouseQueryService : IRoomingHouseQueryService
         };
     }
 
-    private static bool CanEditRejectedOrDraft(RoomingHouse house)
+    private static bool CanEditRejectedOrDraft(RoomingHouseApprovalStatus status)
     {
-        return house.ApprovalStatus is RoomingHouseApprovalStatus.Draft or RoomingHouseApprovalStatus.Rejected;
+        return status is RoomingHouseApprovalStatus.Draft or RoomingHouseApprovalStatus.Rejected;
     }
 
-    private static bool CanSubmit(RoomingHouse house)
+    private static bool CanSubmit(RoomingHouseApprovalStatus status)
     {
-        return house.ApprovalStatus is RoomingHouseApprovalStatus.Draft or RoomingHouseApprovalStatus.Rejected;
+        return status is RoomingHouseApprovalStatus.Draft or RoomingHouseApprovalStatus.Rejected;
     }
 
-    private static bool CanCreateDraft(IEnumerable<RoomingHouse> houses)
+    private static bool CanCreateDraft(IEnumerable<RoomingHouseApprovalStatus> statuses)
     {
-        return !houses.Any(x =>
-            x.ApprovalStatus is RoomingHouseApprovalStatus.Draft
+        return !statuses.Any(status =>
+            status is RoomingHouseApprovalStatus.Draft
                 or RoomingHouseApprovalStatus.Pending
                 or RoomingHouseApprovalStatus.Rejected);
     }
+
+    private sealed record RoomingHouseOnboardingSnapshot(
+        Guid Id,
+        RoomingHouseApprovalStatus ApprovalStatus,
+        DateTimeOffset UpdatedAt);
 
     private sealed record SearchLocationMatch(string Code, string? ProvinceCode, string Alias);
 

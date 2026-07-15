@@ -8,6 +8,8 @@ import { getApiErrorMessage } from '../../../shared/api/apiError';
 import { Toast } from '../../../shared/components/ui/Toast';
 import { toAssetUrl } from '../../../shared/api/assets';
 import { Button } from '../../../shared/components/ui/Button';
+import { Tabs } from '../../../shared/components/ui/Tabs';
+import { Card, CardMetaRow, type CardStatusTone } from '../../../shared/components/ui/Card';
 import { billingApi } from '../api';
 import type { Invoice, InvoiceItem } from '../types';
 import { WalletPaymentConfirmModal } from '../../wallet/components/WalletPaymentConfirmModal';
@@ -28,33 +30,30 @@ export function TenantInvoicesPanel({ invoiceId: controlledInvoiceId, onOpenInvo
   const [invoices, setInvoices] = useState<Invoice[]>([]);
   const [selectedId, setSelectedId] = useState(invoiceId ?? '');
   const [statusFilter, setStatusFilter] = useState('');
-  const [periodFilter, setPeriodFilter] = useState('');
   const [loading, setLoading] = useState(true);
   const [busy, setBusy] = useState('');
-  const [message, setMessage] = useState('');
   const [toast, setToast] = useState<{ message: string; type: 'success' | 'error' | 'info' } | null>(null);
   const [error, setError] = useState('');
   const [confirmPay, setConfirmPay] = useState<Invoice | null>(null);
   const [meterImagePreview, setMeterImagePreview] = useState<{ src: string; title: string; subtitle: string } | null>(null);
-
-  useEffect(() => {
-    void loadInvoices();
-  }, []);
+  const isDetailView = Boolean(invoiceId);
 
   useEffect(() => {
     if (invoiceId) {
       setSelectedId(invoiceId);
       void loadInvoiceDetail(invoiceId);
+      return;
     }
+
+    void loadInvoices();
   }, [invoiceId]);
 
   const filteredInvoices = useMemo(() => {
     return invoices.filter((invoice) => {
       const matchesStatus = !statusFilter || invoice.status === statusFilter;
-      const matchesPeriod = !periodFilter || invoice.billingPeriodStart.startsWith(periodFilter) || invoice.billingPeriodEnd.startsWith(periodFilter);
-      return matchesStatus && matchesPeriod;
+      return matchesStatus;
     });
-  }, [invoices, statusFilter, periodFilter]);
+  }, [invoices, statusFilter]);
 
   const selectedInvoice = useMemo(() => {
     return invoices.find((invoice) => invoice.id === selectedId) ?? filteredInvoices[0] ?? null;
@@ -110,6 +109,7 @@ export function TenantInvoicesPanel({ invoiceId: controlledInvoiceId, onOpenInvo
   return (
     <>
       <PageHeader
+        onBack={isDetailView ? () => navigate(ROUTE_PATHS.ACCOUNT.INVOICES) : undefined}
         icon={
           <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
             <svg viewBox="0 0 24 24" width="24" height="24" fill="none" stroke="#2563eb" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
@@ -119,96 +119,136 @@ export function TenantInvoicesPanel({ invoiceId: controlledInvoiceId, onOpenInvo
           </div>
         }
         eyebrow="Hóa đơn hằng tháng"
-        title="Theo dõi &amp; Thanh toán"
-        description="Xem các hóa đơn đã phát hành và có thể thanh toán các khoản còn nợ qua ví nội bộ."
-        rightContent={
-          <div className="invoice-filter-group" style={{ display: 'flex', gap: '16px', alignItems: 'center' }}>
-            <div className="invoice-filter-item">
-              <label>Trạng thái</label>
-              <select className="invoice-filter-select" value={statusFilter} onChange={(event) => setStatusFilter(event.target.value)}>
-                <option value="">Tất cả trạng thái</option>
-                {tenantStatuses.map((status) => <option key={status} value={status}>{getInvoiceStatusLabel(status)}</option>)}
-              </select>
-            </div>
-            <div className="invoice-filter-item">
-              <label>Kỳ hóa đơn</label>
-              <input type="month" className="invoice-filter-select" value={periodFilter} onChange={(event) => setPeriodFilter(event.target.value)} />
-            </div>
-          </div>
-        }
+        title={isDetailView ? 'Chi tiết hóa đơn' : 'Hóa đơn của tôi'}
+        description={isDetailView ? 'Kiểm tra hạng mục hóa đơn và thực hiện thanh toán qua ví nội bộ.' : 'Danh sách hóa đơn đã phát hành cho bạn.'}
       />
 
-      <TenantNotification invoices={invoices} />
+      {!isDetailView && <TenantNotification invoices={invoices} />}
       {toast && <Toast message={toast.message} type={toast.type} onClose={() => setToast(null)} />}
       {error && <Alert type="error">{error}</Alert>}
 
-      {loading && invoices.length === 0 ? (
+      {loading && (isDetailView ? !selectedInvoice : invoices.length === 0) ? (
         <div className="billing-panel"><div className="state-block loading-state">Đang tải hóa đơn...</div></div>
-      ) : filteredInvoices.length === 0 ? (
+      ) : isDetailView && !selectedInvoice ? (
         <div className="billing-panel empty-state">
-          <h3>Chưa có hóa đơn</h3>
-          <p>Khi chủ trọ phát hành hóa đơn, danh sách sẽ hiển thị tại đây.</p>
+          <h3>Không tìm thấy hóa đơn</h3>
+          <p>Hóa đơn không tồn tại hoặc bạn không có quyền xem hóa đơn này.</p>
         </div>
       ) : (
-        <section className="tenant-layout">
-          <div className="billing-panel tenant-invoice-list">
-            {filteredInvoices.map((invoice) => {
-              const isSelected = selectedInvoice?.id === invoice.id;
-              const statusClass = invoice.status.toLowerCase();
-              return (
-                <button
-                  type="button"
-                  key={invoice.id}
-                  className={`tenant-invoice-card ${isSelected ? 'active' : ''} status-${statusClass}`}
-                  onClick={() => {
-                    setSelectedId(invoice.id);
-                    if (onOpenInvoice) {
-                      onOpenInvoice(invoice.id);
-                    } else {
-                      navigate(ROUTE_PATHS.ACCOUNT.INVOICE_DETAIL(invoice.id));
-                    }
-                  }}
-                >
-                  <div className="tenant-invoice-card-header">
-                    <span className="invoice-no">{invoice.invoiceNo}</span>
-                    <span className={`invoice-status-badge ${statusClass}`}>{getInvoiceStatusLabel(invoice.status)}</span>
-                  </div>
-                  <div className="tenant-invoice-card-body">
-                    <div className="invoice-period">
-                      <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" className="period-icon">
-                        <rect x="3" y="4" width="18" height="18" rx="2" ry="2"></rect>
-                        <line x1="16" y1="2" x2="16" y2="6"></line>
-                        <line x1="8" y1="2" x2="8" y2="6"></line>
-                        <line x1="3" y1="10" x2="21" y2="10"></line>
-                      </svg>
-                      <span>{invoice.billingPeriodStart} - {invoice.billingPeriodEnd}</span>
-                    </div>
-                    <div className="invoice-amount-box">
-                      <span className="amount-label">{invoice.status === 'Paid' ? 'Đã thanh toán' : 'Cần thanh toán'}</span>
-                      <strong className="amount-value">{formatMoney(getPayableAmount(invoice))}</strong>
-                    </div>
-                  </div>
-                </button>
-              );
-            })}
-          </div>
+        <section className={isDetailView ? 'tenant-invoice-detail-route' : 'tenant-invoice-list-route'}>
+          {!isDetailView && (
+            <div className="invoice-list-wrapper tenant-invoice-list-wrapper">
+              <Tabs
+                className="attached-bottom"
+                variant="segmented-secondary"
+                activeId={statusFilter}
+                onChange={setStatusFilter}
+                items={[
+                  { id: '', label: 'Tất cả', icon: getTabIcon('') },
+                  ...tenantStatuses.map((status) => ({
+                    id: status,
+                    label: getInvoiceStatusLabel(status),
+                    icon: getTabIcon(status),
+                  })),
+                ]}
+              />
 
-          {selectedInvoice && (
+              <section className="tab-attached-panel tab-attached-panel--cards">
+                {filteredInvoices.length === 0 ? (
+                  <div className="empty-panel">
+                    <h2>Chưa có hóa đơn</h2>
+                    <p>Chưa có hóa đơn nào phù hợp với bộ lọc hiện tại.</p>
+                  </div>
+                ) : (
+                  <section className="invoice-grid">
+                    {filteredInvoices.map((invoice) => (
+                    <Card
+                      key={invoice.id}
+                      className="invoice-shared-card"
+                      title={`${invoice.roomingHouseName} - Phòng ${invoice.roomNumber} - ${formatInvoicePeriodMonth(invoice.billingPeriodStart)}`}
+                      status={getInvoiceStatusLabel(invoice.status)}
+                      statusTone={getInvoiceStatusTone(invoice.status)}
+                      bodyColumns={2}
+                      actionItems={[
+                        {
+                          label: 'Xem chi tiết',
+                          onClick: () => {
+                            setSelectedId(invoice.id);
+                            if (onOpenInvoice) {
+                              onOpenInvoice(invoice.id);
+                            } else {
+                              navigate(ROUTE_PATHS.ACCOUNT.INVOICE_DETAIL(invoice.id));
+                            }
+                          },
+                          icon: (
+                            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
+                              <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z" />
+                              <circle cx="12" cy="12" r="3" />
+                            </svg>
+                          ),
+                        },
+                      ]}
+                    >
+                      <CardMetaRow
+                        label="Mã hóa đơn"
+                        value={invoice.invoiceNo}
+                        icon={
+                          <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                            <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" />
+                            <polyline points="14 2 14 8 20 8" />
+                          </svg>
+                        }
+                      />
+                      <CardMetaRow
+                        label="Tổng tiền"
+                        value={formatMoney(invoice.totalAmount)}
+                        valueClassName={`invoice-shared-card__total invoice-shared-card__total--${invoice.status.toLowerCase()}`}
+                        icon={
+                          <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                            <line x1="12" y1="1" x2="12" y2="23" />
+                            <path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6" />
+                          </svg>
+                        }
+                      />
+                      <CardMetaRow
+                        label="Kỳ hóa đơn"
+                        value={`${formatDate(invoice.billingPeriodStart)} - ${formatDate(invoice.billingPeriodEnd)}`}
+                        icon={
+                          <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                            <rect x="3" y="4" width="18" height="18" rx="2" ry="2" />
+                            <line x1="16" y1="2" x2="16" y2="6" />
+                            <line x1="8" y1="2" x2="8" y2="6" />
+                            <line x1="3" y1="10" x2="21" y2="10" />
+                          </svg>
+                        }
+                      />
+                      <CardMetaRow
+                        label="Hạn thanh toán"
+                        value={formatDate(invoice.dueDate)}
+                        icon={
+                          <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                            <circle cx="12" cy="12" r="10" />
+                            <polyline points="12 6 12 12 16 14" />
+                          </svg>
+                        }
+                      />
+                    </Card>
+                    ))}
+                  </section>
+                )}
+              </section>
+            </div>
+          )}
+
+          {isDetailView && selectedInvoice && (
             <div className="billing-panel tenant-invoice-detail">
               <div className="tenant-invoice-detail-header">
                 <div className="header-title">
-                  <div className="invoice-icon-box">
-                    <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
-                      <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path>
-                      <polyline points="14 2 14 8 20 8"></polyline>
-                      <line x1="16" y1="13" x2="8" y2="13"></line>
-                      <line x1="16" y1="17" x2="8" y2="17"></line>
-                      <polyline points="10 9 9 9 8 9"></polyline>
-                    </svg>
-                  </div>
                   <div>
-                    <h3>{selectedInvoice.invoiceNo}</h3>
-                    <span className="billing-kicker">Chi tiết hóa đơn thanh toán</span>
+                    <h3>{selectedInvoice.roomingHouseName} - Phòng {selectedInvoice.roomNumber}</h3>
+                    <span className="billing-kicker">
+                      Mã hóa đơn: {selectedInvoice.invoiceNo} - Kỳ hạn: {formatDate(selectedInvoice.billingPeriodStart)} - {formatDate(selectedInvoice.billingPeriodEnd)}
+                    </span>
                   </div>
                 </div>
                 <span className={`invoice-status-badge xl ${selectedInvoice.status.toLowerCase()}`}>
@@ -224,14 +264,6 @@ export function TenantInvoicesPanel({ invoiceId: controlledInvoiceId, onOpenInvo
                 <div className="stat-card">
                   <span className="stat-label">Tổng tiền</span>
                   <strong className="stat-value">{formatMoney(selectedInvoice.totalAmount)}</strong>
-                </div>
-                <div className="stat-card">
-                  <span className="stat-label">Đã thanh toán</span>
-                  <strong className="stat-value paid">{formatMoney(getPaidAmount(selectedInvoice))}</strong>
-                </div>
-                <div className="stat-card highlighted">
-                  <span className="stat-label">Còn lại</span>
-                  <strong className="stat-value payable">{formatMoney(getPayableAmount(selectedInvoice))}</strong>
                 </div>
               </div>
 
@@ -275,20 +307,22 @@ export function TenantInvoicesPanel({ invoiceId: controlledInvoiceId, onOpenInvo
                 </div>
               </div>
 
-              <div className="tenant-invoice-actions">
-                <button
-                  type="button"
-                  className="tenant-pay-button"
-                  disabled={!canPay(selectedInvoice) || busy === selectedInvoice.id}
-                  onClick={() => setConfirmPay(selectedInvoice)}
-                >
-                  <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" className="pay-icon">
-                    <rect x="2" y="5" width="20" height="14" rx="2" ry="2"></rect>
-                    <line x1="2" y1="10" x2="22" y2="10"></line>
-                  </svg>
-                  {busy === selectedInvoice.id ? 'Đang thực hiện giao dịch...' : 'Thanh toán ngay bằng Ví nội bộ'}
-                </button>
-              </div>
+              {canPay(selectedInvoice) && (
+                <div className="tenant-invoice-actions">
+                  <button
+                    type="button"
+                    className="tenant-pay-button"
+                    disabled={busy === selectedInvoice.id}
+                    onClick={() => setConfirmPay(selectedInvoice)}
+                  >
+                    <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" className="pay-icon">
+                      <rect x="2" y="5" width="20" height="14" rx="2" ry="2"></rect>
+                      <line x1="2" y1="10" x2="22" y2="10"></line>
+                    </svg>
+                    {busy === selectedInvoice.id ? 'Đang thực hiện giao dịch...' : 'Thanh toán ngay bằng Ví nội bộ'}
+                  </button>
+                </div>
+              )}
             </div>
           )}
         </section>
@@ -477,16 +511,87 @@ function getPayableAmount(invoice: Invoice) {
   return invoice.status === 'Paid' ? 0 : invoice.totalAmount;
 }
 
+function getTabIcon(status: string) {
+  const props = { width: 14, height: 14, viewBox: '0 0 24 24', fill: 'none', stroke: 'currentColor', strokeWidth: 2, strokeLinecap: 'round' as const, strokeLinejoin: 'round' as const, className: 'invoice-tab-icon' };
+
+  switch (status.toLowerCase()) {
+    case '':
+    case 'all':
+      return (
+        <svg {...props}>
+          <circle cx="12" cy="12" r="10" />
+          <circle cx="12" cy="12" r="3" fill="currentColor" stroke="none" />
+        </svg>
+      );
+    case 'draft':
+      return (
+        <svg {...props}>
+          <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" />
+          <polyline points="14 2 14 8 20 8" />
+        </svg>
+      );
+    case 'issued':
+    case 'sent':
+    case 'paid':
+      return (
+        <svg {...props}>
+          <path d="M22 11.08V12a10 10 0 1 1-5.93-9.14" />
+          <polyline points="22 4 12 14.01 9 11.01" />
+        </svg>
+      );
+    case 'overdue':
+      return (
+        <svg {...props}>
+          <circle cx="12" cy="12" r="10" />
+          <line x1="12" y1="8" x2="12" y2="12" />
+          <line x1="12" y1="16" x2="12.01" y2="16" />
+        </svg>
+      );
+    case 'cancelled':
+      return (
+        <svg {...props}>
+          <circle cx="12" cy="12" r="10" />
+          <line x1="15" y1="9" x2="9" y2="15" />
+          <line x1="9" y1="9" x2="15" y2="15" />
+        </svg>
+      );
+    default:
+      return null;
+  }
+}
+
 function getInvoiceStatusLabel(status: string) {
   const labels: Record<string, string> = {
     Draft: 'Nháp',
-    Issued: 'Đã phát hành',
+    Issued: 'Chờ thanh toán',
     Paid: 'Đã thanh toán',
     Overdue: 'Quá hạn',
     Cancelled: 'Đã hủy'
   };
 
   return labels[status] ?? status;
+}
+
+function getInvoiceStatusTone(status: string): CardStatusTone {
+  const tones: Record<string, CardStatusTone> = {
+    Draft: 'warning',
+    Issued: 'info',
+    Paid: 'success',
+    Overdue: 'danger',
+    Cancelled: 'neutral'
+  };
+
+  return tones[status] ?? 'neutral';
+}
+
+function formatInvoicePeriodMonth(value: string) {
+  const date = new Date(value);
+
+  if (Number.isNaN(date.getTime())) {
+    return value;
+  }
+
+  return `Tháng ${date.getMonth() + 1}/${date.getFullYear()}`;
 }
 
 function getInvoiceItemTypeLabel(itemType: string) {
@@ -498,6 +603,14 @@ function getInvoiceItemTypeLabel(itemType: string) {
   };
 
   return labels[itemType] ?? itemType;
+}
+
+function formatDate(value?: string | null) {
+  if (!value) {
+    return '-';
+  }
+
+  return new Date(value).toLocaleDateString('vi-VN');
 }
 
 function getMeterReadingButtonLabel(item: InvoiceItem) {

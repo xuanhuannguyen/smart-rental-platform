@@ -79,7 +79,7 @@
   height: min(520px, calc(100vh - 140px)); /* Reduced height to keep it compact and out of top navigation's way */
   margin-bottom: 12px;
   overflow: hidden;
-  width: min(370px, calc(100vw - 32px)); /* Reduced width to make it compact and elegant */
+  width: min(370px, calc(100dvw - 32px)); /* Reduced width to make it compact and elegant */
   animation: panel-entrance 0.35s cubic-bezier(0.16, 1, 0.3, 1) forwards;
 }
 
@@ -634,7 +634,7 @@
   .rental-ai-chatbot__panel {
     height: min(480px, calc(100vh - 96px)); /* Slightly shorter on mobile */
     border-radius: 16px;
-    width: min(350px, calc(100vw - 32px));
+    width: min(350px, calc(100dvw - 32px));
   }
 
   .rental-ai-chatbot__launcher strong {

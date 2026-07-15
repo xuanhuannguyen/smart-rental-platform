@@ -151,6 +151,8 @@
   flex-direction: column;
   align-items: flex-end;
   gap: 12px;
+  max-width: 100%;
+  min-width: 0;
 }
 
 .rooming-house-detail-page .eyebrow {
@@ -170,8 +172,12 @@
 
 .rooming-house-detail-page .overview-stats {
   display: flex;
+  flex-wrap: wrap;
   gap: 16px;
   align-items: center;
+  justify-content: flex-end;
+  max-width: 100%;
+  min-width: 0;
 }
 
 .rooming-house-detail-page .stat-item {
@@ -343,7 +349,10 @@
 .rooming-house-detail-page .overview-actions {
   display: flex;
   justify-content: flex-end;
+  flex-wrap: wrap;
   gap: 12px;
+  max-width: 100%;
+  min-width: 0;
 }
 
 .rooming-house-detail-page .secondary-action {

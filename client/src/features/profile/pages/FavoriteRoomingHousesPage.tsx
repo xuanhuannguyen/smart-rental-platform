@@ -53,7 +53,7 @@ export default function FavoriteRoomingHousesPage() {
     }, [page]);
 
     return (
-        <div style={{ display: 'flex', flexDirection: 'column', gap: '24px' }}>
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 0 }}>
             <PageHeader
                 icon={
                     <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center' }}>

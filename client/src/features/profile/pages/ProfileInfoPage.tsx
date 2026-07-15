@@ -205,6 +205,26 @@ export function ProfileInfoPage() {
         eyebrow="TÀI KHOẢN"
         title="Thông tin hồ sơ"
         description="Cập nhật thông tin cá nhân và thông tin liên hệ của bạn."
+        rightContent={
+          !isEditingProfile ? (
+            <Button
+              type="button"
+              className="profile-edit-btn"
+              disabled={isLoading}
+              onClick={() => {
+                setProfileError(null);
+                setToast(null);
+                setIsEditingProfile(true);
+              }}
+            >
+              <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
+                <path d="M12 20h9" />
+                <path d="M16.5 3.5a2.12 2.12 0 0 1 3 3L7 19l-4 1 1-4Z" />
+              </svg>
+              <span>Chỉnh sửa</span>
+            </Button>
+          ) : null
+        }
       />
 
       <div className="profile-info-card">

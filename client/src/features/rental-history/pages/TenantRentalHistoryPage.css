@@ -3,7 +3,7 @@
 .tenant-history-page {
   display: flex;
   flex-direction: column;
-  gap: 24px;
+  gap: 0;
   animation: fadeIn 0.4s ease-out;
 }
 
