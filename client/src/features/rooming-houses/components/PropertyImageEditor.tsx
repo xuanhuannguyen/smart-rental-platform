@@ -101,8 +101,12 @@ export default function PropertyImageEditor({
 
       const failedCount = filesToUpload.length - uploadedImages.length;
       if (failedCount > 0) {
+        const firstFailure = uploadResults.find((result) => result.status === 'rejected');
+        const failureMessage = firstFailure?.status === 'rejected'
+          ? getApiErrorMessage(firstFailure.reason, 'Không thể tải ảnh lên.')
+          : 'Không thể hoàn tất media asset cho ảnh đã chọn.';
         setUploadMessage(
-          `${failedCount} ảnh chưa tải lên được. Vui lòng kiểm tra định dạng và dung lượng ảnh.`
+          `${failedCount} ảnh chưa tải lên được. ${failureMessage}`
         );
       } else if (limitMessage) {
         setUploadMessage(limitMessage);

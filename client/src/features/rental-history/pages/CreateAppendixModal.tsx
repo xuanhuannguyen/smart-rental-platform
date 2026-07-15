@@ -1,7 +1,7 @@
 import React, { useMemo, useState } from 'react';
 import { getApiErrorMessage } from '../../../shared/api/apiError';
-import { toAssetUrl } from '../../../shared/api/assets';
 import { buildPrivateMediaViewUrl } from '../../../shared/api/media';
+import { PrivateMediaImage } from '../../../shared/components/media/PrivateMediaImage';
 import { Button } from '../../../shared/components/ui/Button';
 import { uploadImage } from '../../files/api';
 import { contractApi } from '../../contracts/api';
@@ -719,8 +719,8 @@ function DocumentImageUploadField({
       </label>
       {previewSrc ? (
         <div style={{ display: 'grid', gap: 8 }}>
-          <img
-            src={previewSrc}
+          <PrivateMediaImage
+            source={previewSrc}
             alt={label}
             style={{
               width: '100%',

@@ -1,14 +1,18 @@
+using Microsoft.EntityFrameworkCore;
 using SmartRentalPlatform.Application.Chat;
 using SmartRentalPlatform.Application.Common.Exceptions;
 using SmartRentalPlatform.Application.Common.Interfaces;
 using SmartRentalPlatform.Contracts.Chat.Requests;
 using SmartRentalPlatform.Domain.Entities.Notifications;
+using SmartRentalPlatform.Domain.Entities.Media;
+using SmartRentalPlatform.Domain.Entities.Chat;
 using SmartRentalPlatform.Domain.Entities.Properties;
 using SmartRentalPlatform.Domain.Entities.Rental;
 using SmartRentalPlatform.Domain.Entities.RentalContracts;
 using SmartRentalPlatform.Domain.Entities.Users;
 using SmartRentalPlatform.Domain.Enums.Chat;
 using SmartRentalPlatform.Domain.Enums.Notifications;
+using SmartRentalPlatform.Domain.Enums.Media;
 using SmartRentalPlatform.Domain.Enums.Rental;
 using SmartRentalPlatform.Domain.Enums.RentalContracts;
 using SmartRentalPlatform.Infrastructure.Caching;
@@ -82,6 +86,43 @@ public sealed class ChatServiceTests : IDisposable
     }
 
     [Fact]
+    public async Task CreateAndUpdateGroupConversationAsync_ShouldLinkPublicAvatarMediaAndRetirePreviousAsset()
+    {
+        var landlord = SeedUser(RoleName.Landlord, "landlord-avatar@test.local");
+        var firstAvatar = BuildAvatarMediaAsset(landlord.Id, "first-avatar.jpg");
+        var secondAvatar = BuildAvatarMediaAsset(landlord.Id, "second-avatar.jpg");
+        fixture.Context.MediaAssets.AddRange(firstAvatar, secondAvatar);
+        await fixture.Context.SaveChangesAsync();
+        var service = CreateService();
+
+        var created = await service.CreateGroupConversationAsync(
+            landlord.Id,
+            new CreateGroupConversationRequest
+            {
+                Title = "Media group",
+                AvatarMediaAssetId = firstAvatar.Id
+            });
+        var updated = await service.UpdateConversationAsync(
+            landlord.Id,
+            created.Id,
+            new UpdateConversationRequest { AvatarMediaAssetId = secondAvatar.Id });
+
+        fixture.Context.ChangeTracker.Clear();
+        var savedConversation = await fixture.Context.Conversations.SingleAsync(x => x.Id == created.Id);
+        var savedFirstAvatar = await fixture.Context.MediaAssets.SingleAsync(x => x.Id == firstAvatar.Id);
+        var savedSecondAvatar = await fixture.Context.MediaAssets.SingleAsync(x => x.Id == secondAvatar.Id);
+
+        Assert.Equal(secondAvatar.Id, savedConversation.AvatarMediaAssetId);
+        Assert.Null(savedConversation.AvatarUrl);
+        Assert.Equal(secondAvatar.Id, updated.AvatarMediaAssetId);
+        Assert.Equal($"/api/media/public/{secondAvatar.Id:D}", updated.AvatarUrl);
+        Assert.Equal(MediaStatus.Deleted, savedFirstAvatar.Status);
+        Assert.Equal(MediaStatus.Linked, savedSecondAvatar.Status);
+        Assert.Equal(nameof(Conversation), savedSecondAvatar.LinkedEntityType);
+        Assert.Equal(created.Id, savedSecondAvatar.LinkedEntityId);
+    }
+
+    [Fact]
     public async Task GetLandlordQuickContactsAsync_ReturnsScopedTenantsAndDeduplicates()
     {
         var landlord = SeedUser(RoleName.Landlord, "landlord@test.local");
@@ -139,6 +180,104 @@ public sealed class ChatServiceTests : IDisposable
     }
 
     [Fact]
+    public async Task SendMessageAsync_ShouldReturnCommittedMessageWhenNotificationCreationFails()
+    {
+        var landlord = SeedUser(RoleName.Landlord, "landlord-notification@test.local");
+        var tenant = SeedUser(RoleName.Tenant, "tenant-notification@test.local");
+        await fixture.Context.SaveChangesAsync();
+        var service = CreateService();
+        var conversation = await service.CreateDirectConversationAsync(
+            tenant.Id,
+            new CreateDirectConversationRequest { OtherUserId = landlord.Id });
+        notifications.ThrowOnCreate = true;
+
+        var result = await service.SendMessageAsync(
+            tenant.Id,
+            conversation.Id,
+            new SendChatMessageRequest
+            {
+                MessageType = ChatMessageType.Text.ToString(),
+                Content = "Message must remain successful"
+            });
+
+        Assert.Equal("Message must remain successful", result.Message.Content);
+        Assert.True(await fixture.Context.ChatMessages.AnyAsync(x => x.Id == result.Message.Id));
+    }
+
+    [Fact]
+    public async Task SendMessageAsync_Image_ShouldLinkOwnedMediaAssetAndReturnPrivateMediaUrl()
+    {
+        var landlord = SeedUser(RoleName.Landlord, "landlord-media@test.local");
+        var tenant = SeedUser(RoleName.Tenant, "tenant-media@test.local");
+        await fixture.Context.SaveChangesAsync();
+        var service = CreateService();
+        var conversation = await service.CreateDirectConversationAsync(
+            tenant.Id,
+            new CreateDirectConversationRequest { OtherUserId = landlord.Id });
+        var mediaAsset = BuildChatMediaAsset(tenant.Id, "chat-image.jpg", "image/jpeg");
+        fixture.Context.MediaAssets.Add(mediaAsset);
+        await fixture.Context.SaveChangesAsync();
+
+        var result = await service.SendMessageAsync(
+            tenant.Id,
+            conversation.Id,
+            new SendChatMessageRequest
+            {
+                MessageType = ChatMessageType.Image.ToString(),
+                MediaAssetId = mediaAsset.Id,
+                ImageUrl = "/legacy/url-that-must-not-be-used"
+            });
+
+        fixture.Context.ChangeTracker.Clear();
+        var savedMessage = await fixture.Context.ChatMessages.SingleAsync(x => x.Id == result.Message.Id);
+        var savedAsset = await fixture.Context.MediaAssets.SingleAsync(x => x.Id == mediaAsset.Id);
+
+        Assert.Equal(mediaAsset.Id, savedMessage.MediaAssetId);
+        Assert.Null(savedMessage.ImageUrl);
+        Assert.Equal(mediaAsset.Id, result.Message.MediaAssetId);
+        Assert.Equal($"/api/media/private/{mediaAsset.Id:D}", result.Message.ImageUrl);
+        Assert.Equal(MediaStatus.Linked, savedAsset.Status);
+        Assert.Equal(nameof(SmartRentalPlatform.Domain.Entities.Chat.ChatMessage), savedAsset.LinkedEntityType);
+        Assert.Equal(savedMessage.Id, savedAsset.LinkedEntityId);
+    }
+
+    [Fact]
+    public async Task DeleteMessageAsync_ShouldRetireLinkedChatMediaAsset()
+    {
+        var landlord = SeedUser(RoleName.Landlord, "landlord-delete-media@test.local");
+        var tenant = SeedUser(RoleName.Tenant, "tenant-delete-media@test.local");
+        await fixture.Context.SaveChangesAsync();
+        var service = CreateService();
+        var conversation = await service.CreateDirectConversationAsync(
+            tenant.Id,
+            new CreateDirectConversationRequest { OtherUserId = landlord.Id });
+        var mediaAsset = BuildChatMediaAsset(tenant.Id, "chat-file.pdf", "application/pdf");
+        fixture.Context.MediaAssets.Add(mediaAsset);
+        await fixture.Context.SaveChangesAsync();
+        var sent = await service.SendMessageAsync(
+            tenant.Id,
+            conversation.Id,
+            new SendChatMessageRequest
+            {
+                MessageType = ChatMessageType.File.ToString(),
+                MediaAssetId = mediaAsset.Id
+            });
+
+        await service.DeleteMessageAsync(tenant.Id, conversation.Id, sent.Message.Id);
+
+        fixture.Context.ChangeTracker.Clear();
+        var savedMessage = await fixture.Context.ChatMessages.SingleAsync(x => x.Id == sent.Message.Id);
+        var savedAsset = await fixture.Context.MediaAssets.SingleAsync(x => x.Id == mediaAsset.Id);
+
+        Assert.Null(savedMessage.MediaAssetId);
+        Assert.NotNull(savedMessage.DeletedAt);
+        Assert.Equal(MediaStatus.Deleted, savedAsset.Status);
+        Assert.Null(savedAsset.LinkedEntityType);
+        Assert.Null(savedAsset.LinkedEntityId);
+        Assert.NotNull(savedAsset.DeletedAt);
+    }
+
+    [Fact]
     public async Task LeaveConversationAsync_MarksMemberLeftAndBlocksSending()
     {
         var landlord = SeedUser(RoleName.Landlord, "landlord@test.local");
@@ -181,6 +320,17 @@ public sealed class ChatServiceTests : IDisposable
         Assert.False(presence.IsUserViewingConversation(conversationId, userId));
     }
 
+    [Fact]
+    public void ChatMessageMediaAssetIndex_ShouldBeUnique()
+    {
+        var entityType = fixture.Context.Model.FindEntityType(typeof(ChatMessage));
+        var mediaAssetIndex = Assert.Single(
+            entityType!.GetIndexes(),
+            x => x.Properties.Any(p => p.Name == nameof(ChatMessage.MediaAssetId)));
+
+        Assert.True(mediaAssetIndex.IsUnique);
+    }
+
     private ChatService CreateService()
     {
         return new ChatService(fixture.Context, notifications, presence);
@@ -210,6 +360,48 @@ public sealed class ChatServiceTests : IDisposable
 
         fixture.Context.Users.Add(user);
         return user;
+    }
+
+    private static MediaAsset BuildChatMediaAsset(Guid ownerUserId, string fileName, string contentType)
+    {
+        var mediaAssetId = Guid.NewGuid();
+        return new MediaAsset
+        {
+            Id = mediaAssetId,
+            OwnerUserId = ownerUserId,
+            BucketName = "local-media",
+            ObjectKey = $"private/chat-attachments/{mediaAssetId:N}/{fileName}",
+            OriginalFileName = fileName,
+            StoredFileName = fileName,
+            ContentType = contentType,
+            FileSize = 128,
+            Scope = MediaScope.ChatAttachment,
+            Visibility = MediaVisibility.Private,
+            Status = MediaStatus.Uploaded,
+            CreatedAt = DateTimeOffset.UtcNow,
+            UpdatedAt = DateTimeOffset.UtcNow
+        };
+    }
+
+    private static MediaAsset BuildAvatarMediaAsset(Guid ownerUserId, string fileName)
+    {
+        var mediaAssetId = Guid.NewGuid();
+        return new MediaAsset
+        {
+            Id = mediaAssetId,
+            OwnerUserId = ownerUserId,
+            BucketName = "local-media",
+            ObjectKey = $"public/avatars/{mediaAssetId:N}/{fileName}",
+            OriginalFileName = fileName,
+            StoredFileName = fileName,
+            ContentType = "image/jpeg",
+            FileSize = 128,
+            Scope = MediaScope.Avatar,
+            Visibility = MediaVisibility.Public,
+            Status = MediaStatus.Uploaded,
+            CreatedAt = DateTimeOffset.UtcNow,
+            UpdatedAt = DateTimeOffset.UtcNow
+        };
     }
 
     private void SeedActiveRental(User landlord, User tenant)
@@ -285,9 +477,13 @@ public sealed class ChatServiceTests : IDisposable
     private sealed class FakeNotificationService : INotificationService
     {
         public List<(Guid UserId, NotificationType Type, string Title, string Body, string? ReferenceId, string? ReferenceType)> Created { get; } = new();
+        public bool ThrowOnCreate { get; set; }
 
         public Task CreateAsync(Guid userId, NotificationType type, string title, string body, string? referenceId = null, string? referenceType = null, CancellationToken cancellationToken = default)
         {
+            if (ThrowOnCreate)
+                throw new InvalidOperationException("Notification failure for regression testing.");
+
             Created.Add((userId, type, title, body, referenceId, referenceType));
             return Task.CompletedTask;
         }

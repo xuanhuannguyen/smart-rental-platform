@@ -691,7 +691,7 @@ public static class DevelopmentDataSeed
         {
             existingAsset.OwnerUserId = LandlordUserId;
             existingAsset.Scope = MediaScope.RoomingHouseRulePdf;
-            existingAsset.Visibility = MediaVisibility.Private;
+            existingAsset.Visibility = MediaVisibility.Public;
             existingAsset.Status = MediaStatus.Linked;
             existingAsset.LinkedEntityType = nameof(RoomingHouseRule);
             existingAsset.LinkedEntityId = ApprovedHouseId;
@@ -705,7 +705,7 @@ public static class DevelopmentDataSeed
             {
                 var objectKey = mediaObjectKeyFactory.Create(
                     MediaScope.RoomingHouseRulePdf,
-                    MediaVisibility.Private,
+                    MediaVisibility.Public,
                     fileName);
                 existingAsset.ObjectKey = objectKey.ObjectKey;
                 existingAsset.StoredFileName = objectKey.StoredFileName;
@@ -735,7 +735,7 @@ public static class DevelopmentDataSeed
 
         var createdObjectKey = mediaObjectKeyFactory.Create(
             MediaScope.RoomingHouseRulePdf,
-            MediaVisibility.Private,
+            MediaVisibility.Public,
             fileName);
 
         await UploadApprovedHouseRulePdfAsync(
@@ -756,7 +756,7 @@ public static class DevelopmentDataSeed
             ContentType = "application/pdf",
             FileSize = pdfBytes.Length,
             Scope = MediaScope.RoomingHouseRulePdf,
-            Visibility = MediaVisibility.Private,
+            Visibility = MediaVisibility.Public,
             Status = MediaStatus.Linked,
             LinkedEntityType = nameof(RoomingHouseRule),
             LinkedEntityId = ApprovedHouseId,
@@ -784,7 +784,7 @@ public static class DevelopmentDataSeed
                 ContentType = "application/pdf",
                 FileSize = pdfBytes.Length,
                 ObjectKey = objectKey,
-                Visibility = MediaVisibility.Private
+                Visibility = MediaVisibility.Public
             },
             cancellationToken);
     }

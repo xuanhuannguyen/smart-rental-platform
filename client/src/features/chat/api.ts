@@ -76,12 +76,12 @@ export async function createGroupConversation(
   title: string,
   participantUserIds: string[],
   roomingHouseId?: string | null,
-  avatarUrl?: string | null
+  avatarMediaAssetId?: string | null
 ): Promise<Conversation> {
   const response = await apiClient<ApiResponse<Conversation>>(ENDPOINTS.CHAT.GROUPS, {
     method: 'POST',
     auth: true,
-    body: { title, participantUserIds, roomingHouseId, avatarUrl }
+    body: { title, participantUserIds, roomingHouseId, avatarMediaAssetId }
   });
   return response.data;
 }
@@ -89,12 +89,12 @@ export async function createGroupConversation(
 export async function updateConversation(
   id: string,
   title?: string,
-  avatarUrl?: string | null
+  avatarMediaAssetId?: string | null
 ): Promise<Conversation> {
   const response = await apiClient<ApiResponse<Conversation>>(ENDPOINTS.CHAT.CONVERSATION(id), {
     method: 'PATCH',
     auth: true,
-    body: { title, avatarUrl }
+    body: { title, avatarMediaAssetId }
   });
   return response.data;
 }
@@ -292,9 +292,16 @@ export async function unsendMessage(
   return response.data;
 }
 
-export async function downloadChatFile(conversationId: string, messageId: string): Promise<Blob> {
+export async function getChatImage(mediaAssetId: string): Promise<Blob> {
   return apiClient<Blob>(
-    `/api/chat/conversations/${conversationId}/messages/${messageId}/file`,
+    ENDPOINTS.MEDIA.PRIVATE_BY_ID(mediaAssetId),
+    { auth: true, responseType: 'blob' } as Parameters<typeof apiClient>[1]
+  );
+}
+
+export async function downloadChatFile(mediaAssetId: string): Promise<Blob> {
+  return apiClient<Blob>(
+    ENDPOINTS.MEDIA.PRIVATE_DOWNLOAD(mediaAssetId),
     { auth: true, responseType: 'blob' } as Parameters<typeof apiClient>[1]
   );
 }
@@ -348,15 +355,40 @@ export async function getUnreadMessageCount(): Promise<number> {
 
 // ─── File / Image Upload ──────────────────────────────────────────
 
-export async function uploadChatImage(file: File): Promise<string> {
+export async function uploadChatImage(file: File): Promise<{ mediaAssetId: string; url: string }> {
   const formData = new FormData();
   formData.append('file', file);
-  const response = await apiClient<ApiResponse<{ url: string }>>(ENDPOINTS.CHAT.IMAGES, {
+  const response = await apiClient<ApiResponse<{ mediaAssetId?: string | null; url: string }>>(ENDPOINTS.CHAT.IMAGES, {
     method: 'POST',
     auth: true,
     body: formData
   });
-  return response.data.url;
+  if (!response.data.mediaAssetId) {
+    throw new Error('Server không trả về mediaAssetId cho ảnh chat.');
+  }
+
+  return {
+    mediaAssetId: response.data.mediaAssetId,
+    url: response.data.url
+  };
+}
+
+export async function uploadChatAvatar(file: File): Promise<{ mediaAssetId: string; url: string }> {
+  const formData = new FormData();
+  formData.append('file', file);
+  const response = await apiClient<ApiResponse<{ mediaAssetId?: string | null; url: string }>>(ENDPOINTS.CHAT.AVATARS, {
+    method: 'POST',
+    auth: true,
+    body: formData
+  });
+  if (!response.data.mediaAssetId) {
+    throw new Error('Server không trả về mediaAssetId cho avatar nhóm.');
+  }
+
+  return {
+    mediaAssetId: response.data.mediaAssetId,
+    url: response.data.url
+  };
 }
 
 /**
@@ -365,12 +397,13 @@ export async function uploadChatImage(file: File): Promise<string> {
  */
 export async function uploadChatFile(
   file: File
-): Promise<{ url: string; fileName: string; contentType: string; size: number }> {
+): Promise<{ mediaAssetId: string; url: string; fileName: string; contentType: string; size: number }> {
   const formData = new FormData();
   formData.append('file', file);
   const response = await apiClient<ApiResponse<{
     url?: string;
     fileUrl?: string;
+    mediaAssetId?: string | null;
     fileName: string;
     contentType?: string;
     fileType?: string;
@@ -383,7 +416,12 @@ export async function uploadChatFile(
     body: formData
   });
   const d = response.data;
+  if (!d.mediaAssetId) {
+    throw new Error('Server không trả về mediaAssetId cho tệp chat.');
+  }
+
   return {
+    mediaAssetId: d.mediaAssetId,
     url: d.url ?? d.fileUrl ?? '',
     fileName: d.fileName,
     contentType: d.contentType ?? d.fileType ?? d.fileContentType ?? '',

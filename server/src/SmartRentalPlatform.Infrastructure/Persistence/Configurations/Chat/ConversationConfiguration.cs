@@ -27,10 +27,12 @@ public sealed class ConversationConfiguration : IEntityTypeConfiguration<Convers
         builder.Property(x => x.IsClosed).HasColumnName("is_closed").HasDefaultValue(false).IsRequired();
         builder.Property(x => x.RequiresJoinApproval).HasColumnName("requires_join_approval").HasDefaultValue(false).IsRequired();
         builder.Property(x => x.AvatarUrl).HasColumnName("avatar_url").HasMaxLength(1000);
+        builder.Property(x => x.AvatarMediaAssetId).HasColumnName("avatar_media_asset_id");
 
         builder.HasOne(x => x.Room).WithMany().HasForeignKey(x => x.RoomId).OnDelete(DeleteBehavior.Restrict);
         builder.HasOne(x => x.RoomingHouse).WithMany().HasForeignKey(x => x.RoomingHouseId).OnDelete(DeleteBehavior.Restrict);
         builder.HasOne(x => x.CreatedByUser).WithMany().HasForeignKey(x => x.CreatedByUserId).OnDelete(DeleteBehavior.Restrict);
+        builder.HasOne(x => x.AvatarMediaAsset).WithMany().HasForeignKey(x => x.AvatarMediaAssetId).OnDelete(DeleteBehavior.SetNull);
 
         builder.HasIndex(x => new { x.DirectUserAId, x.DirectUserBId })
             .IsUnique()
@@ -38,5 +40,6 @@ public sealed class ConversationConfiguration : IEntityTypeConfiguration<Convers
             .HasDatabaseName("ux_conversations_direct_pair");
         builder.HasIndex(x => new { x.Type, x.RoomId }).HasDatabaseName("ix_conversations_type_room_id");
         builder.HasIndex(x => x.LastMessageAt).HasDatabaseName("ix_conversations_last_message_at");
+        builder.HasIndex(x => x.AvatarMediaAssetId).IsUnique().HasDatabaseName("ux_conversations_avatar_media_asset_id");
     }
 }

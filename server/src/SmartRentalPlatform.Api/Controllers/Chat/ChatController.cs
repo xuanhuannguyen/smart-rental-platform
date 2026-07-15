@@ -6,6 +6,7 @@ using SmartRentalPlatform.Api.Hubs;
 using SmartRentalPlatform.Application.Chat;
 using SmartRentalPlatform.Application.Common.Exceptions;
 using SmartRentalPlatform.Application.Common.Interfaces;
+using SmartRentalPlatform.Application.Common.Media;
 using SmartRentalPlatform.Application.Common.Models;
 using SmartRentalPlatform.Contracts.Chat.Requests;
 using SmartRentalPlatform.Contracts.Chat.Responses;
@@ -222,34 +223,10 @@ public sealed class ChatController : ControllerBase
     public async Task<IActionResult> DownloadFile(Guid conversationId, Guid messageId, CancellationToken cancellationToken)
     {
         var message = await chatService.GetFileMessageAsync(GetCurrentUserId(), conversationId, messageId, cancellationToken);
-        if (string.IsNullOrEmpty(message.FileUrl))
+        if (!message.MediaAssetId.HasValue)
             throw new BadRequestException("CHAT_FILE_NOT_FOUND", "Không tìm thấy tệp tin.");
 
-        var relativePath = message.FileUrl;
-        if (relativePath.StartsWith("http", StringComparison.OrdinalIgnoreCase))
-        {
-            try
-            {
-                var uri = new Uri(relativePath);
-                relativePath = uri.PathAndQuery;
-            }
-            catch
-            {
-                return Redirect(message.FileUrl);
-            }
-        }
-
-        var pathOnly = relativePath.Split('?')[0].TrimStart('/');
-        var webRootPath = Path.Combine(Directory.GetCurrentDirectory(), "wwwroot");
-        var filePath = Path.Combine(webRootPath, pathOnly);
-
-        if (!System.IO.File.Exists(filePath))
-        {
-            return Redirect(message.FileUrl);
-        }
-
-        var bytes = await System.IO.File.ReadAllBytesAsync(filePath, cancellationToken);
-        return File(bytes, message.FileContentType ?? "application/octet-stream", message.FileName ?? "download");
+        return Redirect(PrivateMediaPathBuilder.Build(message.MediaAssetId.Value, forceDownload: true));
     }
 
     [HttpPatch("conversations/{id:guid}/read")]
@@ -419,6 +396,39 @@ public sealed class ChatController : ControllerBase
             MediaAssetId = uploaded.MediaAssetId,
             Url = uploaded.Url
         }, "Tải ảnh chat thành công."));
+    }
+
+    [HttpPost("avatars")]
+    [RequestSizeLimit(MaxImageBytes)]
+    public async Task<ActionResult<ApiResponse<ChatImageUploadResponse>>> UploadAvatar(IFormFile file, CancellationToken cancellationToken)
+    {
+        if (file is null || file.Length == 0)
+            throw new BadRequestException("CHAT_AVATAR_REQUIRED", "Vui lòng chọn ảnh đại diện nhóm.");
+
+        if (file.Length > MaxImageBytes)
+            throw new BadRequestException("CHAT_AVATAR_TOO_LARGE", "Ảnh đại diện nhóm tối đa 5MB.");
+
+        var extension = Path.GetExtension(file.FileName);
+        if (!AllowedImageExtensions.Contains(extension))
+            throw new BadRequestException("CHAT_AVATAR_TYPE_INVALID", "Ảnh đại diện chỉ hỗ trợ jpg, jpeg, png, webp hoặc gif.");
+
+        await using var stream = file.OpenReadStream();
+        var uploaded = await fileStorageService.UploadImageAsync(
+            new ImageUploadFile
+            {
+                Content = stream,
+                FileName = file.FileName,
+                ContentType = file.ContentType,
+                Length = file.Length
+            },
+            FileUploadScope.Avatar,
+            cancellationToken);
+
+        return Ok(Success(new ChatImageUploadResponse
+        {
+            MediaAssetId = uploaded.MediaAssetId,
+            Url = uploaded.Url
+        }, "Tải ảnh đại diện nhóm thành công."));
     }
 
     [HttpPost("files")]

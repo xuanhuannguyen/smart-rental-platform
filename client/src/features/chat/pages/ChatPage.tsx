@@ -17,6 +17,7 @@ import {
   sendMessage,
   uploadChatFile,
   uploadChatImage,
+  uploadChatAvatar,
   downloadChatFile,
   createJoinRequest,
   getJoinRequests,
@@ -33,6 +34,7 @@ import {
 import { ChatComposer } from '../components/ChatComposer';
 import { CreateGroupModal, OwnerTransferModal, UserSearchModal } from '../components/ChatModals';
 import { ChatDetailsPanel } from '../components/ChatDetailsPanel';
+import { PrivateChatImage, usePrivateChatMediaObjectUrl } from '../components/PrivateChatImage';
 import type { ChatMessage, Conversation, SendChatMessageRequest, ConversationJoinRequest, ChatParticipant, ChatUser } from '../types';
 import { useChatHub } from '../useChatHub';
 import './ChatPage.css';
@@ -483,6 +485,7 @@ export function ChatPage() {
       senderName: currentUser.displayName,
       messageType: request.messageType,
       content: request.content,
+      mediaAssetId: request.mediaAssetId,
       imageUrl: request.imageUrl,
       fileName: request.fileName,
       fileUrl: request.fileUrl,
@@ -520,8 +523,8 @@ export function ChatPage() {
     if (!file) return;
     setImageUploading(true);
     try {
-      const imageUrl = await uploadChatImage(file);
-      await handleSend({ messageType: 'Image', imageUrl });
+      const uploaded = await uploadChatImage(file);
+      await handleSend({ messageType: 'Image', mediaAssetId: uploaded.mediaAssetId });
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Tải ảnh thất bại.');
     } finally {
@@ -536,8 +539,8 @@ export function ChatPage() {
       const meta = await uploadChatFile(file);
       await handleSend({
         messageType: 'File',
+        mediaAssetId: meta.mediaAssetId,
         fileName: meta.fileName,
-        fileUrl: meta.url,
         fileContentType: meta.contentType,
         fileType: meta.contentType,
         fileSize: meta.size
@@ -1153,8 +1156,8 @@ export function ChatPage() {
       {showGroupModal && (
         <CreateGroupModal
           onClose={() => setShowGroupModal(false)}
-          onSubmit={async (title: string, users: ChatUser[], roomingHouseId?: string | null, avatarUrl?: string | null) => {
-            const conversation = await createGroupConversation(title, users.map(user => user.userId), roomingHouseId, avatarUrl);
+          onSubmit={async (title: string, users: ChatUser[], roomingHouseId?: string | null, avatarMediaAssetId?: string | null) => {
+            const conversation = await createGroupConversation(title, users.map(user => user.userId), roomingHouseId, avatarMediaAssetId);
             upsertConversation(conversation);
             selectConversation(conversation.id);
             setShowGroupModal(false);
@@ -1176,10 +1179,14 @@ export function ChatPage() {
 
 function MessageBubble({ message, mine }: { message: ChatMessage; mine: boolean }) {
   const { currentUser } = useAuth();
+  const imageMediaAssetId = message.messageType === 'Image' ? message.mediaAssetId : null;
+  const { objectUrl: imageObjectUrl, error: imageLoadError } = usePrivateChatMediaObjectUrl(imageMediaAssetId);
   
   const handleDownload = async () => {
+    if (!message.mediaAssetId) return;
+
     try {
-      const blob = await downloadChatFile(message.conversationId, message.id);
+      const blob = await downloadChatFile(message.mediaAssetId);
       const objectUrl = URL.createObjectURL(blob);
       const link = document.createElement('a');
       link.href = objectUrl;
@@ -1187,7 +1194,7 @@ function MessageBubble({ message, mine }: { message: ChatMessage; mine: boolean 
       document.body.appendChild(link);
       link.click();
       link.remove();
-      URL.revokeObjectURL(objectUrl);
+      window.setTimeout(() => URL.revokeObjectURL(objectUrl), 0);
     } catch {
       alert('Không thể tải tệp. Vui lòng thử lại.');
     }
@@ -1213,9 +1220,19 @@ function MessageBubble({ message, mine }: { message: ChatMessage; mine: boolean 
     <div className={`message-row ${mine ? 'mine' : ''}`}>
       <div className={`message-bubble message-bubble--${message.messageType.toLowerCase()}`}>
         {!mine && <span className="message-sender">{message.senderName}</span>}
-        {message.messageType === 'Image' && message.imageUrl ? (
-          <img src={toAssetUrl(message.imageUrl)} alt="Ảnh chat" />
-        ) : message.messageType === 'File' ? (
+        {message.messageType === 'Image' && message.mediaAssetId ? (
+          imageLoadError ? (
+            <span className="chat-media-error">Không tải được ảnh.</span>
+          ) : imageObjectUrl ? (
+            <img
+              src={imageObjectUrl}
+              alt="Ảnh chat"
+              onClick={() => window.open(imageObjectUrl, '_blank', 'noopener,noreferrer')}
+            />
+          ) : (
+            <span className="chat-media-loading">Đang tải ảnh...</span>
+          )
+        ) : message.messageType === 'File' && message.mediaAssetId ? (
           <div className="message-file-card">
             <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
               <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" />
@@ -1275,8 +1292,8 @@ function MemberPanel({
     if (!file) return;
     setUpdatingGroup(true);
     try {
-      const url = await uploadChatImage(file);
-      const updated = await updateConversation(conversation.id, undefined, url);
+      const uploaded = await uploadChatAvatar(file);
+      const updated = await updateConversation(conversation.id, undefined, uploaded.mediaAssetId);
       onUpdateConversation(updated);
     } catch (err) {
       alert('Cập nhật ảnh đại diện nhóm thất bại: ' + (err instanceof Error ? err.message : ''));
@@ -1299,10 +1316,28 @@ function MemberPanel({
     }
   };
 
-  const mediaMessages = messages.filter((m) => m.messageType === 'Image' && m.imageUrl && !m.deletedAt);
-  const fileMessages = messages.filter((m) => m.messageType === 'File' && m.fileUrl && !m.deletedAt);
+  const mediaMessages = messages.filter((m) => m.messageType === 'Image' && m.mediaAssetId && !m.deletedAt);
+  const fileMessages = messages.filter((m) => m.messageType === 'File' && m.mediaAssetId && !m.deletedAt);
   const [showMediaList, setShowMediaList] = useState(true);
   const [showFileList, setShowFileList] = useState(false);
+
+  const downloadSharedFile = async (message: ChatMessage) => {
+    if (!message.mediaAssetId) return;
+
+    try {
+      const blob = await downloadChatFile(message.mediaAssetId);
+      const objectUrl = URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      link.href = objectUrl;
+      link.download = message.fileName || 'file';
+      document.body.appendChild(link);
+      link.click();
+      link.remove();
+      window.setTimeout(() => URL.revokeObjectURL(objectUrl), 0);
+    } catch {
+      alert('Không thể tải tệp.');
+    }
+  };
 
   const isAdminOrOwner = conversation.isCurrentUserOwner;
 
@@ -1758,11 +1793,11 @@ function MemberPanel({
               </div>
             ) : (
               mediaMessages.map(m => (
-                <img
+                <PrivateChatImage
                   key={m.id}
-                  src={toAssetUrl(m.imageUrl!)}
+                  mediaAssetId={m.mediaAssetId!}
                   alt="shared media"
-                  onClick={() => window.open(toAssetUrl(m.imageUrl!), '_blank')}
+                  openOnClick
                   style={{ width: '100%', height: '82px', objectFit: 'cover', borderRadius: '8px', cursor: 'pointer', border: '1px solid #e2e8f0' }}
                 />
               ))
@@ -1780,7 +1815,7 @@ function MemberPanel({
               fileMessages.map(m => (
                 <div
                   key={m.id}
-                  onClick={() => window.open(toAssetUrl(m.fileUrl!), '_blank')}
+                  onClick={() => void downloadSharedFile(m)}
                   style={{
                     display: 'flex',
                     alignItems: 'center',

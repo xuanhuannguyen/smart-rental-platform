@@ -1,7 +1,7 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { apiClient } from './apiClient';
 import { tokenStorage } from './tokenStorage';
-import { createMediaUploadSession, uploadFileViaMediaWorkflow } from './media';
+import { buildPublicMediaViewUrl, createMediaUploadSession, extractPrivateMediaAssetId, getPrivateMediaBlob, uploadFileViaMediaWorkflow } from './media';
 
 vi.mock('../../config/env', () => ({
   env: {
@@ -64,6 +64,34 @@ describe('media workflow api', () => {
     );
   });
 
+  it('maps HouseRule uploads to public media and builds an absolute public URL', async () => {
+    const file = new File(['pdf'], 'house-rule.pdf', { type: 'application/pdf' });
+
+    apiClientMock.mockResolvedValue({
+      data: {
+        mediaAssetId: 'house-rule-asset',
+        uploadUrl: '/api/uploads/house-rule-asset',
+        httpMethod: 'PUT',
+        deliveryMode: 'backend-route',
+        expiresAtUtc: '2026-07-15T00:00:00Z',
+      }
+    } as never);
+
+    await createMediaUploadSession(file, 'HouseRule');
+
+    expect(apiClientMock).toHaveBeenCalledWith(
+      '/api/media/upload-url',
+      expect.objectContaining({
+        body: expect.objectContaining({
+          scope: 9,
+          visibility: 1,
+        })
+      })
+    );
+    expect(buildPublicMediaViewUrl('house-rule-asset'))
+      .toBe('http://localhost:5294/api/media/public/house-rule-asset');
+  });
+
   it('uploads binary to backend media route and returns finalized media asset response', async () => {
     const file = new File(['image'], 'avatar.jpg', { type: 'image/jpeg' });
 
@@ -71,7 +99,7 @@ describe('media workflow api', () => {
       .mockResolvedValueOnce({
         data: {
           mediaAssetId: 'asset-123',
-          uploadUrl: '/api/uploads/asset-123',
+          uploadUrl: 'http://localhost:5294/api/media/upload/asset-123',
           httpMethod: 'PUT',
           deliveryMode: 'backend-route',
           expiresAtUtc: '2026-07-14T00:00:00Z',
@@ -93,7 +121,7 @@ describe('media workflow api', () => {
 
     expect(fetchMock).toHaveBeenCalledTimes(1);
     expect(fetchMock).toHaveBeenCalledWith(
-      'http://localhost:5294/api/uploads/asset-123',
+      'http://localhost:5294/api/media/upload/asset-123',
       expect.objectContaining({
         method: 'PUT',
         body: file,
@@ -110,5 +138,64 @@ describe('media workflow api', () => {
       url: '/api/media/private/asset-123',
       status: 'Linked',
     });
+  });
+
+  it('falls back to the backend upload route when a signed upload is blocked', async () => {
+    const file = new File(['image'], 'rooming-house.png', { type: 'image/png' });
+
+    apiClientMock
+      .mockResolvedValueOnce({
+        data: {
+          mediaAssetId: 'asset-s3-fallback',
+          uploadUrl: 'https://media-bucket.s3.amazonaws.com/public/rooming-house.png?signature=test',
+          httpMethod: 'PUT',
+          deliveryMode: 'signed-upload-url',
+          expiresAtUtc: '2026-07-15T00:00:00Z',
+        }
+      } as never)
+      .mockResolvedValueOnce({
+        data: {
+          mediaAssetId: 'asset-s3-fallback',
+          status: 'Uploaded',
+          viewUrl: '/api/media/public/asset-s3-fallback',
+          downloadUrl: null,
+        }
+      } as never);
+
+    vi.mocked(tokenStorage.getAccessToken).mockReturnValue('access-token');
+    fetchMock
+      .mockRejectedValueOnce(new TypeError('Failed to fetch'))
+      .mockResolvedValueOnce(new Response(null, { status: 204 }));
+
+    const result = await uploadFileViaMediaWorkflow(file, 'RoomingHouse');
+
+    expect(fetchMock).toHaveBeenCalledTimes(2);
+    expect(fetchMock.mock.calls[0]?.[0]).toContain('media-bucket.s3.amazonaws.com');
+    expect(fetchMock.mock.calls[1]?.[0]).toBe(
+      'http://localhost:5294/api/media/upload/asset-s3-fallback'
+    );
+
+    const fallbackHeaders = fetchMock.mock.calls[1]?.[1]?.headers as Headers;
+    expect(fallbackHeaders.get('Authorization')).toBe('Bearer access-token');
+    expect(fallbackHeaders.get('Content-Type')).toBe('image/png');
+    expect(result).toEqual({
+      mediaAssetId: 'asset-s3-fallback',
+      url: '/api/media/public/asset-s3-fallback',
+      status: 'Uploaded',
+    });
+  });
+
+  it('extracts private media ids and loads them through an authenticated blob request', async () => {
+    const mediaAssetId = '10483f9c-dc4b-4656-b09c-de36754e9397';
+    const blob = new Blob(['private-image'], { type: 'image/jpeg' });
+    apiClientMock.mockResolvedValue(blob as never);
+
+    expect(extractPrivateMediaAssetId(`/api/media/private/${mediaAssetId}`)).toBe(mediaAssetId);
+    expect(extractPrivateMediaAssetId(`http://localhost:5294/api/media/private/${mediaAssetId}/download`)).toBe(mediaAssetId);
+    await expect(getPrivateMediaBlob(mediaAssetId)).resolves.toBe(blob);
+    expect(apiClientMock).toHaveBeenCalledWith(
+      `/api/media/private/${mediaAssetId}`,
+      { auth: true, responseType: 'blob' }
+    );
   });
 });

@@ -24,7 +24,7 @@ public class DevelopmentDataSeedTests : IClassFixture<TestDatabaseFixture>
     }
 
     [Fact]
-    public async Task EnsureApprovedHouseRuleSeedAsync_ShouldCreateLinkedPrivatePdfAndStayIdempotent()
+    public async Task EnsureApprovedHouseRuleSeedAsync_ShouldCreateLinkedPublicPdfAndStayIdempotent()
     {
         _fixture.Context.RoomingHouses.Add(new RoomingHouse
         {
@@ -42,7 +42,7 @@ public class DevelopmentDataSeedTests : IClassFixture<TestDatabaseFixture>
 
         var storage = new RecordingMediaStorageService();
         var objectKeyFactory = new FixedMediaObjectKeyFactory(
-            "private/rooming-house-rule-pdfs/2026/07/14/approved-house-rule.pdf",
+            "public/rooming-house-rule-pdfs/2026/07/14/approved-house-rule.pdf",
             "approved-house-rule.pdf");
 
         await DevelopmentDataSeed.EnsureApprovedHouseRuleSeedAsync(
@@ -66,7 +66,7 @@ public class DevelopmentDataSeedTests : IClassFixture<TestDatabaseFixture>
         Assert.False(string.IsNullOrWhiteSpace(rule.SecurityPolicy));
         Assert.Equal(LandlordUserId, asset.OwnerUserId);
         Assert.Equal(MediaScope.RoomingHouseRulePdf, asset.Scope);
-        Assert.Equal(MediaVisibility.Private, asset.Visibility);
+        Assert.Equal(MediaVisibility.Public, asset.Visibility);
         Assert.Equal(MediaStatus.Linked, asset.Status);
         Assert.Equal(nameof(RoomingHouseRule), asset.LinkedEntityType);
         Assert.Equal(ApprovedHouseId, asset.LinkedEntityId);

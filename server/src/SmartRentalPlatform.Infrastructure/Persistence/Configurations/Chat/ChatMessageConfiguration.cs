@@ -14,6 +14,7 @@ public sealed class ChatMessageConfiguration : IEntityTypeConfiguration<ChatMess
         builder.Property(x => x.Id).HasColumnName("id");
         builder.Property(x => x.ConversationId).HasColumnName("conversation_id").IsRequired();
         builder.Property(x => x.SenderId).HasColumnName("sender_id").IsRequired();
+        builder.Property(x => x.MediaAssetId).HasColumnName("media_asset_id");
         builder.Property(x => x.MessageType).HasColumnName("message_type").HasConversion<string>().HasMaxLength(20).IsRequired();
         builder.Property(x => x.Content).HasColumnName("content").HasColumnType("text");
         builder.Property(x => x.ImageUrl).HasColumnName("image_url").HasMaxLength(1000);
@@ -26,7 +27,9 @@ public sealed class ChatMessageConfiguration : IEntityTypeConfiguration<ChatMess
 
         builder.HasOne(x => x.Conversation).WithMany(x => x.Messages).HasForeignKey(x => x.ConversationId).OnDelete(DeleteBehavior.Cascade);
         builder.HasOne(x => x.Sender).WithMany().HasForeignKey(x => x.SenderId).OnDelete(DeleteBehavior.Restrict);
+        builder.HasOne(x => x.MediaAsset).WithMany().HasForeignKey(x => x.MediaAssetId).OnDelete(DeleteBehavior.SetNull);
 
         builder.HasIndex(x => new { x.ConversationId, x.CreatedAt }).HasDatabaseName("ix_chat_messages_conversation_created_at");
+        builder.HasIndex(x => x.MediaAssetId).IsUnique().HasDatabaseName("ux_chat_messages_media_asset_id");
     }
 }

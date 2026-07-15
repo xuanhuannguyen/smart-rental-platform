@@ -1,11 +1,15 @@
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Logging;
 using SmartRentalPlatform.Application.Common.Exceptions;
 using SmartRentalPlatform.Application.Common.Interfaces;
+using SmartRentalPlatform.Application.Common.Media;
 using SmartRentalPlatform.Contracts.Chat.Requests;
 using SmartRentalPlatform.Contracts.Chat.Responses;
 using SmartRentalPlatform.Domain.Entities.Chat;
+using SmartRentalPlatform.Domain.Entities.Media;
 using SmartRentalPlatform.Domain.Entities.Users;
 using SmartRentalPlatform.Domain.Enums.Chat;
+using SmartRentalPlatform.Domain.Enums.Media;
 using SmartRentalPlatform.Domain.Enums.Notifications;
 using SmartRentalPlatform.Domain.Enums.RentalContracts;
 using SmartRentalPlatform.Domain.Enums.Users;
@@ -21,15 +25,18 @@ public sealed class ChatService : IChatService
     private readonly IAppDbContext context;
     private readonly INotificationService notificationService;
     private readonly IChatPresenceTracker presenceTracker;
+    private readonly ILogger<ChatService>? logger;
 
     public ChatService(
         IAppDbContext context,
         INotificationService notificationService,
-        IChatPresenceTracker presenceTracker)
+        IChatPresenceTracker presenceTracker,
+        ILogger<ChatService>? logger = null)
     {
         this.context = context;
         this.notificationService = notificationService;
         this.presenceTracker = presenceTracker;
+        this.logger = logger;
     }
 
     public async Task<List<ConversationResponse>> GetConversationsAsync(Guid currentUserId, string? box = null, CancellationToken cancellationToken = default)
@@ -133,13 +140,21 @@ public sealed class ChatService : IChatService
         await EnsureLandlordAsync(currentUserId, cancellationToken);
 
         var now = DateTimeOffset.UtcNow;
+        var conversationId = Guid.NewGuid();
+        var avatarMediaAsset = await ResolveConversationAvatarAsync(
+            currentUserId,
+            conversationId,
+            request.AvatarMediaAssetId,
+            now,
+            cancellationToken);
         var conversation = new Conversation
         {
-            Id = Guid.NewGuid(),
+            Id = conversationId,
             Type = ConversationType.Group,
             Title = NormalizeTitle(request.Title, "Nhóm trò chuyện"),
             RoomingHouseId = request.RoomingHouseId,
-            AvatarUrl = NormalizeOptional(request.AvatarUrl),
+            AvatarUrl = avatarMediaAsset is null ? NormalizeOptional(request.AvatarUrl) : null,
+            AvatarMediaAssetId = avatarMediaAsset?.Id,
             CreatedByUserId = currentUserId,
             CreatedAt = now,
             UpdatedAt = now
@@ -171,7 +186,31 @@ public sealed class ChatService : IChatService
             conversation.Title = NormalizeTitle(request.Title, conversation.Title ?? "Nhóm trò chuyện");
         }
 
-        if (request.AvatarUrl is not null)
+        if (request.AvatarMediaAssetId.HasValue)
+        {
+            var now = DateTimeOffset.UtcNow;
+            var previousAvatarMediaAssetId = conversation.AvatarMediaAssetId;
+            var avatarMediaAsset = await ResolveConversationAvatarAsync(
+                currentUserId,
+                conversation.Id,
+                request.AvatarMediaAssetId,
+                now,
+                cancellationToken);
+
+            conversation.AvatarMediaAssetId = avatarMediaAsset?.Id;
+            conversation.AvatarUrl = null;
+
+            if (previousAvatarMediaAssetId.HasValue &&
+                previousAvatarMediaAssetId != conversation.AvatarMediaAssetId)
+            {
+                await RetireConversationAvatarAsync(
+                    previousAvatarMediaAssetId.Value,
+                    conversation.Id,
+                    now,
+                    cancellationToken);
+            }
+        }
+        else if (request.AvatarUrl is not null)
         {
             conversation.AvatarUrl = NormalizeOptional(request.AvatarUrl);
         }
@@ -378,18 +417,25 @@ public sealed class ChatService : IChatService
         ValidateMessage(messageType, request);
 
         var now = DateTimeOffset.UtcNow;
+        var messageId = Guid.NewGuid();
+        var mediaAsset = await ResolveChatAttachmentAsync(
+            currentUserId,
+            messageId,
+            messageType,
+            request.MediaAssetId,
+            now,
+            cancellationToken);
         var message = new ChatMessage
         {
-            Id = Guid.NewGuid(),
+            Id = messageId,
             ConversationId = conversation.Id,
             SenderId = currentUserId,
+            MediaAssetId = mediaAsset?.Id,
             MessageType = messageType,
             Content = NormalizeOptional(request.Content),
-            ImageUrl = NormalizeOptional(request.ImageUrl),
-            FileUrl = NormalizeOptional(request.FileUrl),
-            FileName = NormalizeOptional(request.FileName),
-            FileContentType = NormalizeOptional(request.FileContentType),
-            FileSize = request.FileSize,
+            FileName = messageType == ChatMessageType.File ? mediaAsset?.OriginalFileName : null,
+            FileContentType = messageType == ChatMessageType.File ? mediaAsset?.ContentType : null,
+            FileSize = messageType == ChatMessageType.File ? mediaAsset?.FileSize : null,
             CreatedAt = now
         };
 
@@ -419,29 +465,54 @@ public sealed class ChatService : IChatService
             recipientIds.Add(participant.UserId);
         }
 
-        await context.SaveChangesAsync(cancellationToken);
+        try
+        {
+            await context.SaveChangesAsync(cancellationToken);
+        }
+        catch (DbUpdateException)
+        {
+            if (mediaAsset is not null && await IsChatMediaAlreadyLinkedAsync(mediaAsset.Id))
+            {
+                throw new BadRequestException(
+                    "CHAT_MEDIA_ALREADY_LINKED",
+                    "Tệp đính kèm đã được sử dụng hoặc không còn sẵn sàng.");
+            }
+
+            throw;
+        }
 
         var savedMessage = await context.ChatMessages
             .AsNoTracking()
             .Include(x => x.Sender)
-            .FirstAsync(x => x.Id == message.Id, cancellationToken);
+            .FirstAsync(x => x.Id == message.Id, CancellationToken.None);
 
         foreach (var recipientId in recipientIds)
         {
             if (!presenceTracker.IsUserViewingConversation(conversationId, recipientId))
             {
-                await notificationService.CreateAsync(
-                    recipientId,
-                    NotificationType.NewChatMessage,
-                    "Tin nhắn mới",
-                    BuildNotificationBody(savedMessage),
-                    conversationId.ToString(),
-                    "Conversation",
-                    cancellationToken);
+                try
+                {
+                    await notificationService.CreateAsync(
+                        recipientId,
+                        NotificationType.NewChatMessage,
+                        "Tin nhắn mới",
+                        BuildNotificationBody(savedMessage),
+                        conversationId.ToString(),
+                        "Conversation",
+                        CancellationToken.None);
+                }
+                catch (Exception exception)
+                {
+                    logger?.LogWarning(
+                        exception,
+                        "Failed to create chat notification for user {RecipientUserId} after message {MessageId} was committed.",
+                        recipientId,
+                        savedMessage.Id);
+                }
             }
         }
 
-        var refreshed = await LoadConversationAsync(conversationId, cancellationToken);
+        var refreshed = await LoadConversationAsync(conversationId, CancellationToken.None);
         var response = MapMessage(savedMessage, currentUserId);
         response.ClientMessageId = request.ClientMessageId;
 
@@ -577,7 +648,6 @@ public sealed class ChatService : IChatService
     private static void ValidateMessage(ChatMessageType type, SendChatMessageRequest request)
     {
         var content = request.Content?.Trim();
-        var imageUrl = request.ImageUrl?.Trim();
 
         if (type == ChatMessageType.Text && string.IsNullOrWhiteSpace(content))
             throw new BadRequestException("CHAT_TEXT_REQUIRED", "Nội dung tin nhắn không được để trống.");
@@ -587,10 +657,152 @@ public sealed class ChatService : IChatService
             throw new BadRequestException("CHAT_ICON_REQUIRED", "Vui lòng chọn biểu tượng.");
         if (type == ChatMessageType.Icon && content!.Length > MaxIconLength)
             throw new BadRequestException("CHAT_ICON_TOO_LONG", "Biểu tượng không hợp lệ.");
-        if (type == ChatMessageType.Image && string.IsNullOrWhiteSpace(imageUrl))
+        if (type == ChatMessageType.Image && !request.MediaAssetId.HasValue)
             throw new BadRequestException("CHAT_IMAGE_REQUIRED", "Vui lòng tải ảnh trước khi gửi.");
-        if (type == ChatMessageType.File && string.IsNullOrWhiteSpace(request.FileUrl))
+        if (type == ChatMessageType.File && !request.MediaAssetId.HasValue)
             throw new BadRequestException("CHAT_FILE_REQUIRED", "Vui lòng chọn tệp tin đính kèm.");
+        if (type is not ChatMessageType.Image and not ChatMessageType.File && request.MediaAssetId.HasValue)
+            throw new BadRequestException("CHAT_MEDIA_NOT_ALLOWED", "Loại tin nhắn này không hỗ trợ tệp đính kèm.");
+    }
+
+    private async Task<MediaAsset?> ResolveChatAttachmentAsync(
+        Guid senderUserId,
+        Guid messageId,
+        ChatMessageType messageType,
+        Guid? mediaAssetId,
+        DateTimeOffset now,
+        CancellationToken cancellationToken)
+    {
+        if (messageType is not ChatMessageType.Image and not ChatMessageType.File)
+            return null;
+
+        var mediaAsset = await context.MediaAssets
+            .FirstOrDefaultAsync(x => x.Id == mediaAssetId!.Value, cancellationToken)
+            ?? throw new BadRequestException(
+                "CHAT_MEDIA_NOT_FOUND",
+                "Không tìm thấy tệp đính kèm đã tải lên.");
+
+        if (mediaAsset.OwnerUserId != senderUserId)
+            throw new ForbiddenException(
+                "CHAT_MEDIA_FORBIDDEN",
+                "Bạn không có quyền sử dụng tệp đính kèm này.");
+
+        if (mediaAsset.Scope != MediaScope.ChatAttachment ||
+            mediaAsset.Visibility != MediaVisibility.Private)
+        {
+            throw new BadRequestException(
+                "CHAT_MEDIA_INVALID",
+                "Media asset không phù hợp với tệp đính kèm chat.");
+        }
+
+        if (mediaAsset.Status != MediaStatus.Uploaded ||
+            mediaAsset.LinkedEntityId.HasValue ||
+            !string.IsNullOrWhiteSpace(mediaAsset.LinkedEntityType))
+        {
+            throw new BadRequestException(
+                "CHAT_MEDIA_ALREADY_LINKED",
+                "Tệp đính kèm đã được sử dụng hoặc không còn sẵn sàng.");
+        }
+
+        if (messageType == ChatMessageType.Image &&
+            !mediaAsset.ContentType.StartsWith("image/", StringComparison.OrdinalIgnoreCase))
+        {
+            throw new BadRequestException(
+                "CHAT_IMAGE_TYPE_INVALID",
+                "Media asset được chọn không phải là ảnh.");
+        }
+
+        mediaAsset.Status = MediaStatus.Linked;
+        mediaAsset.LinkedEntityType = nameof(ChatMessage);
+        mediaAsset.LinkedEntityId = messageId;
+        mediaAsset.DeletedAt = null;
+        mediaAsset.UpdatedAt = now;
+
+        return mediaAsset;
+    }
+
+    private Task<bool> IsChatMediaAlreadyLinkedAsync(Guid mediaAssetId)
+    {
+        return context.ChatMessages
+            .AsNoTracking()
+            .AnyAsync(x => x.MediaAssetId == mediaAssetId, CancellationToken.None);
+    }
+
+    private async Task<MediaAsset?> ResolveConversationAvatarAsync(
+        Guid ownerUserId,
+        Guid conversationId,
+        Guid? mediaAssetId,
+        DateTimeOffset now,
+        CancellationToken cancellationToken)
+    {
+        if (!mediaAssetId.HasValue)
+            return null;
+
+        var mediaAsset = await context.MediaAssets
+            .FirstOrDefaultAsync(x => x.Id == mediaAssetId.Value, cancellationToken)
+            ?? throw new BadRequestException(
+                "CHAT_AVATAR_MEDIA_NOT_FOUND",
+                "Không tìm thấy media asset của avatar nhóm.");
+
+        if (mediaAsset.OwnerUserId != ownerUserId)
+            throw new ForbiddenException(
+                "CHAT_AVATAR_MEDIA_FORBIDDEN",
+                "Bạn không có quyền sử dụng avatar media asset này.");
+
+        if (mediaAsset.Scope != MediaScope.Avatar ||
+            mediaAsset.Visibility != MediaVisibility.Public ||
+            !mediaAsset.ContentType.StartsWith("image/", StringComparison.OrdinalIgnoreCase))
+        {
+            throw new BadRequestException(
+                "CHAT_AVATAR_MEDIA_INVALID",
+                "Media asset được chọn không phải avatar nhóm hợp lệ.");
+        }
+
+        var alreadyLinkedToConversation =
+            mediaAsset.Status == MediaStatus.Linked &&
+            mediaAsset.LinkedEntityType == nameof(Conversation) &&
+            mediaAsset.LinkedEntityId == conversationId;
+
+        if (!alreadyLinkedToConversation &&
+            (mediaAsset.Status != MediaStatus.Uploaded ||
+             mediaAsset.LinkedEntityId.HasValue ||
+             !string.IsNullOrWhiteSpace(mediaAsset.LinkedEntityType)))
+        {
+            throw new BadRequestException(
+                "CHAT_AVATAR_MEDIA_ALREADY_LINKED",
+                "Avatar media asset đã được sử dụng hoặc không còn sẵn sàng.");
+        }
+
+        mediaAsset.Status = MediaStatus.Linked;
+        mediaAsset.LinkedEntityType = nameof(Conversation);
+        mediaAsset.LinkedEntityId = conversationId;
+        mediaAsset.DeletedAt = null;
+        mediaAsset.UpdatedAt = now;
+        return mediaAsset;
+    }
+
+    private async Task RetireConversationAvatarAsync(
+        Guid mediaAssetId,
+        Guid conversationId,
+        DateTimeOffset now,
+        CancellationToken cancellationToken)
+    {
+        var mediaAsset = await context.MediaAssets
+            .FirstOrDefaultAsync(x => x.Id == mediaAssetId, cancellationToken);
+
+        if (mediaAsset is null ||
+            mediaAsset.Scope != MediaScope.Avatar ||
+            mediaAsset.LinkedEntityType != nameof(Conversation) ||
+            mediaAsset.LinkedEntityId != conversationId)
+        {
+            return;
+        }
+
+        mediaAsset.LinkedEntityType = null;
+        mediaAsset.LinkedEntityId = null;
+        mediaAsset.Status = MediaStatus.Deleted;
+        mediaAsset.DeletedAt = now;
+        mediaAsset.UpdatedAt = now;
     }
 
     private static string BuildPreview(ChatMessageType type, string? content)
@@ -654,7 +866,10 @@ public sealed class ChatService : IChatService
             RoomingHouseId = conversation.RoomingHouseId,
             RoomingHouseName = conversation.RoomingHouse?.Name,
             InboxStatus = currentParticipant?.InboxStatus.ToString() ?? "Main",
-            AvatarUrl = conversation.AvatarUrl,
+            AvatarUrl = conversation.AvatarMediaAssetId.HasValue
+                ? PublicMediaPathBuilder.Build(conversation.AvatarMediaAssetId.Value)
+                : conversation.AvatarUrl,
+            AvatarMediaAssetId = conversation.AvatarMediaAssetId,
             Participants = conversation.Participants
                 .OrderBy(x => x.Role == ConversationParticipantRole.Owner ? 0 : 1)
                 .ThenBy(x => x.User?.DisplayName ?? string.Empty)
@@ -717,8 +932,13 @@ public sealed class ChatService : IChatService
             SenderName = message.Sender?.DisplayName ?? "Chủ trọ",
             MessageType = message.MessageType.ToString(),
             Content = content,
-            ImageUrl = isDeleted ? null : message.ImageUrl,
-            FileUrl = isDeleted ? null : message.FileUrl,
+            MediaAssetId = isDeleted ? null : message.MediaAssetId,
+            ImageUrl = !isDeleted && message.MessageType == ChatMessageType.Image && message.MediaAssetId.HasValue
+                ? PrivateMediaPathBuilder.Build(message.MediaAssetId.Value)
+                : null,
+            FileUrl = !isDeleted && message.MessageType == ChatMessageType.File && message.MediaAssetId.HasValue
+                ? PrivateMediaPathBuilder.Build(message.MediaAssetId.Value, forceDownload: true)
+                : null,
             FileName = isDeleted ? null : message.FileName,
             FileContentType = isDeleted ? null : message.FileContentType,
             FileSize = isDeleted ? null : message.FileSize,
@@ -784,6 +1004,7 @@ public sealed class ChatService : IChatService
 
         var now = DateTimeOffset.UtcNow;
         message.DeletedAt = now;
+        await RetireMessageMediaAssetAsync(message, now, cancellationToken);
 
         var latestMessage = await context.ChatMessages
             .Where(x => x.ConversationId == conversationId && x.Id != messageId)
@@ -1401,7 +1622,7 @@ public sealed class ChatService : IChatService
         var now = DateTimeOffset.UtcNow;
         message.DeletedAt = now;
         message.Content = "Tin nhắn đã bị thu hồi";
-        message.ImageUrl = null;
+        await RetireMessageMediaAssetAsync(message, now, cancellationToken);
 
         var conversation = message.Conversation;
         if (conversation.LastMessagePreview != null)
@@ -1412,6 +1633,31 @@ public sealed class ChatService : IChatService
 
         await context.SaveChangesAsync(cancellationToken);
         return MapMessage(message, currentUserId);
+    }
+
+    private async Task RetireMessageMediaAssetAsync(
+        ChatMessage message,
+        DateTimeOffset now,
+        CancellationToken cancellationToken)
+    {
+        if (message.MediaAssetId.HasValue)
+        {
+            var mediaAsset = await context.MediaAssets
+                .FirstOrDefaultAsync(x => x.Id == message.MediaAssetId.Value, cancellationToken);
+
+            if (mediaAsset is not null)
+            {
+                mediaAsset.Status = MediaStatus.Deleted;
+                mediaAsset.LinkedEntityType = null;
+                mediaAsset.LinkedEntityId = null;
+                mediaAsset.DeletedAt = now;
+                mediaAsset.UpdatedAt = now;
+            }
+        }
+
+        message.MediaAssetId = null;
+        message.ImageUrl = null;
+        message.FileUrl = null;
     }
 
     public async Task<ChatMessageResponse> GetFileMessageAsync(Guid currentUserId, Guid conversationId, Guid messageId, CancellationToken cancellationToken = default)

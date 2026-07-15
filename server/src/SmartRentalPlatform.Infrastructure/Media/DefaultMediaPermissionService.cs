@@ -3,6 +3,7 @@ using SmartRentalPlatform.Application.Common.Interfaces;
 using SmartRentalPlatform.Application.Common.Interfaces.Media;
 using SmartRentalPlatform.Application.RentalContracts;
 using SmartRentalPlatform.Domain.Entities.Billing;
+using SmartRentalPlatform.Domain.Entities.Chat;
 using SmartRentalPlatform.Domain.Entities.Media;
 using SmartRentalPlatform.Domain.Entities.Properties;
 using SmartRentalPlatform.Domain.Entities.RentalContracts;
@@ -111,6 +112,14 @@ public class DefaultMediaPermissionService : IMediaPermissionService
         if (string.Equals(mediaAsset.LinkedEntityType, nameof(RoomingHouseRule), StringComparison.Ordinal))
         {
             return await CanAccessRoomingHouseRuleAsync(
+                actorUserId.Value,
+                mediaAsset.LinkedEntityId.Value,
+                cancellationToken);
+        }
+
+        if (string.Equals(mediaAsset.LinkedEntityType, nameof(ChatMessage), StringComparison.Ordinal))
+        {
+            return await CanAccessChatMessageAsync(
                 actorUserId.Value,
                 mediaAsset.LinkedEntityId.Value,
                 cancellationToken);
@@ -265,6 +274,23 @@ public class DefaultMediaPermissionService : IMediaPermissionService
             .FirstOrDefaultAsync(cancellationToken);
 
         return landlordUserId != Guid.Empty && landlordUserId == actorUserId;
+    }
+
+    private Task<bool> CanAccessChatMessageAsync(
+        Guid actorUserId,
+        Guid chatMessageId,
+        CancellationToken cancellationToken)
+    {
+        return dbContext.ChatMessages
+            .AsNoTracking()
+            .AnyAsync(
+                message => message.Id == chatMessageId &&
+                           message.DeletedAt == null &&
+                           message.Conversation.Participants.Any(participant =>
+                               participant.UserId == actorUserId &&
+                               participant.LeftAt == null &&
+                               participant.JoinedAt <= message.CreatedAt),
+                cancellationToken);
     }
 
     private static bool CanAccessByDefault(Guid? actorUserId, MediaAsset mediaAsset)

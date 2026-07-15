@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import type { ReactNode } from 'react';
 import { getApiErrorMessage } from '../../../shared/api/apiError';
-import { toAssetUrl } from '../../../shared/api/assets';
+import { PrivateMediaImage } from '../../../shared/components/media/PrivateMediaImage';
 import { formatStatus } from '../../../shared/utils/status';
 import { uploadImage } from '../../files/api';
 import {
@@ -912,7 +912,7 @@ function LegalImageField({
       {previewSrc ? (
         /* Preview state */
         <div className="legal-image-preview">
-          <img alt={label} src={previewSrc} className="legal-image-preview__img" />
+          <PrivateMediaImage alt={label} source={previewSrc} className="legal-image-preview__img" />
           {!readOnly && (
             <div className="legal-image-preview__overlay">
               <label className="legal-image-action-btn legal-image-action-btn--replace">

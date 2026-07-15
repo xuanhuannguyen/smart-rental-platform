@@ -57,11 +57,7 @@ public class MediaController : ControllerBase
         }
 
         var stream = await _mediaStorageService.OpenReadAsync(mediaAsset.ObjectKey, cancellationToken);
-        var fileName = string.IsNullOrWhiteSpace(mediaAsset.StoredFileName)
-            ? Path.GetFileName(mediaAsset.ObjectKey)
-            : mediaAsset.StoredFileName;
-
-        return File(stream, mediaAsset.ContentType, fileName, enableRangeProcessing: true);
+        return File(stream, mediaAsset.ContentType, enableRangeProcessing: true);
     }
 
     [Authorize]

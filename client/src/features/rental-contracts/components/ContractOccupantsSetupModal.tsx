@@ -3,8 +3,8 @@ import { useAuth } from '../../../app/providers/AuthProvider';
 import { apiClient } from '../../../shared/api/apiClient';
 import { getApiErrorMessage } from '../../../shared/api/apiError';
 import type { ApiResponse } from '../../../shared/api/apiResponse.types';
-import { toAssetUrl } from '../../../shared/api/assets';
 import { ENDPOINTS } from '../../../shared/api/endpoints';
+import { PrivateMediaImage } from '../../../shared/components/media/PrivateMediaImage';
 import { Alert } from '../../../shared/components/ui/Alert';
 import { Toast } from '../../../shared/components/ui/Toast';
 import { Button } from '../../../shared/components/ui/Button';
@@ -727,8 +727,8 @@ function DocumentImageUploadField({
       </label>
       {previewSrc ? (
         <div style={{ display: 'grid', gap: 8 }}>
-          <img
-            src={previewSrc}
+          <PrivateMediaImage
+            source={previewSrc}
             alt={label}
             style={{
               width: '100%',

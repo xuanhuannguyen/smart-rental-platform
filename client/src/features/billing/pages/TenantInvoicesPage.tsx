@@ -5,7 +5,8 @@ import { useNavigate, useParams } from 'react-router-dom';
 import { useAuth } from '../../../app/providers/AuthProvider';
 import { ROUTE_PATHS } from '../../../app/router/routePaths';
 import { getApiErrorMessage } from '../../../shared/api/apiError';
-import { toAssetUrl, toAvatarImageUrl } from '../../../shared/api/assets';
+import { toAvatarImageUrl } from '../../../shared/api/assets';
+import { PrivateMediaImage } from '../../../shared/components/media/PrivateMediaImage';
 import { Toast } from '../../../shared/components/ui/Toast';
 import { Button } from '../../../shared/components/ui/Button';
 import { billingApi } from '../api';
@@ -258,7 +259,7 @@ export function TenantInvoicesPanel({ invoiceId: controlledInvoiceId, onOpenInvo
                             type="button"
                             className="tenant-meter-proof-button"
                             onClick={() => setMeterImagePreview({
-                              src: toAssetUrl(item.meterReadingProofImageUrl!),
+                              src: item.meterReadingProofImageUrl!,
                               title: getMeterReadingButtonLabel(item),
                               subtitle: item.description
                             })}
@@ -317,7 +318,7 @@ export function TenantInvoicesPanel({ invoiceId: controlledInvoiceId, onOpenInvo
               <span>{meterImagePreview.subtitle}</span>
             </div>
             <button type="button" onClick={() => setMeterImagePreview(null)} aria-label="Đóng ảnh chỉ số">×</button>
-            <img src={meterImagePreview.src} alt={meterImagePreview.title} />
+            <PrivateMediaImage source={meterImagePreview.src} alt={meterImagePreview.title} />
           </div>
         </div>
       )}

@@ -70,10 +70,14 @@ public class MediaBackedFileStorageServiceTests : IClassFixture<TestDatabaseFixt
         var response = await service.UploadPdfAsync(stream, "house-rule.pdf", FileUploadScope.HouseRule);
 
         Assert.NotNull(response.MediaAssetId);
+        Assert.Equal($"/api/media/public/{response.MediaAssetId:D}", response.Url);
+        Assert.NotNull(storage.LastRequest);
+        Assert.Equal(MediaVisibility.Public, storage.LastRequest!.Visibility);
 
         var asset = await _fixture.Context.MediaAssets.FindAsync(response.MediaAssetId!.Value);
         Assert.NotNull(asset);
         Assert.Equal(MediaScope.RoomingHouseRulePdf, asset!.Scope);
+        Assert.Equal(MediaVisibility.Public, asset.Visibility);
         Assert.Equal("application/pdf", asset.ContentType);
         Assert.Equal(11, asset.FileSize);
     }

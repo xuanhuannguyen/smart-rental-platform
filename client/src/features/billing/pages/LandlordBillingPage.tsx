@@ -4,7 +4,7 @@ import type { Dispatch, FormEvent, ReactNode, SetStateAction } from 'react';
 import { useLocation, useNavigate, useParams } from 'react-router-dom';
 import { ROUTE_PATHS } from '../../../app/router/routePaths';
 import { getApiErrorMessage } from '../../../shared/api/apiError';
-import { toAssetUrl } from '../../../shared/api/assets';
+import { PrivateMediaImage } from '../../../shared/components/media/PrivateMediaImage';
 import { Toast } from '../../../shared/components/ui/Toast';
 import { Tabs } from '../../../shared/components/ui/Tabs';
 import { PageHeader } from '../../../shared/components/ui/PageHeader';
@@ -1239,13 +1239,18 @@ function BulkInvoiceRoomCard({
                         <button
                           type="button"
                           className="bulk-meter-thumbnail"
-                          onClick={() => setMeterImagePreview({
-                            src: toAssetUrl(draft.proofImageUrl),
-                            alt: `Đồng hồ ${service.serviceName} phòng ${room.contract.roomNumber}`
-                          })}
+                          onClick={(event) => {
+                            const resolvedImageUrl = event.currentTarget.querySelector('img')?.src;
+                            if (resolvedImageUrl) {
+                              setMeterImagePreview({
+                                src: resolvedImageUrl,
+                                alt: `Đồng hồ ${service.serviceName} phòng ${room.contract.roomNumber}`
+                              });
+                            }
+                          }}
                           aria-label={`Xem ảnh đồng hồ ${service.serviceName} kích thước lớn`}
                         >
-                          <img src={toAssetUrl(draft.proofImageUrl)} alt={`Đồng hồ ${service.serviceName} phòng ${room.contract.roomNumber}`} />
+                          <PrivateMediaImage source={draft.proofImageUrl} alt={`Đồng hồ ${service.serviceName} phòng ${room.contract.roomNumber}`} />
                           <span>Xem ảnh</span>
                         </button>
                       )}

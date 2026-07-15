@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import { getApiErrorMessage } from '../../../shared/api/apiError';
-import { buildPrivateMediaViewUrl } from '../../../shared/api/media';
+import { buildPublicMediaViewUrl } from '../../../shared/api/media';
+import { toAssetUrl } from '../../../shared/api/assets';
 import { type FileUploadResponse, uploadPdf } from '../../files/api';
 import { upsertRoomingHouseRule, previewRoomingHouseRule } from '../api';
 import { Toast } from '../../../shared/components/ui/Toast';
@@ -124,7 +125,9 @@ export default function RoomingHouseRuleEditor({
   const isEmpty = sourceType === 'PdfUpload'
     ? !pdfMediaAssetId
     : !form.generalRules && !form.quietHours && !form.securityPolicy && !form.cleaningPolicy && !form.guestPolicy && !form.parkingPolicy && !form.utilityPolicy && !form.damageCompensationPolicy && !form.additionalNotes;
-  const pdfLink = uploadedPdf?.url || houseRule?.pdfUrl || (pdfMediaAssetId ? buildPrivateMediaViewUrl(pdfMediaAssetId) : '');
+  const pdfLink = pdfMediaAssetId
+    ? buildPublicMediaViewUrl(pdfMediaAssetId)
+    : toAssetUrl(uploadedPdf?.url || houseRule?.pdfUrl || '');
   const hasPdf = Boolean(pdfMediaAssetId || pdfLink);
 
   return (

@@ -6,7 +6,8 @@ import HouseImageGallery from './components/HouseImageGallery';
 import RentalAiChatbot from './components/RentalAiChatbot';
 import FavoriteButton from './components/FavoriteButton';
 import type { RoomingHouseDetail } from './types';
-import { toPublicPropertyImageUrl } from '../../shared/api/assets';
+import { toAssetUrl, toPublicPropertyImageUrl } from '../../shared/api/assets';
+import { buildPublicMediaViewUrl } from '../../shared/api/media';
 import { getApiErrorMessage } from '../../shared/api/apiError';
 import { HomeHeader } from '../../shared/components/layout/HomeHeader';
 import { ROUTE_PATHS } from '../../app/router/routePaths';
@@ -280,10 +281,12 @@ export default function PublicRoomingHouseDetailPage() {
 
           <div className="rules-card-body">
             <div className="rules-card-info">
-              {house.houseRule?.pdfUrl ? (
+              {house.houseRule?.mediaAssetId || house.houseRule?.pdfUrl ? (
                 <a
                   className="public-house-detail__rule-link"
-                  href={house.houseRule.pdfUrl}
+                  href={house.houseRule.mediaAssetId
+                    ? buildPublicMediaViewUrl(house.houseRule.mediaAssetId)
+                    : toAssetUrl(house.houseRule.pdfUrl ?? '')}
                   target="_blank"
                   rel="noreferrer"
                 >

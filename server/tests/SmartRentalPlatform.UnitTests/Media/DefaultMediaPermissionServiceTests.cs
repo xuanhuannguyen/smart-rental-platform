@@ -1,9 +1,11 @@
 using SmartRentalPlatform.Domain.Entities.Media;
 using SmartRentalPlatform.Domain.Entities.Billing;
+using SmartRentalPlatform.Domain.Entities.Chat;
 using SmartRentalPlatform.Domain.Entities.Properties;
 using SmartRentalPlatform.Domain.Entities.RentalContracts;
 using SmartRentalPlatform.Domain.Entities.Users;
 using SmartRentalPlatform.Domain.Enums.Billing;
+using SmartRentalPlatform.Domain.Enums.Chat;
 using SmartRentalPlatform.Domain.Enums;
 using SmartRentalPlatform.Domain.Enums.Media;
 using SmartRentalPlatform.Domain.Enums.Properties;
@@ -22,6 +24,33 @@ public class DefaultMediaPermissionServiceTests : IClassFixture<TestDatabaseFixt
     {
         this.fixture = fixture;
         this.fixture.Reset();
+    }
+
+    [Fact]
+    public async Task CanViewAsync_ForPublicHouseRule_ShouldAllowAnonymousUser()
+    {
+        var mediaAsset = new MediaAsset
+        {
+            Id = Guid.NewGuid(),
+            BucketName = "local-media",
+            ObjectKey = $"public/rooming-house-rule-pdfs/{Guid.NewGuid():N}.pdf",
+            OriginalFileName = "house-rule.pdf",
+            StoredFileName = "house-rule.pdf",
+            ContentType = "application/pdf",
+            FileSize = 10,
+            Scope = MediaScope.RoomingHouseRulePdf,
+            Visibility = MediaVisibility.Public,
+            Status = MediaStatus.Linked,
+            LinkedEntityType = nameof(RoomingHouseRule),
+            LinkedEntityId = Guid.NewGuid(),
+            CreatedAt = DateTimeOffset.UtcNow,
+            UpdatedAt = DateTimeOffset.UtcNow
+        };
+        var service = new DefaultMediaPermissionService(fixture.Context);
+
+        var allowed = await service.CanViewAsync(null, mediaAsset);
+
+        Assert.True(allowed);
     }
 
     [Fact]
@@ -124,6 +153,90 @@ public class DefaultMediaPermissionServiceTests : IClassFixture<TestDatabaseFixt
         var allowed = await service.CanViewAsync(adminId, mediaAsset);
 
         Assert.True(allowed);
+    }
+
+    [Fact]
+    public async Task CanViewAsync_ForChatAttachment_ShouldAllowActiveParticipantAndDenyOutsider()
+    {
+        var sender = TestDataBuilder.BuildUser(email: "chat-sender@test.com", displayName: "Chat Sender");
+        var recipient = TestDataBuilder.BuildUser(email: "chat-recipient@test.com", displayName: "Chat Recipient");
+        var outsider = TestDataBuilder.BuildUser(email: "chat-outsider@test.com", displayName: "Chat Outsider");
+        var conversationId = Guid.NewGuid();
+        var messageId = Guid.NewGuid();
+        var mediaAssetId = Guid.NewGuid();
+        var createdAt = DateTimeOffset.UtcNow;
+        var conversation = new Conversation
+        {
+            Id = conversationId,
+            Type = ConversationType.Direct,
+            DirectUserAId = sender.Id,
+            DirectUserBId = recipient.Id,
+            CreatedByUserId = sender.Id,
+            CreatedByUser = sender,
+            CreatedAt = createdAt,
+            UpdatedAt = createdAt,
+            Participants =
+            [
+                new ConversationParticipant
+                {
+                    ConversationId = conversationId,
+                    UserId = sender.Id,
+                    User = sender,
+                    JoinedAt = createdAt.AddMinutes(-1)
+                },
+                new ConversationParticipant
+                {
+                    ConversationId = conversationId,
+                    UserId = recipient.Id,
+                    User = recipient,
+                    JoinedAt = createdAt.AddMinutes(-1)
+                }
+            ]
+        };
+        var mediaAsset = new MediaAsset
+        {
+            Id = mediaAssetId,
+            OwnerUserId = sender.Id,
+            BucketName = "local-media",
+            ObjectKey = $"private/chat-attachments/{mediaAssetId:N}.jpg",
+            OriginalFileName = "chat.jpg",
+            StoredFileName = "chat.jpg",
+            ContentType = "image/jpeg",
+            FileSize = 10,
+            Scope = MediaScope.ChatAttachment,
+            Visibility = MediaVisibility.Private,
+            Status = MediaStatus.Linked,
+            LinkedEntityType = nameof(ChatMessage),
+            LinkedEntityId = messageId,
+            CreatedAt = createdAt,
+            UpdatedAt = createdAt
+        };
+        var message = new ChatMessage
+        {
+            Id = messageId,
+            ConversationId = conversationId,
+            Conversation = conversation,
+            SenderId = sender.Id,
+            Sender = sender,
+            MediaAssetId = mediaAssetId,
+            MediaAsset = mediaAsset,
+            MessageType = ChatMessageType.Image,
+            CreatedAt = createdAt
+        };
+
+        fixture.Context.Users.AddRange(sender, recipient, outsider);
+        fixture.Context.Conversations.Add(conversation);
+        fixture.Context.MediaAssets.Add(mediaAsset);
+        fixture.Context.ChatMessages.Add(message);
+        await fixture.Context.SaveChangesAsync();
+        fixture.Context.ChangeTracker.Clear();
+
+        var service = new DefaultMediaPermissionService(fixture.Context);
+        var activeParticipantAllowed = await service.CanViewAsync(recipient.Id, mediaAsset);
+        var outsiderAllowed = await service.CanViewAsync(outsider.Id, mediaAsset);
+
+        Assert.True(activeParticipantAllowed);
+        Assert.False(outsiderAllowed);
     }
 
     [Fact]

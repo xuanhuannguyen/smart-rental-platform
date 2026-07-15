@@ -1,5 +1,5 @@
 import { Alert } from '../../../shared/components/ui/Alert';
-import { toAssetUrl } from '../../../shared/api/assets';
+import { PrivateMediaImage } from '../../../shared/components/media/PrivateMediaImage';
 import { useState, useEffect, useMemo, type FormEvent } from 'react';
 import { useParams, useNavigate, useLocation } from 'react-router-dom';
 import { useAuth } from '../../../app/providers/AuthProvider';
@@ -1691,7 +1691,7 @@ function CreateInvoiceWithReadingsModal({
                             </div>
                             <div className="meter-image-panel">
                               <span className="label">ẢNH ĐỒNG HỒ {price.serviceName.toUpperCase()}</span>
-                              {draft.proofImageUrl ? <img src={toAssetUrl(draft.proofImageUrl)} alt={`Đồng hồ ${price.serviceName}`} /> : <div className="meter-image-empty">Chưa có ảnh đồng hồ</div>}
+                              {draft.proofImageUrl ? <PrivateMediaImage source={draft.proofImageUrl} alt={`Đồng hồ ${price.serviceName}`} /> : <div className="meter-image-empty">Chưa có ảnh đồng hồ</div>}
                               <label className="meter-upload-button">
                                 {uploadingServiceId === price.serviceTypeId ? 'AI đang đọc ảnh...' : draft.proofImageUrl ? 'Thay ảnh' : 'Upload & đọc ảnh'}
                                 <input type="file" accept="image/jpeg,image/png" disabled={uploadingServiceId !== ''} onChange={(event) => { void handleMeterImage(price.serviceTypeId, event.target.files?.[0]); event.currentTarget.value = ''; }} />
@@ -2003,14 +2003,6 @@ function getInvoiceStatusClass(status: string) {
 function isRoomEditLocked(room: Room | null) {
   return room?.status === 'Reserved' || room?.status === 'Occupied';
 }
-
-function resolveMeterProofUrl(imageUrl?: string | null) {
-  if (imageUrl?.trim()) {
-    return toAssetUrl(imageUrl);
-  }
-  return '';
-}
-
 
 function getAppendixStatusClass(status: ContractAppendixStatus) {
   switch (status) {

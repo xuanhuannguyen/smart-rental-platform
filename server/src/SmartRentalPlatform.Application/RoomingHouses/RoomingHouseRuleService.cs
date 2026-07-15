@@ -115,14 +115,14 @@ public class RoomingHouseRuleService : IRoomingHouseRuleService
                 $"house-rule-{roomingHouseId:N}.pdf",
                 FileUploadScope.HouseRule,
                 cancellationToken);
-            if (uploaded.MediaAssetId.HasValue)
-            {
-                rule.MediaAssetId = uploaded.MediaAssetId.Value;
-            }
-            else
-            {
-                throw new InvalidOperationException("PDF luật khu trọ phải trả về mediaAssetId sau khi tải lên.");
-            }
+            var generatedRulePdf = await EnsureRuleMediaAssetAsync(
+                roomingHouseId,
+                landlordUserId,
+                uploaded.MediaAssetId,
+                rule.MediaAssetId,
+                now,
+                cancellationToken);
+            rule.MediaAssetId = generatedRulePdf.MediaAssetId;
         }
 
         rule.UpdatedAt = now;
@@ -206,14 +206,15 @@ public class RoomingHouseRuleService : IRoomingHouseRuleService
             {
                 currentLinkedAsset.LinkedEntityType = null;
                 currentLinkedAsset.LinkedEntityId = null;
-                currentLinkedAsset.Status = MediaStatus.Uploaded;
+                currentLinkedAsset.Status = MediaStatus.Deleted;
+                currentLinkedAsset.DeletedAt = now;
                 currentLinkedAsset.UpdatedAt = now;
             }
         }
 
         mediaAsset.OwnerUserId = ownerUserId;
         mediaAsset.Scope = MediaScope.RoomingHouseRulePdf;
-        mediaAsset.Visibility = MediaVisibility.Private;
+        mediaAsset.Visibility = MediaVisibility.Public;
         mediaAsset.Status = MediaStatus.Linked;
         mediaAsset.LinkedEntityType = nameof(RoomingHouseRule);
         mediaAsset.LinkedEntityId = roomingHouseId;
@@ -339,7 +340,7 @@ public class RoomingHouseRuleService : IRoomingHouseRuleService
                 new { mediaAssetId = mediaAsset.Id });
         }
 
-        if (mediaAsset.Scope != MediaScope.RoomingHouseRulePdf || mediaAsset.Visibility != MediaVisibility.Private)
+        if (mediaAsset.Scope != MediaScope.RoomingHouseRulePdf)
         {
             throw new BadRequestException(
                 ErrorCodes.ValidationError,
@@ -365,7 +366,7 @@ public class RoomingHouseRuleService : IRoomingHouseRuleService
             SourceType = rule.SourceType.ToString(),
             MediaAssetId = rule.MediaAssetId,
             PdfUrl = rule.MediaAssetId.HasValue
-                ? PrivateMediaPathBuilder.Build(rule.MediaAssetId.Value)
+                ? PublicMediaPathBuilder.Build(rule.MediaAssetId.Value)
                 : string.Empty,
             GeneralRules = rule.GeneralRules,
             QuietHours = rule.QuietHours,

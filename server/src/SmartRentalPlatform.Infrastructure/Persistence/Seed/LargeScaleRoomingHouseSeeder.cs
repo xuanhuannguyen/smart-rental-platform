@@ -20,6 +20,11 @@ namespace SmartRentalPlatform.Infrastructure.Persistence.Seed
 {
     public static class LargeScaleRoomingHouseSeeder
     {
+        public const int TargetRoomingHouseCount = 50;
+
+        private static readonly Guid LegacySearchMockLandlordId =
+            Guid.Parse("90000000-0000-0000-0000-000000000002");
+
         private static readonly byte[] PlaceholderImageBytes = Convert.FromBase64String(
             "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO5Wv7sAAAAASUVORK5CYII=");
         private static readonly string[] UnsplashPhotoIds = new[]
@@ -73,9 +78,9 @@ namespace SmartRentalPlatform.Infrastructure.Persistence.Seed
             var defaultHouseIdsCsv = string.Join(",", defaultHouseGuids.Select(id => $"'{id}'"));
             var dummyLandlordId = Guid.Parse("10000000-0000-0000-0000-000000009999");
             var seededRoomingHouseSubquery =
-                $"SELECT id FROM rooming_houses WHERE landlord_user_id = '{dummyLandlordId}' AND id NOT IN ({defaultHouseIdsCsv})";
+                $"SELECT id FROM rooming_houses WHERE landlord_user_id IN ('{dummyLandlordId}', '{LegacySearchMockLandlordId}') AND id NOT IN ({defaultHouseIdsCsv})";
 
-            // Refresh only generated mock houses. Do not delete user-created rooming houses on development startup.
+            // Refresh generated houses from both the legacy search migration and the current dev seeder.
             // 1. contract_appendix_changes
             await context.Database.ExecuteSqlRawAsync($@"
                 DELETE FROM contract_appendix_changes 
@@ -223,7 +228,7 @@ namespace SmartRentalPlatform.Infrastructure.Persistence.Seed
 
             await context.Database.ExecuteSqlRawAsync($@"
                 DELETE FROM media_assets
-                WHERE owner_user_id = '{dummyLandlordId}'
+                WHERE owner_user_id IN ('{dummyLandlordId}', '{LegacySearchMockLandlordId}')
                   AND linked_entity_type = 'PropertyImage'
                   AND scope IN ('RoomingHouseImage', 'RoomImage')
                   AND NOT EXISTS (
@@ -293,12 +298,13 @@ namespace SmartRentalPlatform.Infrastructure.Persistence.Seed
 
             // Kiểm tra số lượng khu trọ hiện tại
             var currentCount = await context.RoomingHouses.CountAsync(cancellationToken);
-            if (currentCount >= 500)
+            if (currentCount >= TargetRoomingHouseCount)
             {
                 return;
             }
 
-            int targetCount = 500 - currentCount;
+            int targetCount = TargetRoomingHouseCount - currentCount;
+            int danangTargetCount = Math.Max(1, targetCount / 5);
 
             // Lấy danh sách Tỉnh/Thành
             var provinces = await context.AdministrativeProvinces
@@ -414,9 +420,9 @@ namespace SmartRentalPlatform.Infrastructure.Persistence.Seed
 
             for (int i = 0; i < targetCount; i++)
             {
-                // Phân bổ: 100 nhà trọ mock đầu tiên ở Đà Nẵng, còn lại ở các tỉnh thành khác
+                // Giữ khoảng 20% dữ liệu mock ở Đà Nẵng, phần còn lại phân bổ sang các tỉnh khác.
                 AdministrativeWard ward;
-                if (i < 100)
+                if (i < danangTargetCount)
                 {
                     ward = danangWards[random.Next(danangWards.Count)];
                 }

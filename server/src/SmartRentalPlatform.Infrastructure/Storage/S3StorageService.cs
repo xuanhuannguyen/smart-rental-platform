@@ -40,6 +40,11 @@ public sealed class S3StorageService : IMediaStorageService
             ServerSideEncryptionMethod = ServerSideEncryptionMethod.AES256
         };
 
+        if (request.FileSize > 0)
+        {
+            putRequest.Headers.ContentLength = request.FileSize;
+        }
+
         await _s3Client.PutObjectAsync(putRequest, cancellationToken);
 
         return new MediaStoredObjectResult

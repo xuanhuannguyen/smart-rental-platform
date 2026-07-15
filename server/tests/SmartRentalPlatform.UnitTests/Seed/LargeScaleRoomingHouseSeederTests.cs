@@ -18,6 +18,7 @@ namespace SmartRentalPlatform.UnitTests.Seed;
 public sealed class LargeScaleRoomingHouseSeederTests : IDisposable
 {
     private static readonly Guid DummyLandlordUserId = Guid.Parse("10000000-0000-0000-0000-000000009999");
+    private static readonly Guid LegacySearchMockLandlordId = Guid.Parse("90000000-0000-0000-0000-000000000002");
 
     private readonly SqliteConnection _connection;
     private readonly AppDbContext _context;
@@ -53,6 +54,10 @@ public sealed class LargeScaleRoomingHouseSeederTests : IDisposable
             .Where(x => x.LandlordUserId == DummyLandlordUserId)
             .ToListAsync();
         var generatedHouse = Assert.Single(generatedHouses);
+        Assert.Equal(
+            LargeScaleRoomingHouseSeeder.TargetRoomingHouseCount,
+            await _context.RoomingHouses.CountAsync());
+        Assert.False(await _context.RoomingHouses.AnyAsync(x => x.LandlordUserId == LegacySearchMockLandlordId));
 
         var roomIds = await _context.Rooms
             .Where(x => x.RoomingHouseId == generatedHouse.Id)
@@ -104,10 +109,31 @@ public sealed class LargeScaleRoomingHouseSeederTests : IDisposable
             id: Guid.Parse("10000000-0000-0000-0000-000000000777"),
             email: "existing-mock-owner@test.com",
             displayName: "Existing Mock Owner");
+        var legacySearchLandlord = TestDataBuilder.BuildUser(
+            id: LegacySearchMockLandlordId,
+            email: "legacy-search-mock@test.com",
+            displayName: "Legacy Search Mock Owner");
 
-        _context.Users.Add(stableLandlord);
+        _context.Users.AddRange(stableLandlord, legacySearchLandlord);
+        _context.RoomingHouses.Add(new RoomingHouse
+        {
+            Id = Guid.NewGuid(),
+            LandlordUserId = legacySearchLandlord.Id,
+            Landlord = legacySearchLandlord,
+            Name = "Legacy Search Mock House",
+            AddressLine = "1 Legacy Street",
+            ProvinceCode = province.Code,
+            WardCode = ward.Code,
+            AddressDisplay = $"1 Legacy Street, {ward.Name}, {province.Name}",
+            ApprovalStatus = RoomingHouseApprovalStatus.Approved,
+            VisibilityStatus = RoomingHouseVisibilityStatus.Visible,
+            Province = province,
+            Ward = ward,
+            CreatedAt = now,
+            UpdatedAt = now
+        });
 
-        for (var index = 0; index < 499; index++)
+        for (var index = 0; index < LargeScaleRoomingHouseSeeder.TargetRoomingHouseCount - 1; index++)
         {
             _context.RoomingHouses.Add(new RoomingHouse
             {

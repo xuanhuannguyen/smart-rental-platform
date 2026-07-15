@@ -6,7 +6,7 @@ import { getApiErrorMessage } from '../../../shared/api/apiError';
 import { Toast } from '../../../shared/components/ui/Toast';
 import { Tabs } from '../../../shared/components/ui/Tabs';
 import { PageHeader } from '../../../shared/components/ui/PageHeader';
-import { toAssetUrl } from '../../../shared/api/assets';
+import { PrivateMediaImage } from '../../../shared/components/media/PrivateMediaImage';
 import { formatDateVi, formatMoneyString, parseMoneyString } from '../../../shared/utils/format';
 import { formatStatus, getStatusToneClass } from '../../../shared/utils/status';
 import {
@@ -47,14 +47,6 @@ import { cleanImages, toImageRequests } from '../../rooming-houses/utils/imageRe
 import './RoomingHouseDetailPage.css';
 
 type MainTab = 'basic' | 'images' | 'amenities' | 'legal' | 'house-rule' | 'rental-policy' | 'service-prices' | 'rooms' | 'create-room';
-
-function resolveLegalDocumentImageUrl(imageUrl?: string | null) {
-  if (imageUrl?.trim()) {
-    return toAssetUrl(imageUrl);
-  }
-
-  return '';
-}
 
 function getLocalDateString(year: number, month: number, day: number): string {
   return `${year}-${String(month).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
@@ -864,8 +856,8 @@ export default function RoomingHouseDetailPage() {
                 <div>
                   <h4 style={{ fontSize: '14px', fontWeight: 600, color: '#334155', marginBottom: '10px' }}>Mặt trước giấy tờ</h4>
                   {house.legalDocument?.frontImageUrl ? (
-                    <img
-                      src={resolveLegalDocumentImageUrl(house.legalDocument.frontImageUrl)}
+                    <PrivateMediaImage
+                      source={house.legalDocument.frontImageUrl}
                       alt="Front"
                       style={{ width: '100%', maxHeight: '240px', objectFit: 'contain', border: '1px solid #e2e8f0', borderRadius: '12px', background: '#f8fafc', padding: '6px' }}
                     />
@@ -877,8 +869,8 @@ export default function RoomingHouseDetailPage() {
                 <div>
                   <h4 style={{ fontSize: '14px', fontWeight: 600, color: '#334155', marginBottom: '10px' }}>Mặt sau giấy tờ</h4>
                   {house.legalDocument?.backImageUrl ? (
-                    <img
-                      src={resolveLegalDocumentImageUrl(house.legalDocument.backImageUrl)}
+                    <PrivateMediaImage
+                      source={house.legalDocument.backImageUrl}
                       alt="Back"
                       style={{ width: '100%', maxHeight: '240px', objectFit: 'contain', border: '1px solid #e2e8f0', borderRadius: '12px', background: '#f8fafc', padding: '6px' }}
                     />
@@ -890,8 +882,8 @@ export default function RoomingHouseDetailPage() {
                 {house.legalDocument?.extraImageUrl && (
                   <div>
                     <h4 style={{ fontSize: '14px', fontWeight: 600, color: '#334155', marginBottom: '10px' }}>Ảnh bổ sung</h4>
-                    <img
-                      src={resolveLegalDocumentImageUrl(house.legalDocument.extraImageUrl)}
+                    <PrivateMediaImage
+                      source={house.legalDocument.extraImageUrl}
                       alt="Extra"
                       style={{ width: '100%', maxHeight: '240px', objectFit: 'contain', border: '1px solid #e2e8f0', borderRadius: '12px', background: '#f8fafc', padding: '6px' }}
                     />

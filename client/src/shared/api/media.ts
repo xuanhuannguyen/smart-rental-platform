@@ -58,10 +58,14 @@ const MEDIA_VISIBILITY_BY_UPLOAD_SCOPE: Record<MediaWorkflowScope, number> = {
   LegalDocument: 2,
   KycDocument: 2,
   Avatar: 1,
-  HouseRule: 2,
+  HouseRule: 1,
   MeterReading: 2,
   ChatAttachment: 2,
 };
+
+export function buildPublicMediaViewUrl(mediaAssetId: string): string {
+  return toAbsoluteUrl(ENDPOINTS.MEDIA.PUBLIC_BY_ID(mediaAssetId));
+}
 
 export function buildPrivateMediaViewUrl(mediaAssetId: string): string {
   return ENDPOINTS.MEDIA.PRIVATE_BY_ID(mediaAssetId);
@@ -69,6 +73,18 @@ export function buildPrivateMediaViewUrl(mediaAssetId: string): string {
 
 export function buildPrivateMediaDownloadRoute(mediaAssetId: string): string {
   return ENDPOINTS.MEDIA.PRIVATE_DOWNLOAD(mediaAssetId);
+}
+
+export function extractPrivateMediaAssetId(source?: string | null): string | null {
+  const match = source?.match(/\/api\/media\/private\/([0-9a-f-]{36})(?:\/download)?(?:[?#]|$)/i);
+  return match?.[1] ?? null;
+}
+
+export async function getPrivateMediaBlob(mediaAssetId: string): Promise<Blob> {
+  return apiClient<Blob>(
+    ENDPOINTS.MEDIA.PRIVATE_BY_ID(mediaAssetId),
+    { auth: true, responseType: 'blob' }
+  );
 }
 
 export async function getPrivateMediaDownloadUrl(mediaAssetId: string): Promise<PrivateMediaDownloadUrlResponse> {
@@ -137,19 +153,41 @@ async function uploadBinaryToMediaSession(
   session: MediaUploadSessionResponse,
   file: File
 ): Promise<void> {
+  try {
+    await putMediaBinary(session.uploadUrl, session.httpMethod, file);
+  } catch (error) {
+    if (session.deliveryMode !== 'signed-upload-url' || isApiUrl(session.uploadUrl)) {
+      throw error;
+    }
+
+    // A signed S3 upload can be blocked by bucket CORS before the PUT is sent.
+    // Retry through the authenticated backend route so uploads remain usable.
+    await putMediaBinary(
+      ENDPOINTS.MEDIA.UPLOAD_BINARY(session.mediaAssetId),
+      'PUT',
+      file
+    );
+  }
+}
+
+async function putMediaBinary(
+  uploadUrl: string,
+  httpMethod: string,
+  file: File
+): Promise<void> {
   const headers = new Headers();
   headers.set('Content-Type', file.type || 'application/octet-stream');
 
-  const uploadUrl = toAbsoluteUrl(session.uploadUrl);
-  if (isApiUrl(session.uploadUrl)) {
+  const absoluteUploadUrl = toAbsoluteUrl(uploadUrl);
+  if (isApiUrl(uploadUrl)) {
     const accessToken = tokenStorage.getAccessToken();
     if (accessToken) {
       headers.set('Authorization', `Bearer ${accessToken}`);
     }
   }
 
-  const response = await fetch(uploadUrl, {
-    method: session.httpMethod || 'PUT',
+  const response = await fetch(absoluteUploadUrl, {
+    method: httpMethod || 'PUT',
     headers,
     body: file,
   });
@@ -168,6 +206,16 @@ function toAbsoluteUrl(url: string): string {
 }
 
 function isApiUrl(url: string): boolean {
-  return url.startsWith('/api/') || url.startsWith('api/');
+  if (url.startsWith('/api/') || url.startsWith('api/')) {
+    return true;
+  }
+
+  try {
+    const targetUrl = new URL(url);
+    const apiBaseUrl = new URL(env.apiBaseUrl);
+    return targetUrl.origin === apiBaseUrl.origin && targetUrl.pathname.startsWith('/api/');
+  } catch {
+    return false;
+  }
 }
 
