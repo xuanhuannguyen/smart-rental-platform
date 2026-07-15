@@ -8,6 +8,8 @@ namespace SmartRentalPlatform.Application.Rooms;
 
 internal static class RoomValidationRules
 {
+    private const int MaxPropertyImages = 10;
+
     public static void ValidateRoomFields(
         string roomNumber,
         int floor,
@@ -55,6 +57,14 @@ internal static class RoomValidationRules
                 ErrorCodes.ValidationError,
                 "Phòng cần có ít nhất 3 ảnh.",
                 new { field = nameof(images) });
+        }
+
+        if (images.Count > MaxPropertyImages)
+        {
+            throw new BadRequestException(
+                ErrorCodes.ValidationError,
+                $"Phòng chỉ được có tối đa {MaxPropertyImages} ảnh.",
+                new { field = nameof(images), max = MaxPropertyImages });
         }
 
         var coverCount = images.Count(x => x.IsCover);

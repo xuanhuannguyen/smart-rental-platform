@@ -1408,6 +1408,8 @@ function InvoiceDetailSection({
   onIssue: (invoice: Invoice) => void;
   onCancel: (invoice: Invoice) => void;
 }) {
+  const [meterImagePreview, setMeterImagePreview] = useState<{ src: string; title: string; subtitle: string } | null>(null);
+
   if (loading) {
     return <section className="billing-panel"><LoadingBlock text="Đang tải chi tiết hóa đơn..." /></section>;
   }
@@ -1438,7 +1440,22 @@ function InvoiceDetailSection({
         {invoice.items.map((item) => (
           <div key={item.id} className="table-row item-table-row">
             <span>{getInvoiceItemTypeLabel(item.itemType)}</span>
-            <span>{item.description}</span>
+            <span className="tenant-invoice-item-desc">
+              <span>{item.description}</span>
+              {item.meterReadingProofImageUrl && (
+                <button
+                  type="button"
+                  className="tenant-meter-proof-button"
+                  onClick={() => setMeterImagePreview({
+                    src: item.meterReadingProofImageUrl!,
+                    title: getMeterReadingProofLabel(item.serviceName, item.description),
+                    subtitle: item.description
+                  })}
+                >
+                  {getMeterReadingProofLabel(item.serviceName, item.description)}
+                </button>
+              )}
+            </span>
             <span>{item.quantity}</span>
             <span>{formatMoney(item.unitPrice)}</span>
             <strong>{formatMoney(item.amount)}</strong>
@@ -1453,6 +1470,19 @@ function InvoiceDetailSection({
           {busy === 'cancel' ? 'Đang hủy...' : 'Hủy hóa đơn'}
         </button>
       </div>
+
+      {meterImagePreview && (
+        <div className="meter-image-lightbox" role="dialog" aria-modal="true" aria-label={meterImagePreview.title} onClick={() => setMeterImagePreview(null)}>
+          <div className="meter-image-lightbox-content" onClick={(event) => event.stopPropagation()}>
+            <div>
+              <strong>{meterImagePreview.title}</strong>
+              <span>{meterImagePreview.subtitle}</span>
+            </div>
+            <button type="button" onClick={() => setMeterImagePreview(null)} aria-label="Đóng ảnh chỉ số">×</button>
+            <PrivateMediaImage source={meterImagePreview.src} alt={meterImagePreview.title} />
+          </div>
+        </div>
+      )}
     </section>
   );
 }
@@ -1880,6 +1910,19 @@ function getInvoiceItemTypeLabel(itemType: string) {
   };
 
   return labels[itemType] ?? itemType;
+}
+
+function getMeterReadingProofLabel(serviceName?: string | null, description?: string | null) {
+  const text = `${serviceName ?? ''} ${description ?? ''}`.toLowerCase();
+  if (text.includes('điện') || text.includes('dien')) {
+    return 'Xem chỉ số điện';
+  }
+
+  if (text.includes('nước') || text.includes('nuoc')) {
+    return 'Xem chỉ số nước';
+  }
+
+  return 'Xem ảnh chỉ số';
 }
 
 function formatCentralDate(value: string) {

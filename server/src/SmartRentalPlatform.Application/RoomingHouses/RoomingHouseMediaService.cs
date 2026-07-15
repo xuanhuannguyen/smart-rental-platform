@@ -18,6 +18,7 @@ namespace SmartRentalPlatform.Application.RoomingHouses;
 
 public class RoomingHouseMediaService : IRoomingHouseMediaService
 {
+    private const int MaxPropertyImages = 10;
     private sealed record LinkedMediaAssetResolution(Guid MediaAssetId);
 
     private readonly IAppDbContext context;
@@ -313,6 +314,14 @@ public class RoomingHouseMediaService : IRoomingHouseMediaService
                 ErrorCodes.ValidationError,
                 "Khu trọ cần có ít nhất 3 ảnh.",
                 new { field = nameof(images) });
+        }
+
+        if (images.Count > MaxPropertyImages)
+        {
+            throw new BadRequestException(
+                ErrorCodes.ValidationError,
+                $"Khu trọ chỉ được có tối đa {MaxPropertyImages} ảnh.",
+                new { field = nameof(images), max = MaxPropertyImages });
         }
 
         ValidateCoverImageCount(images.Count(x => x.IsCover));

@@ -70,6 +70,26 @@ public sealed class ChatServiceTests : IDisposable
     }
 
     [Fact]
+    public async Task CreateDirectConversationAsync_MapsParticipantAvatarFromMediaAsset()
+    {
+        var landlord = SeedUser(RoleName.Landlord, "landlord-media-avatar@test.local");
+        var tenant = SeedUser(RoleName.Tenant, "tenant-media-avatar@test.local");
+        var avatar = BuildAvatarMediaAsset(tenant.Id, "tenant-avatar.jpg");
+        tenant.AvatarMediaAssetId = avatar.Id;
+        tenant.AvatarUrl = "https://legacy.example/avatar.jpg";
+        fixture.Context.MediaAssets.Add(avatar);
+        await fixture.Context.SaveChangesAsync();
+        var service = CreateService();
+
+        var conversation = await service.CreateDirectConversationAsync(
+            landlord.Id,
+            new CreateDirectConversationRequest { OtherUserId = tenant.Id });
+
+        var participant = Assert.Single(conversation.Participants, x => x.UserId == tenant.Id);
+        Assert.Equal($"/api/media/public/{avatar.Id:D}", participant.AvatarUrl);
+    }
+
+    [Fact]
     public async Task CreateGroupConversationAsync_RejectsOutOfScopeUser()
     {
         var landlord = SeedUser(RoleName.Landlord, "landlord@test.local");

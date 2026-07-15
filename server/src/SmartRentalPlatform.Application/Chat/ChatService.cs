@@ -894,7 +894,9 @@ public sealed class ChatService : IChatService
             UserId = participant.UserId,
             DisplayName = participant.User.DisplayName,
             Email = participant.User.Email,
-            AvatarUrl = participant.User.AvatarUrl,
+            AvatarUrl = participant.User.AvatarMediaAssetId.HasValue
+                ? PublicMediaPathBuilder.Build(participant.User.AvatarMediaAssetId.Value)
+                : participant.User.AvatarUrl,
             Role = participant.Role.ToString(),
             Source = participant.Source.ToString(),
             JoinedAt = participant.JoinedAt,

@@ -1,4 +1,5 @@
 using Microsoft.EntityFrameworkCore;
+using SmartRentalPlatform.Application.Common.Exceptions;
 using SmartRentalPlatform.Application.Common.Media;
 using SmartRentalPlatform.Application.RoomingHouses;
 using SmartRentalPlatform.Contracts.Common;
@@ -95,6 +96,37 @@ public class RoomingHouseMediaServiceTests : IDisposable
             Assert.Equal(MediaVisibility.Public, asset.Visibility);
             Assert.Equal(MediaStatus.Linked, asset.Status);
         });
+    }
+
+    [Fact]
+    public async Task UpdateImagesAsync_ShouldRejectMoreThanTenImages()
+    {
+        var landlord = TestDataBuilder.BuildUser(email: "house-image-limit@unit.test", displayName: "House Image Limit");
+        var house = TestDataBuilder.BuildRoomingHouse(landlord.Id, status: RoomingHouseApprovalStatus.Draft);
+        _fixture.Context.Users.Add(landlord);
+        _fixture.Context.RoomingHouses.Add(house);
+        await _fixture.Context.SaveChangesAsync();
+
+        var service = new RoomingHouseMediaService(
+            _fixture.Context,
+            new FakeRoomingHouseQueryService(_fixture.Context));
+        var request = new UpdatePropertyImagesRequest
+        {
+            Images = Enumerable.Range(0, 11)
+                .Select(index => new UpdatePropertyImageItemRequest
+                {
+                    MediaAssetId = Guid.NewGuid(),
+                    IsCover = index == 0,
+                    SortOrder = index
+                })
+                .ToList()
+        };
+
+        var exception = await Assert.ThrowsAsync<BadRequestException>(() =>
+            service.UpdateImagesAsync(house.Id, request));
+
+        Assert.Contains("tối đa 10 ảnh", exception.Message);
+        Assert.Empty(_fixture.Context.PropertyImages);
     }
 
     [Fact]
