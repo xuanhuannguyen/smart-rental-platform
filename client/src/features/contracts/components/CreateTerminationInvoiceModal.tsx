@@ -24,6 +24,7 @@ export function CreateTerminationInvoiceModal({ contract, onClose, onCreated }: 
   const [note, setNote] = useState('');
   const [loading, setLoading] = useState(true);
   const [submitting, setSubmitting] = useState(false);
+  const [uploadingServiceId, setUploadingServiceId] = useState('');
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
@@ -131,6 +132,40 @@ export function CreateTerminationInvoiceModal({ contract, onClose, onCreated }: 
     }));
   }
 
+  async function handleMeterImage(serviceTypeId: string, file?: File) {
+    if (!file || !preview) return;
+    if (!['image/jpeg', 'image/png'].includes(file.type)) {
+      setError('Chỉ hỗ trợ ảnh đồng hồ định dạng JPG hoặc PNG.');
+      return;
+    }
+    if (file.size > 5 * 1024 * 1024) {
+      setError('Dung lượng ảnh đồng hồ không được vượt quá 5MB.');
+      return;
+    }
+
+    setUploadingServiceId(serviceTypeId);
+    setError(null);
+    try {
+      const response = await billingApi.readMeterImage({
+        contractId: contract.id,
+        serviceTypeId,
+        billingPeriodStart: preview.billingPeriodStart,
+        file
+      });
+      updateReading(serviceTypeId, {
+        currentReading: response.data.reading,
+        aiReading: response.data.reading,
+        aiRawText: response.data.rawText,
+        proofImageObjectKey: response.data.proofImageObjectKey,
+        proofImageUrl: response.data.proofImageUrl
+      });
+    } catch (err) {
+      setError(getApiErrorMessage(err, 'Không thể đọc chỉ số từ ảnh. Vui lòng thử ảnh rõ hơn.'));
+    } finally {
+      setUploadingServiceId('');
+    }
+  }
+
   return (
     <div className="history-modal-overlay">
       <div className="history-modal-content terminate-contract-modal">
@@ -155,6 +190,8 @@ export function CreateTerminationInvoiceModal({ contract, onClose, onCreated }: 
                 totalLabel={isFinalPeriod ? 'Tổng hóa đơn kỳ cuối' : 'Tổng hóa đơn'}
                 blockReason={preview.canGenerate ? '' : preview.blockReason || 'Chưa thể tạo hóa đơn này.'}
                 onChangeReading={updateReading}
+                onReadMeterImage={handleMeterImage}
+                uploadingServiceId={uploadingServiceId}
                 onChangeDiscountAmount={setDiscountAmount}
                 onChangeNote={setNote}
               />
@@ -165,7 +202,7 @@ export function CreateTerminationInvoiceModal({ contract, onClose, onCreated }: 
           </div>
           <div className="history-modal-footer">
             <Button type="button" variant="outline" onClick={onClose} disabled={submitting}>Đóng</Button>
-            <Button type="submit" disabled={loading || submitting || !preview?.canGenerate}>
+            <Button type="submit" disabled={loading || submitting || uploadingServiceId !== '' || !preview?.canGenerate}>
               {submitting ? 'Đang tạo...' : actionLabel}
             </Button>
           </div>

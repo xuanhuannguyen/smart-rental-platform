@@ -459,19 +459,22 @@ public class RentalContractService : IRentalContractService
 				RentalContractLifecycleHelper.EnsureDepositReadyForSettlement(deposit);
 
 				var settlementGroupId = Guid.NewGuid();
-				await walletService.ReleaseReservedWithinTransactionAsync(
+				await walletService.TransferFromReservedWithinTransactionAsync(
 					landlordWallet.Id,
+					tenantWallet.Id,
 					deposit.DepositAmount,
-					WalletTransactionType.DepositForfeitRelease,
-					RentalContractLifecycleHelper.CreateDepositSettlementMetadata(deposit, settlementGroupId, "Tenant contract rejection deposit forfeiture."),
+					deposit.DepositAmount,
+					WalletTransactionType.DepositRefundDebit,
+					WalletTransactionType.DepositRefundCredit,
+					RentalContractLifecycleHelper.CreateDepositSettlementMetadata(deposit, settlementGroupId, "Tenant contract rejection deposit refund."),
 					cancellationToken);
 
-				contract.RoomDeposit.Status = RoomDepositStatus.Forfeited;
-				contract.RoomDeposit.RefundedAt = null;
-				contract.RoomDeposit.RefundAmount = default(decimal);
-				contract.RoomDeposit.ForfeitedAt = now;
-				contract.RoomDeposit.ForfeitedAmount = contract.RoomDeposit.DepositAmount;
-				contract.RoomDeposit.RefundTransferGroupId = null;
+				contract.RoomDeposit.Status = RoomDepositStatus.Refunded;
+				contract.RoomDeposit.RefundedAt = now;
+				contract.RoomDeposit.RefundAmount = contract.RoomDeposit.DepositAmount;
+				contract.RoomDeposit.ForfeitedAt = null;
+				contract.RoomDeposit.ForfeitedAmount = default(decimal);
+				contract.RoomDeposit.RefundTransferGroupId = settlementGroupId;
 				contract.RentalRequest.Status = RentalRequestStatus.Cancelled;
 			}
 
@@ -676,20 +679,23 @@ public class RentalContractService : IRentalContractService
 				throw new ForbiddenException("RENTAL_CONTRACT_FORBIDDEN", "Không có quyền thao tác.");
 			}
 			var settlementGroupId = Guid.NewGuid();
-			await walletService.ReleaseReservedWithinTransactionAsync(
+			await walletService.TransferFromReservedWithinTransactionAsync(
 				landlordWallet.Id,
+				tenantWallet.Id,
 				deposit.DepositAmount,
-				WalletTransactionType.DepositForfeitRelease,
-				RentalContractLifecycleHelper.CreateDepositSettlementMetadata(deposit, settlementGroupId, "Tenant unilateral termination deposit forfeiture."),
+				deposit.DepositAmount,
+				WalletTransactionType.DepositRefundDebit,
+				WalletTransactionType.DepositRefundCredit,
+				RentalContractLifecycleHelper.CreateDepositSettlementMetadata(deposit, settlementGroupId, "Tenant unilateral termination deposit refund."),
 				cancellationToken);
 			contract.Status = RentalContractStatus.Cancelled;
-			deposit.Status = RoomDepositStatus.Forfeited;
-			deposit.RefundAmount = default(decimal);
-			deposit.ForfeitedAmount = deposit.DepositAmount;
-			deposit.ForfeitedAt = now;
-			deposit.RefundedAt = null;
-			deposit.RefundTransferGroupId = null;
-			contract.StatusReason = $"Người thuê đơn phương chấm dứt. Tịch thu cọc: {deposit.DepositAmount:N0} VNĐ. Lý do: {reasonText}";
+			deposit.Status = RoomDepositStatus.Refunded;
+			deposit.RefundAmount = deposit.DepositAmount;
+			deposit.ForfeitedAmount = default(decimal);
+			deposit.ForfeitedAt = null;
+			deposit.RefundedAt = now;
+			deposit.RefundTransferGroupId = settlementGroupId;
+			contract.StatusReason = $"Người thuê đơn phương chấm dứt. Hoàn cọc: {deposit.DepositAmount:N0} VNĐ. Lý do: {reasonText}";
 			break;
 		}
 		case ContractTerminationType.NormalExpiration:

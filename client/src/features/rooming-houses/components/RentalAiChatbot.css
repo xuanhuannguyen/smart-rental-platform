@@ -79,7 +79,7 @@
   height: min(520px, calc(100vh - 140px)); /* Reduced height to keep it compact and out of top navigation's way */
   margin-bottom: 12px;
   overflow: hidden;
-  width: min(370px, calc(100vw - 32px)); /* Reduced width to make it compact and elegant */
+  width: min(370px, calc(100dvw - 32px)); /* Reduced width to make it compact and elegant */
   animation: panel-entrance 0.35s cubic-bezier(0.16, 1, 0.3, 1) forwards;
 }
 
@@ -482,9 +482,33 @@
   background: #ffffff;
   border-top: 1px solid #f1f5f9;
   display: flex;
+  flex-wrap: wrap;
   gap: 8px;
   padding: 10px 12px; /* Tighter padding */
   align-items: center;
+}
+
+.rental-ai-chatbot__contact-landlord {
+  width: 100%;
+  border: 1px solid #bfdbfe;
+  border-radius: 8px;
+  background: #eff6ff;
+  color: #1d4ed8;
+  cursor: pointer;
+  font: inherit;
+  font-size: 13px;
+  font-weight: 750;
+  min-height: 34px;
+}
+
+.rental-ai-chatbot__contact-landlord:hover:not(:disabled) {
+  border-color: #246bfe;
+  background: #dbeafe;
+}
+
+.rental-ai-chatbot__contact-landlord:disabled {
+  cursor: not-allowed;
+  opacity: 0.65;
 }
 
 .rental-ai-chatbot__input-group {
@@ -634,7 +658,7 @@
   .rental-ai-chatbot__panel {
     height: min(480px, calc(100vh - 96px)); /* Slightly shorter on mobile */
     border-radius: 16px;
-    width: min(350px, calc(100vw - 32px));
+    width: min(350px, calc(100dvw - 32px));
   }
 
   .rental-ai-chatbot__launcher strong {

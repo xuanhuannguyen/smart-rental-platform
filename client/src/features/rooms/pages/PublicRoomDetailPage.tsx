@@ -344,6 +344,8 @@ export default function PublicRoomDetailPage() {
             roomNumber={room.roomNumber}
             houseName={house.name}
             maxOccupants={room.maxOccupants}
+            minRentalMonths={house.rentalPolicy?.minRentalMonths}
+            maxRentalMonths={house.rentalPolicy?.maxRentalMonths}
             onClose={() => setIsRentalModalOpen(false)}
             onSuccess={(msg) => {
               setToast({ message: msg, type: 'success' });

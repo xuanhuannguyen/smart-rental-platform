@@ -161,9 +161,8 @@ export const TenantRentalHistoryDetailPage: React.FC = () => {
   const [contractInvoices, setContractInvoices] = useState<Invoice[]>([]);
   const [invoiceStatusFilter, setInvoiceStatusFilter] = useState('');
   const [invoicesLoading, setInvoicesLoading] = useState(false);
-  const [invoiceActionBusy, setInvoiceActionBusy] = useState('');
   const [invoiceError, setInvoiceError] = useState<string | null>(null);
-  const [invoiceMessage, setInvoiceMessage] = useState<string | null>(null);
+  const [expandedInvoiceId, setExpandedInvoiceId] = useState<string | null>(null);
 
   const [reviewEligibility, setReviewEligibility] = useState<ReviewEligibilityResponse | null>(null);
 
@@ -352,21 +351,6 @@ export const TenantRentalHistoryDetailPage: React.FC = () => {
       setActionError(err instanceof Error ? err.message : 'Không thể tải file hợp đồng.');
     } finally {
       setIsFileActionLoading(false);
-    }
-  };
-
-  const handlePayInvoice = async (invoice: Invoice) => {
-    setInvoiceActionBusy(invoice.id);
-    setInvoiceError(null);
-    setInvoiceMessage(null);
-    try {
-      const response = await billingApi.payInvoice(invoice.id);
-      setContractInvoices((current) => current.map((item) => item.id === invoice.id ? response.data : item));
-      setInvoiceMessage(`Đã thanh toán hóa đơn ${response.data.invoiceNo}.`);
-    } catch (err) {
-      setInvoiceError(getApiErrorMessage(err, 'Thanh toán hóa đơn thất bại.'));
-    } finally {
-      setInvoiceActionBusy('');
     }
   };
 
@@ -669,7 +653,10 @@ export const TenantRentalHistoryDetailPage: React.FC = () => {
               className="attached-bottom"
               variant="segmented-secondary"
               activeId={invoiceStatusFilter || 'all'}
-              onChange={(status) => setInvoiceStatusFilter(status === 'all' ? '' : status)}
+              onChange={(status) => {
+                setInvoiceStatusFilter(status === 'all' ? '' : status);
+                setExpandedInvoiceId(null);
+              }}
               items={invoiceStatusTabs.map((status) => ({
                 id: status || 'all',
                 label: status ? getInvoiceStatusLabel(status) : 'Tất cả',
@@ -678,7 +665,6 @@ export const TenantRentalHistoryDetailPage: React.FC = () => {
             />
 
             <div className="history-detail-content tab-attached-panel tab-attached-panel--compact">
-            {invoiceMessage && <div className="invoice-inline-message success">{invoiceMessage}</div>}
             {invoiceError && <Alert type="error">{invoiceError}</Alert>}
 
             {invoicesLoading ? (
@@ -693,37 +679,96 @@ export const TenantRentalHistoryDetailPage: React.FC = () => {
             ) : (
               <div className="contract-invoice-list">
                 {contractInvoices.map((invoice) => {
-                  const canPayNow = invoice.status === 'Issued' && invoice.tenantUserId === currentUser?.userId;
+                  const isExpanded = expandedInvoiceId === invoice.id;
+                  const serviceFees = invoice.utilityAmount + invoice.serviceAmount;
+                  const canPayInMyInvoices = invoice.status === 'Issued' && invoice.tenantUserId === currentUser?.userId;
 
                   return (
                     <div
                       key={invoice.id}
-                      className={`contract-invoice-card ${invoice.status === 'Cancelled' ? 'muted' : ''}`}
+                      className={`contract-invoice-entry ${isExpanded ? 'expanded' : ''}`}
                     >
-                      <div>
-                        <div className="contract-invoice-title">
-                          <strong>{invoice.invoiceNo}</strong>
-                          <span className={`status-badge ${getInvoiceStatusClass(invoice.status)}`}>
-                            {getInvoiceStatusLabel(invoice.status)}
-                          </span>
+                      <div className={`contract-invoice-card ${invoice.status === 'Cancelled' ? 'muted' : ''}`}>
+                        <div>
+                          <div className="contract-invoice-title">
+                            <strong>{invoice.invoiceNo}</strong>
+                            <span className={`status-badge ${getInvoiceStatusClass(invoice.status)}`}>
+                              {getInvoiceStatusLabel(invoice.status)}
+                            </span>
+                          </div>
+                          <div className="contract-invoice-meta">
+                            <span>Kỳ: {formatDate(invoice.billingPeriodStart)} - {formatDate(invoice.billingPeriodEnd)}</span>
+                            <span>Hạn thanh toán: {formatDate(invoice.dueDate)}</span>
+                            <span>Người đứng tên: {invoice.tenantName}</span>
+                          </div>
                         </div>
-                        <div className="contract-invoice-meta">
-                          <span>Kỳ: {formatDate(invoice.billingPeriodStart)} - {formatDate(invoice.billingPeriodEnd)}</span>
-                          <span>Hạn thanh toán: {formatDate(invoice.dueDate)}</span>
-                          <span>Người đứng tên: {invoice.tenantName}</span>
-                        </div>
-                      </div>
-                      <div className="contract-invoice-actions">
-                        <strong>{formatCurrency(invoice.totalAmount)} đ</strong>
-                        {canPayNow && (
-                          <Button
-                            onClick={() => void handlePayInvoice(invoice)}
-                            disabled={invoiceActionBusy === invoice.id}
+                        <div className="contract-invoice-actions">
+                          <strong>{formatCurrency(invoice.totalAmount)} đ</strong>
+                          <button
+                            type="button"
+                            className="contract-invoice-toggle"
+                            aria-expanded={isExpanded}
+                            aria-label={isExpanded ? `Ẩn chi tiết hóa đơn ${invoice.invoiceNo}` : `Xem chi tiết hóa đơn ${invoice.invoiceNo}`}
+                            onClick={() => setExpandedInvoiceId((current) => current === invoice.id ? null : invoice.id)}
                           >
-                            {invoiceActionBusy === invoice.id ? 'Đang thanh toán...' : 'Thanh toán ngay'}
-                          </Button>
-                        )}
+                            {isExpanded ? '−' : '+'}
+                          </button>
+                        </div>
                       </div>
+
+                      {isExpanded && (
+                        <div className="contract-invoice-detail-panel">
+                          <div className="contract-invoice-breakdown">
+                            <div>
+                              <span>Tiền phòng</span>
+                              <strong>{formatCurrency(invoice.rentAmount)} đ</strong>
+                            </div>
+                            <div>
+                              <span>Phí dịch vụ</span>
+                              <strong>{formatCurrency(serviceFees)} đ</strong>
+                            </div>
+                            {invoice.discountAmount > 0 && (
+                              <div>
+                                <span>Giảm trừ</span>
+                                <strong>-{formatCurrency(invoice.discountAmount)} đ</strong>
+                              </div>
+                            )}
+                            <div className="total">
+                              <span>Tổng cộng</span>
+                              <strong>{formatCurrency(invoice.totalAmount)} đ</strong>
+                            </div>
+                          </div>
+
+                          {invoice.items.length === 0 ? (
+                            <div className="contract-invoice-empty-detail">Chưa có hạng mục chi tiết.</div>
+                          ) : (
+                            <div className="contract-invoice-detail-table">
+                              <div className="detail-table-header">
+                                <span>Hạng mục</span>
+                                <span>Mô tả</span>
+                                <span>Số lượng</span>
+                                <span>Đơn giá</span>
+                                <span>Thành tiền</span>
+                              </div>
+                              {invoice.items.map((item) => (
+                                <div key={item.id} className="detail-table-row">
+                                  <span data-label="Hạng mục">{getInvoiceItemTypeLabel(item.itemType)}</span>
+                                  <span data-label="Mô tả">{item.description}</span>
+                                  <span data-label="Số lượng">{formatQuantity(item.quantity)}</span>
+                                  <span data-label="Đơn giá">{formatCurrency(item.unitPrice)} đ</span>
+                                  <strong data-label="Thành tiền">{formatCurrency(item.amount)} đ</strong>
+                                </div>
+                              ))}
+                            </div>
+                          )}
+
+                          {canPayInMyInvoices && (
+                            <p className="contract-invoice-readonly-note">
+                              Thanh toán hóa đơn này tại mục Hóa đơn của tôi.
+                            </p>
+                          )}
+                        </div>
+                        )}
                     </div>
                   );
                 })}
@@ -872,6 +917,21 @@ function getInvoiceStatusClass(status: string) {
   }
 }
 
+function getInvoiceItemTypeLabel(itemType: string) {
+  switch (itemType) {
+    case 'Rent':
+      return 'Tiền phòng';
+    case 'Service':
+      return 'Dịch vụ';
+    case 'Utility':
+      return 'Điện nước';
+    case 'Adjustment':
+      return 'Điều chỉnh';
+    default:
+      return itemType;
+  }
+}
+
 function getAppendixStatusClass(status: ContractAppendixStatus) {
   switch (status) {
     case 'Active': return 'active';
@@ -910,6 +970,12 @@ function formatDate(value?: string | null) {
 
 function formatCurrency(value: number) {
   return new Intl.NumberFormat('vi-VN').format(value);
+}
+
+function formatQuantity(value: number) {
+  return new Intl.NumberFormat('vi-VN', {
+    maximumFractionDigits: 2,
+  }).format(value);
 }
 
 export default TenantRentalHistoryDetailPage;

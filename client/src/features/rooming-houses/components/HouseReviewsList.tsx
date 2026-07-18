@@ -187,35 +187,12 @@ export const HouseReviewsList: React.FC<HouseReviewsListProps> = ({ roomingHouse
     return new Date(value).toLocaleDateString('vi-VN');
   };
 
-  const formatContractStatus = (status: string) => {
-    const normalized = status.toLowerCase();
-    if (normalized === 'active') return 'Đang thuê';
-    if (normalized === 'expired') return 'Đã kết thúc';
-    if (normalized === 'cancelled') return 'Đã hủy';
-    return status;
-  };
-
-  const getReviewStatusLabel = (status?: string | null) => {
-    if (!status) return 'Chưa đánh giá';
-    if (status === 'Approved') return 'Đã duyệt';
-    if (status === 'Rejected') return 'Bị từ chối';
-    if (status === 'PendingAiReview') return 'Chờ AI duyệt';
-    if (status === 'PendingAdminReview') return 'Chờ admin duyệt';
-    return status;
-  };
-
-  const getReviewStatusClass = (status?: string | null) => {
-    if (!status) return 'empty';
-    if (status === 'Approved') return 'approved';
-    if (status === 'Rejected') return 'rejected';
-    return 'pending';
-  };
-
   if (loading && !reviewsData) return <div>Đang tải đánh giá...</div>;
   if (error) return <div style={{ color: 'red' }}>{error}</div>;
 
   const hasReviews = reviewsData && reviewsData.reviews.length > 0;
   const reviewableContracts = reviewEligibility?.reviewableContracts ?? [];
+  const contractsAvailableForReview = reviewableContracts.filter(contract => contract.canReview);
 
   return (
     <div className="house-reviews-list">
@@ -247,7 +224,7 @@ export const HouseReviewsList: React.FC<HouseReviewsListProps> = ({ roomingHouse
           <div className="reviews-summary contract-review-notice">
             <p>Đang kiểm tra quyền đánh giá...</p>
           </div>
-        ) : reviewableContracts.length > 0 ? (
+        ) : contractsAvailableForReview.length > 0 ? (
           <div className="contract-review-panel">
             <div className="contract-review-panel__header">
               <h3>Đánh giá theo hợp đồng</h3>
@@ -255,11 +232,9 @@ export const HouseReviewsList: React.FC<HouseReviewsListProps> = ({ roomingHouse
             </div>
 
             <div className="contract-review-grid">
-              {reviewableContracts.map(contract => {
+              {contractsAvailableForReview.map(contract => {
                 const review = contract.review;
-                const canEdit = review?.moderationStatus === 'Approved' || review?.moderationStatus === 'Rejected';
                 const isCreating = activeReviewContractId === contract.contractId;
-                const isEditing = review && editingReviewId === review.id;
 
                 return (
                   <article key={contract.contractId} className="contract-review-card">
@@ -268,14 +243,9 @@ export const HouseReviewsList: React.FC<HouseReviewsListProps> = ({ roomingHouse
                         <strong>Phòng {contract.roomNumber}</strong>
                         <p>{formatDate(contract.startDate)} - {formatDate(contract.endDate)}</p>
                       </div>
-                      <span className="contract-review-card__status">{formatContractStatus(contract.status)}</span>
                     </div>
 
-                    <div className={`contract-review-card__review-status ${getReviewStatusClass(contract.reviewStatus)}`}>
-                      {getReviewStatusLabel(contract.reviewStatus)}
-                    </div>
-
-                    {isCreating && contract.canReview && (
+                    {isCreating && (
                       <InlineReviewForm
                         mode="create"
                         contractId={contract.contractId}
@@ -291,51 +261,16 @@ export const HouseReviewsList: React.FC<HouseReviewsListProps> = ({ roomingHouse
                       />
                     )}
 
-                    {isEditing && review && (
-                      <InlineReviewForm
-                        mode="edit"
-                        review={review}
-                        hideAvatar={true}
-                        onSuccess={() => {
-                          setEditingReviewId(null);
-                          checkEligibility();
-                          refreshCurrentList();
-                          setToast({ message: 'Đã gửi chỉnh sửa đánh giá. Hệ thống đang kiểm duyệt trước khi hiển thị công khai.', type: 'success' });
-                        }}
-                        onCancel={() => setEditingReviewId(null)}
-                      />
-                    )}
-
-                    {!isCreating && !isEditing && (
+                    {!isCreating && (
                       <div className="contract-review-card__actions">
-                        {contract.canReview ? (
-                          <Button
-                            onClick={() => {
-                              setEditingReviewId(null);
-                              setActiveReviewContractId(contract.contractId);
-                            }}
-                          >
-                            Viết đánh giá
-                          </Button>
-                        ) : canEdit && review ? (
-                          <Button
-                            variant="outline"
-                            onClick={() => {
-                              setActiveReviewContractId(null);
-                              setEditingReviewId(review.id);
-                            }}
-                          >
-                            Sửa đánh giá
-                          </Button>
-                        ) : (
-                          <p className="contract-review-card__hint">
-                            {contract.reviewStatus === 'PendingAiReview'
-                              ? 'Đánh giá của hợp đồng này đang chờ AI kiểm duyệt.'
-                              : contract.reviewStatus === 'PendingAdminReview'
-                                ? 'Đánh giá của hợp đồng này đang chờ admin kiểm tra.'
-                                : 'Hợp đồng này đã có đánh giá.'}
-                          </p>
-                        )}
+                        <Button
+                          onClick={() => {
+                            setEditingReviewId(null);
+                            setActiveReviewContractId(contract.contractId);
+                          }}
+                        >
+                          Viết đánh giá
+                        </Button>
                       </div>
                     )}
                   </article>

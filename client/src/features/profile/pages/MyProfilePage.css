@@ -772,6 +772,19 @@
 }
 
 /* Status Banner Styles for KycStatusPage */
+.kyc-status-page-container {
+  padding: 24px;
+}
+
+.kyc-status-auth-page {
+  overflow: visible;
+}
+
+.kyc-status-auth-page::before,
+.kyc-status-auth-page::after {
+  display: none;
+}
+
 .ekyc-status-banner {
   display: flex;
   align-items: center;
@@ -851,6 +864,12 @@
   bottom: -10px;
   opacity: 0.05;
   pointer-events: none;
+}
+
+@media (max-width: 768px) {
+  .kyc-status-page-container {
+    padding: 16px;
+  }
 }
 
 

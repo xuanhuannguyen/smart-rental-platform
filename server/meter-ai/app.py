@@ -8,6 +8,26 @@ from starlette.concurrency import run_in_threadpool
 
 from meter_reader import MeterReadError, read_prediction
 
+ENV_PATH = Path(__file__).with_name(".env")
+
+
+def _load_local_env() -> None:
+    if not ENV_PATH.exists():
+        return
+
+    for line in ENV_PATH.read_text(encoding="utf-8").splitlines():
+        stripped = line.strip()
+        if not stripped or stripped.startswith("#") or "=" not in stripped:
+            continue
+        key, value = stripped.split("=", 1)
+        key = key.strip()
+        value = value.strip().strip('"').strip("'")
+        if key and key not in os.environ:
+            os.environ[key] = value
+
+
+_load_local_env()
+
 API_KEY = os.environ.get("ROBOFLOW_API_KEY", "").strip()
 MODEL_ID = os.environ.get(
     "ROBOFLOW_MODEL_ID", "utility-meter-reading-dataset-for-automatic-reading-yolo/1"

@@ -300,7 +300,7 @@ export function ContractPreviewModal({ contractId, role, onClose, onSuccess }: C
                     <p className="reject-contract-warning">
                       {role === 'landlord' 
                         ? 'Bạn bắt buộc phải hoàn cọc cho khách nếu như muốn hủy hợp đồng. Bạn có chắc chắn muốn hủy hợp đồng không?'
-                        : 'Việc hủy hợp đồng ở bước này sẽ khiến bạn mất toàn bộ tiền cọc phòng. Bạn có chắc chắn muốn từ chối ký và hủy hợp đồng không?'
+                        : 'Tiền cọc đang giữ sẽ được hoàn về ví của bạn sau khi hủy hợp đồng. Bạn có chắc chắn muốn từ chối ký và hủy hợp đồng không?'
                       }
                     </p>
                     <textarea

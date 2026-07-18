@@ -19,7 +19,12 @@ import SearchSuggestionBox from '../../rooming-houses/components/SearchSuggestio
 import { LocationFilterPanel } from '../../rooming-houses/components/LocationFilterPanel';
 import RentalAiChatbot from '../../rooming-houses/components/RentalAiChatbot';
 import FavoriteButton from '../../rooming-houses/components/FavoriteButton';
-import { saveRoomingHouseView, saveSearchBehavior, toGuestRecommendationRequest } from '../../rooming-houses/rentalBehaviorStorage';
+import {
+  GUEST_RECOMMENDATION_CACHE_KEY,
+  saveRoomingHouseView,
+  saveSearchBehavior,
+  toGuestRecommendationRequest,
+} from '../../rooming-houses/rentalBehaviorStorage';
 import { saveRecentSearch } from '../../rooming-houses/searchRecentStorage';
 import { NotificationBell } from '../../notifications/components/NotificationBell';
 import { HomeHeader } from '../../../shared/components/layout/HomeHeader';
@@ -55,7 +60,6 @@ type HomeListingCategory = {
 
 /** sessionStorage cache key for home page listing. */
 const LISTING_CACHE_KEY = 'srp_home_listing_cache';
-const RECOMMENDATION_CACHE_KEY = 'srp_home_ai_recommendation_cache';
 /** Cache TTL: 5 minutes. */
 const LISTING_CACHE_TTL = 5 * 60 * 1000;
 
@@ -69,6 +73,23 @@ const AFFORDABLE_MAX_RENT = 5_000_000;
 type ListingCacheEntry = {
   items: HomeListingItem[];
   timestamp: number;
+};
+
+type RecommendationDisplayMeta = {
+  personalized: boolean;
+  aiAssisted: boolean;
+  fallbackReason?: string | null;
+};
+
+type RecommendationCacheEntry = ListingCacheEntry & {
+  behaviorKey: string;
+  meta: RecommendationDisplayMeta;
+};
+
+const DEFAULT_RECOMMENDATION_META: RecommendationDisplayMeta = {
+  personalized: false,
+  aiAssisted: false,
+  fallbackReason: null,
 };
 
 export function MePage() {
@@ -88,6 +109,7 @@ export function MePage() {
   const [error, setError] = useState('');
   const [homeListings, setHomeListings] = useState<HomeListingItem[]>([]);
   const [recommendedListings, setRecommendedListings] = useState<HomeListingItem[]>([]);
+  const [recommendationMeta, setRecommendationMeta] = useState<RecommendationDisplayMeta>(DEFAULT_RECOMMENDATION_META);
   const [searchQuery, setSearchQuery] = useState('');
   const [loadingHouses, setLoadingHouses] = useState(false);
   const [isCheckingLandlord, setIsCheckingLandlord] = useState(false);
@@ -154,12 +176,18 @@ export function MePage() {
 
   useEffect(() => {
     async function loadAiRecommendations() {
+      const personalizedRequest = toGuestRecommendationRequest(8);
+      const request = personalizedRequest ?? createDefaultRecommendationRequest();
+      const personalized = personalizedRequest != null;
+      const behaviorKey = buildRecommendationBehaviorKey(request);
+
       try {
-        const cached = sessionStorage.getItem(RECOMMENDATION_CACHE_KEY);
+        const cached = sessionStorage.getItem(GUEST_RECOMMENDATION_CACHE_KEY);
         if (cached) {
-          const entry: ListingCacheEntry = JSON.parse(cached);
-          if (Date.now() - entry.timestamp < LISTING_CACHE_TTL) {
+          const entry: RecommendationCacheEntry = JSON.parse(cached);
+          if (Date.now() - entry.timestamp < LISTING_CACHE_TTL && entry.behaviorKey === behaviorKey) {
             setRecommendedListings(entry.items);
+            setRecommendationMeta(entry.meta ?? DEFAULT_RECOMMENDATION_META);
             return;
           }
         }
@@ -168,21 +196,32 @@ export function MePage() {
       }
 
       try {
-        const request = toGuestRecommendationRequest(8) ?? createDefaultRecommendationRequest();
         const recommendation = await getGuestRoomingHouseRecommendations(request);
         const mapped = recommendation.items.map((item) =>
           mapSearchItemToHomeItem(item, recommendation.reasons[item.id])
         );
+        const meta: RecommendationDisplayMeta = {
+          personalized,
+          aiAssisted: recommendation.aiAssisted,
+          fallbackReason: recommendation.fallbackReason,
+        };
         setRecommendedListings(mapped);
+        setRecommendationMeta(meta);
 
         try {
-          const entry: ListingCacheEntry = { items: mapped, timestamp: Date.now() };
-          sessionStorage.setItem(RECOMMENDATION_CACHE_KEY, JSON.stringify(entry));
+          const entry: RecommendationCacheEntry = {
+            items: mapped,
+            timestamp: Date.now(),
+            behaviorKey,
+            meta,
+          };
+          sessionStorage.setItem(GUEST_RECOMMENDATION_CACHE_KEY, JSON.stringify(entry));
         } catch {
           // sessionStorage full — silently skip cache
         }
       } catch {
         setRecommendedListings([]);
+        setRecommendationMeta(DEFAULT_RECOMMENDATION_META);
       }
     }
 
@@ -254,10 +293,10 @@ export function MePage() {
     'Khu vực / Xung quanh';
   const listingCategories = useMemo(
     () => [
-      ...buildListingCategories(recommendedListings, true),
+      ...buildListingCategories(recommendedListings, true, recommendationMeta),
       ...buildListingCategories(homeListings, false),
     ],
-    [homeListings, recommendedListings]
+    [homeListings, recommendationMeta, recommendedListings]
   );
 
   async function handleLandlordRegister() {
@@ -698,22 +737,65 @@ function createDefaultRecommendationRequest(): GuestRoomingHouseRecommendationRe
   };
 }
 
-function buildListingCategories(items: HomeListingItem[], personalized: boolean): HomeListingCategory[] {
-  // Lọc bỏ những khu trọ chưa có ảnh bìa
-  const itemsWithImages = items.filter(item => item.coverImageUrl && item.coverImageUrl.trim() !== '');
+function buildRecommendationBehaviorKey(request: GuestRoomingHouseRecommendationRequest) {
+  return JSON.stringify({
+    recentQueries: request.recentQueries,
+    recentRoomingHouseIds: request.recentRoomingHouseIds,
+    clickedRoomingHouseIds: request.clickedRoomingHouseIds,
+    preferredAmenityIds: request.preferredAmenityIds,
+    preferredRoomAmenityIds: request.preferredRoomAmenityIds,
+    provinceCode: request.provinceCode ?? null,
+    wardCode: request.wardCode ?? null,
+    minPrice: request.minPrice ?? null,
+    maxPrice: request.maxPrice ?? null,
+    minAreaM2: request.minAreaM2 ?? null,
+    maxAreaM2: request.maxAreaM2 ?? null,
+    pageSize: request.pageSize,
+  });
+}
+
+function buildRecommendationCategoryCopy(meta: RecommendationDisplayMeta) {
+  if (!meta.personalized) {
+    return {
+      eyebrow: 'KHU TRỌ ĐỀ XUẤT',
+      title: 'Khu trọ đề xuất hôm nay',
+      description: 'Các khu trọ còn phòng, có thông tin tốt để bạn tham khảo nhanh.',
+    };
+  }
+
+  if (meta.aiAssisted) {
+    return {
+      eyebrow: 'GỢI Ý AI',
+      title: 'Gợi ý phù hợp với bạn',
+      description: 'Dựa trên thói quen tìm kiếm và sở thích gần đây của bạn, đề xuất bởi AI.',
+    };
+  }
+
+  return {
+    eyebrow: 'GỢI Ý PHÙ HỢP',
+    title: 'Gợi ý theo nhu cầu của bạn',
+    description: meta.fallbackReason || 'Dựa trên tìm kiếm, tiện ích và khu vực bạn quan tâm gần đây.',
+  };
+}
+
+function buildListingCategories(
+  items: HomeListingItem[],
+  personalized: boolean,
+  recommendationMeta: RecommendationDisplayMeta = DEFAULT_RECOMMENDATION_META
+): HomeListingCategory[] {
+  const displayItems = prioritizeListingsWithImages(items);
   const categories: HomeListingCategory[] = [];
   const now = Date.now();
+  const recommendationCopy = buildRecommendationCategoryCopy(recommendationMeta);
 
   // ── Category 1: Tất cả khu trọ ──────────────────────────────────
-  const primary = itemsWithImages.slice(0, personalized ? 8 : 6);
+  const primary = displayItems.slice(0, personalized ? 8 : 6);
   if (primary.length > 0) {
     categories.push({
       id: personalized ? 'personalized' : 'available',
-      eyebrow: personalized ? 'GỢI Ý AI' : 'KHU TRỌ CÔNG KHAI',
-      title: personalized ? 'Gợi ý phù hợp với bạn' : 'Khu trọ đang còn phòng',
-      description: personalized
-        ? 'Dựa trên thói quen tìm kiếm và sở thích của bạn, đề xuất bởi AI.'
-        : 'Danh sách các khu trọ còn phòng, thông tin minh bạch, cập nhật liên tục.',
+      eyebrow: personalized ? recommendationCopy.eyebrow : 'KHU TRỌ CÔNG KHAI',
+      title: personalized ? recommendationCopy.title : 'Khu trọ đang còn phòng',
+      description: personalized ? recommendationCopy.description : 'Danh sách các khu trọ còn phòng, thông tin minh bạch, cập nhật liên tục.',
       icon: (
         <svg className="category-eyebrow-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
           <rect x="4" y="2" width="16" height="20" rx="2" ry="2" />
@@ -728,7 +810,7 @@ function buildListingCategories(items: HomeListingItem[], personalized: boolean)
   }
 
   // ── Category 2: Khu trọ mới (created trong vòng 14 ngày) ────────
-  const newest = itemsWithImages
+  const newest = displayItems
     .filter((item) => {
       if (!item.createdAt) return false;
       const ageMs = now - new Date(item.createdAt).getTime();
@@ -752,7 +834,7 @@ function buildListingCategories(items: HomeListingItem[], personalized: boolean)
   }
 
   // ── Category 3: Còn nhiều phòng trống (availableRooms ≥ 5) ──────
-  const manyRooms = itemsWithImages
+  const manyRooms = displayItems
     .filter((item) => (item.availableRooms ?? 0) >= MANY_ROOMS_THRESHOLD)
     .sort((a, b) => (b.availableRooms ?? 0) - (a.availableRooms ?? 0))
     .slice(0, 4);
@@ -775,7 +857,7 @@ function buildListingCategories(items: HomeListingItem[], personalized: boolean)
   }
 
   // ── Category 4: Giá thuê dễ tiếp cận (minMonthlyRent ≤ 5 triệu) ─
-  const affordable = itemsWithImages
+  const affordable = displayItems
     .filter((item) => item.minMonthlyRent != null && item.minMonthlyRent <= AFFORDABLE_MAX_RENT)
     .sort((a, b) => (a.minMonthlyRent ?? Number.MAX_SAFE_INTEGER) - (b.minMonthlyRent ?? Number.MAX_SAFE_INTEGER))
     .slice(0, 4);
@@ -796,6 +878,14 @@ function buildListingCategories(items: HomeListingItem[], personalized: boolean)
   }
 
   return categories;
+}
+
+function prioritizeListingsWithImages(items: HomeListingItem[]) {
+  return [...items].sort((a, b) => Number(hasCoverImage(b)) - Number(hasCoverImage(a)));
+}
+
+function hasCoverImage(item: HomeListingItem) {
+  return Boolean(item.coverImageUrl?.trim());
 }
 
 function formatListingSummary(house: HomeListingItem) {

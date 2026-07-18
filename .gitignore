@@ -11,6 +11,10 @@
 !/docs/
 !/docs/interval-plan/
 !/docs/interval-plan/Interval2BusinessLogicReport.md
+!/scripts/
+!/scripts/reset-demo-data.ps1
+!/database/
+!/database/smart_rental_demo_snapshot.dump
 !/qa/
 !/qa/wallet/
 !/qa/wallet/README.md

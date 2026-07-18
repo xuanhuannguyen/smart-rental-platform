@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import { PageHeader } from '../../../shared/components/ui/PageHeader';
 import { useNavigate } from 'react-router-dom';
 import { getTenantAppointments, cancelViewingAppointmentByTenant, acceptProposal, rejectProposal } from '../api';
@@ -101,22 +101,46 @@ export default function TenantAppointmentsPage() {
   const [proposalLoading, setProposalLoading] = useState(false);
   const [chatOpeningId, setChatOpeningId] = useState<string | null>(null);
 
-  const loadData = async () => {
-    setLoading(true);
-    setError('');
+  const loadData = useCallback(async (silent = false) => {
+    if (!silent) {
+      setLoading(true);
+      setError('');
+    }
     try {
       const appointmentsData = await getTenantAppointments();
       setAppointments(appointmentsData);
     } catch (err) {
-      setError(getApiErrorMessage(err, 'Không thể tải danh sách lịch hẹn.'));
+      if (!silent) {
+        setError(getApiErrorMessage(err, 'Không thể tải danh sách lịch hẹn.'));
+      }
     } finally {
-      setLoading(false);
+      if (!silent) {
+        setLoading(false);
+      }
     }
-  };
+  }, []);
 
   useEffect(() => {
     void loadData();
-  }, []);
+  }, [loadData]);
+
+  useEffect(() => {
+    const interval = window.setInterval(() => {
+      void loadData(true);
+    }, 8000);
+
+    const refreshOnFocus = () => {
+      if (document.visibilityState === 'visible') {
+        void loadData(true);
+      }
+    };
+
+    document.addEventListener('visibilitychange', refreshOnFocus);
+    return () => {
+      window.clearInterval(interval);
+      document.removeEventListener('visibilitychange', refreshOnFocus);
+    };
+  }, [loadData]);
 
   const handleCancelClick = (id: string) => {
     setCancellingId(id);

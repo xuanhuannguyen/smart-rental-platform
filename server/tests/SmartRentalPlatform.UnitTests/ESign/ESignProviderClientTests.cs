@@ -196,6 +196,8 @@ public class ESignProviderClientTests
             evidence, "owner@example.com", "access-code", ESignOtpMethod.EmailOtp);
 
         Assert.True(result.IsSuccess);
+        Assert.Equal("econtract-integration-service/api/v1/tich-hop-ky/email-otp/hoan-thanh", handler.Requests[1].Path);
+        Assert.DoesNotContain("/sms-otp/", handler.Requests[1].Path);
         Assert.Contains("\"RECTANGLE\":\"57,362,298,467\"", handler.Requests[1].Body);
         Assert.Contains("\"PAGE\":4", handler.Requests[1].Body);
         Assert.Contains("\"emailFlag\":false", handler.Requests[1].Body);

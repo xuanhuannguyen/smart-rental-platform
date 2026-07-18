@@ -1,6 +1,7 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { Button } from '../../../shared/components/ui/Button';
 import { getApiErrorMessage } from '../../../shared/api/apiError';
+import { toAssetUrl } from '../../../shared/api/assets';
 import { contractApi } from '../../contracts/api';
 import type { ContractDetailResponse, ContractHistoryItemResponse } from '../../contracts/types';
 import { billingApi } from '../../billing/api';
@@ -18,6 +19,10 @@ interface Props {
 export interface ReadingDraft {
   previousReading: number;
   currentReading: number;
+  proofImageObjectKey?: string;
+  proofImageUrl?: string;
+  aiReading?: number | null;
+  aiRawText?: string;
 }
 
 export const TerminateContractModal: React.FC<Props> = ({
@@ -35,6 +40,7 @@ export const TerminateContractModal: React.FC<Props> = ({
   const [finalInvoiceDiscountAmount, setFinalInvoiceDiscountAmount] = useState(0);
   const [finalInvoiceNote, setFinalInvoiceNote] = useState('');
   const [loadingFinalInvoicePreview, setLoadingFinalInvoicePreview] = useState(false);
+  const [uploadingFinalInvoiceServiceId, setUploadingFinalInvoiceServiceId] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [toast, setToast] = useState<{ message: string; type: 'success' | 'error' | 'info' } | null>(null);
@@ -211,6 +217,40 @@ export const TerminateContractModal: React.FC<Props> = ({
     }));
   }
 
+  async function handleFinalInvoiceMeterImage(serviceTypeId: string, file?: File) {
+    if (!file || !finalInvoicePreview) return;
+    if (!['image/jpeg', 'image/png'].includes(file.type)) {
+      setError('Chỉ hỗ trợ ảnh đồng hồ định dạng JPG hoặc PNG.');
+      return;
+    }
+    if (file.size > 5 * 1024 * 1024) {
+      setError('Dung lượng ảnh đồng hồ không được vượt quá 5MB.');
+      return;
+    }
+
+    setUploadingFinalInvoiceServiceId(serviceTypeId);
+    setError(null);
+    try {
+      const response = await billingApi.readMeterImage({
+        contractId: contract.id,
+        serviceTypeId,
+        billingPeriodStart: finalInvoicePreview.billingPeriodStart,
+        file
+      });
+      updateFinalInvoiceReading(serviceTypeId, {
+        currentReading: response.data.reading,
+        aiReading: response.data.reading,
+        aiRawText: response.data.rawText,
+        proofImageObjectKey: response.data.proofImageObjectKey,
+        proofImageUrl: response.data.proofImageUrl
+      });
+    } catch (err) {
+      setError(getApiErrorMessage(err, 'Không thể đọc chỉ số từ ảnh. Vui lòng thử ảnh rõ hơn.'));
+    } finally {
+      setUploadingFinalInvoiceServiceId('');
+    }
+  }
+
   return (
     <div className="history-modal-overlay">
       <div className="history-modal-content terminate-contract-modal">
@@ -305,6 +345,8 @@ export const TerminateContractModal: React.FC<Props> = ({
                         totalAmount={finalInvoiceTotal}
                         blockReason={finalInvoiceBlockReason}
                         onChangeReading={updateFinalInvoiceReading}
+                        onReadMeterImage={handleFinalInvoiceMeterImage}
+                        uploadingServiceId={uploadingFinalInvoiceServiceId}
                         onChangeDiscountAmount={setFinalInvoiceDiscountAmount}
                         onChangeNote={setFinalInvoiceNote}
                       />
@@ -324,7 +366,7 @@ export const TerminateContractModal: React.FC<Props> = ({
             <Button
               variant="danger"
               type="submit"
-              disabled={isSubmitting || loadingFinalInvoicePreview || normalExpirationBlocked || Boolean(finalInvoiceBlockReason)}
+              disabled={isSubmitting || loadingFinalInvoicePreview || uploadingFinalInvoiceServiceId !== '' || normalExpirationBlocked || Boolean(finalInvoiceBlockReason)}
             >
               Xác nhận yêu cầu
             </Button>
@@ -346,6 +388,8 @@ export function FinalInvoicePreviewSection({
   totalLabel = 'Tổng hóa đơn kỳ cuối',
   blockReason,
   onChangeReading,
+  onReadMeterImage,
+  uploadingServiceId = '',
   onChangeDiscountAmount,
   onChangeNote
 }: {
@@ -358,6 +402,8 @@ export function FinalInvoicePreviewSection({
   totalLabel?: string;
   blockReason: string;
   onChangeReading: (serviceTypeId: string, patch: Partial<ReadingDraft>) => void;
+  onReadMeterImage?: (serviceTypeId: string, file?: File) => void | Promise<void>;
+  uploadingServiceId?: string;
   onChangeDiscountAmount: (value: number) => void;
   onChangeNote: (value: string) => void;
 }) {
@@ -430,9 +476,44 @@ export function FinalInvoicePreviewSection({
                         value={draft.currentReading}
                         onChange={(event) => onChangeReading(service.serviceTypeId, { currentReading: Number(event.target.value) })}
                       />
+                      {draft.aiReading !== null && draft.aiReading !== undefined ? (
+                        <small style={{ color: draft.currentReading === draft.aiReading ? '#15803d' : '#b45309' }}>
+                          {draft.currentReading === draft.aiReading ? 'AI đã điền chỉ số này.' : 'Đã chỉnh sửa kết quả AI.'}
+                        </small>
+                      ) : (
+                        <small style={{ color: '#64748b' }}>Có thể nhập tay hoặc upload ảnh để AI đọc.</small>
+                      )}
                     </label>
                     <PreviewBox label="Tạm tính" value={`${formatNumber(consumption)} x ${formatMoney(service.unitPrice)} = ${formatMoney(amount)}`} />
                   </div>
+                  {onReadMeterImage && (
+                    <div className="final-invoice-meter-proof">
+                      <div>
+                        <span className="label">Ảnh đồng hồ {service.serviceName}</span>
+                        <strong>AI đọc: {draft.aiReading ?? '--'} {draft.aiReading !== null && draft.aiReading !== undefined ? service.meterUnitName : ''}</strong>
+                        <small>{draft.aiRawText || 'Upload ảnh JPG/PNG để AI đọc và lưu bằng chứng vào hóa đơn.'}</small>
+                      </div>
+                      <div className="final-invoice-meter-proof__image">
+                        {draft.proofImageUrl ? (
+                          <img src={toAssetUrl(draft.proofImageUrl)} alt={`Đồng hồ ${service.serviceName}`} />
+                        ) : (
+                          <span>Chưa có ảnh</span>
+                        )}
+                      </div>
+                      <label className="final-invoice-meter-proof__upload">
+                        {uploadingServiceId === service.serviceTypeId ? 'AI đang đọc...' : draft.proofImageUrl ? 'Thay ảnh' : 'Upload & đọc AI'}
+                        <input
+                          type="file"
+                          accept="image/jpeg,image/png"
+                          disabled={uploadingServiceId !== ''}
+                          onChange={(event) => {
+                            void onReadMeterImage(service.serviceTypeId, event.target.files?.[0]);
+                            event.currentTarget.value = '';
+                          }}
+                        />
+                      </label>
+                    </div>
+                  )}
                 </div>
               );
             })}
@@ -500,7 +581,9 @@ export function buildFinalInvoiceMeterReadings(
       serviceTypeId: service.serviceTypeId,
       previousReading: latestReading ? null : Number(draft.previousReading),
       currentReading: Number(draft.currentReading),
-      proofImageObjectKey: null
+      proofImageObjectKey: draft.proofImageObjectKey?.trim() || null,
+      aiReading: draft.aiReading ?? null,
+      aiRawText: draft.aiRawText?.trim() || null
     };
   });
 }

@@ -87,6 +87,7 @@ public sealed class RoomingHouseAiChatService : IRoomingHouseAiChatService
 
         var plan = await CreatePlanAsync(request, history, cancellationToken)
             ?? CreateFallbackPlan(request);
+        ApplyDeterministicPlanGuards(message, plan);
         var detail = await LoadDetailIfNeededAsync(request, plan, cancellationToken);
         var searchResults = await SearchIfNeededAsync(request, plan, detail, cancellationToken);
         var nearbyPlaces = await SearchNearbyIfNeededAsync(request, plan, detail, cancellationToken);
@@ -222,6 +223,8 @@ public sealed class RoomingHouseAiChatService : IRoomingHouseAiChatService
     private static ChatPlan CreateFallbackPlan(RoomingHouseAiChatRequest request)
     {
         var normalized = Normalize(request.Message);
+        var isMetaQuestion = IsPlatformOrModelQuestion(normalized);
+        var isSearch = IsRentalSearchQuestion(normalized);
         var isNearby = ContainsAny(normalized,
             "xung quanh", "quanh", "lan canh", "gan day", "gan khu", "gan nha", "gan tro",
             "quan an", "cho", "cafe", "ca phe",
@@ -235,10 +238,10 @@ public sealed class RoomingHouseAiChatService : IRoomingHouseAiChatService
 
         var plan = new ChatPlan
         {
-            Intent = isNearby ? "nearby" : isDetail ? "detail" : "search",
+            Intent = isMetaQuestion ? "general" : isNearby ? "nearby" : isDetail ? "detail" : isSearch ? "search" : "clarify",
             Confidence = 0.72m,
-            SearchQuery = request.Message,
-            DetailFocus = request.Message,
+            SearchQuery = isSearch ? request.Message : null,
+            DetailFocus = isDetail ? request.Message : null,
             NearbyKeywords = ExtractNearbyKeywords(normalized),
             RadiusMeters = GetRequestedRadiusMeters(request.Message, DefaultNearbyRadiusMeters),
             NeedsRoomingHouseDetail = request.RoomingHouseId.HasValue,
@@ -292,6 +295,20 @@ public sealed class RoomingHouseAiChatService : IRoomingHouseAiChatService
         }
     }
 
+    private static void ApplyDeterministicPlanGuards(string message, ChatPlan plan)
+    {
+        var normalized = Normalize(message);
+        if (IsPlatformOrModelQuestion(normalized))
+        {
+            plan.Intent = "general";
+            plan.SearchQuery = null;
+            plan.DetailFocus = null;
+            plan.LocationName = null;
+            plan.NearbyKeywords = new List<string>();
+            plan.NeedsRoomingHouseDetail = false;
+        }
+    }
+
     private async Task<RoomingHouseDetailResponse?> LoadDetailIfNeededAsync(
         RoomingHouseAiChatRequest request,
         ChatPlan plan,
@@ -318,7 +335,7 @@ public sealed class RoomingHouseAiChatService : IRoomingHouseAiChatService
         RoomingHouseDetailResponse? detail,
         CancellationToken cancellationToken)
     {
-        if (plan.Intent is not ("search" or "compare") && detail is not null)
+        if (plan.Intent is not ("search" or "compare"))
         {
             return new List<RoomingHouseSearchItemResponse>();
         }
@@ -737,6 +754,16 @@ public sealed class RoomingHouseAiChatService : IRoomingHouseAiChatService
             return $"Mình tìm thấy {searchResults.Count} khu trọ phù hợp với câu hỏi của bạn. Mình đã đặt các thẻ kết quả bên dưới để bạn xem giá, phòng trống và vị trí nhanh hơn.";
         }
 
+        if (plan.Intent == "general")
+        {
+            return "Mình là chatbot tư vấn của Smart Rental Platform. Mình tập trung hỗ trợ tìm khu trọ, so sánh giá, phòng trống, tiện ích và địa điểm xung quanh.";
+        }
+
+        if (plan.Intent == "clarify")
+        {
+            return "Mình chưa rõ nhu cầu tìm trọ của bạn. Bạn có thể cho mình biết khu vực, ngân sách, số người ở hoặc tiện ích mong muốn nhé.";
+        }
+
         return "Mình chưa tìm thấy dữ liệu phù hợp. Bạn có thể nói rõ khu vực, ngân sách, số người ở hoặc tiện ích mong muốn để mình tìm kỹ hơn.";
     }
 
@@ -825,6 +852,29 @@ public sealed class RoomingHouseAiChatService : IRoomingHouseAiChatService
 
     private static bool ContainsAny(string source, params string[] terms)
         => terms.Any(source.Contains);
+
+    private static bool IsPlatformOrModelQuestion(string normalized)
+    {
+        if (ContainsAny(normalized,
+                "model nao", "mo hinh nao", "dung model", "dang dung model", "ai nao",
+                "chatgpt", "gemini", "openai", "claude", "deepseek", "llm",
+                "ban la ai", "m la ai", "bot la ai", "chatbot la ai"))
+        {
+            return true;
+        }
+
+        return ContainsAny(normalized, "phien ban", "version")
+            && ContainsAny(normalized, "model", "ai", "chatbot");
+    }
+
+    private static bool IsRentalSearchQuestion(string normalized)
+        => ContainsAny(normalized,
+            "tim tro", "tim phong", "tim khu tro", "tim nha tro",
+            "khu tro", "phong tro", "nha tro", "can ho", "cho thue",
+            "gia", "duoi", "tren", "khoang", "trieu", "ngan sach",
+            "gan", "xung quanh", "quanh", "cach",
+            "wifi", "giu xe", "may lanh", "dieu hoa", "gac", "ban cong",
+            "con phong", "phong trong", "sinh vien", "o ghep", "thue");
 
     private static List<string> ExtractNearbyKeywords(string normalized)
     {

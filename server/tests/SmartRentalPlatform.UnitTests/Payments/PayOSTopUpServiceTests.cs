@@ -260,6 +260,16 @@ public class PayOSTopUpServiceTests : IDisposable
             LastInput = input;
             return Task.FromResult(Result);
         }
+
+        public Task<PayOSCreatePayoutResult> CreatePayoutAsync(PayOSCreatePayoutInput input, CancellationToken cancellationToken = default)
+        {
+            return Task.FromResult(new PayOSCreatePayoutResult());
+        }
+
+        public Task<PayOSPayoutDetailsResult> GetPayoutDetailsAsync(string paymentLinkId, CancellationToken cancellationToken = default)
+        {
+            return Task.FromResult(new PayOSPayoutDetailsResult());
+        }
     }
 
     private sealed class FakeWalletService : IWalletService
@@ -277,6 +287,7 @@ public class PayOSTopUpServiceTests : IDisposable
         public Task<WalletMutationResponse> DebitAsync(Guid walletAccountId, decimal amount, WalletTransactionType transactionType, WalletTransactionMetadata? metadata = null, CancellationToken cancellationToken = default) => throw new NotImplementedException();
         public Task<WalletMutationResponse> IncreaseReservedAsync(Guid walletAccountId, decimal amount, WalletTransactionType transactionType, WalletTransactionMetadata? metadata = null, CancellationToken cancellationToken = default) => throw new NotImplementedException();
         public Task<WalletMutationResponse> DecreaseReservedAsync(Guid walletAccountId, decimal amount, WalletTransactionType transactionType, WalletTransactionMetadata? metadata = null, CancellationToken cancellationToken = default) => throw new NotImplementedException();
+        public Task<WalletMutationResponse> DebitFromReservedAsync(Guid walletAccountId, decimal amount, WalletTransactionType transactionType, WalletTransactionMetadata? metadata = null, CancellationToken cancellationToken = default) => throw new NotImplementedException();
         public Task<WalletTransferResponse> TransferAsync(Guid sourceWalletAccountId, Guid targetWalletAccountId, decimal amount, WalletTransactionType debitTransactionType, WalletTransactionType creditTransactionType, WalletTransactionMetadata? metadata = null, CancellationToken cancellationToken = default) => throw new NotImplementedException();
         public Task<WalletTransferResponse> TransferWithinTransactionAsync(Guid sourceWalletAccountId, Guid targetWalletAccountId, decimal amount, WalletTransactionType debitTransactionType, WalletTransactionType creditTransactionType, WalletTransactionMetadata? metadata = null, CancellationToken cancellationToken = default) => throw new NotImplementedException();
         public Task<WalletTransferResponse> TransferToReservedWithinTransactionAsync(Guid sourceWalletAccountId, Guid targetWalletAccountId, decimal amount, WalletTransactionType debitTransactionType, WalletTransactionType creditTransactionType, WalletTransactionMetadata? metadata = null, CancellationToken cancellationToken = default) => throw new NotImplementedException();

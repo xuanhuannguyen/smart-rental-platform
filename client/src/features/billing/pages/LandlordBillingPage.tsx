@@ -8,6 +8,7 @@ import { toAssetUrl } from '../../../shared/api/assets';
 import { Toast } from '../../../shared/components/ui/Toast';
 import { Tabs } from '../../../shared/components/ui/Tabs';
 import { PageHeader } from '../../../shared/components/ui/PageHeader';
+import { Card, CardMetaRow, type CardStatusTone } from '../../../shared/components/ui/Card';
 import { contractApi } from '../../contracts/api';
 import { billingApi } from '../api';
 import type { ContractAppendixResponse, ContractHistoryItemResponse } from '../../contracts/types';
@@ -285,8 +286,8 @@ export default function LandlordBillingPage() {
   return (
     <div className="billing-shell" style={{ display: 'contents' }}>
 
-      <main className="billing-main">
-        {tab !== 'invoices' && (
+      <main className={`billing-main ${tab === 'detail' ? 'billing-main--page-header-flow' : ''}`.trim()}>
+        {tab !== 'invoices' && tab !== 'detail' && (
           <section className="billing-header">
             <div>
               <span className="billing-kicker">Nền tảng quản lý thuê trọ</span>
@@ -303,7 +304,7 @@ export default function LandlordBillingPage() {
           </section>
         )}
 
-        {tab !== 'invoices' && <NotificationStrip invoices={invoices} />}
+        {tab !== 'invoices' && tab !== 'detail' && <NotificationStrip invoices={invoices} />}
         {toast && <Toast message={toast.message} type={toast.type} onClose={() => setToast(null)} />}
         {error && <Alert type="error">{error}</Alert>}
 
@@ -344,6 +345,7 @@ export default function LandlordBillingPage() {
             invoice={selectedInvoice}
             loading={loadingInvoices}
             busy={busy}
+            onBack={() => navigate(ROUTE_PATHS.LANDLORD.INVOICES)}
             onIssue={(invoice) => setConfirmAction({
               title: 'Phát hành hóa đơn?',
               body: 'Sau khi phát hành, người thuê sẽ thấy hóa đơn và có thể thanh toán bằng ví nội bộ.',
@@ -537,6 +539,7 @@ function InvoiceListSection({
     <div className="landlord-billing-page">
       {/* ── Overview Band ── */}
       <PageHeader
+        className="invoice-page-header"
         icon={
           <svg viewBox="0 0 24 24" width="24" height="24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
             <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" />
@@ -622,62 +625,70 @@ function InvoiceListSection({
         ) : (
           <section className="invoice-grid">
             {invoices.map((invoice) => (
-              <div
-                className={`invoice-card status-${invoice.status.toLowerCase()}`}
+              <Card
                 key={invoice.id}
-                onClick={() => onOpen(invoice)}
+                className="invoice-shared-card"
+                title={`${invoice.roomingHouseName} - Phòng ${invoice.roomNumber} - ${formatInvoicePeriodMonth(invoice.billingPeriodStart)}`}
+                status={getInvoiceStatusLabel(invoice.status)}
+                statusTone={getInvoiceStatusTone(invoice.status)}
+                bodyColumns={2}
+                actionItems={[
+                  {
+                    label: 'Xem chi tiết',
+                    onClick: () => onOpen(invoice),
+                    icon: (
+                      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
+                        <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z" />
+                        <circle cx="12" cy="12" r="3" />
+                      </svg>
+                    ),
+                  },
+                ]}
               >
-                {/* Card Header */}
-                <div className="invoice-card-header">
-                  <div className="invoice-no-box">
-                    <svg className="invoice-file-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                      <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" />
-                      <polyline points="14 2 14 8 20 8" />
-                      <line x1="16" y1="13" x2="8" y2="13" />
-                      <line x1="16" y1="17" x2="8" y2="17" />
+                <CardMetaRow
+                  label="Người thuê"
+                  value={invoice.tenantName || invoice.tenantEmail}
+                  icon={
+                    <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                      <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2" />
+                      <circle cx="12" cy="7" r="4" />
                     </svg>
-                    <h3>{invoice.invoiceNo}</h3>
-                  </div>
-                  <span className={`invoice-status-badge ${invoice.status.toLowerCase()}`}>
-                    {getInvoiceStatusLabel(invoice.status)}
-                  </span>
-                </div>
-
-                {/* Card Body */}
-                <div className="invoice-card-body">
-                  <div className="house-info">
-                    <svg className="info-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                      <path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z" />
-                      <polyline points="9 22 9 12 15 12 15 22" />
+                  }
+                />
+                <CardMetaRow
+                  label="Tổng tiền"
+                  value={formatMoney(invoice.totalAmount)}
+                  valueClassName={`invoice-shared-card__total invoice-shared-card__total--${invoice.status.toLowerCase()}`}
+                  icon={
+                    <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                      <line x1="12" y1="1" x2="12" y2="23" />
+                      <path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6" />
                     </svg>
-                    <span>{invoice.roomingHouseName}</span>
-                    <span className="room-badge">Phòng {invoice.roomNumber}</span>
-                  </div>
-
-                  <ul className="invoice-details-list">
-                    <li className="invoice-detail-row">
-                      <span className="label">Người thuê</span>
-                      <span className="value tenant-name">{invoice.tenantName || invoice.tenantEmail}</span>
-                    </li>
-                    <li className="invoice-detail-row">
-                      <span className="label">Kỳ hóa đơn</span>
-                      <span className="value">{invoice.billingPeriodStart} – {invoice.billingPeriodEnd}</span>
-                    </li>
-                    <li className="invoice-detail-row">
-                      <span className="label">Hạn thanh toán</span>
-                      <span className="value due-date">{invoice.dueDate}</span>
-                    </li>
-                  </ul>
-
-                  {/* Card Footer */}
-                  <div className="invoice-card-footer">
-                    <span className="amount-label">Tổng tiền</span>
-                    <p className={`amount-value ${invoice.status.toLowerCase()}`}>
-                      {formatMoney(invoice.totalAmount)}
-                    </p>
-                  </div>
-                </div>
-              </div>
+                  }
+                />
+                <CardMetaRow
+                  label="Kỳ hóa đơn"
+                  value={`${formatCentralDate(invoice.billingPeriodStart)} - ${formatCentralDate(invoice.billingPeriodEnd)}`}
+                  icon={
+                    <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                      <rect x="3" y="4" width="18" height="18" rx="2" ry="2" />
+                      <line x1="16" y1="2" x2="16" y2="6" />
+                      <line x1="8" y1="2" x2="8" y2="6" />
+                      <line x1="3" y1="10" x2="21" y2="10" />
+                    </svg>
+                  }
+                />
+                <CardMetaRow
+                  label="Hạn thanh toán"
+                  value={formatCentralDate(invoice.dueDate)}
+                  icon={
+                    <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                      <circle cx="12" cy="12" r="10" />
+                      <polyline points="12 6 12 12 16 14" />
+                    </svg>
+                  }
+                />
+              </Card>
             ))}
           </section>
         )}
@@ -1394,61 +1405,97 @@ function InvoiceDetailSection({
   invoice,
   loading,
   busy,
+  onBack,
   onIssue,
   onCancel
 }: {
   invoice: Invoice | null;
   loading: boolean;
   busy: string;
+  onBack: () => void;
   onIssue: (invoice: Invoice) => void;
   onCancel: (invoice: Invoice) => void;
 }) {
+  const headerTitle = invoice ? `Hóa đơn ${invoice.invoiceNo}` : 'Chi tiết hóa đơn';
+  const headerDescription = invoice
+    ? `${invoice.roomingHouseName} - Phòng ${invoice.roomNumber} - ${formatInvoicePeriodMonth(invoice.billingPeriodStart)}`
+    : 'Xem thông tin chi tiết, hạng mục tính tiền và trạng thái xử lý hóa đơn.';
+
+  const header = (
+    <PageHeader
+      className="invoice-detail-page-header"
+      onBack={onBack}
+      icon={
+        <svg viewBox="0 0 24 24" width="24" height="24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+          <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" />
+          <polyline points="14 2 14 8 20 8" />
+          <line x1="16" y1="13" x2="8" y2="13" />
+          <line x1="16" y1="17" x2="8" y2="17" />
+          <polyline points="10 9 9 9 8 9" />
+        </svg>
+      }
+      eyebrow="Quản lý hóa đơn"
+      title={headerTitle}
+      description={headerDescription}
+      rightContent={invoice && (
+        <span className={`status-chip ${invoice.status.toLowerCase()}`}>
+          {getInvoiceStatusLabel(invoice.status)}
+        </span>
+      )}
+    />
+  );
+
   if (loading) {
-    return <section className="billing-panel"><LoadingBlock text="Đang tải chi tiết hóa đơn..." /></section>;
+    return (
+      <>
+        {header}
+        <section className="billing-panel"><LoadingBlock text="Đang tải chi tiết hóa đơn..." /></section>
+      </>
+    );
   }
 
   if (!invoice) {
-    return <section className="billing-panel"><EmptyBlock title="Không có hóa đơn" text="Chọn một hóa đơn từ danh sách để xem chi tiết." /></section>;
+    return (
+      <>
+        {header}
+        <section className="billing-panel"><EmptyBlock title="Không có hóa đơn" text="Chọn một hóa đơn từ danh sách để xem chi tiết." /></section>
+      </>
+    );
   }
 
   return (
-    <section className="billing-panel invoice-detail">
-      <div className="invoice-topline">
-        <div>
-          <span className="billing-kicker">Chi tiết hóa đơn</span>
-          <h3>{invoice.invoiceNo}</h3>
+    <>
+      {header}
+      <section className="billing-panel invoice-detail">
+        <div className="invoice-summary">
+          <span>Tiền phòng <strong>{formatMoney(invoice.rentAmount)}</strong></span>
+          <span>Phí dịch vụ <strong>{formatMoney(invoice.utilityAmount + invoice.serviceAmount)}</strong></span>
+          <span>Tổng cộng <strong>{formatMoney(invoice.totalAmount)}</strong></span>
         </div>
-        <span className={`status-chip ${invoice.status.toLowerCase()}`}>{getInvoiceStatusLabel(invoice.status)}</span>
-      </div>
-      <div className="invoice-summary">
-        <span>Tiền phòng <strong>{formatMoney(invoice.rentAmount)}</strong></span>
-        <span>Điện nước <strong>{formatMoney(invoice.utilityAmount)}</strong></span>
-        <span>Dịch vụ cố định <strong>{formatMoney(invoice.serviceAmount)}</strong></span>
-        <span>Tổng cộng <strong>{formatMoney(invoice.totalAmount)}</strong></span>
-      </div>
-      <div className="data-table">
-        <div className="table-row table-head item-table-row">
-          <span>Hạng mục</span><span>Mô tả</span><span>Số lượng</span><span>Đơn giá chốt</span><span>Thành tiền</span>
-        </div>
-        {invoice.items.map((item) => (
-          <div key={item.id} className="table-row item-table-row">
-            <span>{getInvoiceItemTypeLabel(item.itemType)}</span>
-            <span>{item.description}</span>
-            <span>{item.quantity}</span>
-            <span>{formatMoney(item.unitPrice)}</span>
-            <strong>{formatMoney(item.amount)}</strong>
+        <div className="data-table">
+          <div className="table-row table-head item-table-row">
+            <span>Hạng mục</span><span>Mô tả</span><span>Số lượng</span><span>Đơn giá chốt</span><span>Thành tiền</span>
           </div>
-        ))}
-      </div>
-      <div className="action-row">
-        <button type="button" className="billing-button" disabled={invoice.status !== 'Draft' || busy === 'issue'} onClick={() => onIssue(invoice)}>
-          {busy === 'issue' ? 'Đang phát hành...' : 'Phát hành'}
-        </button>
-        <button type="button" className="billing-button danger" disabled={invoice.status === 'Paid' || invoice.status === 'Cancelled' || busy === 'cancel'} onClick={() => onCancel(invoice)}>
-          {busy === 'cancel' ? 'Đang hủy...' : 'Hủy hóa đơn'}
-        </button>
-      </div>
-    </section>
+          {invoice.items.map((item) => (
+            <div key={item.id} className="table-row item-table-row">
+              <span>{getInvoiceItemTypeLabel(item.itemType)}</span>
+              <span>{item.description}</span>
+              <span>{item.quantity}</span>
+              <span>{formatMoney(item.unitPrice)}</span>
+              <strong>{formatMoney(item.amount)}</strong>
+            </div>
+          ))}
+        </div>
+        <div className="action-row invoice-detail-actions">
+          <button type="button" className="billing-button danger" disabled={invoice.status === 'Paid' || invoice.status === 'Cancelled' || busy === 'cancel'} onClick={() => onCancel(invoice)}>
+            {busy === 'cancel' ? 'Đang hủy...' : 'Hủy hóa đơn'}
+          </button>
+          <button type="button" className="billing-button" disabled={invoice.status !== 'Draft' || busy === 'issue'} onClick={() => onIssue(invoice)}>
+            {busy === 'issue' ? 'Đang phát hành...' : 'Phát hành'}
+          </button>
+        </div>
+      </section>
+    </>
   );
 }
 
@@ -1864,6 +1911,28 @@ function getInvoiceStatusLabel(status: string) {
   };
 
   return labels[status] ?? status;
+}
+
+function getInvoiceStatusTone(status: string): CardStatusTone {
+  const tones: Record<string, CardStatusTone> = {
+    Draft: 'warning',
+    Issued: 'info',
+    Paid: 'success',
+    Overdue: 'danger',
+    Cancelled: 'neutral'
+  };
+
+  return tones[status] ?? 'neutral';
+}
+
+function formatInvoicePeriodMonth(value: string) {
+  const date = new Date(value);
+
+  if (Number.isNaN(date.getTime())) {
+    return value;
+  }
+
+  return `Tháng ${date.getMonth() + 1}/${date.getFullYear()}`;
 }
 
 function getInvoiceItemTypeLabel(itemType: string) {

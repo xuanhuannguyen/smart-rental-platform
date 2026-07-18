@@ -3,6 +3,8 @@ using Microsoft.AspNetCore.DataProtection;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Options;
+using System.Net;
+using System.Net.Sockets;
 using SmartRentalPlatform.Application.Common.Interfaces;
 using SmartRentalPlatform.Application.Common.Options;
 using SmartRentalPlatform.Infrastructure.Caching;
@@ -103,6 +105,39 @@ public static class DependencyInjection
             var options = provider.GetRequiredService<IOptions<PayOSOptions>>().Value;
             client.BaseAddress = new Uri(options.BaseUrl.TrimEnd('/') + "/");
             client.Timeout = TimeSpan.FromSeconds(options.TimeoutSeconds);
+        })
+        .ConfigurePrimaryHttpMessageHandler(() => new SocketsHttpHandler
+        {
+            ConnectCallback = async (context, cancellationToken) =>
+            {
+                var addresses = await Dns.GetHostAddressesAsync(
+                    context.DnsEndPoint.Host,
+                    AddressFamily.InterNetwork,
+                    cancellationToken);
+
+                if (addresses.Length == 0)
+                {
+                    throw new HttpRequestException($"No IPv4 address found for {context.DnsEndPoint.Host}.");
+                }
+
+                var socket = new Socket(SocketType.Stream, ProtocolType.Tcp)
+                {
+                    NoDelay = true
+                };
+
+                try
+                {
+                    await socket.ConnectAsync(
+                        new IPEndPoint(addresses[0], context.DnsEndPoint.Port),
+                        cancellationToken);
+                    return new NetworkStream(socket, ownsSocket: true);
+                }
+                catch
+                {
+                    socket.Dispose();
+                    throw;
+                }
+            }
         });
         services.AddScoped<IPayOSClient, PayOSClient>();
         services.AddScoped<IPayOSWebhookSignatureVerifier, PayOSWebhookSignatureVerifier>();

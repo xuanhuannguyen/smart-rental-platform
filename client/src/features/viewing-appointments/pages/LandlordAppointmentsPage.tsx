@@ -215,6 +215,12 @@ export default function LandlordAppointmentsPage() {
 
     let proposedScheduledAt: string | null = null;
     let proposedDurationMinutes: number | null = null;
+    if (proposeNewTime && (!proposedDate || !proposedTime)) {
+      setModalError('Vui lòng chọn đầy đủ ngày và giờ đề xuất cho người thuê.');
+      setActionLoading(false);
+      return;
+    }
+
     if (proposeNewTime && proposedDate && proposedTime) {
       proposedScheduledAt = new Date(`${proposedDate}T${proposedTime}`).toISOString();
     }

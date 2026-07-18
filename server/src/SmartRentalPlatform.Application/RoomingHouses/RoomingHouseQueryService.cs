@@ -541,7 +541,7 @@ public class RoomingHouseQueryService : IRoomingHouseQueryService
         CancellationToken cancellationToken = default)
     {
         var pageSize = Math.Min(24, Math.Max(1, request.PageSize));
-        var candidatePageSize = pageSize;
+        var candidatePageSize = Math.Min(48, Math.Max(pageSize * 3, pageSize));
         var candidateCriteria = new ParsedRoomingHouseSearchCriteria
         {
             ProvinceCode = NormalizeEmpty(request.ProvinceCode),
@@ -565,15 +565,23 @@ public class RoomingHouseQueryService : IRoomingHouseQueryService
 
         ValidateSearchRequest(candidateCriteria);
         var candidateResult = await ExecutePublicSearchAsync(candidateCriteria, cancellationToken);
-        if (candidateResult.Items.Count == 0)
+        var candidateItems = candidateResult.Items.Count == 0
+            ? await LoadDefaultRecommendationCandidatesAsync(pageSize, candidatePageSize, cancellationToken)
+            : await BackfillRecommendationCandidatesAsync(
+                candidateResult.Items,
+                pageSize,
+                candidatePageSize,
+                cancellationToken);
+
+        if (candidateItems.Count == 0)
         {
             return new RoomingHouseRecommendationResponse
             {
-                FallbackReason = "Không có ứng viên phù hợp với hành vi cục bộ."
+                FallbackReason = "Không có khu trọ còn phòng để gợi ý."
             };
         }
 
-        var candidates = candidateResult.Items
+        var candidates = candidateItems
             .Select(ToRecommendationCandidate)
             .ToList();
         var rerankResult = await recommendationReranker.RerankAsync(request, candidates, cancellationToken);
@@ -581,18 +589,18 @@ public class RoomingHouseQueryService : IRoomingHouseQueryService
         {
             return new RoomingHouseRecommendationResponse
             {
-                Items = candidateResult.Items.Take(pageSize).ToList(),
-                Reasons = BuildRuleBasedRecommendationReasons(candidateResult.Items.Take(pageSize)),
+                Items = candidateItems.Take(pageSize).ToList(),
+                Reasons = BuildRuleBasedRecommendationReasons(candidateItems.Take(pageSize)),
                 AiAssisted = false,
                 FallbackReason = "AI chưa khả dụng, dùng xếp hạng mặc định."
             };
         }
 
-        var itemById = candidateResult.Items.ToDictionary(x => x.Id);
+        var itemById = candidateItems.ToDictionary(x => x.Id);
         var rankedItems = rerankResult.RankedIds
             .Where(itemById.ContainsKey)
             .Select(id => itemById[id])
-            .Concat(candidateResult.Items.Where(item => !rerankResult.RankedIds.Contains(item.Id)))
+            .Concat(candidateItems.Where(item => !rerankResult.RankedIds.Contains(item.Id)))
             .Take(pageSize)
             .ToList();
 
@@ -604,6 +612,44 @@ public class RoomingHouseQueryService : IRoomingHouseQueryService
                 .ToDictionary(x => x.Key, x => x.Value),
             AiAssisted = true
         };
+    }
+
+    private async Task<List<RoomingHouseSearchItemResponse>> BackfillRecommendationCandidatesAsync(
+        IReadOnlyList<RoomingHouseSearchItemResponse> primaryItems,
+        int pageSize,
+        int candidatePageSize,
+        CancellationToken cancellationToken)
+    {
+        if (primaryItems.Count >= pageSize)
+        {
+            return primaryItems.ToList();
+        }
+
+        var fallbackItems = await LoadDefaultRecommendationCandidatesAsync(
+            pageSize,
+            candidatePageSize,
+            cancellationToken);
+        return primaryItems
+            .Concat(fallbackItems.Where(item => primaryItems.All(existing => existing.Id != item.Id)))
+            .Take(Math.Max(pageSize, primaryItems.Count))
+            .ToList();
+    }
+
+    private async Task<List<RoomingHouseSearchItemResponse>> LoadDefaultRecommendationCandidatesAsync(
+        int pageSize,
+        int candidatePageSize,
+        CancellationToken cancellationToken)
+    {
+        var fallbackCriteria = new ParsedRoomingHouseSearchCriteria
+        {
+            Sort = "relevance",
+            Page = 1,
+            PageSize = Math.Max(pageSize, candidatePageSize)
+        };
+
+        ValidateSearchRequest(fallbackCriteria);
+        var fallbackResult = await ExecutePublicSearchAsync(fallbackCriteria, cancellationToken);
+        return fallbackResult.Items;
     }
 
     private static RoomingHouseRecommendationCandidate ToRecommendationCandidate(

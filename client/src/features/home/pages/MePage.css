@@ -131,7 +131,7 @@
   top: calc(100% + 10px);
   right: 0;
   z-index: 150;
-  width: min(420px, calc(100vw - 24px));
+  width: min(420px, calc(100dvw - 24px));
   display: grid;
   gap: 18px;
   padding: 18px 16px 14px;
@@ -1000,7 +1000,7 @@
   .home-location-panel {
     left: 0;
     right: auto;
-    width: calc(100vw - 24px);
+    width: calc(100dvw - 24px);
   }
 
   .hero-section {

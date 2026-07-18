@@ -39,7 +39,8 @@ public sealed class ChatService : IChatService
             : ConversationParticipantInboxStatus.Main;
 
         var conversations = await BaseConversationQuery()
-            .Where(x => x.Participants.Any(p => p.UserId == currentUserId && p.LeftAt == null && p.InboxStatus == status) && x.LastMessageAt != null)
+            .Where(x => x.Participants.Any(p => p.UserId == currentUserId && p.LeftAt == null && p.InboxStatus == status) &&
+                (x.LastMessageAt != null || x.Type == ConversationType.Group))
             .OrderByDescending(x => x.LastMessageAt ?? x.UpdatedAt)
             .ToListAsync(cancellationToken);
 
@@ -149,7 +150,7 @@ public sealed class ChatService : IChatService
 
         foreach (var userId in request.ParticipantUserIds.Where(x => x != Guid.Empty && x != currentUserId).Distinct())
         {
-            await EnsureUserCanBeAddedByLandlordAsync(currentUserId, userId, cancellationToken);
+            await EnsureActiveUserExistsAsync(userId, cancellationToken);
             conversation.Participants.Add(CreateParticipant(userId, ConversationParticipantRole.Member, ConversationParticipantSource.RoomQuickPick, currentUserId, now));
         }
 
@@ -217,28 +218,33 @@ public sealed class ChatService : IChatService
             .FirstOrDefaultAsync(x => x.Id == currentUserId && x.DeletedAt == null, cancellationToken)
             ?? throw new NotFoundException("CHAT_USER_NOT_FOUND", "Không tìm thấy người dùng hiện tại.");
 
-        if (HasRole(currentUser, RoleName.Landlord))
+        if (roomingHouseId.HasValue && HasRole(currentUser, RoleName.Landlord))
         {
-            var quickContacts = await GetLandlordQuickContactsAsync(currentUserId, cancellationToken);
-            return quickContacts
-                .Where(x => x.UserId != currentUserId && x.Email.ToUpperInvariant().Contains(normalized, StringComparison.OrdinalIgnoreCase))
-                .Take(10)
-                .ToList();
+            return await GetUsersInRoomingHouseAsync(roomingHouseId.Value, currentUserId, cancellationToken);
         }
 
-        var landlords = await context.RoomingHouses
+        var users = await context.Users
             .AsNoTracking()
-            .Include(x => x.Landlord).ThenInclude(x => x.UserRoles).ThenInclude(x => x.Role)
-            .Where(x => x.Landlord.Email.ToUpper().Contains(normalized) &&
-                x.LandlordUserId != currentUserId &&
-                x.Landlord.DeletedAt == null &&
-                x.Landlord.Status == UserStatus.Active)
-            .Select(x => x.Landlord)
+            .Include(x => x.UserRoles).ThenInclude(x => x.Role)
+            .Where(x =>
+                x.Id != currentUserId &&
+                x.DeletedAt == null &&
+                x.Status == UserStatus.Active &&
+                x.Email.ToUpper().Contains(normalized))
+            .OrderBy(x => x.Email)
             .Distinct()
             .Take(10)
             .ToListAsync(cancellationToken);
 
-        return landlords.Select(x => MapChatUser(x, "Chủ trọ")).ToList();
+        return users.Select(x =>
+        {
+            var label = HasRole(x, RoleName.Landlord)
+                ? "Chủ trọ"
+                : HasRole(x, RoleName.Admin)
+                    ? "Quản trị viên"
+                    : "Người dùng";
+            return MapChatUser(x, label);
+        }).ToList();
     }
 
     public async Task<ConversationResponse> AddParticipantsAsync(Guid currentUserId, Guid conversationId, AddConversationParticipantsRequest request, CancellationToken cancellationToken = default)
@@ -250,7 +256,7 @@ public sealed class ChatService : IChatService
         var now = DateTimeOffset.UtcNow;
         foreach (var userId in request.UserIds.Where(x => x != Guid.Empty && x != currentUserId).Distinct())
         {
-            await EnsureUserCanBeAddedByLandlordAsync(currentUserId, userId, cancellationToken);
+            await EnsureActiveUserExistsAsync(userId, cancellationToken);
             var participant = conversation.Participants.FirstOrDefault(x => x.UserId == userId);
             if (participant is null)
             {
@@ -520,19 +526,36 @@ public sealed class ChatService : IChatService
             throw new ForbiddenException("CHAT_LANDLORD_REQUIRED", "Chỉ chủ trọ mới có quyền thực hiện thao tác này.");
     }
 
-    private async Task EnsureUserCanBeAddedByLandlordAsync(Guid landlordUserId, Guid userId, CancellationToken cancellationToken)
+    private async Task EnsureUserCanBeAddedByLandlordAsync(Guid landlordUserId, Guid userId, Guid? roomingHouseId, CancellationToken cancellationToken)
     {
-        var isAllowed = await context.RentalContracts
+        var allowedQuery = context.RentalContracts
             .AsNoTracking()
-            .AnyAsync(x => x.DeletedAt == null &&
+            .Where(x => x.DeletedAt == null &&
                 x.Room.RoomingHouse.LandlordUserId == landlordUserId &&
-                (x.MainTenantUserId == userId || x.Occupants.Any(o => o.UserId == userId)), cancellationToken);
+                (x.MainTenantUserId == userId || x.Occupants.Any(o => o.UserId == userId)));
+
+        if (roomingHouseId.HasValue)
+        {
+            allowedQuery = allowedQuery.Where(x => x.Room.RoomingHouseId == roomingHouseId.Value);
+        }
+
+        var isAllowed = await allowedQuery.AnyAsync(cancellationToken);
 
         if (!isAllowed)
             throw new ForbiddenException("CHAT_MEMBER_OUT_OF_SCOPE", "Người dùng này không thuộc khu trọ/hợp đồng của bạn.");
 
         var user = await context.Users.AsNoTracking().FirstOrDefaultAsync(x => x.Id == userId && x.DeletedAt == null, cancellationToken)
             ?? throw new NotFoundException("CHAT_USER_NOT_FOUND", "Không tìm thấy người dùng.");
+        EnsureActiveUser(user);
+    }
+
+    private async Task EnsureActiveUserExistsAsync(Guid userId, CancellationToken cancellationToken)
+    {
+        var user = await context.Users
+            .AsNoTracking()
+            .FirstOrDefaultAsync(x => x.Id == userId && x.DeletedAt == null, cancellationToken)
+            ?? throw new NotFoundException("CHAT_USER_NOT_FOUND", "Không tìm thấy người dùng.");
+
         EnsureActiveUser(user);
     }
 
@@ -826,7 +849,8 @@ public sealed class ChatService : IChatService
             : ConversationParticipantInboxStatus.Main;
 
         var conversations = await BaseConversationQuery()
-            .Where(x => x.Participants.Any(p => p.UserId == currentUserId && p.LeftAt == null && p.InboxStatus == status) && x.LastMessageAt != null)
+            .Where(x => x.Participants.Any(p => p.UserId == currentUserId && p.LeftAt == null && p.InboxStatus == status) &&
+                (x.LastMessageAt != null || x.Type == ConversationType.Group))
             .OrderByDescending(x => x.LastMessageAt ?? x.UpdatedAt)
             .Skip(skip)
             .Take(take)
@@ -972,9 +996,11 @@ public sealed class ChatService : IChatService
         else
         {
             landlordPart.LeftAt = null;
-            if (existing is null)
+            if (existing is null || landlordPart.InboxStatus == ConversationParticipantInboxStatus.Rejected)
             {
                 landlordPart.InboxStatus = ConversationParticipantInboxStatus.Pending;
+                landlordPart.InboxStatusUpdatedAt = now;
+                landlordPart.InboxStatusUpdatedByUserId = tenantUserId;
             }
         }
 

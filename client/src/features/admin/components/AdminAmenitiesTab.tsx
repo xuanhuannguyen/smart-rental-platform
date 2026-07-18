@@ -127,7 +127,6 @@ export function AdminAmenitiesTab() {
               <tr>
                 <th>Tên Tiện Ích</th>
                 <th>Phạm Vi</th>
-                <th>Icon Code</th>
                 <th>Trạng Thái</th>
                 <th style={{ textAlign: 'right' }}>Thao Tác</th>
               </tr>
@@ -159,14 +158,6 @@ export function AdminAmenitiesTab() {
                         </select>
                       </td>
                       <td>
-                        <input 
-                          type="text" 
-                          className="admin-table-input"
-                          value={editingFormData.iconCode}
-                          onChange={e => setEditingFormData({...editingFormData, iconCode: e.target.value})}
-                        />
-                      </td>
-                      <td>
                         <span className={`kyc-timeline-status ${item.isActive ? 'Approved' : 'Rejected'}`}>
                           {item.isActive ? 'Hoạt động' : 'Đã ẩn'}
                         </span>
@@ -195,7 +186,6 @@ export function AdminAmenitiesTab() {
                     <>
                       <td><strong>{item.name}</strong></td>
                       <td>{item.scope === 'House' ? 'Khu trọ' : item.scope === 'Room' ? 'Phòng' : 'Cả 2'}</td>
-                      <td><span title={item.iconCode} style={{ fontSize: '1.25rem' }}>{item.iconCode || '-'}</span></td>
                       <td>
                         <span className={`kyc-timeline-status ${item.isActive ? 'Approved' : 'Rejected'}`}>
                           {item.isActive ? 'Hoạt động' : 'Đã ẩn'}
@@ -225,7 +215,7 @@ export function AdminAmenitiesTab() {
               ))}
               {!isCreating && data?.items.length === 0 && (
                 <tr>
-                  <td colSpan={5} style={{ textAlign: 'center', padding: '32px' }}>
+                  <td colSpan={4} style={{ textAlign: 'center', padding: '32px' }}>
                     Không có tiện ích nào
                   </td>
                 </tr>
@@ -288,16 +278,6 @@ export function AdminAmenitiesTab() {
                   <option value="House">Khu trọ</option>
                   <option value="Room">Phòng</option>
                 </select>
-              </div>
-              <div className="admin-form-group">
-                <label className="admin-form-label">Icon Code</label>
-                <input 
-                  type="text" 
-                  placeholder="vd: fa-solid fa-home"
-                  className="admin-form-input"
-                  value={createFormData.iconCode}
-                  onChange={e => setCreateFormData({...createFormData, iconCode: e.target.value})}
-                />
               </div>
             </div>
             <div className="admin-modal-footer">

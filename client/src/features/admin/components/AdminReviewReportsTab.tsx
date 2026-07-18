@@ -10,6 +10,7 @@ import type {
 type Mode = "moderation" | "reports";
 type ReportStatusFilter = "" | "Pending" | "Resolved" | "Dismissed";
 type ModerationStatusFilter = "PendingAdminReview" | "Approved" | "Rejected";
+type ReportAction = "dismiss" | "delete";
 
 export const AdminReviewReportsTab: React.FC = () => {
   const [mode, setMode] = useState<Mode>("moderation");
@@ -26,7 +27,8 @@ export const AdminReviewReportsTab: React.FC = () => {
     | null
   >(null);
   const [note, setNote] = useState("");
-  const [hideReview, setHideReview] = useState(false);
+  const [reportAction, setReportAction] = useState<ReportAction | null>(null);
+  const [deleteReason, setDeleteReason] = useState("");
   const [submitting, setSubmitting] = useState(false);
   const [imageDialog, setImageDialog] = useState<{ images: AdminReviewModerationItemResponse["images"]; index: number; title: string } | null>(null);
 
@@ -60,7 +62,8 @@ export const AdminReviewReportsTab: React.FC = () => {
   const openReport = (report: AdminReviewReportResponse) => {
     setModal({ type: "report", report });
     setNote("");
-    setHideReview(false);
+    setReportAction(null);
+    setDeleteReason("");
   };
 
   const submitModal = async (e: React.FormEvent) => {
@@ -72,12 +75,23 @@ export const AdminReviewReportsTab: React.FC = () => {
       if (modal.type === "moderate") {
         await adminCatalogApi.moderateReview(modal.review.id, modal.action, note.trim() || undefined);
       } else {
-        await adminCatalogApi.resolveReviewReport(modal.report.id, {
-          adminNote: note.trim(),
-          hideReview,
-        });
+        if (!reportAction) return;
+        const trimmedDeleteReason = deleteReason.trim();
+        if (reportAction === "delete" && !trimmedDeleteReason) {
+          setError("Vui lòng nhập lý do xóa đánh giá.");
+          return;
+        }
+
+        await adminCatalogApi.resolveReviewReport(
+          modal.report.id,
+          reportAction === "delete"
+            ? { adminNote: trimmedDeleteReason, hideReview: true }
+            : { adminNote: "Bỏ qua báo cáo, giữ đánh giá hiển thị.", hideReview: false }
+        );
       }
       setModal(null);
+      setReportAction(null);
+      setDeleteReason("");
       await loadData();
     } catch (e: any) {
       setError(e?.message ?? "Không xử lý được đánh giá.");
@@ -151,38 +165,93 @@ export const AdminReviewReportsTab: React.FC = () => {
       {modal && (
         <div style={overlay} onClick={(e) => e.target === e.currentTarget && setModal(null)}>
           <form onSubmit={submitModal} style={dialog}>
-            <h3 style={{ margin: "0 0 8px", color: "#0f172a" }}>
-              {modal.type === "moderate"
-                ? modal.action === "Approve" ? "Duyệt hiển thị đánh giá" : "Từ chối đánh giá"
-                : "Xử lý báo cáo đánh giá"}
-            </h3>
-            <p style={{ color: "#475569", margin: "0 0 14px", fontSize: "0.9rem" }}>
-              {modal.type === "moderate"
-                ? `${modal.review.roomingHouseName} - ${modal.review.tenantDisplayName}`
-                : `${modal.report.roomingHouseName ?? "Khu trọ"} - ${modal.report.reason}`}
-            </p>
-            <textarea
-              value={note}
-              onChange={(e) => setNote(e.target.value)}
-              rows={3}
-              required={modal.type === "report" || (modal.type === "moderate" && modal.action === "Reject")}
-              style={textarea}
-              placeholder="Ghi chú xử lý..."
-            />
-            {modal.type === "report" && (
-              <label style={{ display: "flex", alignItems: "center", gap: 8, margin: "12px 0 18px", cursor: "pointer" }}>
-                <input type="checkbox" checked={hideReview} onChange={(e) => setHideReview(e.target.checked)} />
-                <span style={{ fontSize: "0.9rem" }}>Ẩn đánh giá bị báo cáo</span>
-              </label>
+            {modal.type === "moderate" ? (
+              <>
+                <h3 style={{ margin: "0 0 8px", color: "#0f172a" }}>
+                  {modal.action === "Approve" ? "Duyệt hiển thị đánh giá" : "Từ chối đánh giá"}
+                </h3>
+                <p style={{ color: "#475569", margin: "0 0 14px", fontSize: "0.9rem" }}>
+                  {modal.review.roomingHouseName} - {modal.review.tenantDisplayName}
+                </p>
+                <textarea
+                  value={note}
+                  onChange={(e) => setNote(e.target.value)}
+                  rows={3}
+                  required={modal.action === "Reject"}
+                  style={textarea}
+                  placeholder="Ghi chú xử lý..."
+                />
+                <div style={{ display: "flex", justifyContent: "flex-end", gap: 10, marginTop: 18 }}>
+                  <button type="button" onClick={() => setModal(null)} disabled={submitting} style={{ ...actionBtn, background: "#f1f5f9", color: "#334155" }}>
+                    Hủy
+                  </button>
+                  <button type="submit" disabled={submitting} style={{ ...actionBtn, background: "#1d4ed8", color: "#fff" }}>
+                    {submitting ? "Đang xử lý..." : "Xác nhận"}
+                  </button>
+                </div>
+              </>
+            ) : reportAction ? (
+              <>
+                <h3 style={{ margin: "0 0 8px", color: "#0f172a" }}>
+                  {reportAction === "delete" ? "Xác nhận xóa đánh giá" : "Xác nhận bỏ qua báo cáo"}
+                </h3>
+                <p style={{ color: "#475569", margin: "0 0 14px", fontSize: "0.9rem", lineHeight: 1.55 }}>
+                  {reportAction === "delete"
+                    ? "Đánh giá sẽ bị ẩn/xóa khỏi khu trọ. Vui lòng nhập lý do để lưu lại lịch sử xử lý."
+                    : "Báo cáo sẽ được xử lý bỏ qua và đánh giá này vẫn được giữ hiển thị."}
+                </p>
+                {reportAction === "delete" && (
+                  <textarea
+                    value={deleteReason}
+                    onChange={(e) => setDeleteReason(e.target.value)}
+                    rows={3}
+                    required
+                    style={textarea}
+                    placeholder="Nhập lý do xóa đánh giá..."
+                  />
+                )}
+                <div style={{ display: "flex", justifyContent: "flex-end", gap: 10, marginTop: 18 }}>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setReportAction(null);
+                      setDeleteReason("");
+                    }}
+                    disabled={submitting}
+                    style={{ ...actionBtn, background: "#f1f5f9", color: "#334155" }}
+                  >
+                    Hủy
+                  </button>
+                  <button type="submit" disabled={submitting} style={{ ...actionBtn, background: reportAction === "delete" ? "#dc2626" : "#1d4ed8", color: "#fff" }}>
+                    {submitting ? "Đang xử lý..." : "Xác nhận"}
+                  </button>
+                </div>
+              </>
+            ) : (
+              <>
+                <h3 style={{ margin: "0 0 8px", color: "#0f172a" }}>Xử lý báo cáo đánh giá</h3>
+                <p style={{ color: "#475569", margin: "0 0 14px", fontSize: "0.9rem" }}>
+                  {modal.report.roomingHouseName ?? "Khu trọ"} - {modal.report.reason}
+                </p>
+                <div style={reportSummaryBox}>
+                  <strong style={{ color: "#0f172a" }}>Nội dung đánh giá</strong>
+                  <p style={{ margin: "6px 0 0", color: "#334155", lineHeight: 1.5 }}>
+                    {modal.report.reviewContent || modal.report.review?.comment || "Không có nội dung."}
+                  </p>
+                </div>
+                <div style={{ display: "flex", justifyContent: "flex-end", gap: 10, marginTop: 18, flexWrap: "wrap" }}>
+                  <button type="button" onClick={() => setModal(null)} disabled={submitting} style={{ ...actionBtn, background: "#f1f5f9", color: "#334155" }}>
+                    Hủy
+                  </button>
+                  <button type="button" onClick={() => setReportAction("dismiss")} disabled={submitting} style={{ ...actionBtn, background: "#eff6ff", color: "#1d4ed8" }}>
+                    Bỏ qua báo cáo
+                  </button>
+                  <button type="button" onClick={() => setReportAction("delete")} disabled={submitting} style={{ ...actionBtn, background: "#fee2e2", color: "#991b1b" }}>
+                    Xóa đánh giá
+                  </button>
+                </div>
+              </>
             )}
-            <div style={{ display: "flex", justifyContent: "flex-end", gap: 10, marginTop: 18 }}>
-              <button type="button" onClick={() => setModal(null)} disabled={submitting} style={{ ...actionBtn, background: "#f1f5f9", color: "#334155" }}>
-                Hủy
-              </button>
-              <button type="submit" disabled={submitting} style={{ ...actionBtn, background: "#1d4ed8", color: "#fff" }}>
-                {submitting ? "Đang xử lý..." : "Xác nhận"}
-              </button>
-            </div>
           </form>
         </div>
       )}
@@ -435,6 +504,7 @@ const actionBtn: React.CSSProperties = { padding: "8px 20px", borderRadius: 8, b
 const overlay: React.CSSProperties = { position: "fixed", inset: 0, background: "rgba(15,23,42,0.55)", zIndex: 1200, display: "flex", alignItems: "center", justifyContent: "center", padding: 20 };
 const dialog: React.CSSProperties = { background: "#fff", borderRadius: 14, padding: 26, width: "min(520px,100%)", boxShadow: "0 20px 60px rgba(15,23,42,0.25)" };
 const textarea: React.CSSProperties = { width: "100%", boxSizing: "border-box", border: "1px solid #cbd5e1", borderRadius: 8, padding: "9px 12px", fontSize: "0.9rem", resize: "vertical" };
+const reportSummaryBox: React.CSSProperties = { border: "1px solid #e2e8f0", borderRadius: 10, background: "#f8fafc", padding: 14 };
 const aiNote: React.CSSProperties = { margin: "6px 0 0", color: "#334155", fontSize: "0.82rem", lineHeight: 1.45 };
 const mediaImage: React.CSSProperties = { width: "100%", height: "100%", objectFit: "cover", display: "block" };
 const imageDialogStyle: React.CSSProperties = { background: "#fff", borderRadius: 14, padding: 18, width: "min(760px,100%)", boxShadow: "0 20px 60px rgba(15,23,42,0.25)" };
