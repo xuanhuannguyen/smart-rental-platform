@@ -1,4 +1,5 @@
 using System.Text.Json;
+using SmartRentalPlatform.Application.Common.Media;
 using SmartRentalPlatform.Contracts.RentalContracts.Responses;
 using SmartRentalPlatform.Domain.Entities.RentalContracts;
 using SmartRentalPlatform.Domain.Entities.Users;
@@ -234,9 +235,12 @@ internal static class RentalContractResponseMapper
             ContractOccupantId = document.RentalContractOccupantId,
             DocumentType = document.DocumentType,
             DocumentNumberMasked = document.DocumentNumberMasked,
-            FrontImageObjectKey = document.FrontImageObjectKey,
-            BackImageObjectKey = document.BackImageObjectKey,
-            ExtraImageObjectKey = document.ExtraImageObjectKey,
+            FrontMediaAssetId = document.FrontMediaAssetId,
+            BackMediaAssetId = document.BackMediaAssetId,
+            ExtraMediaAssetId = document.ExtraMediaAssetId,
+            FrontImageUrl = BuildRequiredPrivateMediaUrl(document.FrontMediaAssetId),
+            BackImageUrl = BuildOptionalPrivateMediaUrl(document.BackMediaAssetId),
+            ExtraImageUrl = BuildOptionalPrivateMediaUrl(document.ExtraMediaAssetId),
             UploadedAt = document.UploadedAt
         };
     }
@@ -530,5 +534,22 @@ internal static class RentalContractResponseMapper
         return string.IsNullOrWhiteSpace(value)
             ? string.Empty
             : value.Replace("_", string.Empty, StringComparison.Ordinal).Trim().ToLowerInvariant();
+    }
+
+    private static string BuildRequiredPrivateMediaUrl(Guid? mediaAssetId)
+    {
+        if (!mediaAssetId.HasValue)
+        {
+            throw new InvalidOperationException("Contract occupant document is missing the required front media asset.");
+        }
+
+        return PrivateMediaPathBuilder.Build(mediaAssetId.Value);
+    }
+
+    private static string? BuildOptionalPrivateMediaUrl(Guid? mediaAssetId)
+    {
+        return mediaAssetId.HasValue
+            ? PrivateMediaPathBuilder.Build(mediaAssetId.Value)
+            : null;
     }
 }

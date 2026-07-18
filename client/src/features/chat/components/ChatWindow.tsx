@@ -252,6 +252,7 @@ export function ChatWindow({
       senderName: currentUser.displayName,
       messageType: request.messageType,
       content: request.content,
+      mediaAssetId: request.mediaAssetId,
       imageUrl: request.imageUrl,
       fileUrl: request.fileUrl,
       fileName: request.fileName,
@@ -288,8 +289,8 @@ export function ChatWindow({
     if (!file) return;
     setImageUploading(true);
     try {
-      const imageUrl = await uploadChatImage(file);
-      await handleSend({ messageType: 'Image', imageUrl });
+      const uploaded = await uploadChatImage(file);
+      await handleSend({ messageType: 'Image', mediaAssetId: uploaded.mediaAssetId });
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Tải ảnh thất bại.');
     } finally {
@@ -304,7 +305,7 @@ export function ChatWindow({
       const uploaded = await uploadChatFile(file);
       await handleSend({
         messageType: 'File',
-        fileUrl: uploaded.url,
+        mediaAssetId: uploaded.mediaAssetId,
         fileName: uploaded.fileName,
         fileContentType: uploaded.contentType,
         fileSize: uploaded.size
@@ -362,7 +363,12 @@ export function ChatWindow({
     <section className={`chat-main chat-window--${mode}`}>
       <header className={`chat-main__header ${mode === 'bubble' ? 'bubble-header' : ''}`}>
         <div className="chat-main__title">
-          <Avatar name={activeConversation.title} url={activeConversation.participants.find(p => p.userId !== currentUser?.userId)?.avatarUrl} />
+          <Avatar
+            name={activeConversation.title}
+            url={activeConversation.type === 'Group'
+              ? activeConversation.avatarUrl
+              : activeConversation.participants.find(p => p.userId !== currentUser?.userId)?.avatarUrl}
+          />
           <div>
             <h2 className={mode === 'bubble' ? 'bubble-title' : ''}>{activeConversation.title}</h2>
             {mode !== 'bubble' && (

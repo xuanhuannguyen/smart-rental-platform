@@ -3,7 +3,7 @@ using SmartRentalPlatform.Domain.Enums.RentalContracts;
 
 namespace SmartRentalPlatform.Application.RentalContracts;
 
-internal static class ContractDocumentAccessPolicy
+public static class ContractDocumentAccessPolicy
 {
     public static bool HasContractRelationship(Guid userId, RentalContract contract)
     {

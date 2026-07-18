@@ -3,6 +3,7 @@ using SmartRentalPlatform.Contracts.LegalDocuments;
 using SmartRentalPlatform.Contracts.PropertyImages;
 using SmartRentalPlatform.Contracts.RentalPolicies.Responses;
 using SmartRentalPlatform.Contracts.RoomingHouses;
+using SmartRentalPlatform.Application.Common.Media;
 using SmartRentalPlatform.Application.Rooms;
 using SmartRentalPlatform.Domain.Entities.Properties;
 
@@ -23,8 +24,7 @@ internal static class RoomingHouseReadModelMapper
             RejectedReason = house.RejectedReason,
             CreatedAt = house.CreatedAt,
             UpdatedAt = house.UpdatedAt,
-            CoverImageUrl = house.Images.OrderBy(x => x.SortOrder).FirstOrDefault(x => x.IsCover)?.ImageUrl 
-                ?? house.Images.OrderBy(x => x.SortOrder).FirstOrDefault()?.ImageUrl,
+            CoverImageUrl = BuildCoverImageUrl(house),
             TotalRooms = house.Rooms?.Count(x => x.DeletedAt == null) ?? 0,
             AvailableRooms = house.Rooms?.Count(x => x.Status == RoomStatus.Available && x.DeletedAt == null) ?? 0,
             AverageRating = house.AverageRating,
@@ -57,10 +57,13 @@ internal static class RoomingHouseReadModelMapper
             LegalDocument = house.LegalDocument is null ? null : new RoomingHouseLegalDocumentResponse
             {
                 RoomingHouseId = house.LegalDocument.RoomingHouseId,
+                FrontMediaAssetId = house.LegalDocument.FrontMediaAssetId,
+                BackMediaAssetId = house.LegalDocument.BackMediaAssetId,
+                ExtraMediaAssetId = house.LegalDocument.ExtraMediaAssetId,
                 DocumentType = house.LegalDocument.DocumentType.ToString(),
-                FrontImageObjectKey = house.LegalDocument.FrontImageObjectKey,
-                BackImageObjectKey = house.LegalDocument.BackImageObjectKey,
-                ExtraImageObjectKey = house.LegalDocument.ExtraImageObjectKey,
+                FrontImageUrl = BuildPrivateImageUrl(house.LegalDocument.FrontMediaAssetId),
+                BackImageUrl = BuildPrivateImageUrl(house.LegalDocument.BackMediaAssetId),
+                ExtraImageUrl = BuildOptionalPrivateImageUrl(house.LegalDocument.ExtraMediaAssetId),
                 DocumentNumberMasked = house.LegalDocument.DocumentNumberMasked,
                 UploadedAt = house.LegalDocument.UploadedAt,
                 CreatedAt = house.LegalDocument.CreatedAt,
@@ -82,12 +85,13 @@ internal static class RoomingHouseReadModelMapper
             },
             HouseRule = house.HouseRule is null ? null : RoomingHouseRuleService.ToResponse(house.HouseRule),
             Images = house.Images
+                .Where(x => x.MediaAssetId.HasValue)
                 .OrderBy(x => x.SortOrder)
                 .Select(x => new PropertyImageResponse
                 {
                     Id = x.Id,
-                    ObjectKey = x.ObjectKey,
-                    ImageUrl = x.ImageUrl,
+                    MediaAssetId = x.MediaAssetId,
+                    ImageUrl = BuildPublicImageUrl(x.MediaAssetId),
                     Caption = x.Caption,
                     IsCover = x.IsCover,
                     SortOrder = x.SortOrder,
@@ -137,5 +141,42 @@ internal static class RoomingHouseReadModelMapper
         }
 
         return house.AddressDisplay;
+    }
+
+    private static string? BuildCoverImageUrl(RoomingHouse house)
+    {
+        var coverMediaAssetId = house.Images
+            .Where(x => x.MediaAssetId.HasValue)
+            .OrderBy(x => x.SortOrder)
+            .FirstOrDefault(x => x.IsCover)?.MediaAssetId
+            ?? house.Images
+                .Where(x => x.MediaAssetId.HasValue)
+                .OrderBy(x => x.SortOrder)
+                .FirstOrDefault()?.MediaAssetId;
+
+        return coverMediaAssetId.HasValue
+            ? PublicMediaPathBuilder.Build(coverMediaAssetId.Value)
+            : null;
+    }
+
+    private static string BuildPublicImageUrl(Guid? mediaAssetId)
+    {
+        return mediaAssetId.HasValue
+            ? PublicMediaPathBuilder.Build(mediaAssetId.Value)
+            : string.Empty;
+    }
+
+    private static string BuildPrivateImageUrl(Guid? mediaAssetId)
+    {
+        return mediaAssetId.HasValue
+            ? PrivateMediaPathBuilder.Build(mediaAssetId.Value)
+            : string.Empty;
+    }
+
+    private static string? BuildOptionalPrivateImageUrl(Guid? mediaAssetId)
+    {
+        return mediaAssetId.HasValue
+            ? PrivateMediaPathBuilder.Build(mediaAssetId.Value)
+            : null;
     }
 }

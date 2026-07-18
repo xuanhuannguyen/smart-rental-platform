@@ -80,7 +80,7 @@ public sealed class MeterReadingAiService : IMeterReadingAiService
         var aiResult = await aiClient.ReadMeterAsync(aiImage, cancellationToken);
         var normalizedReading = NormalizeReading(serviceTypeId, aiResult.Reading);
         var upload = await storage.UploadImageAsync(storedImage, FileUploadScope.MeterReading, cancellationToken);
-        return new MeterAiResponse(normalizedReading, aiResult.RawText, upload.ObjectKey, upload.Url);
+        return new MeterAiResponse(normalizedReading, aiResult.RawText, upload.MediaAssetId, upload.Url);
     }
 
     /// <summary>

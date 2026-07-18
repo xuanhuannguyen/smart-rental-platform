@@ -19,7 +19,7 @@ interface Props {
 export interface ReadingDraft {
   previousReading: number;
   currentReading: number;
-  proofImageObjectKey?: string;
+  proofMediaAssetId?: string | null;
   proofImageUrl?: string;
   aiReading?: number | null;
   aiRawText?: string;
@@ -241,7 +241,7 @@ export const TerminateContractModal: React.FC<Props> = ({
         currentReading: response.data.reading,
         aiReading: response.data.reading,
         aiRawText: response.data.rawText,
-        proofImageObjectKey: response.data.proofImageObjectKey,
+        proofMediaAssetId: response.data.proofMediaAssetId ?? null,
         proofImageUrl: response.data.proofImageUrl
       });
     } catch (err) {
@@ -581,7 +581,7 @@ export function buildFinalInvoiceMeterReadings(
       serviceTypeId: service.serviceTypeId,
       previousReading: latestReading ? null : Number(draft.previousReading),
       currentReading: Number(draft.currentReading),
-      proofImageObjectKey: draft.proofImageObjectKey?.trim() || null,
+      proofMediaAssetId: draft.proofMediaAssetId?.trim() || null,
       aiReading: draft.aiReading ?? null,
       aiRawText: draft.aiRawText?.trim() || null
     };

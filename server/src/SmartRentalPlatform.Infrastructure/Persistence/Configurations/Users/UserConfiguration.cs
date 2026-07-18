@@ -19,6 +19,7 @@ public class UserConfiguration : IEntityTypeConfiguration<User>
         builder.Property(x => x.PasswordHash).HasColumnName("password_hash").HasColumnType("text");
         builder.Property(x => x.DisplayName).HasColumnName("display_name").HasMaxLength(150).IsRequired();
         builder.Property(x => x.AvatarUrl).HasColumnName("avatar_url").HasColumnType("text");
+        builder.Property(x => x.AvatarMediaAssetId).HasColumnName("avatar_media_asset_id");
         builder.Property(x => x.Status).HasColumnName("status").HasConversion<string>().HasMaxLength(30).IsRequired();
         builder.Property(x => x.OnboardingStatus).HasColumnName("onboarding_status").HasConversion<string>().HasMaxLength(50).IsRequired();
         builder.Property(x => x.EmailConfirmed).HasColumnName("email_confirmed").HasDefaultValue(false).IsRequired();
@@ -32,5 +33,11 @@ public class UserConfiguration : IEntityTypeConfiguration<User>
 
         builder.HasIndex(x => x.NormalizedEmail).IsUnique();
         builder.HasIndex(x => x.PhoneNumber);
+        builder.HasIndex(x => x.AvatarMediaAssetId);
+
+        builder.HasOne(x => x.AvatarMediaAsset)
+            .WithMany()
+            .HasForeignKey(x => x.AvatarMediaAssetId)
+            .OnDelete(DeleteBehavior.SetNull);
     }
 }

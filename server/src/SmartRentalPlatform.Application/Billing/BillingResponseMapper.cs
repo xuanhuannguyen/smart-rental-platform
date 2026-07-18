@@ -1,3 +1,4 @@
+using SmartRentalPlatform.Application.Common.Media;
 using SmartRentalPlatform.Contracts.Billing.Responses;
 using SmartRentalPlatform.Domain.Entities.Billing;
 
@@ -53,7 +54,8 @@ internal static class BillingResponseMapper
             item.ServiceTypeId,
             item.ServiceType?.Name,
             item.MeterReadingId,
-            BuildMeterReadingImageUrl(item.MeterReading?.ProofImageObjectKey),
+            item.MeterReading?.ProofMediaAssetId,
+            BuildPrivateProofImageUrl(item.MeterReading?.ProofMediaAssetId),
             item.ItemType.ToString(),
             item.Description,
             item.Quantity,
@@ -61,13 +63,10 @@ internal static class BillingResponseMapper
             item.Amount);
     }
 
-    private static string? BuildMeterReadingImageUrl(string? objectKey)
+    private static string? BuildPrivateProofImageUrl(Guid? mediaAssetId)
     {
-        if (string.IsNullOrWhiteSpace(objectKey))
-        {
-            return null;
-        }
-
-        return $"/uploads/{objectKey.TrimStart('/')}";
+        return mediaAssetId.HasValue
+            ? PrivateMediaPathBuilder.Build(mediaAssetId.Value)
+            : null;
     }
 }

@@ -48,7 +48,7 @@ export type PagedResult<T> = {
 
 export type PropertyImageRequest = {
   id?: string;
-  objectKey: string;
+  mediaAssetId?: string | null;
   imageUrl?: string;
   caption?: string | null;
   isCover: boolean;
@@ -62,7 +62,8 @@ export type RoomingHouseRule = {
   id: string;
   roomingHouseId: string;
   sourceType: HouseRuleSourceType;
-  pdfObjectKey: string;
+  mediaAssetId?: string | null;
+  pdfUrl?: string | null;
   generalRules?: string | null;
   quietHours?: string | null;
   securityPolicy?: string | null;
@@ -78,7 +79,7 @@ export type RoomingHouseRule = {
 
 export type UpsertRoomingHouseRuleRequest = {
   sourceType: HouseRuleSourceType;
-  pdfObjectKey?: string | null;
+  pdfMediaAssetId?: string | null;
   generalRules?: string | null;
   quietHours?: string | null;
   securityPolicy?: string | null;
@@ -92,9 +93,9 @@ export type UpsertRoomingHouseRuleRequest = {
 
 export type UpdateLegalDocumentRequest = {
   documentType: string;
-  frontImageObjectKey: string;
-  backImageObjectKey: string;
-  extraImageObjectKey?: string | null;
+  frontMediaAssetId?: string | null;
+  backMediaAssetId?: string | null;
+  extraMediaAssetId?: string | null;
   documentNumber: string;
 };
 

@@ -1,12 +1,14 @@
 using Microsoft.EntityFrameworkCore;
 using SmartRentalPlatform.Application.Common.Exceptions;
 using SmartRentalPlatform.Application.Common.Interfaces;
+using SmartRentalPlatform.Application.Common.Media;
 using SmartRentalPlatform.Contracts.Billing.Requests;
 using SmartRentalPlatform.Contracts.Billing.Responses;
 using SmartRentalPlatform.Contracts.Common;
 using SmartRentalPlatform.Domain.Entities.Billing;
 using SmartRentalPlatform.Domain.Entities.Properties;
 using SmartRentalPlatform.Domain.Enums.Billing;
+using SmartRentalPlatform.Domain.Enums.Media;
 using SmartRentalPlatform.Domain.Enums.Properties;
 using SmartRentalPlatform.Domain.Enums.RentalContracts;
 
@@ -857,6 +859,7 @@ public class BillingService : IBillingService
             billingPeriod,
             meteredInputs,
             now);
+        await LinkMeterReadingProofMediaAssetsAsync(invoice, landlordUserId, now, cancellationToken);
         billingInvoiceBuilder.AddFixedServiceInvoiceItems(
             invoice,
             prices,
@@ -1071,6 +1074,7 @@ public class BillingService : IBillingService
             billingPeriod,
             meteredInputs,
             now);
+        await LinkMeterReadingProofMediaAssetsAsync(invoice, landlordUserId, now, cancellationToken);
         billingInvoiceBuilder.AddFixedServiceInvoiceItems(
             invoice,
             prices,
@@ -1119,6 +1123,7 @@ public class BillingService : IBillingService
                 x.PreviousReading,
                 x.CurrentReading,
                 x.Consumption,
+                x.ProofMediaAssetId,
                 x.CreatedAt
             })
             .ToListAsync(cancellationToken);
@@ -1140,7 +1145,9 @@ public class BillingService : IBillingService
                         latest.BillingPeriodEnd,
                         latest.PreviousReading,
                         latest.CurrentReading,
-                        latest.Consumption);
+                        latest.Consumption,
+                        latest.ProofMediaAssetId,
+                        BuildPrivateProofImageUrl(latest.ProofMediaAssetId));
                 });
     }
 
@@ -1322,5 +1329,69 @@ public class BillingService : IBillingService
             results.Count(x => x.Status == "Skipped"),
             results.Count(x => x.Status == "MissingData"),
             results);
+    }
+
+    private async Task LinkMeterReadingProofMediaAssetsAsync(
+        Invoice invoice,
+        Guid landlordUserId,
+        DateTimeOffset now,
+        CancellationToken cancellationToken)
+    {
+        var processedReadingIds = new HashSet<Guid>();
+        foreach (var reading in invoice.Items
+                     .Select(x => x.MeterReading)
+                     .Where(x => x is not null)
+                     .Select(x => x!))
+        {
+            if (!processedReadingIds.Add(reading.Id))
+            {
+                continue;
+            }
+
+            reading.ProofMediaAssetId = await EnsureMeterReadingProofMediaAssetAsync(
+                reading.Id,
+                landlordUserId,
+                reading.ProofMediaAssetId,
+                now,
+                cancellationToken);
+        }
+    }
+
+    private async Task<Guid?> EnsureMeterReadingProofMediaAssetAsync(
+        Guid meterReadingId,
+        Guid landlordUserId,
+        Guid? proofMediaAssetId,
+        DateTimeOffset now,
+        CancellationToken cancellationToken)
+    {
+        if (!proofMediaAssetId.HasValue)
+        {
+            return null;
+        }
+
+        var linkedAsset = await context.MediaAssets
+            .FirstOrDefaultAsync(x => x.Id == proofMediaAssetId.Value, cancellationToken);
+
+        if (linkedAsset is null)
+        {
+            return null;
+        }
+
+        linkedAsset.OwnerUserId = landlordUserId;
+        linkedAsset.Scope = MediaScope.MeterReadingImage;
+        linkedAsset.Visibility = MediaVisibility.Private;
+        linkedAsset.Status = MediaStatus.Linked;
+        linkedAsset.LinkedEntityType = nameof(MeterReading);
+        linkedAsset.LinkedEntityId = meterReadingId;
+        linkedAsset.DeletedAt = null;
+        linkedAsset.UpdatedAt = now;
+        return linkedAsset.Id;
+    }
+
+    private static string? BuildPrivateProofImageUrl(Guid? mediaAssetId)
+    {
+        return mediaAssetId.HasValue
+            ? PrivateMediaPathBuilder.Build(mediaAssetId.Value)
+            : null;
     }
 }

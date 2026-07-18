@@ -4,7 +4,7 @@ import type { Dispatch, FormEvent, ReactNode, SetStateAction } from 'react';
 import { useLocation, useNavigate, useParams } from 'react-router-dom';
 import { ROUTE_PATHS } from '../../../app/router/routePaths';
 import { getApiErrorMessage } from '../../../shared/api/apiError';
-import { toAssetUrl } from '../../../shared/api/assets';
+import { PrivateMediaImage } from '../../../shared/components/media/PrivateMediaImage';
 import { Toast } from '../../../shared/components/ui/Toast';
 import { Tabs } from '../../../shared/components/ui/Tabs';
 import { PageHeader } from '../../../shared/components/ui/PageHeader';
@@ -708,7 +708,7 @@ type ReadingDraft = {
   hasPreviousReading: boolean;
   currentReading: number;
   hasCurrentReading: boolean;
-  proofImageObjectKey: string;
+  proofMediaAssetId?: string | null;
   proofImageUrl: string;
   aiReading: number | null;
   aiRawText: string;
@@ -719,7 +719,7 @@ const emptyReadingDraft: ReadingDraft = {
   hasPreviousReading: false,
   currentReading: 0,
   hasCurrentReading: false,
-  proofImageObjectKey: '',
+  proofMediaAssetId: null,
   proofImageUrl: '',
   aiReading: null,
   aiRawText: ''
@@ -908,7 +908,7 @@ function CentralCreateInvoiceModal({
         hasCurrentReading: true,
         aiReading: response.data.reading,
         aiRawText: response.data.rawText,
-        proofImageObjectKey: response.data.proofImageObjectKey,
+        proofMediaAssetId: response.data.proofMediaAssetId ?? null,
         proofImageUrl: response.data.proofImageUrl
       });
     } catch (err) {
@@ -953,7 +953,7 @@ function CentralCreateInvoiceModal({
               serviceTypeId: service.serviceTypeId,
               previousReading: service.latestReading ? null : draft.previousReading,
               currentReading: Number(draft.currentReading),
-              proofImageObjectKey: draft.proofImageObjectKey || null,
+              proofMediaAssetId: draft.proofMediaAssetId || null,
               aiReading: draft.aiReading,
               aiRawText: draft.aiRawText || null
             };
@@ -1250,13 +1250,18 @@ function BulkInvoiceRoomCard({
                         <button
                           type="button"
                           className="bulk-meter-thumbnail"
-                          onClick={() => setMeterImagePreview({
-                            src: toAssetUrl(draft.proofImageUrl),
-                            alt: `Đồng hồ ${service.serviceName} phòng ${room.contract.roomNumber}`
-                          })}
+                          onClick={(event) => {
+                            const resolvedImageUrl = event.currentTarget.querySelector('img')?.src;
+                            if (resolvedImageUrl) {
+                              setMeterImagePreview({
+                                src: resolvedImageUrl,
+                                alt: `Đồng hồ ${service.serviceName} phòng ${room.contract.roomNumber}`
+                              });
+                            }
+                          }}
                           aria-label={`Xem ảnh đồng hồ ${service.serviceName} kích thước lớn`}
                         >
-                          <img src={toAssetUrl(draft.proofImageUrl)} alt={`Đồng hồ ${service.serviceName} phòng ${room.contract.roomNumber}`} />
+                          <PrivateMediaImage source={draft.proofImageUrl} alt={`Đồng hồ ${service.serviceName} phòng ${room.contract.roomNumber}`} />
                           <span>Xem ảnh</span>
                         </button>
                       )}
@@ -1416,6 +1421,7 @@ function InvoiceDetailSection({
   onIssue: (invoice: Invoice) => void;
   onCancel: (invoice: Invoice) => void;
 }) {
+  const [meterImagePreview, setMeterImagePreview] = useState<{ src: string; title: string; subtitle: string } | null>(null);
   const headerTitle = invoice ? `Hóa đơn ${invoice.invoiceNo}` : 'Chi tiết hóa đơn';
   const headerDescription = invoice
     ? `${invoice.roomingHouseName} - Phòng ${invoice.roomNumber} - ${formatInvoicePeriodMonth(invoice.billingPeriodStart)}`
@@ -1479,7 +1485,22 @@ function InvoiceDetailSection({
           {invoice.items.map((item) => (
             <div key={item.id} className="table-row item-table-row">
               <span>{getInvoiceItemTypeLabel(item.itemType)}</span>
-              <span>{item.description}</span>
+              <span className="tenant-invoice-item-desc">
+                <span>{item.description}</span>
+                {item.meterReadingProofImageUrl && (
+                  <button
+                    type="button"
+                    className="tenant-meter-proof-button"
+                    onClick={() => setMeterImagePreview({
+                      src: item.meterReadingProofImageUrl!,
+                      title: getMeterReadingProofLabel(item.serviceName, item.description),
+                      subtitle: item.description
+                    })}
+                  >
+                    {getMeterReadingProofLabel(item.serviceName, item.description)}
+                  </button>
+                )}
+              </span>
               <span>{item.quantity}</span>
               <span>{formatMoney(item.unitPrice)}</span>
               <strong>{formatMoney(item.amount)}</strong>
@@ -1494,6 +1515,19 @@ function InvoiceDetailSection({
             {busy === 'issue' ? 'Đang phát hành...' : 'Phát hành'}
           </button>
         </div>
+
+        {meterImagePreview && (
+          <div className="meter-image-lightbox" role="dialog" aria-modal="true" aria-label={meterImagePreview.title} onClick={() => setMeterImagePreview(null)}>
+            <div className="meter-image-lightbox-content" onClick={(event) => event.stopPropagation()}>
+              <div>
+                <strong>{meterImagePreview.title}</strong>
+                <span>{meterImagePreview.subtitle}</span>
+              </div>
+              <button type="button" onClick={() => setMeterImagePreview(null)} aria-label="Đóng ảnh chỉ số">×</button>
+              <PrivateMediaImage source={meterImagePreview.src} alt={meterImagePreview.title} />
+            </div>
+          </div>
+        )}
       </section>
     </>
   );
@@ -1944,6 +1978,19 @@ function getInvoiceItemTypeLabel(itemType: string) {
   };
 
   return labels[itemType] ?? itemType;
+}
+
+function getMeterReadingProofLabel(serviceName?: string | null, description?: string | null) {
+  const text = `${serviceName ?? ''} ${description ?? ''}`.toLowerCase();
+  if (text.includes('điện') || text.includes('dien')) {
+    return 'Xem chỉ số điện';
+  }
+
+  if (text.includes('nước') || text.includes('nuoc')) {
+    return 'Xem chỉ số nước';
+  }
+
+  return 'Xem ảnh chỉ số';
 }
 
 function formatCentralDate(value: string) {

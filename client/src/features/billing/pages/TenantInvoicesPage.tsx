@@ -5,8 +5,9 @@ import { useNavigate, useParams } from 'react-router-dom';
 import { useAuth } from '../../../app/providers/AuthProvider';
 import { ROUTE_PATHS } from '../../../app/router/routePaths';
 import { getApiErrorMessage } from '../../../shared/api/apiError';
+import { toAvatarImageUrl } from '../../../shared/api/assets';
+import { PrivateMediaImage } from '../../../shared/components/media/PrivateMediaImage';
 import { Toast } from '../../../shared/components/ui/Toast';
-import { toAssetUrl } from '../../../shared/api/assets';
 import { Button } from '../../../shared/components/ui/Button';
 import { Tabs } from '../../../shared/components/ui/Tabs';
 import { Card, CardMetaRow, type CardStatusTone } from '../../../shared/components/ui/Card';
@@ -290,7 +291,7 @@ export function TenantInvoicesPanel({ invoiceId: controlledInvoiceId, onOpenInvo
                             type="button"
                             className="tenant-meter-proof-button"
                             onClick={() => setMeterImagePreview({
-                              src: toAssetUrl(item.meterReadingProofImageUrl!),
+                              src: item.meterReadingProofImageUrl!,
                               title: getMeterReadingButtonLabel(item),
                               subtitle: item.description
                             })}
@@ -351,7 +352,7 @@ export function TenantInvoicesPanel({ invoiceId: controlledInvoiceId, onOpenInvo
               <span>{meterImagePreview.subtitle}</span>
             </div>
             <button type="button" onClick={() => setMeterImagePreview(null)} aria-label="Đóng ảnh chỉ số">×</button>
-            <img src={meterImagePreview.src} alt={meterImagePreview.title} />
+            <PrivateMediaImage source={meterImagePreview.src} alt={meterImagePreview.title} />
           </div>
         </div>
       )}
@@ -420,7 +421,7 @@ export default function TenantInvoicesPage() {
           <div className="avatar-wrapper" ref={dropdownRef}>
             <button className="avatar-btn" onClick={() => setShowDropdown(!showDropdown)}>
               {currentUser.avatarUrl && currentUser.avatarUrl.trim() !== '' ? (
-                <img src={toAssetUrl(currentUser.avatarUrl)} alt="Avatar" className="avatar-image" />
+                <img src={toAvatarImageUrl(currentUser)} alt="Avatar" className="avatar-image" />
               ) : (
                 <span className="avatar-initials">{avatarInitials}</span>
               )}

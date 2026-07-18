@@ -2,7 +2,7 @@ import React, { useEffect, useState } from 'react';
 import { getRoomingHouseReviews, replyRoomingHouseReview, reportRoomingHouseReview, deleteRoomingHouseReviewReply, checkRoomingHouseReviewEligibility, deleteRoomingHouseReview } from '../api';
 import type { RoomingHouseReviewResponse, RoomingHouseReviewListResponse, RoomingHouseReviewEligibilitySummaryResponse } from '../types';
 import { getApiErrorMessage } from '../../../shared/api/apiError';
-import { toAssetUrl } from '../../../shared/api/assets';
+import { toAssetUrl, toPublicPropertyImageUrl } from '../../../shared/api/assets';
 import { Button } from '../../../shared/components/ui/Button';
 import { Toast } from '../../../shared/components/ui/Toast';
 import { useAuth } from '../../../app/providers/AuthProvider';
@@ -20,11 +20,11 @@ interface HouseReviewsListProps {
 export const HouseReviewsList: React.FC<HouseReviewsListProps> = ({ roomingHouseId, landlordUserId, roomingHouseName, roomingHouseAvatarUrl }) => {
   const { currentUser } = useAuth();
   const isLandlord = currentUser?.userId === landlordUserId;
-  
+
   const [reviewsData, setReviewsData] = useState<RoomingHouseReviewListResponse | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
-  
+
   // Pagination state
   const [page, setPage] = useState(1);
   const [hasMore, setHasMore] = useState(false);
@@ -34,7 +34,7 @@ export const HouseReviewsList: React.FC<HouseReviewsListProps> = ({ roomingHouse
   const [replyingToId, setReplyingToId] = useState<string | null>(null);
   const [replyContent, setReplyContent] = useState('');
   const [isSubmittingReply, setIsSubmittingReply] = useState(false);
-  
+
   // Report state
   const [reportingId, setReportingId] = useState<string | null>(null);
   const [reportReason, setReportReason] = useState('');
@@ -89,7 +89,7 @@ export const HouseReviewsList: React.FC<HouseReviewsListProps> = ({ roomingHouse
     }
     try {
       const data = await getRoomingHouseReviews(roomingHouseId, pageIndex, 5);
-      
+
       setReviewsData(prev => {
         if (append && prev) {
           return {
@@ -99,7 +99,7 @@ export const HouseReviewsList: React.FC<HouseReviewsListProps> = ({ roomingHouse
         }
         return data;
       });
-      
+
       setHasMore(data.reviews.length === 5 && (append ? (reviewsData?.reviews.length || 0) : 0) + data.reviews.length < data.totalReviews);
     } catch (err) {
       setError('Không thể tải danh sách đánh giá.');
@@ -144,7 +144,7 @@ export const HouseReviewsList: React.FC<HouseReviewsListProps> = ({ roomingHouse
 
   const handleConfirmDelete = async () => {
     if (!deleteModalState.targetId) return;
-    
+
     if (deleteModalState.type === 'reply') {
       try {
         await deleteRoomingHouseReviewReply(deleteModalState.targetId);
@@ -162,7 +162,7 @@ export const HouseReviewsList: React.FC<HouseReviewsListProps> = ({ roomingHouse
         setToast({ message: getApiErrorMessage(err, 'Lỗi khi xóa bài đánh giá.'), type: 'error' });
       }
     }
-    
+
     setDeleteModalState({ isOpen: false, type: null, targetId: null });
   };
 
@@ -293,10 +293,10 @@ export const HouseReviewsList: React.FC<HouseReviewsListProps> = ({ roomingHouse
               <div className="review-user">
                 {review.tenantAvatarUrl ? (
                   <>
-                    <img 
-                      src={toAssetUrl(review.tenantAvatarUrl)} 
-                      alt={review.tenantDisplayName} 
-                      className="review-avatar" 
+                    <img
+                      src={toAssetUrl(review.tenantAvatarUrl)}
+                      alt={review.tenantDisplayName}
+                      className="review-avatar"
                       onError={(e) => {
                         e.currentTarget.style.display = 'none';
                         if (e.currentTarget.nextElementSibling) {
@@ -325,25 +325,25 @@ export const HouseReviewsList: React.FC<HouseReviewsListProps> = ({ roomingHouse
                   </span>
                 )}
               </div>
-              
+
               <div className="review-header-right" style={{ display: 'flex', alignItems: 'center' }}>
                 {editingReviewId !== review.id && (
                   <div className="review-rating">
                     {'★'.repeat(review.rating)}{'☆'.repeat(5 - review.rating)}
                   </div>
                 )}
-                
+
                 {currentUser && currentUser.userId === review.tenantUserId && editingReviewId !== review.id && (
                   <div className="reply-actions" style={{ marginLeft: '12px' }}>
-                    <button 
-                      className="icon-btn edit-icon" 
+                    <button
+                      className="icon-btn edit-icon"
                       onClick={() => setEditingReviewId(review.id)}
                       title="Sửa"
                     >
                       ✎
                     </button>
-                    <button 
-                      className="icon-btn delete-icon" 
+                    <button
+                      className="icon-btn delete-icon"
                       onClick={() => handleDeleteReviewClick(review.id)}
                       title="Xóa"
                     >
@@ -369,14 +369,14 @@ export const HouseReviewsList: React.FC<HouseReviewsListProps> = ({ roomingHouse
               />
             ) : (
               <>
-            
+
             <p className="review-comment">{review.comment}</p>
-            
+
             {review.images && review.images.length > 0 && (
               <div className="review-images">
                 {review.images.slice(0, 2).map((img, index) => (
                   <div key={img.id} className="review-image-wrapper" onClick={() => setActiveImageGallery({ images: review.images!, index })}>
-                    <img src={toAssetUrl(img.imageUrl || img.objectKey)} alt="Review" />
+                    <img src={toPublicPropertyImageUrl(img)} alt="Review" />
                     {index === 1 && review.images!.length > 2 && (
                       <div className="more-images-overlay">
                         +{review.images!.length - 2}
@@ -386,7 +386,7 @@ export const HouseReviewsList: React.FC<HouseReviewsListProps> = ({ roomingHouse
                 ))}
               </div>
             )}
-            
+
             <div className="review-actions">
               {isLandlord && (
                 <>
@@ -442,10 +442,10 @@ export const HouseReviewsList: React.FC<HouseReviewsListProps> = ({ roomingHouse
                   <div className="review-user">
                     {roomingHouseAvatarUrl ? (
                       <>
-                        <img 
-                          src={toAssetUrl(roomingHouseAvatarUrl)} 
-                          alt={roomingHouseName || 'Nhà trọ'} 
-                          className="review-avatar reply-avatar" 
+                        <img
+                          src={toAssetUrl(roomingHouseAvatarUrl)}
+                          alt={roomingHouseName || 'Nhà trọ'}
+                          className="review-avatar reply-avatar"
                           onError={(e) => {
                             e.currentTarget.style.display = 'none';
                             if (e.currentTarget.nextElementSibling) {
@@ -469,15 +469,15 @@ export const HouseReviewsList: React.FC<HouseReviewsListProps> = ({ roomingHouse
                   </div>
                   {isLandlord && replyingToId !== review.id && (
                     <div className="reply-actions">
-                      <button 
-                        className="icon-btn edit-icon" 
+                      <button
+                        className="icon-btn edit-icon"
                         onClick={() => { setReplyingToId(review.id); setReplyContent(review.landlordReply!); }}
                         title="Sửa"
                       >
                         ✎
                       </button>
-                      <button 
-                        className="icon-btn delete-icon" 
+                      <button
+                        className="icon-btn delete-icon"
                         onClick={() => handleDeleteReplyClick(review.id)}
                         title="Xóa"
                       >
@@ -510,16 +510,16 @@ export const HouseReviewsList: React.FC<HouseReviewsListProps> = ({ roomingHouse
         ))}
       </div>
       )}
-      
+
       {hasMore && (
         <div style={{ textAlign: 'center', marginTop: '16px', marginBottom: '16px' }}>
-          <Button 
-            variant="outline" 
+          <Button
+            variant="outline"
             onClick={() => {
               const nextPage = page + 1;
               setPage(nextPage);
               loadReviews(nextPage, true);
-            }} 
+            }}
             disabled={isLoadingMore}
           >
             {isLoadingMore ? 'Đang tải...' : 'Xem thêm'}
@@ -529,7 +529,7 @@ export const HouseReviewsList: React.FC<HouseReviewsListProps> = ({ roomingHouse
       {activeImageGallery && (
         <div className="image-gallery-modal" onClick={() => setActiveImageGallery(null)}>
           <button className="gallery-close" onClick={() => setActiveImageGallery(null)}>&times;</button>
-          
+
           {activeImageGallery.images.length > 1 && (
             <button className="gallery-nav prev" onClick={(e) => {
               e.stopPropagation();
@@ -538,13 +538,13 @@ export const HouseReviewsList: React.FC<HouseReviewsListProps> = ({ roomingHouse
               &#10094;
             </button>
           )}
-          
-          <img 
-            src={toAssetUrl(activeImageGallery.images[activeImageGallery.index].imageUrl || activeImageGallery.images[activeImageGallery.index].objectKey)} 
-            alt="Review gallery" 
-            onClick={(e) => e.stopPropagation()} 
+
+          <img
+            src={toPublicPropertyImageUrl(activeImageGallery.images[activeImageGallery.index])}
+            alt="Review gallery"
+            onClick={(e) => e.stopPropagation()}
           />
-          
+
           {activeImageGallery.images.length > 1 && (
             <button className="gallery-nav next" onClick={(e) => {
               e.stopPropagation();
@@ -553,7 +553,7 @@ export const HouseReviewsList: React.FC<HouseReviewsListProps> = ({ roomingHouse
               &#10095;
             </button>
           )}
-          
+
           <div className="gallery-counter">
             {activeImageGallery.index + 1} / {activeImageGallery.images.length}
           </div>

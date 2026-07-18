@@ -1,3 +1,4 @@
+using System.IO;
 using SmartRentalPlatform.Domain.Enums;
 
 namespace SmartRentalPlatform.Application.Common.Interfaces;
@@ -15,15 +16,24 @@ public sealed class VnptEkycVerifyInput
 
     public string DocumentType { get; init; } = default!;
 
-    public string FrontImageObjectKey { get; init; } = default!;
+    public VnptEkycFileInput FrontImage { get; init; } = default!;
 
-    public string BackImageObjectKey { get; init; } = default!;
+    public VnptEkycFileInput BackImage { get; init; } = default!;
 
-    public string SelfieImageObjectKey { get; init; } = default!;
+    public VnptEkycFileInput? SelfieImage { get; init; }
 
     public string SelfieCaptureMethod { get; init; } = default!;
 
     public bool DocumentOnly { get; init; }
+}
+
+public sealed class VnptEkycFileInput
+{
+    public Stream Content { get; init; } = default!;
+
+    public string FileName { get; init; } = default!;
+
+    public string ContentType { get; init; } = "application/octet-stream";
 }
 
 public sealed class VnptEkycClientResult

@@ -5,7 +5,7 @@ import { ROUTE_PATHS } from '../../../app/router/routePaths';
 import { Alert } from '../../../shared/components/ui/Alert';
 import { Button } from '../../../shared/components/ui/Button';
 import { Toast } from '../../../shared/components/ui/Toast';
-import { toAssetUrl } from '../../../shared/api/assets';
+import { toPublicListingImageUrl } from '../../../shared/api/assets';
 import { getProvinces, getWardsByProvince } from '../../administrative/api';
 import type { Province, Ward } from '../../administrative/types';
 import {
@@ -559,7 +559,7 @@ function HomeListingCard({ house, onOpen }: { house: HomeListingItem; onOpen: ()
     >
       <div className="card-image-wrapper">
         {house.coverImageUrl ? (
-          <img alt={house.name} src={toAssetUrl(house.coverImageUrl)} className="card-image" />
+          <img alt={house.name} src={toPublicListingImageUrl(house.coverImageUrl)} className="card-image" />
         ) : (
           <div className="home-listing-card__placeholder">Chưa có ảnh</div>
         )}

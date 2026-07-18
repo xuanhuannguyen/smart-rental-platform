@@ -1,6 +1,7 @@
 import { apiClient } from '../../../shared/api/apiClient';
 import type { ApiResponse } from '../../../shared/api/apiResponse.types';
 import { ENDPOINTS } from '../../../shared/api/endpoints';
+import { uploadImage as uploadImageViaMediaWorkflow } from '../../files/api';
 import type {
   Amenity,
   FileUploadResponse,
@@ -16,9 +17,9 @@ import type {
 
 interface LegalDocumentRequest {
   documentType: string;
-  frontImageObjectKey: string;
-  backImageObjectKey: string;
-  extraImageObjectKey?: string | null;
+  frontMediaAssetId?: string | null;
+  backMediaAssetId?: string | null;
+  extraMediaAssetId?: string | null;
   documentNumber: string;
 }
 
@@ -102,15 +103,13 @@ export const landlordApi = {
     });
   },
 
-  uploadImage(file: File, scope: 'RoomingHouse' | 'LegalDocument') {
-    const formData = new FormData();
-    formData.append('file', file);
-    formData.append('scope', scope);
+  async uploadImage(file: File, scope: 'RoomingHouse' | 'LegalDocument'): Promise<ApiResponse<FileUploadResponse>> {
+    const uploaded = await uploadImageViaMediaWorkflow(file, scope);
 
-    return apiClient<ApiResponse<FileUploadResponse>>(ENDPOINTS.FILES.IMAGES, {
-      method: 'POST',
-      auth: true,
-      body: formData
-    });
+    return {
+      success: true,
+      message: 'Tải ảnh lên thành công.',
+      data: uploaded
+    };
   }
 };

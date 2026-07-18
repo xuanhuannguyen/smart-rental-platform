@@ -39,6 +39,9 @@ export interface KycStatusResponse {
   ekycResult?: string | null;
   riskLevel?: string | null;
   documentType?: string | null;
+  frontMediaAssetId?: string | null;
+  backMediaAssetId?: string | null;
+  selfieMediaAssetId?: string | null;
   ocrFullName?: string | null;
   ocrCitizenIdMasked?: string | null;
   ocrDateOfBirth?: string | null;

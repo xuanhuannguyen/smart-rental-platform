@@ -41,8 +41,15 @@ export const ENDPOINTS = {
   AMENITIES: {
     ROOT: '/api/amenities'
   },
-  FILES: {
-    IMAGES: '/api/files/images'
+  MEDIA: {
+    UPLOAD_URL: '/api/media/upload-url',
+    UPLOAD_BINARY: (mediaAssetId: string) => `/api/media/upload/${mediaAssetId}`,
+    FINALIZE: '/api/media/finalize',
+    BY_ID: (mediaAssetId: string) => `/api/media/${mediaAssetId}`,
+    PUBLIC_BY_ID: (mediaAssetId: string) => `/api/media/public/${mediaAssetId}`,
+    PRIVATE_BY_ID: (mediaAssetId: string) => `/api/media/private/${mediaAssetId}`,
+    PRIVATE_DOWNLOAD: (mediaAssetId: string) => `/api/media/private/${mediaAssetId}/download`,
+    PRIVATE_DOWNLOAD_URL: (mediaAssetId: string) => `/api/media/private/${mediaAssetId}/download-url`
   },
   ROOMING_HOUSES: {
     ROOT: '/api/rooming-houses',
@@ -112,6 +119,7 @@ export const ENDPOINTS = {
     FILES: (id: string) => `/api/contracts/${id}/files`,
     GENERATE_FILE: (id: string) => `/api/contracts/${id}/files/generate`,
     DOWNLOAD_FILE: (id: string, fileId: string) => `/api/contracts/${id}/files/${fileId}/download`,
+    VIEW_FILE_URL: (id: string, fileId: string) => `/api/contracts/${id}/files/${fileId}/view-url`,
     REVISION_REQUEST: (id: string) => `/api/contracts/${id}/revision-request`,
     REJECT: (id: string) => `/api/contracts/${id}/reject`,
     TERMINATE: (id: string) => `/api/contracts/${id}/terminate`,
@@ -182,6 +190,7 @@ export const ENDPOINTS = {
     MESSAGES: (id: string) => `/api/chat/conversations/${id}/messages`,
     READ: (id: string) => `/api/chat/conversations/${id}/read`,
     IMAGES: '/api/chat/images',
+    AVATARS: '/api/chat/avatars',
     FILES: '/api/chat/files',
     DELETE_MESSAGE: (conversationId: string, messageId: string) => `/api/chat/conversations/${conversationId}/messages/${messageId}`,
     QUICK_CONTACTS: '/api/chat/landlord/quick-contacts',

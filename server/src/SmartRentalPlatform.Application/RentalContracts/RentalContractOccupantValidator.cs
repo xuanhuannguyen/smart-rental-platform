@@ -175,7 +175,7 @@ public sealed class RentalContractOccupantValidator
 
         if (string.IsNullOrWhiteSpace(occupant.Document.DocumentType) ||
             string.IsNullOrWhiteSpace(occupant.Document.DocumentNumber) ||
-            string.IsNullOrWhiteSpace(occupant.Document.FrontImageObjectKey))
+            !occupant.Document.FrontMediaAssetId.HasValue)
         {
             throw new BadRequestException("RENTAL_CONTRACT_INVALID_OCCUPANT", "Giấy tờ người ở phải có loại giấy tờ, số giấy tờ và ảnh mặt trước.");
         }

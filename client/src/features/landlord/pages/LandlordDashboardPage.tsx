@@ -3,7 +3,7 @@ import { useEffect, useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { ROUTE_PATHS } from '../../../app/router/routePaths';
 import { getApiErrorMessage } from '../../../shared/api/apiError';
-import { toAssetUrl } from '../../../shared/api/assets';
+import { toPublicListingImageUrl } from '../../../shared/api/assets';
 import { formatDateVi } from '../../../shared/utils/format';
 import { formatStatus, getCreateHouseBlockedMessage, getStatusToneClass } from '../../../shared/utils/status';
 import { getMyRoomingHouseOnboarding, getMyRoomingHouses } from '../../rooming-houses/api';
@@ -156,7 +156,7 @@ export default function LandlordDashboardPage() {
               >
                 <div className="card-media-wrapper">
                   <img
-                    src={house.coverImageUrl ? toAssetUrl(house.coverImageUrl) : fallbackImage}
+                    src={house.coverImageUrl ? toPublicListingImageUrl(house.coverImageUrl) : fallbackImage}
                     alt={house.name}
                     className="card-cover-image"
                   />

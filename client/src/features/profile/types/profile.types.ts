@@ -14,6 +14,7 @@ export interface UserProfileResponse {
   identityVerified: boolean;
   profileCompleted: boolean;
   avatarUrl?: string | null;
+  avatarMediaAssetId?: string | null;
   isGoogleUser?: boolean;
 }
 
@@ -22,7 +23,7 @@ export interface UpdateUserProfileRequest {
   phoneNumber?: string | null;
   emergencyContactName?: string | null;
   emergencyContactPhone?: string | null;
-  avatarUrl?: string | null;
+  avatarMediaAssetId?: string | null;
 }
 
 export interface LandlordEligibilityResponse {

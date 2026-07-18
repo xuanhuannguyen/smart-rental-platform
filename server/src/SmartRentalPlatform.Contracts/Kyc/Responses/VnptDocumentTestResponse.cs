@@ -33,8 +33,4 @@ public sealed class VnptDocumentTestResponse
     public bool IsProviderFailure { get; set; }
 
     public bool IsDocumentUnreadable { get; set; }
-
-    public string FrontImageObjectKey { get; set; } = default!;
-
-    public string BackImageObjectKey { get; set; } = default!;
 }

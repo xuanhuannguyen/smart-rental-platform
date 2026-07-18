@@ -5,13 +5,16 @@ using System.Threading.Tasks;
 using Microsoft.EntityFrameworkCore;
 using SmartRentalPlatform.Application.Common.Exceptions;
 using SmartRentalPlatform.Application.Common.Interfaces;
+using SmartRentalPlatform.Application.Common.Media;
 using SmartRentalPlatform.Application.Common.Models;
 using SmartRentalPlatform.Contracts.Common;
 using SmartRentalPlatform.Contracts.PropertyImages.Responses;
 using SmartRentalPlatform.Contracts.RoomingHouseReviews.Requests;
 using SmartRentalPlatform.Contracts.RoomingHouseReviews.Responses;
+using SmartRentalPlatform.Domain.Entities.Media;
 using SmartRentalPlatform.Domain.Entities.Properties;
 using SmartRentalPlatform.Domain.Entities.RentalContracts;
+using SmartRentalPlatform.Domain.Enums.Media;
 using SmartRentalPlatform.Domain.Enums.RentalContracts;
 using SmartRentalPlatform.Contracts.Files;
 using SmartRentalPlatform.Application.RoomingHouses.Helpers;
@@ -133,7 +136,7 @@ public class RoomingHouseReviewService : IRoomingHouseReviewService
         var contracts = await _context.RentalContracts
             .Include(x => x.Room)
             .Include(x => x.Occupants)
-            .Where(x => x.Room.RoomingHouseId == roomingHouseId && 
+            .Where(x => x.Room.RoomingHouseId == roomingHouseId &&
                         (x.MainTenantUserId == tenantUserId || x.Occupants.Any(o => o.UserId == tenantUserId)))
             .OrderByDescending(x => x.CreatedAt)
             .ToListAsync(cancellationToken);
@@ -141,7 +144,7 @@ public class RoomingHouseReviewService : IRoomingHouseReviewService
         var today = DateOnly.FromDateTime(DateTime.UtcNow);
 
         // Find contracts that are eligible (started, active/expired, or cancelled after an actual stay)
-        var eligibleContracts = contracts.Where(contract => 
+        var eligibleContracts = contracts.Where(contract =>
         {
             var occupant = contract.Occupants.FirstOrDefault(o => o.UserId == tenantUserId);
             var isMainTenant = contract.MainTenantUserId == tenantUserId;
@@ -248,7 +251,7 @@ public class RoomingHouseReviewService : IRoomingHouseReviewService
             throw new ConflictException(ErrorCodes.ValidationError, $"Mỗi đánh giá chỉ được tải tối đa {MaxReviewImages} ảnh.");
 
         var contract = await _context.RentalContracts.Include(x => x.Room).FirstOrDefaultAsync(x => x.Id == contractId, cancellationToken);
-        
+
         await using var transaction = await _context.BeginTransactionAsync(cancellationToken);
         try
         {
@@ -276,15 +279,28 @@ public class RoomingHouseReviewService : IRoomingHouseReviewService
                     await using var stream = file.OpenReadStream();
                     var imageUploadFile = new ImageUploadFile { Content = stream, FileName = file.FileName, ContentType = file.ContentType, Length = file.Length };
                     var uploadResponse = await _fileStorageService.UploadImageAsync(imageUploadFile, FileUploadScope.RoomingHouse, cancellationToken);
-                    
+                    if (!uploadResponse.MediaAssetId.HasValue)
+                    {
+                        throw new InvalidOperationException("Review image upload did not return mediaAssetId.");
+                    }
+
+                    var propertyImageId = Guid.NewGuid();
+                    var createdAt = DateTimeOffset.UtcNow;
+                    await LinkReviewImageMediaAssetAsync(
+                        propertyImageId,
+                        tenantUserId,
+                        uploadResponse.MediaAssetId.Value,
+                        createdAt,
+                        cancellationToken);
+
                     review.Images.Add(new PropertyImage
                     {
-                        Id = Guid.NewGuid(),
+                        Id = propertyImageId,
                         RoomingHouseReviewId = review.Id,
-                        ObjectKey = uploadResponse.ObjectKey,
-                        ImageUrl = uploadResponse.Url,
+                        MediaAssetId = uploadResponse.MediaAssetId.Value,
+                        ImageUrl = BuildReviewImageUrl(uploadResponse.MediaAssetId.Value),
                         SortOrder = sortOrder++,
-                        CreatedAt = DateTimeOffset.UtcNow,
+                        CreatedAt = createdAt,
                         IsCover = false
                     });
                 }
@@ -316,7 +332,7 @@ public class RoomingHouseReviewService : IRoomingHouseReviewService
             .Where(x => x.RoomingHouseId == roomingHouseId && !x.IsHidden && x.ModerationStatus == RoomingHouseReviewModerationStatus.Approved);
 
         var totalCount = await query.CountAsync(cancellationToken);
-        
+
         var reviews = await query
             .OrderByDescending(x => x.CreatedAt)
             .Skip((page - 1) * pageSize)
@@ -345,7 +361,7 @@ public class RoomingHouseReviewService : IRoomingHouseReviewService
             AverageRating = house?.AverageRating ?? 0,
             TotalReviews = house?.TotalReviews ?? 0,
             RatingDistribution = distribution,
-            Reviews = reviews.Select(r => 
+            Reviews = reviews.Select(r =>
             {
                 var mapped = MapToResponse(r);
                 mapped.IsReported = reportedReviewIds.Contains(r.Id);
@@ -406,6 +422,8 @@ public class RoomingHouseReviewService : IRoomingHouseReviewService
                 _context.PropertyImages.Remove(img);
             }
 
+            await UnlinkReviewImageMediaAssetsAsync(imagesToRemove, DateTimeOffset.UtcNow, cancellationToken);
+
             if (request.NewImages != null && request.NewImages.Any())
             {
                 int sortOrder = review.Images.Count > 0 ? review.Images.Max(x => x.SortOrder) + 1 : 0;
@@ -414,18 +432,31 @@ public class RoomingHouseReviewService : IRoomingHouseReviewService
                     await using var stream = file.OpenReadStream();
                     var imageUploadFile = new ImageUploadFile { Content = stream, FileName = file.FileName, ContentType = file.ContentType, Length = file.Length };
                     var uploadResponse = await _fileStorageService.UploadImageAsync(imageUploadFile, FileUploadScope.RoomingHouse, cancellationToken);
+                    if (!uploadResponse.MediaAssetId.HasValue)
+                    {
+                        throw new InvalidOperationException("Review image upload did not return mediaAssetId.");
+                    }
+
+                    var propertyImageId = Guid.NewGuid();
+                    var createdAt = DateTimeOffset.UtcNow;
+                    await LinkReviewImageMediaAssetAsync(
+                        propertyImageId,
+                        tenantUserId,
+                        uploadResponse.MediaAssetId.Value,
+                        createdAt,
+                        cancellationToken);
 
                     var newImage = new PropertyImage
                     {
-                        Id = Guid.NewGuid(),
+                        Id = propertyImageId,
                         RoomingHouseReviewId = review.Id,
-                        ObjectKey = uploadResponse.ObjectKey,
-                        ImageUrl = uploadResponse.Url,
+                        MediaAssetId = uploadResponse.MediaAssetId.Value,
+                        ImageUrl = BuildReviewImageUrl(uploadResponse.MediaAssetId.Value),
                         SortOrder = sortOrder++,
-                        CreatedAt = DateTimeOffset.UtcNow,
+                        CreatedAt = createdAt,
                         IsCover = false
                     };
-                    
+
                     _context.PropertyImages.Add(newImage);
                     review.Images.Add(newImage);
                 }
@@ -546,7 +577,7 @@ public class RoomingHouseReviewService : IRoomingHouseReviewService
 
         var response = MapToResponse(review);
         response.IsReported = await _context.ReviewReports.AnyAsync(x => x.RoomingHouseReviewId == reviewId, cancellationToken);
-        
+
         return response;
     }
 
@@ -573,15 +604,103 @@ public class RoomingHouseReviewService : IRoomingHouseReviewService
             AiModerationProvider = review.AiModerationProvider,
             AiModerationRiskLevel = review.AiModerationRiskLevel,
             AdminNote = review.AdminNote,
-            Images = review.Images.OrderBy(x => x.SortOrder).Select(img => new PropertyImageResponse
+            Images = review.Images
+                .Where(x => x.MediaAssetId.HasValue)
+                .OrderBy(x => x.SortOrder)
+                .Select(img => new PropertyImageResponse
             {
                 Id = img.Id,
-                ImageUrl = img.ImageUrl,
+                MediaAssetId = img.MediaAssetId,
+                ImageUrl = BuildReviewImageUrl(img.MediaAssetId!.Value),
                 Caption = img.Caption,
                 IsCover = img.IsCover,
-                SortOrder = img.SortOrder
+                SortOrder = img.SortOrder,
+                CreatedAt = img.CreatedAt
             }).ToList()
         };
+    }
+
+    private async Task LinkReviewImageMediaAssetAsync(
+        Guid propertyImageId,
+        Guid ownerUserId,
+        Guid mediaAssetId,
+        DateTimeOffset now,
+        CancellationToken cancellationToken)
+    {
+        var mediaAsset = await _context.MediaAssets
+            .FirstOrDefaultAsync(x => x.Id == mediaAssetId, cancellationToken)
+            ?? throw new BadRequestException(
+                ErrorCodes.ValidationError,
+                "Media asset ảnh đánh giá không tồn tại.",
+                new { mediaAssetId });
+
+        if (mediaAsset.OwnerUserId.HasValue && mediaAsset.OwnerUserId.Value != ownerUserId)
+        {
+            throw new BadRequestException(
+                ErrorCodes.ImageInvalidOwner,
+                "Bạn không có quyền sử dụng media asset ảnh đánh giá này.",
+                new { mediaAssetId });
+        }
+
+        if (mediaAsset.Scope != MediaScope.RoomingHouseImage || mediaAsset.Visibility != MediaVisibility.Public)
+        {
+            throw new BadRequestException(
+                ErrorCodes.ValidationError,
+                "Media asset không phù hợp với ảnh đánh giá.",
+                new { mediaAssetId, expectedScope = MediaScope.RoomingHouseImage.ToString() });
+        }
+
+        if (mediaAsset.Status is MediaStatus.PendingUpload or MediaStatus.Deleted)
+        {
+            throw new BadRequestException(
+                ErrorCodes.ValidationError,
+                "Media asset ảnh đánh giá chưa sẵn sàng để liên kết.",
+                new { mediaAssetId, status = mediaAsset.Status.ToString() });
+        }
+
+        mediaAsset.OwnerUserId = ownerUserId;
+        mediaAsset.Scope = MediaScope.RoomingHouseImage;
+        mediaAsset.Visibility = MediaVisibility.Public;
+        mediaAsset.Status = MediaStatus.Linked;
+        mediaAsset.LinkedEntityType = nameof(PropertyImage);
+        mediaAsset.LinkedEntityId = propertyImageId;
+        mediaAsset.DeletedAt = null;
+        mediaAsset.UpdatedAt = now;
+    }
+
+    private async Task UnlinkReviewImageMediaAssetsAsync(
+        IEnumerable<PropertyImage> images,
+        DateTimeOffset now,
+        CancellationToken cancellationToken)
+    {
+        var mediaAssetIds = images
+            .Where(x => x.MediaAssetId.HasValue)
+            .Select(x => x.MediaAssetId!.Value)
+            .Distinct()
+            .ToList();
+
+        if (mediaAssetIds.Count == 0)
+        {
+            return;
+        }
+
+        var mediaAssets = await _context.MediaAssets
+            .Where(x => mediaAssetIds.Contains(x.Id))
+            .ToListAsync(cancellationToken);
+
+        foreach (var mediaAsset in mediaAssets)
+        {
+            mediaAsset.LinkedEntityType = null;
+            mediaAsset.LinkedEntityId = null;
+            mediaAsset.Status = MediaStatus.Deleted;
+            mediaAsset.DeletedAt = now;
+            mediaAsset.UpdatedAt = now;
+        }
+    }
+
+    private static string BuildReviewImageUrl(Guid mediaAssetId)
+    {
+        return PublicMediaPathBuilder.Build(mediaAssetId);
     }
 
     private static bool IsReviewableContractStatus(RentalContractStatus status, bool userHasStayed)

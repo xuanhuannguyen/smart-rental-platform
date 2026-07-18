@@ -1,5 +1,6 @@
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Metadata.Builders;
+using SmartRentalPlatform.Domain.Entities.Media;
 using SmartRentalPlatform.Domain.Entities.RentalContracts;
 
 namespace SmartRentalPlatform.Infrastructure.Persistence.Configurations.RentalContracts;
@@ -34,17 +35,17 @@ public class ContractSigningEnvelopeConfiguration : IEntityTypeConfiguration<Con
             
         builder.Property(x => x.Title).HasColumnName("title").HasMaxLength(1000);
         
-        builder.Property(x => x.UnsignedFileObjectKey).HasColumnName("unsigned_file_object_key").HasColumnType("text");
+        builder.Property(x => x.UnsignedFileMediaAssetId).HasColumnName("unsigned_file_media_asset_id");
         builder.Property(x => x.UnsignedFileSha256Hash).HasColumnName("unsigned_file_sha256_hash").HasMaxLength(64);
         builder.Property(x => x.DocumentSnapshotEncrypted).HasColumnName("document_snapshot_encrypted").HasColumnType("text");
         builder.Property(x => x.DocumentSnapshotSha256Hash).HasColumnName("document_snapshot_sha256_hash").HasMaxLength(64);
         builder.Property(x => x.DocumentTemplateVersion).HasColumnName("document_template_version").HasMaxLength(40);
         builder.Property(x => x.DocumentPreparedAt).HasColumnName("document_prepared_at");
         
-        builder.Property(x => x.SignedFileObjectKey).HasColumnName("signed_file_object_key").HasColumnType("text");
+        builder.Property(x => x.SignedFileMediaAssetId).HasColumnName("signed_file_media_asset_id");
         builder.Property(x => x.SignedFileSha256Hash).HasColumnName("signed_file_sha256_hash").HasMaxLength(64);
         
-        builder.Property(x => x.EvidenceFileObjectKey).HasColumnName("evidence_file_object_key").HasColumnType("text");
+        builder.Property(x => x.EvidenceFileMediaAssetId).HasColumnName("evidence_file_media_asset_id");
         
         builder.Property(x => x.ProviderStatusReason).HasColumnName("provider_status_reason").HasMaxLength(2000);
         
@@ -63,11 +64,29 @@ public class ContractSigningEnvelopeConfiguration : IEntityTypeConfiguration<Con
             .HasForeignKey(x => x.RentalContractAppendixId)
             .OnDelete(DeleteBehavior.SetNull);
 
+        builder.HasOne(x => x.UnsignedFileMediaAsset)
+            .WithMany()
+            .HasForeignKey(x => x.UnsignedFileMediaAssetId)
+            .OnDelete(DeleteBehavior.Restrict);
+
+        builder.HasOne(x => x.SignedFileMediaAsset)
+            .WithMany()
+            .HasForeignKey(x => x.SignedFileMediaAssetId)
+            .OnDelete(DeleteBehavior.Restrict);
+
+        builder.HasOne(x => x.EvidenceFileMediaAsset)
+            .WithMany()
+            .HasForeignKey(x => x.EvidenceFileMediaAssetId)
+            .OnDelete(DeleteBehavior.Restrict);
+
         builder.HasIndex(x => new { x.Provider, x.ProviderEnvelopeId })
             .IsUnique()
             .HasFilter("provider_envelope_id IS NOT NULL");
             
         builder.HasIndex(x => new { x.RentalContractId, x.Status });
         builder.HasIndex(x => new { x.RentalContractAppendixId, x.Status });
+        builder.HasIndex(x => x.UnsignedFileMediaAssetId);
+        builder.HasIndex(x => x.SignedFileMediaAssetId);
+        builder.HasIndex(x => x.EvidenceFileMediaAssetId);
     }
 }

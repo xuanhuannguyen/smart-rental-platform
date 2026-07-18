@@ -7,8 +7,10 @@ using SmartRentalPlatform.Application.Common.Exceptions;
 using SmartRentalPlatform.Application.Common.Interfaces;
 using SmartRentalPlatform.Contracts.Billing.Requests;
 using SmartRentalPlatform.Domain.Entities.Billing;
+using SmartRentalPlatform.Domain.Entities.Media;
 using SmartRentalPlatform.Domain.Entities.Properties;
 using SmartRentalPlatform.Domain.Enums.Billing;
+using SmartRentalPlatform.Domain.Enums.Media;
 using SmartRentalPlatform.Domain.Enums.RentalContracts;
 using SmartRentalPlatform.UnitTests.Common;
 using Xunit;
@@ -444,8 +446,8 @@ public class BillingServiceTests : IClassFixture<TestDatabaseFixture>
             0,
             "January invoice",
             [
-                new MeterReadingInput(ElectricServiceTypeId, 0, 100, null),
-                new MeterReadingInput(WaterServiceTypeId, 0, 10, null)
+                new MeterReadingInput(ElectricServiceTypeId, 0, 100),
+                new MeterReadingInput(WaterServiceTypeId, 0, 10)
             ]);
 
         var result = await service.GenerateInvoiceWithReadingsAsync(seed.Landlord.Id, request, CancellationToken.None);
@@ -456,6 +458,59 @@ public class BillingServiceTests : IClassFixture<TestDatabaseFixture>
         Assert.True(await context.Invoices.AnyAsync(x => x.Id == result.Id && x.Status == InvoiceStatus.Draft));
         Assert.Equal(5, await context.InvoiceItems.CountAsync(x => x.InvoiceId == result.Id));
         Assert.Equal(2, await context.MeterReadings.CountAsync(x => x.ContractId == seed.Contract.Id));
+    }
+
+    [Fact]
+    public async Task GenerateInvoiceWithReadingsAsync_ShouldLinkProofMediaAsset_WhenProofMediaAssetIdExists()
+    {
+        var context = _fixture.Context;
+        var seed = await SeedActiveContractGraphAsync();
+        AddDefaultServicePrices(seed.House.Id);
+
+        var proofAsset = new MediaAsset
+        {
+            Id = Guid.NewGuid(),
+            OwnerUserId = seed.Landlord.Id,
+            BucketName = "test-bucket",
+            ObjectKey = "private/meter-reading-images/2026/07/11/proof-electric.jpg",
+            OriginalFileName = "proof-electric.jpg",
+            StoredFileName = "proof-electric.jpg",
+            ContentType = "image/jpeg",
+            FileSize = 128,
+            Scope = MediaScope.MeterReadingImage,
+            Visibility = MediaVisibility.Private,
+            Status = MediaStatus.Uploaded,
+            CreatedAt = DateTimeOffset.UtcNow,
+            UpdatedAt = DateTimeOffset.UtcNow
+        };
+
+        context.MediaAssets.Add(proofAsset);
+        await context.SaveChangesAsync();
+
+        _contractReadService.ActiveContract = BuildContractSnapshot(seed, terminationDate: null, terminationType: null);
+        var service = CreateBillingService(context);
+        var request = new GenerateInvoiceWithReadingsRequest(
+            seed.Contract.Id,
+            new DateOnly(2026, 1, 1),
+            new DateOnly(2026, 1, 31),
+            0,
+            "January invoice",
+            [
+                new MeterReadingInput(ElectricServiceTypeId, 0, 100, proofAsset.Id),
+                new MeterReadingInput(WaterServiceTypeId, 0, 10)
+            ]);
+
+        var result = await service.GenerateInvoiceWithReadingsAsync(seed.Landlord.Id, request, CancellationToken.None);
+
+        var reading = await context.MeterReadings
+            .AsNoTracking()
+            .FirstAsync(x => x.ContractId == seed.Contract.Id && x.ServiceTypeId == ElectricServiceTypeId);
+        var meterItem = result.Items.First(x => x.MeterReadingId == reading.Id);
+
+        Assert.Equal(proofAsset.Id, reading.ProofMediaAssetId);
+        Assert.Equal(proofAsset.Id, meterItem.MeterReadingProofMediaAssetId);
+        Assert.Equal(nameof(MeterReading), context.MediaAssets.Single(x => x.Id == proofAsset.Id).LinkedEntityType);
+        Assert.Equal(reading.Id, context.MediaAssets.Single(x => x.Id == proofAsset.Id).LinkedEntityId);
     }
 
     [Fact]

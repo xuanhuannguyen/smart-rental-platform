@@ -397,6 +397,34 @@ public class RentalContractsController : ControllerBase
     }
 
     [Authorize]
+    [HttpGet("{id:guid}/files/{fileId:guid}/view-url")]
+    public async Task<ActionResult<ApiResponse<ContractFileViewUrlResponse>>> GetContractFileViewUrl(
+        Guid id,
+        Guid fileId,
+        CancellationToken cancellationToken)
+    {
+        var userId = GetCurrentUserId();
+        var result = await contractFileService.GetFileViewUrlAsync(userId, id, fileId, cancellationToken);
+
+        if (result is null)
+        {
+            return NotFound(new ApiErrorResponse
+            {
+                Success = false,
+                ErrorCode = ErrorCodes.NotFound,
+                Message = "Không tìm thấy file hợp đồng."
+            });
+        }
+
+        return Ok(new ApiResponse<ContractFileViewUrlResponse>
+        {
+            Success = true,
+            Message = "Lấy đường xem file hợp đồng thành công.",
+            Data = result
+        });
+    }
+
+    [Authorize]
     [HttpPost("{id:guid}/appendices")]
     public async Task<ActionResult<ApiResponse<ContractAppendixResponse>>> CreateAppendix(
         Guid id,

@@ -26,7 +26,7 @@ export type {
 
 export interface PropertyImageItemRequest {
   id?: string;
-  objectKey: string;
+  mediaAssetId?: string | null;
   caption?: string | null;
   isCover: boolean;
   sortOrder: number;

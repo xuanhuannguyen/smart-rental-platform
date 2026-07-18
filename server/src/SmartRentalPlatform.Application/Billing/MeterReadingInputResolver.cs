@@ -145,14 +145,6 @@ public sealed class MeterReadingInputResolver
                     $"Chỉ số cuối kỳ phải lớn hơn hoặc bằng chỉ số đầu kỳ cho dịch vụ {serviceType.Name}.");
             }
 
-            if (!string.IsNullOrWhiteSpace(input.ProofImageObjectKey) &&
-                !input.ProofImageObjectKey.StartsWith("meter-readings/", StringComparison.OrdinalIgnoreCase))
-            {
-                throw new BadRequestException(
-                    ErrorCodes.MeterReadingInvalid,
-                    "Ảnh minh chứng chỉ số điện nước phải thuộc phạm vi meter-readings.");
-            }
-
             if (input.AiReading.HasValue && input.AiReading.Value < 0)
             {
                 throw new BadRequestException(
@@ -160,6 +152,9 @@ public sealed class MeterReadingInputResolver
                     "Chỉ số đọc được từ AI không được âm.");
             }
 
+            var proofMediaAssetId = input.ProofMediaAssetId == Guid.Empty
+                ? null
+                : input.ProofMediaAssetId;
             var resolvedAiRawText = string.IsNullOrWhiteSpace(input.AiRawText)
                 ? null
                 : input.AiRawText.Trim()[..Math.Min(input.AiRawText.Trim().Length, 4000)];
@@ -169,7 +164,7 @@ public sealed class MeterReadingInputResolver
                 price,
                 previousReading.Value,
                 input.CurrentReading,
-                input.ProofImageObjectKey?.Trim(),
+                proofMediaAssetId,
                 input.AiReading,
                 resolvedAiRawText));
         }

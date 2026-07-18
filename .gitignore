@@ -4,11 +4,14 @@
 !/.gitignore
 !/README.md
 !/docker-compose.yml
+!/quality-gate.ps1
 !/client/
 !/client/**
 !/server/
 !/server/**
 !/docs/
+!/docs/Media_Manual_Test_Checklist.md
+!/docs/Media_Test_Findings_Summary.md
 !/docs/interval-plan/
 !/docs/interval-plan/Interval2BusinessLogicReport.md
 !/scripts/

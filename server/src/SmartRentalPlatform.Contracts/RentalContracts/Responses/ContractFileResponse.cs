@@ -8,11 +8,11 @@ public class ContractFileResponse
 
     public Guid? RentalContractAppendixId { get; set; }
 
-    public string StorageObjectKey { get; set; } = string.Empty;
+    public Guid? MediaAssetId { get; set; }
 
     public string Purpose { get; set; } = string.Empty;
 
-    public string? FileUrl { get; set; }
+    public string? ViewUrl { get; set; }
 
     public DateTimeOffset CreatedAt { get; set; }
 }

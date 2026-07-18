@@ -2,7 +2,7 @@ import { useState, useRef } from 'react';
 import type { DragEvent } from 'react';
 import { uploadImage, type FileUploadScope } from '../../files/api';
 import { getApiErrorMessage } from '../../../shared/api/apiError';
-import { toAssetUrl } from '../../../shared/api/assets';
+import { toPublicAssetUrl } from '../../../shared/api/assets';
 import type { PropertyImageRequest } from '../types';
 import './RoomingHouseEditor.css';
 
@@ -78,8 +78,11 @@ export default function PropertyImageEditor({
       uploadResults.forEach((result, index) => {
         if (result.status !== 'fulfilled') return;
 
+        const uploadedMediaAssetId = result.value.mediaAssetId ?? null;
+        if (!uploadedMediaAssetId) return;
+
         uploadedImages.push({
-          objectKey: result.value.objectKey,
+          mediaAssetId: uploadedMediaAssetId,
           imageUrl: result.value.url,
           caption: '',
           isCover: images.length === 0 && index === 0,
@@ -98,8 +101,12 @@ export default function PropertyImageEditor({
 
       const failedCount = filesToUpload.length - uploadedImages.length;
       if (failedCount > 0) {
+        const firstFailure = uploadResults.find((result) => result.status === 'rejected');
+        const failureMessage = firstFailure?.status === 'rejected'
+          ? getApiErrorMessage(firstFailure.reason, 'Không thể tải ảnh lên.')
+          : 'Không thể hoàn tất media asset cho ảnh đã chọn.';
         setUploadMessage(
-          `${failedCount} ảnh chưa tải lên được. Vui lòng kiểm tra định dạng và dung lượng ảnh.`
+          `${failedCount} ảnh chưa tải lên được. ${failureMessage}`
         );
       } else if (limitMessage) {
         setUploadMessage(limitMessage);
@@ -236,7 +243,7 @@ export default function PropertyImageEditor({
         {images.map((image, index) => (
           <article
             className={`property-image-card ${draggedIndex === index ? 'dragging' : ''}`}
-            key={image.id ?? image.objectKey}
+            key={(image.id ?? image.mediaAssetId) || `uploaded-image-${index}`}
             draggable
             onDragStart={(e) => handleCardDragStart(e, index)}
             onDragOver={handleCardDragOver}
@@ -244,7 +251,7 @@ export default function PropertyImageEditor({
           >
             <img
               alt={image.caption || 'Ảnh khu trọ'}
-              src={toAssetUrl(image.imageUrl || image.objectKey)}
+              src={toPublicAssetUrl(image.imageUrl)}
             />
             {image.isCover && <span className="property-image-cover-badge">Ảnh bìa</span>}
             <div className="property-image-card-overlay">

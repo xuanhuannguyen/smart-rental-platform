@@ -260,6 +260,9 @@ public class FakeWalletService : IWalletService
     public Task<WalletMutationResponse> DecreaseReservedAsync(Guid walletAccountId, decimal amount, WalletTransactionType transactionType, WalletTransactionMetadata? metadata = null, CancellationToken cancellationToken = default)
         => Task.FromResult(new WalletMutationResponse());
 
+    public Task<WalletMutationResponse> DebitFromReservedAsync(Guid walletAccountId, decimal amount, WalletTransactionType transactionType, WalletTransactionMetadata? metadata = null, CancellationToken cancellationToken = default)
+        => Task.FromResult(new WalletMutationResponse());
+
     public Task<WalletTransferResponse> TransferAsync(Guid sourceWalletAccountId, Guid targetWalletAccountId, decimal amount, WalletTransactionType debitTransactionType, WalletTransactionType creditTransactionType, WalletTransactionMetadata? metadata = null, CancellationToken cancellationToken = default)
         => Task.FromResult(new WalletTransferResponse());
 
@@ -273,9 +276,6 @@ public class FakeWalletService : IWalletService
         => Task.FromResult(new WalletTransferResponse());
 
     public Task<WalletMutationResponse> ReleaseReservedWithinTransactionAsync(Guid walletAccountId, decimal amount, WalletTransactionType transactionType, WalletTransactionMetadata? metadata = null, CancellationToken cancellationToken = default)
-        => Task.FromResult(new WalletMutationResponse());
-
-    public Task<WalletMutationResponse> DebitFromReservedAsync(Guid walletAccountId, decimal amount, WalletTransactionType transactionType, WalletTransactionMetadata? metadata = null, CancellationToken cancellationToken = default)
         => Task.FromResult(new WalletMutationResponse());
 }
 

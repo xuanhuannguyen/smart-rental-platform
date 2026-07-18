@@ -6,7 +6,8 @@ import HouseImageGallery from './components/HouseImageGallery';
 import RentalAiChatbot from './components/RentalAiChatbot';
 import FavoriteButton from './components/FavoriteButton';
 import type { RoomingHouseDetail } from './types';
-import { toAssetUrl } from '../../shared/api/assets';
+import { toAssetUrl, toPublicPropertyImageUrl } from '../../shared/api/assets';
+import { buildPublicMediaViewUrl } from '../../shared/api/media';
 import { getApiErrorMessage } from '../../shared/api/apiError';
 import { HomeHeader } from '../../shared/components/layout/HomeHeader';
 import { ROUTE_PATHS } from '../../app/router/routePaths';
@@ -277,13 +278,15 @@ export default function PublicRoomingHouseDetailPage() {
             </div>
             <h2>Luật khu trọ</h2>
           </div>
-          
+
           <div className="rules-card-body">
             <div className="rules-card-info">
-              {house.houseRule?.pdfObjectKey ? (
+              {house.houseRule?.mediaAssetId || house.houseRule?.pdfUrl ? (
                 <a
                   className="public-house-detail__rule-link"
-                  href={toAssetUrl(house.houseRule.pdfObjectKey)}
+                  href={house.houseRule.mediaAssetId
+                    ? buildPublicMediaViewUrl(house.houseRule.mediaAssetId)
+                    : toAssetUrl(house.houseRule.pdfUrl ?? '')}
                   target="_blank"
                   rel="noreferrer"
                 >
@@ -298,7 +301,7 @@ export default function PublicRoomingHouseDetailPage() {
                 <p className="public-house-detail__muted">Chủ trọ chưa cập nhật luật khu trọ.</p>
               )}
             </div>
-            
+
             <div className="rules-card-illustration">
               <svg width="120" height="120" viewBox="0 0 120 120" fill="none" xmlns="http://www.w3.org/2000/svg">
                 <rect x="35" y="25" width="60" height="80" rx="8" fill="#f1f5f9" />
@@ -331,7 +334,7 @@ export default function PublicRoomingHouseDetailPage() {
               </div>
               <h2>Chính sách thuê</h2>
             </div>
-            
+
             <div className="rental-policy-grid">
               <div className="rental-policy-item">
                 <div className="policy-item-icon-wrapper">
@@ -347,7 +350,7 @@ export default function PublicRoomingHouseDetailPage() {
                   <span className="rental-policy-value">{house.rentalPolicy.minRentalMonths} tháng</span>
                 </div>
               </div>
-              
+
               <div className="rental-policy-item">
                 <div className="policy-item-icon-wrapper">
                   <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
@@ -366,7 +369,7 @@ export default function PublicRoomingHouseDetailPage() {
                   </span>
                 </div>
               </div>
-              
+
               <div className="rental-policy-item">
                 <div className="policy-item-icon-wrapper">
                   <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
@@ -379,7 +382,7 @@ export default function PublicRoomingHouseDetailPage() {
                   <span className="rental-policy-value">{house.rentalPolicy.depositMonths} tháng tiền thuê</span>
                 </div>
               </div>
-              
+
               <div className="rental-policy-item">
                 <div className="policy-item-icon-wrapper">
                   <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
@@ -396,7 +399,7 @@ export default function PublicRoomingHouseDetailPage() {
                   <span className="rental-policy-value">Ngày {house.rentalPolicy.defaultPaymentDay} hàng tháng</span>
                 </div>
               </div>
-              
+
               <div className="rental-policy-item">
                 <div className="policy-item-icon-wrapper">
                   <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
@@ -409,7 +412,7 @@ export default function PublicRoomingHouseDetailPage() {
                   <span className="rental-policy-value">Trước {house.rentalPolicy.renewalNoticeDays} ngày</span>
                 </div>
               </div>
-              
+
               <div className="rental-policy-item">
                 <div className="policy-item-icon-wrapper">
                   <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
@@ -437,7 +440,7 @@ export default function PublicRoomingHouseDetailPage() {
               </div>
               <h2>Bảng giá dịch vụ</h2>
             </div>
-            
+
             <div className="service-price-grid">
               {house.servicePrices.map((service) => (
                 <div key={service.id} className="service-price-item">
@@ -475,7 +478,7 @@ export default function PublicRoomingHouseDetailPage() {
             </div>
             <span className="available-rooms-count">{availableRooms.length} phòng</span>
           </div>
-          
+
           {availableRooms.length > 0 ? (
             <div className="public-house-detail__rooms">
               {availableRooms.map((room) => {
@@ -487,12 +490,12 @@ export default function PublicRoomingHouseDetailPage() {
                   <Link to={ROUTE_PATHS.ME.ROOM_DETAIL(house.id, room.id)} className="public-room-card" key={room.id}>
                     <div className="public-room-card__img-wrapper">
                       {roomImage ? (
-                        <img alt={`Phòng ${room.roomNumber}`} src={toAssetUrl(roomImage.imageUrl || roomImage.objectKey)} />
+                        <img alt={`Phòng ${room.roomNumber}`} src={toPublicPropertyImageUrl(roomImage)} />
                       ) : (
                         <div className="public-room-card__placeholder">Chưa có ảnh</div>
                       )}
                     </div>
-                    
+
                     <div className="public-room-card__body">
                       <div className="room-card-main-info">
                         <h3>Phòng {room.roomNumber}</h3>
@@ -500,11 +503,11 @@ export default function PublicRoomingHouseDetailPage() {
                           Tầng {room.floor} · {room.areaM2 ? `${room.areaM2} m²` : 'Chưa cập nhật diện tích'} · Tối đa {room.maxOccupants} người
                         </p>
                       </div>
-                      
+
                       <strong className="room-card-price">
                         {lowestRent != null ? `Từ ${formatCurrency(lowestRent)}` : 'Liên hệ chủ trọ'}
                       </strong>
-                      
+
                       {roomAmenities.length > 0 && (
                         <div className="public-room-card__amenities">
                           {roomAmenities.slice(0, 4).map((amenity) => (
@@ -515,7 +518,7 @@ export default function PublicRoomingHouseDetailPage() {
                         </div>
                       )}
                     </div>
-                    
+
                     <div className="public-room-card__chevron">
                       <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" strokeWidth="2.5">
                         <polyline points="9 18 15 12 9 6" />
@@ -539,14 +542,14 @@ export default function PublicRoomingHouseDetailPage() {
             </div>
             <h2>Đánh giá từ người thuê</h2>
           </div>
-          
-          <HouseReviewsList 
-            roomingHouseId={house.id} 
-            landlordUserId={house.landlordUserId} 
+
+          <HouseReviewsList
+            roomingHouseId={house.id}
+            landlordUserId={house.landlordUserId}
             roomingHouseName={house.name}
             roomingHouseAvatarUrl={(() => {
               const img = houseImages.find(i => i.isCover) || houseImages[0];
-              return img ? (img.imageUrl || img.objectKey) : undefined;
+              return img ? toPublicPropertyImageUrl(img) : undefined;
             })()}
           />
         </section>

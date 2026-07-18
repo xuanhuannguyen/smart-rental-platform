@@ -1,7 +1,8 @@
 import { useEffect, useState } from 'react';
 import { getApiErrorMessage } from '../../../shared/api/apiError';
+import { buildPublicMediaViewUrl } from '../../../shared/api/media';
 import { toAssetUrl } from '../../../shared/api/assets';
-import { uploadPdf } from '../../files/api';
+import { type FileUploadResponse, uploadPdf } from '../../files/api';
 import { upsertRoomingHouseRule, previewRoomingHouseRule } from '../api';
 import { Toast } from '../../../shared/components/ui/Toast';
 import type {
@@ -39,7 +40,8 @@ export default function RoomingHouseRuleEditor({
   const [sourceType, setSourceType] = useState<HouseRuleSourceType>(
     lockedSourceType ?? 'PdfUpload'
   );
-  const [pdfObjectKey, setPdfObjectKey] = useState(houseRule?.pdfObjectKey ?? '');
+  const [pdfMediaAssetId, setPdfMediaAssetId] = useState(houseRule?.mediaAssetId ?? null);
+  const [uploadedPdf, setUploadedPdf] = useState<FileUploadResponse | null>(null);
   const [form, setForm] = useState<UpsertRoomingHouseRuleRequest>(() =>
     buildForm(houseRule)
   );
@@ -50,7 +52,8 @@ export default function RoomingHouseRuleEditor({
 
   useEffect(() => {
     setSourceType(houseRule?.sourceType ?? 'PdfUpload');
-    setPdfObjectKey(houseRule?.pdfObjectKey ?? '');
+    setPdfMediaAssetId(houseRule?.mediaAssetId ?? null);
+    setUploadedPdf(null);
     setForm(buildForm(houseRule));
     setValidationError('');
   }, [houseRule]);
@@ -61,7 +64,8 @@ export default function RoomingHouseRuleEditor({
     setValidationError('');
     try {
       const uploaded = await uploadPdf(file, 'HouseRule');
-      setPdfObjectKey(uploaded.objectKey);
+      setPdfMediaAssetId(uploaded.mediaAssetId || null);
+      setUploadedPdf(uploaded);
       setToast({ message: 'Đã tải PDF lên. Bấm lưu để áp dụng luật khu trọ.', type: 'success' });
     } catch (error) {
       setToast({ message: getApiErrorMessage(error, 'Không thể tải PDF luật khu trọ.'), type: 'error' });
@@ -72,7 +76,7 @@ export default function RoomingHouseRuleEditor({
 
   async function saveRule() {
     const isEmpty = sourceType === 'PdfUpload'
-      ? !pdfObjectKey
+      ? !pdfMediaAssetId
       : !form.generalRules && !form.quietHours && !form.securityPolicy && !form.cleaningPolicy && !form.guestPolicy && !form.parkingPolicy && !form.utilityPolicy && !form.damageCompensationPolicy && !form.additionalNotes;
 
     if (isEmpty) {
@@ -85,9 +89,10 @@ export default function RoomingHouseRuleEditor({
     try {
       const payload: UpsertRoomingHouseRuleRequest =
         sourceType === 'PdfUpload'
-          ? { sourceType, pdfObjectKey }
+          ? { sourceType, pdfMediaAssetId }
           : { ...form, sourceType: 'FormGenerated' };
       const saved = await upsertRoomingHouseRule(roomingHouseId, payload);
+      setUploadedPdf(null);
       onSaved?.(saved);
       setToast({ message: 'Đã lưu luật khu trọ.', type: 'success' });
     } catch (error) {
@@ -118,8 +123,12 @@ export default function RoomingHouseRuleEditor({
   const canChooseSource = !lockedSourceType;
 
   const isEmpty = sourceType === 'PdfUpload'
-    ? !pdfObjectKey
+    ? !pdfMediaAssetId
     : !form.generalRules && !form.quietHours && !form.securityPolicy && !form.cleaningPolicy && !form.guestPolicy && !form.parkingPolicy && !form.utilityPolicy && !form.damageCompensationPolicy && !form.additionalNotes;
+  const pdfLink = pdfMediaAssetId
+    ? buildPublicMediaViewUrl(pdfMediaAssetId)
+    : toAssetUrl(uploadedPdf?.url || houseRule?.pdfUrl || '');
+  const hasPdf = Boolean(pdfMediaAssetId || pdfLink);
 
   return (
     <div className="rooming-house-rule-editor">
@@ -193,7 +202,7 @@ export default function RoomingHouseRuleEditor({
 
       {sourceType === 'PdfUpload' ? (
         <div className="rooming-house-rule-pdf-section">
-          {pdfObjectKey ? (
+          {hasPdf ? (
             <>
               <p className="pdf-status-text">Đã tải lên PDF luật khu trọ.</p>
               <div className="pdf-upload-dropzone">
@@ -210,7 +219,7 @@ export default function RoomingHouseRuleEditor({
                 <div className="pdf-upload-dropzone__middle">
                   <h5>Luật_khu_trọ.pdf</h5>
                   <p>
-                    <a href={toAssetUrl(pdfObjectKey)} target="_blank" rel="noreferrer" className="pdf-view-link">
+                    <a href={pdfLink} target="_blank" rel="noreferrer" className="pdf-view-link">
                       <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ marginRight: '4px', verticalAlign: 'middle' }}>
                         <path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6" />
                         <polyline points="15 3 21 3 21 9" />

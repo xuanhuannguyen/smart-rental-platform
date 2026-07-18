@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import type { ReactNode } from 'react';
 import { getApiErrorMessage } from '../../../shared/api/apiError';
-import { toAssetUrl } from '../../../shared/api/assets';
+import { PrivateMediaImage } from '../../../shared/components/media/PrivateMediaImage';
 import { formatStatus } from '../../../shared/utils/status';
 import { uploadImage } from '../../files/api';
 import {
@@ -34,11 +34,6 @@ import { cleanImages, toImageRequests } from '../utils/imageRequests';
 import './RoomingHouseEditor.css';
 
 type RoomingHouseTab = 'basic' | 'images' | 'amenities' | 'legal' | 'rental-policy';
-type LegalImageFieldName =
-  | 'frontImageObjectKey'
-  | 'backImageObjectKey'
-  | 'extraImageObjectKey';
-
 type RoomingHouseEditorProps = {
   title: string;
   subtitle: string;
@@ -63,9 +58,9 @@ const emptyHouseForm: RoomingHouseBasicInfoRequest = {
 
 const emptyLegalForm: UpdateLegalDocumentRequest = {
   documentType: '',
-  frontImageObjectKey: '',
-  backImageObjectKey: '',
-  extraImageObjectKey: '',
+  frontMediaAssetId: null,
+  backMediaAssetId: null,
+  extraMediaAssetId: null,
   documentNumber: '',
 };
 
@@ -96,9 +91,9 @@ function buildLegalForm(detail: RoomingHouseDetail | null): UpdateLegalDocumentR
   if (!detail) return emptyLegalForm;
   return {
     documentType: detail.legalDocument?.documentType ?? '',
-    frontImageObjectKey: detail.legalDocument?.frontImageObjectKey ?? '',
-    backImageObjectKey: detail.legalDocument?.backImageObjectKey ?? '',
-    extraImageObjectKey: detail.legalDocument?.extraImageObjectKey ?? '',
+    frontMediaAssetId: detail.legalDocument?.frontMediaAssetId ?? null,
+    backMediaAssetId: detail.legalDocument?.backMediaAssetId ?? null,
+    extraMediaAssetId: detail.legalDocument?.extraMediaAssetId ?? null,
     documentNumber: detail.legalDocument?.documentNumberMasked ?? '',
   };
 }
@@ -362,7 +357,7 @@ export default function RoomingHouseEditor({
     setBasicForm({ ...basicForm, provinceCode, wardCode: '' });
   }
 
-  async function uploadLegalImage(fieldName: LegalImageFieldName, file: File | null) {
+  async function uploadLegalImage(fieldName: 'front' | 'back' | 'extra', file: File | null) {
     if (!file || !canEditLegalDocument) return;
 
     setSaving(true);
@@ -370,7 +365,10 @@ export default function RoomingHouseEditor({
 
     try {
       const uploaded = await uploadImage(file, 'LegalDocument');
-      setLegalForm((current) => ({ ...current, [fieldName]: uploaded.objectKey }));
+      setLegalForm((current) => ({
+        ...current,
+        [`${fieldName}MediaAssetId`]: uploaded.mediaAssetId || null,
+      }));
     } catch (error) {
       setToast({
         message: getApiErrorMessage(error, 'Không thể tải ảnh giấy tờ lên.'),
@@ -381,9 +379,12 @@ export default function RoomingHouseEditor({
     }
   }
 
-  function removeLegalImage(fieldName: LegalImageFieldName) {
+  function removeLegalImage(fieldName: 'front' | 'back' | 'extra') {
     if (!canEditLegalDocument) return;
-    setLegalForm((current) => ({ ...current, [fieldName]: '' }));
+    setLegalForm((current) => ({
+      ...current,
+      [`${fieldName}MediaAssetId`]: null,
+    }));
   }
 
   return (
@@ -659,25 +660,25 @@ export default function RoomingHouseEditor({
               <div className="legal-images-grid">
                 <LegalImageField
                   label="Ảnh mặt trước"
-                  objectKey={legalForm.frontImageObjectKey}
+                  imageUrl={roomingHouse?.legalDocument?.frontImageUrl ?? ''}
                   readOnly={!canEditLegalDocument}
-                  onUpload={(file) => void uploadLegalImage('frontImageObjectKey', file)}
-                  onRemove={() => removeLegalImage('frontImageObjectKey')}
+                  onUpload={(file) => void uploadLegalImage('front', file)}
+                  onRemove={() => removeLegalImage('front')}
                 />
                 <LegalImageField
                   label="Ảnh mặt sau"
-                  objectKey={legalForm.backImageObjectKey}
+                  imageUrl={roomingHouse?.legalDocument?.backImageUrl ?? ''}
                   readOnly={!canEditLegalDocument}
-                  onUpload={(file) => void uploadLegalImage('backImageObjectKey', file)}
-                  onRemove={() => removeLegalImage('backImageObjectKey')}
+                  onUpload={(file) => void uploadLegalImage('back', file)}
+                  onRemove={() => removeLegalImage('back')}
                 />
                 <LegalImageField
                   label="Ảnh bổ sung"
-                  objectKey={legalForm.extraImageObjectKey ?? ''}
+                  imageUrl={roomingHouse?.legalDocument?.extraImageUrl ?? ''}
                   readOnly={!canEditLegalDocument}
                   optional
-                  onUpload={(file) => void uploadLegalImage('extraImageObjectKey', file)}
-                  onRemove={() => removeLegalImage('extraImageObjectKey')}
+                  onUpload={(file) => void uploadLegalImage('extra', file)}
+                  onRemove={() => removeLegalImage('extra')}
                 />
               </div>
             </div>
@@ -875,21 +876,22 @@ function NumberField({
 
 function LegalImageField({
   label,
-  objectKey,
-  readOnly,
+  imageUrl,
+  readOnly = false,
   optional = false,
   onUpload,
   onRemove,
 }: {
   label: string;
-  objectKey: string;
-  readOnly: boolean;
+  imageUrl?: string;
+  readOnly?: boolean;
   optional?: boolean;
   onUpload: (file: File | null) => void;
   onRemove: () => void;
 }) {
   const fileInputRef = useRef<HTMLInputElement | null>(null);
   const [isDragOver, setIsDragOver] = useState(false);
+  const previewSrc = imageUrl || '';
 
   function handleDrop(e: React.DragEvent<HTMLDivElement>) {
     e.preventDefault();
@@ -907,10 +909,10 @@ function LegalImageField({
         {optional && <span className="legal-image-field__optional">Tuỳ chọn</span>}
       </div>
 
-      {objectKey ? (
+      {previewSrc ? (
         /* Preview state */
         <div className="legal-image-preview">
-          <img alt={label} src={toAssetUrl(objectKey)} className="legal-image-preview__img" />
+          <PrivateMediaImage alt={label} source={previewSrc} className="legal-image-preview__img" />
           {!readOnly && (
             <div className="legal-image-preview__overlay">
               <label className="legal-image-action-btn legal-image-action-btn--replace">

@@ -23,6 +23,7 @@ import {
 } from '../appendixFiles';
 import { findAccessibleContractFile } from '../contractFiles';
 import { AppendixFileActions } from '../components/AppendixFileActions';
+import { openContractFileForView } from '../fileAccess';
 import { getApiErrorMessage } from '../../../shared/api/apiError';
 import { ROUTE_PATHS } from '../../../app/router/routePaths';
 import { formatDateVi as formatDate, formatMoneyString as formatCurrency } from '../../../shared/utils/format';
@@ -212,20 +213,20 @@ export default function LandlordContractDetailPage() {
 
     try {
       const file = await resolveRawContractFile(contract.id);
-      const blob = await contractApi.downloadContractFile(contract.id, file.id);
-
-      const url = window.URL.createObjectURL(blob);
       if (mode === 'view') {
-        window.open(url, '_blank', 'noopener,noreferrer');
-      } else {
-        const link = document.createElement('a');
-        link.href = url;
-        link.download = `${contract.contractNumber}-${file.purpose.toLowerCase()}.pdf`;
-        document.body.appendChild(link);
-        link.click();
-        document.body.removeChild(link);
+        await openContractFileForView(contract.id, file);
+        return;
       }
-      setTimeout(() => window.URL.revokeObjectURL(url), 60000);
+
+      const blob = await contractApi.downloadContractFile(contract.id, file.id);
+      const url = window.URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      link.href = url;
+      link.download = `${contract.contractNumber}-${file.purpose.toLowerCase()}.pdf`;
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      setTimeout(() => window.URL.revokeObjectURL(url), 1000);
     } catch (err) {
       setContractActionError(getApiErrorMessage(err, 'Không thể tải file hợp đồng.'));
     } finally {

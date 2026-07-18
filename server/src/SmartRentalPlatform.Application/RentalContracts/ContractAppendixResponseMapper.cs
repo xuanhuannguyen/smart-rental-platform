@@ -1,3 +1,4 @@
+using SmartRentalPlatform.Application.Common.Media;
 using SmartRentalPlatform.Contracts.RentalContracts.Responses;
 using SmartRentalPlatform.Domain.Entities.RentalContracts;
 
@@ -70,8 +71,11 @@ internal static class ContractAppendixResponseMapper
             Id = file.Id,
             RentalContractId = file.RentalContractId,
             RentalContractAppendixId = file.RentalContractAppendixId,
-            StorageObjectKey = file.StorageObjectKey,
-            FileUrl = file.FileUrl,
+            MediaAssetId = file.MediaAssetId,
+            Purpose = file.Purpose.ToString(),
+            ViewUrl = file.MediaAssetId.HasValue
+                ? PrivateMediaPathBuilder.Build(file.MediaAssetId.Value)
+                : null,
             CreatedAt = file.CreatedAt
         };
     }

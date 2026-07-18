@@ -3,9 +3,13 @@ using System.Security.Cryptography;
 using System.Text.Json;
 using SmartRentalPlatform.Application.Common.Exceptions;
 using SmartRentalPlatform.Application.Common.Interfaces;
+using SmartRentalPlatform.Application.Common.Interfaces.Media;
+using SmartRentalPlatform.Application.Common.Media;
+using SmartRentalPlatform.Application.Common.Models.Media;
 using SmartRentalPlatform.Contracts.Common;
 using SmartRentalPlatform.Contracts.RentalContracts.Responses;
 using SmartRentalPlatform.Domain.Entities.RentalContracts;
+using SmartRentalPlatform.Domain.Enums.Media;
 using SmartRentalPlatform.Domain.Enums.RentalContracts;
 
 namespace SmartRentalPlatform.Application.RentalContracts;
@@ -13,24 +17,34 @@ namespace SmartRentalPlatform.Application.RentalContracts;
 public class ContractFileService : IContractFileService
 {
     private const string PdfContentType = "application/pdf";
+    private static readonly TimeSpan ContractFileViewUrlTtl = TimeSpan.FromMinutes(5);
 
     private readonly IAppDbContext context;
     private readonly IContractPdfRenderer contractPdfRenderer;
+    private readonly IMediaObjectKeyFactory mediaObjectKeyFactory;
+    private readonly IMediaStorageService mediaStorageService;
+    private readonly IMediaAssetService mediaAssetService;
+    private readonly IMediaAccessService mediaAccessService;
     private readonly IContractDocumentModelFactory contractDocumentModelFactory;
-    private readonly IPrivateStorageService privateStorageService;
     private readonly ISensitiveDataProtector sensitiveDataProtector;
 
     public ContractFileService(
         IAppDbContext context,
         IContractPdfRenderer contractPdfRenderer,
+        IMediaObjectKeyFactory mediaObjectKeyFactory,
+        IMediaStorageService mediaStorageService,
+        IMediaAssetService mediaAssetService,
+        IMediaAccessService mediaAccessService,
         IContractDocumentModelFactory contractDocumentModelFactory,
-        IPrivateStorageService privateStorageService,
         ISensitiveDataProtector sensitiveDataProtector)
     {
         this.context = context;
         this.contractPdfRenderer = contractPdfRenderer;
+        this.mediaObjectKeyFactory = mediaObjectKeyFactory;
+        this.mediaStorageService = mediaStorageService;
+        this.mediaAssetService = mediaAssetService;
+        this.mediaAccessService = mediaAccessService;
         this.contractDocumentModelFactory = contractDocumentModelFactory;
-        this.privateStorageService = privateStorageService;
         this.sensitiveDataProtector = sensitiveDataProtector;
     }
 
@@ -49,14 +63,23 @@ public class ContractFileService : IContractFileService
 
         EnsureCanAccess(userId, contract);
 
+        await using var transaction = await context.BeginTransactionAsync(cancellationToken);
+
         var now = DateTimeOffset.UtcNow;
         var (file, _) = await EnsureContractFilePurposeAsync(
+            contract,
+            ContractFilePurpose.SignedLegalDocument,
+            now,
+            cancellationToken);
+
+        await EnsureContractFilePurposeAsync(
             contract,
             ContractFilePurpose.MaskedReference,
             now,
             cancellationToken);
 
         await context.SaveChangesAsync(cancellationToken);
+        await transaction.CommitAsync(cancellationToken);
 
         return MapToResponse(file);
     }
@@ -227,38 +250,28 @@ public class ContractFileService : IContractFileService
         }
 
         var now = DateTimeOffset.UtcNow;
-        var objectKey = $"contracts/{envelope.RentalContractId:N}/provider-signed-{envelope.Id:N}-{now:yyyyMMddHHmmss}.pdf";
+        var originalFileName = $"provider-signed-{envelope.Id:N}.pdf";
 
         await using var bufferedStream = new MemoryStream();
         await pdfStream.CopyToAsync(bufferedStream, cancellationToken);
         var pdfBytes = bufferedStream.ToArray();
-        var sha256Hash = Convert.ToHexString(SHA256.HashData(pdfBytes)).ToLowerInvariant();
-        bufferedStream.Position = 0;
-
-        var storageObjectKey = await privateStorageService.UploadAsync(
-            bufferedStream,
-            PdfContentType,
-            objectKey,
+        var contractFile = await CreateContractFileAsync(
+            envelope.RentalContractId!.Value,
+            envelope.RentalContractAppendixId,
+            originalFileName,
+            pdfBytes,
+            ContractFilePurpose.SignedLegalDocument,
+            envelope.RentalContractAppendixId.HasValue
+                ? MediaScope.ContractAppendixPdf
+                : MediaScope.ContractPdf,
+            ownerUserId: null,
+            now,
+            envelope.Id,
+            isLegallySigned: true,
             cancellationToken);
-
-        var contractFile = new ContractFile
-        {
-            Id = Guid.NewGuid(),
-            RentalContractId = envelope.RentalContractId!.Value,
-            RentalContractAppendixId = envelope.RentalContractAppendixId,
-            StorageObjectKey = storageObjectKey,
-            Purpose = ContractFilePurpose.SignedLegalDocument,
-            ContentType = PdfContentType,
-            Sha256Hash = sha256Hash,
-            IsLegallySigned = true,
-            ContractSigningEnvelopeId = envelope.Id,
-            FileUrl = null,
-            CreatedAt = now
-        };
-
-        context.ContractFiles.Add(contractFile);
-        envelope.SignedFileObjectKey = storageObjectKey;
-        envelope.SignedFileSha256Hash = sha256Hash;
+        
+        envelope.SignedFileMediaAssetId = contractFile.MediaAssetId;
+        envelope.SignedFileSha256Hash = contractFile.Sha256Hash;
         await context.SaveChangesAsync(cancellationToken);
 
         return contractFile;
@@ -278,26 +291,27 @@ public class ContractFileService : IContractFileService
         }
 
         var now = DateTimeOffset.UtcNow;
-        var objectKey = $"contracts/{envelope.RentalContractId:N}/provider-evidence-{envelope.Id:N}-{now:yyyyMMddHHmmss}.pdf";
+        var originalFileName = $"provider-evidence-{envelope.Id:N}.pdf";
 
-        var storageObjectKey = await privateStorageService.UploadAsync(
-            evidenceStream,
-            PdfContentType,
-            objectKey,
+        await using var bufferedStream = new MemoryStream();
+        await evidenceStream.CopyToAsync(bufferedStream, cancellationToken);
+        var pdfBytes = bufferedStream.ToArray();
+        var contractFile = await CreateContractFileAsync(
+            envelope.RentalContractId!.Value,
+            envelope.RentalContractAppendixId,
+            originalFileName,
+            pdfBytes,
+            ContractFilePurpose.ProviderEvidence,
+            envelope.RentalContractAppendixId.HasValue
+                ? MediaScope.ContractAppendixPdf
+                : MediaScope.ContractPdf,
+            ownerUserId: null,
+            now,
+            envelope.Id,
+            isLegallySigned: false,
             cancellationToken);
 
-        var contractFile = new ContractFile
-        {
-            Id = Guid.NewGuid(),
-            RentalContractId = envelope.RentalContractId!.Value,
-            RentalContractAppendixId = envelope.RentalContractAppendixId,
-            StorageObjectKey = storageObjectKey,
-            Purpose = ContractFilePurpose.ProviderEvidence,
-            FileUrl = null,
-            CreatedAt = now
-        };
-
-        context.ContractFiles.Add(contractFile);
+        envelope.EvidenceFileMediaAssetId = contractFile.MediaAssetId;
         await context.SaveChangesAsync(cancellationToken);
 
         return contractFile;
@@ -373,8 +387,68 @@ public class ContractFileService : IContractFileService
 
         EnsureCanViewFile(userId, contract, file);
 
-        var stream = await privateStorageService.OpenReadAsync(file.StorageObjectKey, cancellationToken);
-        return (stream, GuessContentType(file.StorageObjectKey), Path.GetFileName(file.StorageObjectKey));
+        if (file.MediaAssetId.HasValue)
+        {
+            var mediaAccess = await mediaAccessService.OpenReadAsync(file.MediaAssetId.Value, userId, cancellationToken);
+            return (mediaAccess.Stream, mediaAccess.ContentType, mediaAccess.DownloadFileName);
+        }
+
+        throw new InvalidOperationException("Contract file must be linked to a media asset.");
+    }
+
+    public async Task<ContractFileViewUrlResponse?> GetFileViewUrlAsync(
+        Guid userId,
+        Guid contractId,
+        Guid fileId,
+        CancellationToken cancellationToken = default)
+    {
+        var contract = await context.RentalContracts
+            .AsNoTracking()
+            .Include(x => x.Room)
+                .ThenInclude(x => x.RoomingHouse)
+            .Include(x => x.Occupants)
+            .Include(x => x.Appendices)
+                .ThenInclude(x => x.Changes)
+            .Include(x => x.Appendices)
+                .ThenInclude(x => x.Signatures)
+            .Include(x => x.Files)
+            .FirstOrDefaultAsync(x => x.Id == contractId && x.DeletedAt == null, cancellationToken);
+
+        if (contract is null)
+        {
+            return null;
+        }
+
+        EnsureCanAccess(userId, contract);
+
+        var file = contract.Files.FirstOrDefault(x => x.Id == fileId);
+        if (file is null)
+        {
+            return null;
+        }
+
+        EnsureCanViewFile(userId, contract, file);
+
+        if (!file.MediaAssetId.HasValue)
+        {
+            throw new InvalidOperationException("Contract file must be linked to a media asset.");
+        }
+
+        try
+        {
+            var url = await mediaAccessService.GetDownloadUrlAsync(
+                file.MediaAssetId.Value,
+                ContractFileViewUrlTtl,
+                userId,
+                cancellationToken,
+                BuildAuditContext(contract.Id, file.Id, "GenerateViewUrl"));
+
+            return new ContractFileViewUrlResponse(url, "signed-url");
+        }
+        catch (NotSupportedException)
+        {
+            return new ContractFileViewUrlResponse(BuildBackendDownloadRoute(contract.Id, file.Id), "backend-route");
+        }
     }
 
     private IQueryable<RentalContract> BaseContractQuery()
@@ -445,7 +519,7 @@ public class ContractFileService : IContractFileService
 
     private async Task<(ContractFile File, IReadOnlyDictionary<string, SignatureZone> Zones)> EnsureContractFilePurposeAsync(
         RentalContract contract,
-        ContractFilePurpose Purpose,
+        ContractFilePurpose purpose,
         DateTimeOffset now,
         CancellationToken cancellationToken,
         bool reuseExisting = true,
@@ -454,8 +528,8 @@ public class ContractFileService : IContractFileService
         var existingFile = reuseExisting
             ? contract.Files
                 .Where(x => x.RentalContractAppendixId == null &&
-                            x.Purpose == Purpose &&
-                            x.StorageObjectKey.EndsWith(".pdf", StringComparison.OrdinalIgnoreCase))
+                            x.Purpose == purpose &&
+                            x.MediaAssetId.HasValue)
                 .OrderByDescending(x => x.CreatedAt)
                 .FirstOrDefault()
             : null;
@@ -466,8 +540,8 @@ public class ContractFileService : IContractFileService
             return (existingFile, new Dictionary<string, SignatureZone>());
         }
 
-        var renderOptions = await BuildSignedFileRenderOptionsAsync(contract, Purpose, cancellationToken);
-        var buildMode = Purpose == ContractFilePurpose.UnsignedForESign
+        var renderOptions = await BuildSignedFileRenderOptionsAsync(contract, purpose, cancellationToken);
+        var buildMode = purpose == ContractFilePurpose.UnsignedForESign
             ? ContractDocumentBuildMode.FreezeNewSnapshot
             : ContractDocumentBuildMode.ExistingSnapshotOrLive;
         var document = await contractDocumentModelFactory.BuildAsync(
@@ -480,7 +554,7 @@ public class ContractFileService : IContractFileService
         // generating a file for the signing workflow; otherwise use the plain renderer.
         byte[] pdfBytes;
         IReadOnlyDictionary<string, SignatureZone> signatureZones;
-        if (Purpose == ContractFilePurpose.UnsignedForESign)
+        if (purpose == ContractFilePurpose.UnsignedForESign)
         {
             var result = contractPdfRenderer.RenderRentalContractForESign(document, renderOptions);
             pdfBytes       = result.PdfBytes;
@@ -491,38 +565,26 @@ public class ContractFileService : IContractFileService
             pdfBytes       = contractPdfRenderer.RenderSignedRentalContract(document, renderOptions);
             signatureZones = new Dictionary<string, SignatureZone>();
         }
-
-        var sha256Hash = Convert.ToHexString(SHA256.HashData(pdfBytes)).ToLowerInvariant();
-        var objectKey = BuildObjectKey(contract, Purpose, now);
-
-        await using var stream = new MemoryStream(pdfBytes);
-        var storageObjectKey = await privateStorageService.UploadAsync(
-            stream,
-            PdfContentType,
-            objectKey,
+        
+        var contractFile = await CreateContractFileAsync(
+            contract.Id,
+            rentalContractAppendixId: null,
+            BuildContractFileName(contract, purpose, now),
+            pdfBytes,
+            purpose,
+            MediaScope.ContractPdf,
+            contract.Room.RoomingHouse.LandlordUserId,
+            now,
+            signingEnvelope?.Id,
+            isLegallySigned: false,
             cancellationToken);
 
-        var contractFile = new ContractFile
-        {
-            Id = Guid.NewGuid(),
-            RentalContractId = contract.Id,
-            StorageObjectKey = storageObjectKey,
-            Purpose = Purpose,
-            ContentType = PdfContentType,
-            Sha256Hash = sha256Hash,
-            IsLegallySigned = false,
-            ContractSigningEnvelopeId = signingEnvelope?.Id,
-            FileUrl = null,
-            CreatedAt = now
-        };
-
-        context.ContractFiles.Add(contractFile);
         contract.Files.Add(contractFile);
 
         if (signingEnvelope is not null)
         {
-            signingEnvelope.UnsignedFileObjectKey = storageObjectKey;
-            signingEnvelope.UnsignedFileSha256Hash = sha256Hash;
+            signingEnvelope.UnsignedFileMediaAssetId = contractFile.MediaAssetId;
+            signingEnvelope.UnsignedFileSha256Hash = contractFile.Sha256Hash;
         }
 
         return (contractFile, signatureZones);
@@ -562,7 +624,7 @@ public class ContractFileService : IContractFileService
             ? appendix.Files
                 .Where(x => x.RentalContractAppendixId == appendix.Id &&
                             x.Purpose == purpose &&
-                            x.StorageObjectKey.EndsWith(".pdf", StringComparison.OrdinalIgnoreCase))
+                            x.MediaAssetId.HasValue)
                 .OrderByDescending(x => x.CreatedAt)
                 .FirstOrDefault()
             : null;
@@ -588,38 +650,25 @@ public class ContractFileService : IContractFileService
             signatureZones = new Dictionary<string, SignatureZone>();
         }
 
-        var sha256Hash = Convert.ToHexString(SHA256.HashData(pdfBytes)).ToLowerInvariant();
-        var objectKey = BuildAppendixObjectKey(appendix, purpose, now);
-
-        await using var stream = new MemoryStream(pdfBytes);
-        var storageObjectKey = await privateStorageService.UploadAsync(
-            stream,
-            PdfContentType,
-            objectKey,
+        var contractFile = await CreateContractFileAsync(
+            appendix.RentalContractId,
+            appendix.Id,
+            BuildAppendixFileName(appendix, purpose, now),
+            pdfBytes,
+            purpose,
+            MediaScope.ContractAppendixPdf,
+            appendix.CreatedByUserId,
+            now,
+            signingEnvelope?.Id,
+            isLegallySigned: false,
             cancellationToken);
 
-        var contractFile = new ContractFile
-        {
-            Id = Guid.NewGuid(),
-            RentalContractId = appendix.RentalContractId,
-            RentalContractAppendixId = appendix.Id,
-            StorageObjectKey = storageObjectKey,
-            Purpose = purpose,
-            ContentType = PdfContentType,
-            Sha256Hash = sha256Hash,
-            IsLegallySigned = false,
-            ContractSigningEnvelopeId = signingEnvelope?.Id,
-            FileUrl = null,
-            CreatedAt = now
-        };
-
-        context.ContractFiles.Add(contractFile);
         appendix.Files.Add(contractFile);
 
         if (signingEnvelope is not null)
         {
-            signingEnvelope.UnsignedFileObjectKey = storageObjectKey;
-            signingEnvelope.UnsignedFileSha256Hash = sha256Hash;
+            signingEnvelope.UnsignedFileMediaAssetId = contractFile.MediaAssetId;
+            signingEnvelope.UnsignedFileSha256Hash = contractFile.Sha256Hash;
             signingEnvelope.DocumentTemplateVersion ??= "appendix-v1.0";
             signingEnvelope.DocumentPreparedAt ??= now;
         }
@@ -627,12 +676,85 @@ public class ContractFileService : IContractFileService
         return (contractFile, signatureZones);
     }
 
-    private static string BuildAppendixObjectKey(
-        ContractAppendix appendix,
+    private async Task<ContractFile> CreateContractFileAsync(
+        Guid rentalContractId,
+        Guid? rentalContractAppendixId,
+        string originalFileName,
+        byte[] pdfBytes,
         ContractFilePurpose purpose,
-        DateTimeOffset now)
+        MediaScope scope,
+        Guid? ownerUserId,
+        DateTimeOffset now,
+        Guid? signingEnvelopeId,
+        bool isLegallySigned,
+        CancellationToken cancellationToken)
     {
-        return $"contracts/{appendix.RentalContractId:N}/appendix-{appendix.Id:N}-{purpose.ToString().ToLowerInvariant()}-{now:yyyyMMddHHmmssfff}-{Guid.NewGuid():N}.pdf";
+        var contractFileId = Guid.NewGuid();
+        var sha256Hash = ComputeSha256Hex(pdfBytes);
+        var mediaObjectKey = mediaObjectKeyFactory.Create(scope, MediaVisibility.Private, originalFileName);
+        MediaStoredObjectResult? storedObject = null;
+
+        try
+        {
+            await using var stream = new MemoryStream(pdfBytes);
+            storedObject = await mediaStorageService.UploadAsync(
+                new MediaUploadRequest
+                {
+                    Content = stream,
+                    OriginalFileName = originalFileName,
+                    ContentType = PdfContentType,
+                    FileSize = pdfBytes.Length,
+                    ObjectKey = mediaObjectKey.ObjectKey,
+                    Visibility = MediaVisibility.Private
+                },
+                cancellationToken);
+
+            var mediaAsset = await mediaAssetService.CreateAsync(
+                new CreateMediaAssetRequest
+                {
+                    OwnerUserId = ownerUserId,
+                    BucketName = storedObject.BucketName,
+                    ObjectKey = storedObject.ObjectKey,
+                    OriginalFileName = originalFileName,
+                    StoredFileName = storedObject.StoredFileName,
+                    ContentType = PdfContentType,
+                    FileSize = pdfBytes.Length,
+                    FileHash = sha256Hash,
+                    Scope = scope,
+                    Visibility = MediaVisibility.Private,
+                    Status = MediaStatus.Linked,
+                    LinkedEntityType = nameof(ContractFile),
+                    LinkedEntityId = contractFileId
+                },
+                cancellationToken);
+
+            var contractFile = new ContractFile
+            {
+                Id = contractFileId,
+                RentalContractId = rentalContractId,
+                RentalContractAppendixId = rentalContractAppendixId,
+                MediaAssetId = mediaAsset.Id,
+                Purpose = purpose,
+                ContentType = PdfContentType,
+                Sha256Hash = sha256Hash,
+                IsLegallySigned = isLegallySigned,
+                ContractSigningEnvelopeId = signingEnvelopeId,
+                FileUrl = null,
+                CreatedAt = now
+            };
+
+            context.ContractFiles.Add(contractFile);
+            return contractFile;
+        }
+        catch
+        {
+            if (storedObject is not null)
+            {
+                await mediaStorageService.DeleteAsync(storedObject.ObjectKey, cancellationToken);
+            }
+
+            throw;
+        }
     }
 
     private async Task<IReadOnlyDictionary<Guid, string?>> GetDecryptedUserDocumentNumbersAsync(
@@ -890,12 +1012,25 @@ public class ContractFileService : IContractFileService
             new { contract.Id });
     }
 
-    private static string BuildObjectKey(
+    private static string BuildContractFileName(
         RentalContract contract,
-        ContractFilePurpose Purpose,
+        ContractFilePurpose purpose,
         DateTimeOffset now)
     {
-        return $"contracts/{contract.Id:N}/signed-contract-{Purpose.ToString().ToLowerInvariant()}-{now:yyyyMMddHHmmssfff}-{Guid.NewGuid():N}.pdf";
+        return $"contract-{contract.Id:N}-{purpose.ToString().ToLowerInvariant()}-{now:yyyyMMddHHmmss}.pdf";
+    }
+
+    private static string BuildAppendixFileName(
+        ContractAppendix appendix,
+        ContractFilePurpose purpose,
+        DateTimeOffset now)
+    {
+        return $"appendix-{appendix.AppendixNumber}-{purpose.ToString().ToLowerInvariant()}-{now:yyyyMMddHHmmss}.pdf";
+    }
+
+    private static string ComputeSha256Hex(byte[] content)
+    {
+        return Convert.ToHexString(SHA256.HashData(content)).ToLowerInvariant();
     }
 
     private static ContractFileResponse MapToResponse(ContractFile file)
@@ -905,22 +1040,32 @@ public class ContractFileService : IContractFileService
             Id = file.Id,
             RentalContractId = file.RentalContractId,
             RentalContractAppendixId = file.RentalContractAppendixId,
-            StorageObjectKey = file.StorageObjectKey,
+            MediaAssetId = file.MediaAssetId,
             Purpose = file.Purpose.ToString(),
-            FileUrl = file.FileUrl,
+            ViewUrl = file.MediaAssetId.HasValue
+                ? PrivateMediaPathBuilder.Build(file.MediaAssetId.Value)
+                : null,
             CreatedAt = file.CreatedAt
         };
     }
 
-    private static string GuessContentType(string objectKey)
+    private static string BuildBackendDownloadRoute(Guid contractId, Guid fileId)
     {
-        return Path.GetExtension(objectKey).ToLowerInvariant() switch
+        return $"/api/contracts/{contractId:D}/files/{fileId:D}/download";
+    }
+
+    private static MediaAuditContext BuildAuditContext(Guid contractId, Guid fileId, string action)
+    {
+        return new MediaAuditContext
         {
-            ".pdf" => PdfContentType,
-            ".html" => "text/html",
-            ".txt" => "text/plain",
-            _ => "application/octet-stream"
+            Action = action,
+            MetadataJson = JsonSerializer.Serialize(new
+            {
+                contractId,
+                fileId,
+                source = nameof(ContractFileService)
+            })
         };
     }
-}
 
+}

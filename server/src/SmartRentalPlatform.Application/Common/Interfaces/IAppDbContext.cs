@@ -1,6 +1,7 @@
 using Microsoft.EntityFrameworkCore;
 using SmartRentalPlatform.Domain.Entities.AdminApproval;
 using SmartRentalPlatform.Domain.Entities.Administrative;
+using SmartRentalPlatform.Domain.Entities.Media;
 using SmartRentalPlatform.Domain.Entities.Notifications;
 using SmartRentalPlatform.Domain.Entities.RentalContracts;
 using SmartRentalPlatform.Domain.Entities.Properties;
@@ -61,6 +62,10 @@ public interface IAppDbContext {
     DbSet<RoomingHouseRule> RoomingHouseRules { get; }
 
     DbSet<ApprovalAuditLog> ApprovalAuditLogs { get; }
+
+    DbSet<MediaAsset> MediaAssets { get; }
+
+    DbSet<MediaAuditLog> MediaAuditLogs { get; }
     
     DbSet<RentalRequest> RentalRequests { get; }
 

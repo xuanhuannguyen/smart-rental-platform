@@ -4,8 +4,10 @@ using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging;
 using SmartRentalPlatform.Application.Common.Exceptions;
 using SmartRentalPlatform.Application.Common.Interfaces;
+using SmartRentalPlatform.Application.Common.Interfaces.Media;
 using SmartRentalPlatform.Contracts.Common;
 using SmartRentalPlatform.Contracts.RentalContracts.Requests;
+using SmartRentalPlatform.Domain.Entities.Media;
 using SmartRentalPlatform.Domain.Entities.RentalContracts;
 using SmartRentalPlatform.Domain.Entities.Users;
 using SmartRentalPlatform.Domain.Enums.Kyc;
@@ -21,18 +23,18 @@ public sealed class ContractPreviewAttachmentService : IContractPreviewAttachmen
     private static readonly JsonSerializerOptions JsonOptions = new(JsonSerializerDefaults.Web);
 
     private readonly IAppDbContext context;
-    private readonly IPrivateStorageService privateStorageService;
+    private readonly IMediaStorageService mediaStorageService;
     private readonly ISensitiveDataProtector sensitiveDataProtector;
     private readonly ILogger<ContractPreviewAttachmentService> logger;
 
     public ContractPreviewAttachmentService(
         IAppDbContext context,
-        IPrivateStorageService privateStorageService,
+        IMediaStorageService mediaStorageService,
         ISensitiveDataProtector sensitiveDataProtector,
         ILogger<ContractPreviewAttachmentService> logger)
     {
         this.context = context;
-        this.privateStorageService = privateStorageService;
+        this.mediaStorageService = mediaStorageService;
         this.sensitiveDataProtector = sensitiveDataProtector;
         this.logger = logger;
     }
@@ -197,9 +199,9 @@ public sealed class ContractPreviewAttachmentService : IContractPreviewAttachmen
                 document.DocumentType,
                 DecryptDocumentNumber(document.DocumentNumberEncrypted) ?? document.DocumentNumberMasked,
                 await LoadDocumentImagesAsync(
-                    document.FrontImageObjectKey,
-                    document.BackImageObjectKey,
-                    document.ExtraImageObjectKey,
+                    document.FrontMediaAssetId,
+                    document.BackMediaAssetId,
+                    document.ExtraMediaAssetId,
                     "Ảnh bổ sung",
                     budget,
                     cancellationToken)));
@@ -223,9 +225,9 @@ public sealed class ContractPreviewAttachmentService : IContractPreviewAttachmen
             request.Document.DocumentType,
             request.Document.DocumentNumber,
             await LoadDocumentImagesAsync(
-                request.Document.FrontImageObjectKey,
-                request.Document.BackImageObjectKey,
-                request.Document.ExtraImageObjectKey,
+                request.Document.FrontMediaAssetId,
+                request.Document.BackMediaAssetId,
+                request.Document.ExtraMediaAssetId,
                 "Ảnh bổ sung",
                 budget,
                 cancellationToken)));
@@ -262,8 +264,8 @@ public sealed class ContractPreviewAttachmentService : IContractPreviewAttachmen
             kyc.DocumentType.ToString(),
             DecryptDocumentNumber(kyc.DocumentNumberEncrypted) ?? kyc.OcrCitizenIdMasked,
             await LoadDocumentImagesAsync(
-                kyc.FrontImageObjectKey,
-                kyc.BackImageObjectKey,
+                kyc.FrontMediaAssetId,
+                kyc.BackMediaAssetId,
                 null,
                 "Ảnh bổ sung",
                 budget,
@@ -271,29 +273,29 @@ public sealed class ContractPreviewAttachmentService : IContractPreviewAttachmen
     }
 
     private async Task<IReadOnlyList<ContractReviewImage>> LoadDocumentImagesAsync(
-        string? frontObjectKey,
-        string? backObjectKey,
-        string? extraObjectKey,
+        Guid? frontMediaAssetId,
+        Guid? backMediaAssetId,
+        Guid? extraMediaAssetId,
         string extraLabel,
         LoadBudget budget,
         CancellationToken cancellationToken)
     {
         return new[]
         {
-            await LoadImageAsync("Mặt trước", frontObjectKey, "Chưa cung cấp mặt trước.", budget, cancellationToken),
-            await LoadImageAsync("Mặt sau", backObjectKey, "Chưa cung cấp mặt sau.", budget, cancellationToken),
-            await LoadImageAsync(extraLabel, extraObjectKey, "Không có ảnh bổ sung.", budget, cancellationToken)
+            await LoadImageAsync("Mặt trước", frontMediaAssetId, "Chưa cung cấp mặt trước.", budget, cancellationToken),
+            await LoadImageAsync("Mặt sau", backMediaAssetId, "Chưa cung cấp mặt sau.", budget, cancellationToken),
+            await LoadImageAsync(extraLabel, extraMediaAssetId, "Không có ảnh bổ sung.", budget, cancellationToken)
         };
     }
 
     private async Task<ContractReviewImage> LoadImageAsync(
         string label,
-        string? objectKey,
+        Guid? mediaAssetId,
         string missingMessage,
         LoadBudget budget,
         CancellationToken cancellationToken)
     {
-        if (string.IsNullOrWhiteSpace(objectKey))
+        if (!mediaAssetId.HasValue)
         {
             return new ContractReviewImage(label, null, missingMessage);
         }
@@ -303,9 +305,20 @@ public sealed class ContractPreviewAttachmentService : IContractPreviewAttachmen
             return new ContractReviewImage(label, null, "Đã vượt giới hạn ảnh của bản xem trước.");
         }
 
+        var mediaAsset = await LoadMediaAssetAsync(mediaAssetId.Value, cancellationToken);
+        if (mediaAsset is null)
+        {
+            return new ContractReviewImage(label, null, missingMessage);
+        }
+
+        if (mediaAsset.Status is Domain.Enums.Media.MediaStatus.PendingUpload or Domain.Enums.Media.MediaStatus.Deleted)
+        {
+            return new ContractReviewImage(label, null, "Ảnh chưa sẵn sàng để xem trước.");
+        }
+
         try
         {
-            await using var source = await privateStorageService.OpenReadAsync(objectKey, cancellationToken);
+            await using var source = await mediaStorageService.OpenReadAsync(mediaAsset.ObjectKey, cancellationToken);
             await using var destination = new MemoryStream();
             var buffer = new byte[81920];
             var imageBytes = 0;
@@ -345,6 +358,17 @@ public sealed class ContractPreviewAttachmentService : IContractPreviewAttachmen
                 label);
             return new ContractReviewImage(label, null, "Không thể tải ảnh giấy tờ.");
         }
+    }
+
+    private async Task<MediaAsset?> LoadMediaAssetAsync(
+        Guid mediaAssetId,
+        CancellationToken cancellationToken)
+    {
+        return await context.MediaAssets
+            .AsNoTracking()
+            .FirstOrDefaultAsync(
+                x => x.Id == mediaAssetId && x.DeletedAt == null,
+                cancellationToken);
     }
 
     private string? DecryptDocumentNumber(string? encryptedValue)

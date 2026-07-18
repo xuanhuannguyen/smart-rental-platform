@@ -13,9 +13,9 @@ export interface ContractBriefResponse {
 export interface ContractOccupantDocumentRequest {
   documentType: string;
   documentNumber?: string | null;
-  frontImageObjectKey: string;
-  backImageObjectKey?: string | null;
-  extraImageObjectKey?: string | null;
+  frontMediaAssetId?: string | null;
+  backMediaAssetId?: string | null;
+  extraMediaAssetId?: string | null;
 }
 
 export interface ContractOccupantRequest {
@@ -53,10 +53,15 @@ export interface ContractFileResponse {
   id: string;
   rentalContractId: string;
   rentalContractAppendixId?: string | null;
-  storageObjectKey: string;
+  mediaAssetId?: string | null;
   purpose: ContractFilePurpose;
-  fileUrl?: string | null;
+  viewUrl?: string | null;
   createdAt: string;
+}
+
+export interface ContractFileViewUrlResponse {
+  url: string;
+  deliveryMode: 'signed-url' | 'backend-route' | string;
 }
 
 export interface RequestContractRevisionRequest {
@@ -86,9 +91,12 @@ export interface ContractOccupantDocumentResponse {
   contractOccupantId: string;
   documentType: string;
   documentNumberMasked?: string | null;
-  frontImageObjectKey: string;
-  backImageObjectKey?: string | null;
-  extraImageObjectKey?: string | null;
+  frontMediaAssetId?: string | null;
+  backMediaAssetId?: string | null;
+  extraMediaAssetId?: string | null;
+  frontImageUrl?: string | null;
+  backImageUrl?: string | null;
+  extraImageUrl?: string | null;
   uploadedAt: string;
 }
 

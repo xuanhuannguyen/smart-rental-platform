@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { Avatar } from '../../../shared/components/Avatar';
-import { getQuickContacts, searchChatUsers, getActiveTenantsByRoomingHouse, getEligibleMembers, getFilterRoomingHouses, uploadChatImage } from '../api';
+import { getQuickContacts, searchChatUsers, getActiveTenantsByRoomingHouse, getEligibleMembers, getFilterRoomingHouses, uploadChatAvatar } from '../api';
 import type { ChatUser, ChatFilterRoomingHouse, ChatParticipant } from '../types';
 import { getMyRoomingHouses } from '../../rooming-houses/api';
 import type { RoomingHouseSummary } from '../../rooming-houses/types';
@@ -320,7 +320,7 @@ export function UserSearchModal({
 
 interface CreateGroupModalProps {
   onClose: () => void;
-  onSubmit: (title: string, users: ChatUser[], roomingHouseId?: string | null, avatarUrl?: string | null) => Promise<void>;
+  onSubmit: (title: string, users: ChatUser[], roomingHouseId?: string | null, avatarMediaAssetId?: string | null) => Promise<void>;
 }
 
 export function CreateGroupModal({ onClose, onSubmit }: CreateGroupModalProps) {
@@ -419,11 +419,12 @@ export function CreateGroupModal({ onClose, onSubmit }: CreateGroupModalProps) {
     if (submitting) return;
     setSubmitting(true);
     try {
-      let uploadedUrl: string | null = null;
+      let avatarMediaAssetId: string | null = null;
       if (avatarFile) {
-        uploadedUrl = await uploadChatImage(avatarFile);
+        const uploaded = await uploadChatAvatar(avatarFile);
+        avatarMediaAssetId = uploaded.mediaAssetId;
       }
-      await onSubmit(title || 'Nhóm trò chuyện', selected, selectedHouseId || null, uploadedUrl);
+      await onSubmit(title || 'Nhóm trò chuyện', selected, selectedHouseId || null, avatarMediaAssetId);
     } catch (err) {
       alert('Lỗi tạo nhóm: ' + (err instanceof Error ? err.message : ''));
     } finally {

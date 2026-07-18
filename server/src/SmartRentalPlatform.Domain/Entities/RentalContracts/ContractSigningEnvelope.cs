@@ -1,3 +1,4 @@
+using SmartRentalPlatform.Domain.Entities.Media;
 using SmartRentalPlatform.Domain.Enums.RentalContracts;
 
 namespace SmartRentalPlatform.Domain.Entities.RentalContracts;
@@ -14,15 +15,15 @@ public class ContractSigningEnvelope
     public string? ProviderEnvelopeId { get; set; }
     public SigningEnvelopeStatus Status { get; set; }
     public string? Title { get; set; }
-    public string? UnsignedFileObjectKey { get; set; }
+    public Guid? UnsignedFileMediaAssetId { get; set; }
     public string? UnsignedFileSha256Hash { get; set; }
     public string? DocumentSnapshotEncrypted { get; set; }
     public string? DocumentSnapshotSha256Hash { get; set; }
     public string? DocumentTemplateVersion { get; set; }
     public DateTimeOffset? DocumentPreparedAt { get; set; }
-    public string? SignedFileObjectKey { get; set; }
+    public Guid? SignedFileMediaAssetId { get; set; }
     public string? SignedFileSha256Hash { get; set; }
-    public string? EvidenceFileObjectKey { get; set; }
+    public Guid? EvidenceFileMediaAssetId { get; set; }
     public string? ProviderStatusReason { get; set; }
     public DateTimeOffset CreatedAt { get; set; }
     public DateTimeOffset? SentAt { get; set; }
@@ -34,5 +35,8 @@ public class ContractSigningEnvelope
     // Navigations
     public virtual RentalContract? RentalContract { get; set; }
     public virtual ContractAppendix? ContractAppendix { get; set; }
+    public virtual MediaAsset? UnsignedFileMediaAsset { get; set; }
+    public virtual MediaAsset? SignedFileMediaAsset { get; set; }
+    public virtual MediaAsset? EvidenceFileMediaAsset { get; set; }
     public virtual ICollection<ContractSignature> Signatures { get; set; } = new List<ContractSignature>();
 }

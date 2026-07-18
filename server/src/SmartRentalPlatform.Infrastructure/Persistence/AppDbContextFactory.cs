@@ -18,6 +18,7 @@ public class AppDbContextFactory : IDesignTimeDbContextFactory<AppDbContext>
             .SetBasePath(Directory.Exists(basePath) ? basePath : Directory.GetCurrentDirectory())
             .AddJsonFile("appsettings.json", optional: true)
             .AddJsonFile($"appsettings.{environment}.json", optional: true)
+            .AddJsonFile("appsettings.Local.json", optional: true)
             .AddEnvironmentVariables()
             .Build();
 

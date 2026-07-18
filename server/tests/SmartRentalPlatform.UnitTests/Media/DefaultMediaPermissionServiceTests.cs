@@ -1,0 +1,904 @@
+using SmartRentalPlatform.Domain.Entities.Media;
+using SmartRentalPlatform.Domain.Entities.Billing;
+using SmartRentalPlatform.Domain.Entities.Chat;
+using SmartRentalPlatform.Domain.Entities.Properties;
+using SmartRentalPlatform.Domain.Entities.RentalContracts;
+using SmartRentalPlatform.Domain.Entities.Users;
+using SmartRentalPlatform.Domain.Enums.Billing;
+using SmartRentalPlatform.Domain.Enums.Chat;
+using SmartRentalPlatform.Domain.Enums;
+using SmartRentalPlatform.Domain.Enums.Media;
+using SmartRentalPlatform.Domain.Enums.Properties;
+using SmartRentalPlatform.Domain.Enums.RentalContracts;
+using SmartRentalPlatform.Domain.Enums.Users;
+using SmartRentalPlatform.Infrastructure.Media;
+using SmartRentalPlatform.UnitTests.Common;
+
+namespace SmartRentalPlatform.UnitTests.Media;
+
+public class DefaultMediaPermissionServiceTests : IClassFixture<TestDatabaseFixture>
+{
+    private readonly TestDatabaseFixture fixture;
+
+    public DefaultMediaPermissionServiceTests(TestDatabaseFixture fixture)
+    {
+        this.fixture = fixture;
+        this.fixture.Reset();
+    }
+
+    [Fact]
+    public async Task CanViewAsync_ForPublicHouseRule_ShouldAllowAnonymousUser()
+    {
+        var mediaAsset = new MediaAsset
+        {
+            Id = Guid.NewGuid(),
+            BucketName = "local-media",
+            ObjectKey = $"public/rooming-house-rule-pdfs/{Guid.NewGuid():N}.pdf",
+            OriginalFileName = "house-rule.pdf",
+            StoredFileName = "house-rule.pdf",
+            ContentType = "application/pdf",
+            FileSize = 10,
+            Scope = MediaScope.RoomingHouseRulePdf,
+            Visibility = MediaVisibility.Public,
+            Status = MediaStatus.Linked,
+            LinkedEntityType = nameof(RoomingHouseRule),
+            LinkedEntityId = Guid.NewGuid(),
+            CreatedAt = DateTimeOffset.UtcNow,
+            UpdatedAt = DateTimeOffset.UtcNow
+        };
+        var service = new DefaultMediaPermissionService(fixture.Context);
+
+        var allowed = await service.CanViewAsync(null, mediaAsset);
+
+        Assert.True(allowed);
+    }
+
+    [Fact]
+    public async Task CanViewAsync_ForRawContractFile_ShouldAllowMainTenantAndDenyOccupant()
+    {
+        var graph = await SeedContractFileGraphAsync(ContractFilePurpose.SignedLegalDocument);
+        var service = new DefaultMediaPermissionService(fixture.Context);
+
+        var mainTenantAllowed = await service.CanViewAsync(graph.MainTenantId, graph.MediaAsset);
+        var occupantAllowed = await service.CanViewAsync(graph.OccupantId, graph.MediaAsset);
+
+        Assert.True(mainTenantAllowed);
+        Assert.False(occupantAllowed);
+    }
+
+    [Fact]
+    public async Task CanViewAsync_ForMaskedContractFile_ShouldAllowMainTenantAndOccupant()
+    {
+        var graph = await SeedContractFileGraphAsync(ContractFilePurpose.MaskedReference);
+        var service = new DefaultMediaPermissionService(fixture.Context);
+
+        var mainTenantAllowed = await service.CanViewAsync(graph.MainTenantId, graph.MediaAsset);
+        var occupantAllowed = await service.CanViewAsync(graph.OccupantId, graph.MediaAsset);
+        var outsiderAllowed = await service.CanViewAsync(Guid.NewGuid(), graph.MediaAsset);
+
+        Assert.True(mainTenantAllowed);
+        Assert.True(occupantAllowed);
+        Assert.False(outsiderAllowed);
+    }
+
+    [Fact]
+    public async Task CanViewAsync_ForRawAppendixFile_ShouldAllowPreviousMainTenantAndDenyOccupant()
+    {
+        var graph = await SeedAppendixFileGraphAsync(ContractFilePurpose.SignedLegalDocument);
+        var service = new DefaultMediaPermissionService(fixture.Context);
+
+        var previousMainTenantAllowed = await service.CanViewAsync(graph.PreviousMainTenantId, graph.MediaAsset);
+        var occupantAllowed = await service.CanViewAsync(graph.OccupantId, graph.MediaAsset);
+
+        Assert.True(previousMainTenantAllowed);
+        Assert.False(occupantAllowed);
+    }
+
+    [Fact]
+    public async Task CanViewAsync_ForMaskedAppendixFile_ShouldAllowOccupantAndDenyOutsider()
+    {
+        var graph = await SeedAppendixFileGraphAsync(ContractFilePurpose.MaskedReference);
+        var service = new DefaultMediaPermissionService(fixture.Context);
+
+        var occupantAllowed = await service.CanViewAsync(graph.OccupantId, graph.MediaAsset);
+        var outsiderAllowed = await service.CanViewAsync(Guid.NewGuid(), graph.MediaAsset);
+
+        Assert.True(occupantAllowed);
+        Assert.False(outsiderAllowed);
+    }
+
+    [Fact]
+    public async Task CanViewAsync_ForPrivateKycMedia_ShouldAllowAdmin()
+    {
+        var adminId = Guid.NewGuid();
+        fixture.Context.Users.Add(new User
+        {
+            Id = adminId,
+            Email = "admin-media@test.com",
+            NormalizedEmail = "ADMIN-MEDIA@TEST.COM",
+            DisplayName = "Admin",
+            Status = UserStatus.Active,
+            OnboardingStatus = OnboardingStatus.Completed,
+            UserRoles =
+            [
+                new UserRole
+                {
+                    UserId = adminId,
+                    RoleId = (int)RoleName.Admin
+                }
+            ]
+        });
+
+        var mediaAsset = new MediaAsset
+        {
+            Id = Guid.NewGuid(),
+            BucketName = "local-media",
+            ObjectKey = $"private/kyc-documents/{Guid.NewGuid():N}.jpg",
+            OriginalFileName = "front.jpg",
+            StoredFileName = "front.jpg",
+            ContentType = "image/jpeg",
+            FileSize = 10,
+            Scope = MediaScope.KycDocument,
+            Visibility = MediaVisibility.Private,
+            Status = MediaStatus.Linked,
+            CreatedAt = DateTimeOffset.UtcNow,
+            UpdatedAt = DateTimeOffset.UtcNow
+        };
+
+        fixture.Context.MediaAssets.Add(mediaAsset);
+        await fixture.Context.SaveChangesAsync();
+
+        var service = new DefaultMediaPermissionService(fixture.Context);
+
+        var allowed = await service.CanViewAsync(adminId, mediaAsset);
+
+        Assert.True(allowed);
+    }
+
+    [Fact]
+    public async Task CanViewAsync_ForChatAttachment_ShouldAllowActiveParticipantAndDenyOutsider()
+    {
+        var sender = TestDataBuilder.BuildUser(email: "chat-sender@test.com", displayName: "Chat Sender");
+        var recipient = TestDataBuilder.BuildUser(email: "chat-recipient@test.com", displayName: "Chat Recipient");
+        var outsider = TestDataBuilder.BuildUser(email: "chat-outsider@test.com", displayName: "Chat Outsider");
+        var conversationId = Guid.NewGuid();
+        var messageId = Guid.NewGuid();
+        var mediaAssetId = Guid.NewGuid();
+        var createdAt = DateTimeOffset.UtcNow;
+        var conversation = new Conversation
+        {
+            Id = conversationId,
+            Type = ConversationType.Direct,
+            DirectUserAId = sender.Id,
+            DirectUserBId = recipient.Id,
+            CreatedByUserId = sender.Id,
+            CreatedByUser = sender,
+            CreatedAt = createdAt,
+            UpdatedAt = createdAt,
+            Participants =
+            [
+                new ConversationParticipant
+                {
+                    ConversationId = conversationId,
+                    UserId = sender.Id,
+                    User = sender,
+                    JoinedAt = createdAt.AddMinutes(-1)
+                },
+                new ConversationParticipant
+                {
+                    ConversationId = conversationId,
+                    UserId = recipient.Id,
+                    User = recipient,
+                    JoinedAt = createdAt.AddMinutes(-1)
+                }
+            ]
+        };
+        var mediaAsset = new MediaAsset
+        {
+            Id = mediaAssetId,
+            OwnerUserId = sender.Id,
+            BucketName = "local-media",
+            ObjectKey = $"private/chat-attachments/{mediaAssetId:N}.jpg",
+            OriginalFileName = "chat.jpg",
+            StoredFileName = "chat.jpg",
+            ContentType = "image/jpeg",
+            FileSize = 10,
+            Scope = MediaScope.ChatAttachment,
+            Visibility = MediaVisibility.Private,
+            Status = MediaStatus.Linked,
+            LinkedEntityType = nameof(ChatMessage),
+            LinkedEntityId = messageId,
+            CreatedAt = createdAt,
+            UpdatedAt = createdAt
+        };
+        var message = new ChatMessage
+        {
+            Id = messageId,
+            ConversationId = conversationId,
+            Conversation = conversation,
+            SenderId = sender.Id,
+            Sender = sender,
+            MediaAssetId = mediaAssetId,
+            MediaAsset = mediaAsset,
+            MessageType = ChatMessageType.Image,
+            CreatedAt = createdAt
+        };
+
+        fixture.Context.Users.AddRange(sender, recipient, outsider);
+        fixture.Context.Conversations.Add(conversation);
+        fixture.Context.MediaAssets.Add(mediaAsset);
+        fixture.Context.ChatMessages.Add(message);
+        await fixture.Context.SaveChangesAsync();
+        fixture.Context.ChangeTracker.Clear();
+
+        var service = new DefaultMediaPermissionService(fixture.Context);
+        var activeParticipantAllowed = await service.CanViewAsync(recipient.Id, mediaAsset);
+        var outsiderAllowed = await service.CanViewAsync(outsider.Id, mediaAsset);
+
+        Assert.True(activeParticipantAllowed);
+        Assert.False(outsiderAllowed);
+    }
+
+    [Fact]
+    public async Task CanViewAsync_ForPrivateLegalDocument_ShouldAllowLandlordAndDenyOccupant()
+    {
+        var landlordId = Guid.NewGuid();
+        var occupantId = Guid.NewGuid();
+        var roomingHouseId = Guid.NewGuid();
+
+        fixture.Context.Users.AddRange(
+            new User
+            {
+                Id = landlordId,
+                Email = "legal-landlord@test.com",
+                NormalizedEmail = "LEGAL-LANDLORD@TEST.COM",
+                DisplayName = "Landlord",
+                Status = UserStatus.Active,
+                OnboardingStatus = OnboardingStatus.Completed
+            },
+            new User
+            {
+                Id = occupantId,
+                Email = "legal-occupant@test.com",
+                NormalizedEmail = "LEGAL-OCCUPANT@TEST.COM",
+                DisplayName = "Occupant",
+                Status = UserStatus.Active,
+                OnboardingStatus = OnboardingStatus.Completed
+            });
+
+        fixture.Context.RoomingHouses.Add(new RoomingHouse
+        {
+            Id = roomingHouseId,
+            LandlordUserId = landlordId,
+            Name = "House",
+            AddressLine = "Addr",
+            WardCode = "001",
+            ProvinceCode = "001",
+            AddressDisplay = "Addr Display",
+            ApprovalStatus = RoomingHouseApprovalStatus.Draft,
+            VisibilityStatus = RoomingHouseVisibilityStatus.Hidden,
+            CreatedAt = DateTimeOffset.UtcNow,
+            UpdatedAt = DateTimeOffset.UtcNow
+        });
+
+        fixture.Context.RoomingHouseLegalDocuments.Add(new RoomingHouseLegalDocument
+        {
+            RoomingHouseId = roomingHouseId,
+            DocumentNumberMasked = "123***",
+            DocumentNumberHash = "hash",
+            UploadedAt = DateTimeOffset.UtcNow,
+            CreatedAt = DateTimeOffset.UtcNow,
+            UpdatedAt = DateTimeOffset.UtcNow
+        });
+
+        var mediaAsset = new MediaAsset
+        {
+            Id = Guid.NewGuid(),
+            BucketName = "local-media",
+            ObjectKey = "private/legal/front.jpg",
+            OriginalFileName = "front.jpg",
+            StoredFileName = "front.jpg",
+            ContentType = "image/jpeg",
+            FileSize = 10,
+            Scope = MediaScope.RoomingHouseLegalDocument,
+            Visibility = MediaVisibility.Private,
+            Status = MediaStatus.Linked,
+            LinkedEntityType = nameof(RoomingHouseLegalDocument),
+            LinkedEntityId = roomingHouseId,
+            CreatedAt = DateTimeOffset.UtcNow,
+            UpdatedAt = DateTimeOffset.UtcNow
+        };
+
+        fixture.Context.MediaAssets.Add(mediaAsset);
+        await fixture.Context.SaveChangesAsync();
+
+        var service = new DefaultMediaPermissionService(fixture.Context);
+
+        var landlordAllowed = await service.CanViewAsync(landlordId, mediaAsset);
+        var occupantAllowed = await service.CanViewAsync(occupantId, mediaAsset);
+
+        Assert.True(landlordAllowed);
+        Assert.False(occupantAllowed);
+    }
+
+    [Fact]
+    public async Task CanViewAsync_ForMeterReadingProof_ShouldDenyOccupantBeforeInvoiceIssued()
+    {
+        var graph = await SeedMeterReadingMediaGraphAsync(InvoiceStatus.Draft);
+        var service = new DefaultMediaPermissionService(fixture.Context);
+
+        var tenantAllowed = await service.CanViewAsync(graph.TenantId, graph.MediaAsset);
+        var occupantAllowed = await service.CanViewAsync(graph.OccupantId, graph.MediaAsset);
+
+        Assert.False(tenantAllowed);
+        Assert.False(occupantAllowed);
+    }
+
+    [Fact]
+    public async Task CanViewAsync_ForMeterReadingProof_ShouldAllowTenantAndOccupantAfterInvoiceIssued()
+    {
+        var graph = await SeedMeterReadingMediaGraphAsync(InvoiceStatus.Issued);
+        var service = new DefaultMediaPermissionService(fixture.Context);
+
+        var tenantAllowed = await service.CanViewAsync(graph.TenantId, graph.MediaAsset);
+        var occupantAllowed = await service.CanViewAsync(graph.OccupantId, graph.MediaAsset);
+
+        Assert.True(tenantAllowed);
+        Assert.True(occupantAllowed);
+    }
+
+    private async Task<(Guid MainTenantId, Guid OccupantId, MediaAsset MediaAsset)> SeedContractFileGraphAsync(ContractFilePurpose purpose)
+    {
+        var landlordId = Guid.NewGuid();
+        var mainTenantId = Guid.NewGuid();
+        var occupantId = Guid.NewGuid();
+        var roomingHouseId = Guid.NewGuid();
+        var roomId = Guid.NewGuid();
+        var contractId = Guid.NewGuid();
+        var fileId = Guid.NewGuid();
+        var mediaAssetId = Guid.NewGuid();
+
+        var landlord = new User
+        {
+            Id = landlordId,
+            Email = "landlord@test.com",
+            NormalizedEmail = "LANDLORD@TEST.COM",
+            DisplayName = "Landlord",
+            Status = UserStatus.Active,
+            OnboardingStatus = OnboardingStatus.Completed
+        };
+        var mainTenant = new User
+        {
+            Id = mainTenantId,
+            Email = "tenant@test.com",
+            NormalizedEmail = "TENANT@TEST.COM",
+            DisplayName = "Tenant",
+            Status = UserStatus.Active,
+            OnboardingStatus = OnboardingStatus.Completed
+        };
+        var occupant = new User
+        {
+            Id = occupantId,
+            Email = "occupant@test.com",
+            NormalizedEmail = "OCCUPANT@TEST.COM",
+            DisplayName = "Occupant",
+            Status = UserStatus.Active,
+            OnboardingStatus = OnboardingStatus.Completed
+        };
+
+        var roomingHouse = new RoomingHouse
+        {
+            Id = roomingHouseId,
+            LandlordUserId = landlordId,
+            Landlord = landlord,
+            Name = "House",
+            AddressLine = "Addr",
+            WardCode = "001",
+            ProvinceCode = "001",
+            AddressDisplay = "Addr Display",
+            ApprovalStatus = RoomingHouseApprovalStatus.Approved,
+            VisibilityStatus = RoomingHouseVisibilityStatus.Visible,
+            CreatedAt = DateTimeOffset.UtcNow,
+            UpdatedAt = DateTimeOffset.UtcNow
+        };
+        var room = new Room
+        {
+            Id = roomId,
+            RoomingHouseId = roomingHouseId,
+            RoomingHouse = roomingHouse,
+            RoomNumber = "101",
+            Status = RoomStatus.Occupied,
+            CreatedAt = DateTimeOffset.UtcNow,
+            UpdatedAt = DateTimeOffset.UtcNow
+        };
+        var mediaAsset = new MediaAsset
+        {
+            Id = mediaAssetId,
+            BucketName = "local-media",
+            ObjectKey = $"private/contract-pdfs/{mediaAssetId:N}.pdf",
+            OriginalFileName = "contract.pdf",
+            StoredFileName = "contract.pdf",
+            ContentType = "application/pdf",
+            FileSize = 10,
+            Scope = MediaScope.ContractPdf,
+            Visibility = MediaVisibility.Private,
+            Status = MediaStatus.Linked,
+            LinkedEntityType = nameof(ContractFile),
+            LinkedEntityId = fileId,
+            CreatedAt = DateTimeOffset.UtcNow,
+            UpdatedAt = DateTimeOffset.UtcNow
+        };
+
+        var contract = new RentalContract
+        {
+            Id = contractId,
+            RentalRequestId = Guid.NewGuid(),
+            RoomDepositId = Guid.NewGuid(),
+            RoomId = roomId,
+            MainTenantUserId = mainTenantId,
+            MainTenantUser = mainTenant,
+            Room = room,
+            ContractNumber = "C-001",
+            StartDate = new DateOnly(2026, 7, 1),
+            EndDate = new DateOnly(2027, 7, 1),
+            MonthlyRent = 100,
+            DepositAmount = 100,
+            PaymentDay = 5,
+            Status = RentalContractStatus.Active,
+            CreatedAt = DateTimeOffset.UtcNow,
+            UpdatedAt = DateTimeOffset.UtcNow,
+            Occupants =
+            [
+                new ContractOccupant
+                {
+                    Id = Guid.NewGuid(),
+                    RentalContractId = contractId,
+                    UserId = occupantId,
+                    User = occupant,
+                    FullName = "Occupant",
+                    DateOfBirth = new DateOnly(2000, 1, 1),
+                    MoveInDate = new DateOnly(2026, 7, 1),
+                    Status = ContractOccupantStatus.Active,
+                    CreatedAt = DateTimeOffset.UtcNow,
+                    UpdatedAt = DateTimeOffset.UtcNow
+                }
+            ],
+            Signatures =
+            [
+                new ContractSignature
+                {
+                    Id = Guid.NewGuid(),
+                    RentalContractId = contractId,
+                    SignerUserId = landlordId,
+                    SignerRole = ContractSignerRole.Landlord,
+                    SignatureMethod = ContractSignatureMethod.EmailOtp,
+                    SignedAt = DateTimeOffset.UtcNow,
+                    CreatedAt = DateTimeOffset.UtcNow
+                },
+                new ContractSignature
+                {
+                    Id = Guid.NewGuid(),
+                    RentalContractId = contractId,
+                    SignerUserId = mainTenantId,
+                    SignerRole = ContractSignerRole.Tenant,
+                    SignatureMethod = ContractSignatureMethod.EmailOtp,
+                    SignedAt = DateTimeOffset.UtcNow,
+                    CreatedAt = DateTimeOffset.UtcNow
+                }
+            ],
+            Files =
+            [
+                new ContractFile
+                {
+                    Id = fileId,
+                    RentalContractId = contractId,
+                    MediaAssetId = mediaAssetId,
+                    MediaAsset = mediaAsset,
+                    Purpose = purpose,
+                    CreatedAt = DateTimeOffset.UtcNow
+                }
+            ]
+        };
+
+        fixture.Context.Users.AddRange(landlord, mainTenant, occupant);
+        fixture.Context.RoomingHouses.Add(roomingHouse);
+        fixture.Context.Rooms.Add(room);
+        fixture.Context.MediaAssets.Add(mediaAsset);
+        fixture.Context.RentalContracts.Add(contract);
+        await fixture.Context.SaveChangesAsync();
+        fixture.Context.ChangeTracker.Clear();
+
+        return (mainTenantId, occupantId, mediaAsset);
+    }
+
+    private async Task<(Guid PreviousMainTenantId, Guid CurrentMainTenantId, Guid OccupantId, MediaAsset MediaAsset)> SeedAppendixFileGraphAsync(ContractFilePurpose purpose)
+    {
+        var landlordId = Guid.NewGuid();
+        var previousMainTenantId = Guid.NewGuid();
+        var currentMainTenantId = Guid.NewGuid();
+        var occupantId = Guid.NewGuid();
+        var roomingHouseId = Guid.NewGuid();
+        var roomId = Guid.NewGuid();
+        var contractId = Guid.NewGuid();
+        var appendixId = Guid.NewGuid();
+        var fileId = Guid.NewGuid();
+        var mediaAssetId = Guid.NewGuid();
+
+        var landlord = new User
+        {
+            Id = landlordId,
+            Email = "landlord2@test.com",
+            NormalizedEmail = "LANDLORD2@TEST.COM",
+            DisplayName = "Landlord",
+            Status = UserStatus.Active,
+            OnboardingStatus = OnboardingStatus.Completed
+        };
+        var previousMainTenant = new User
+        {
+            Id = previousMainTenantId,
+            Email = "prev-tenant@test.com",
+            NormalizedEmail = "PREV-TENANT@TEST.COM",
+            DisplayName = "Previous Tenant",
+            Status = UserStatus.Active,
+            OnboardingStatus = OnboardingStatus.Completed
+        };
+        var currentMainTenant = new User
+        {
+            Id = currentMainTenantId,
+            Email = "current-tenant@test.com",
+            NormalizedEmail = "CURRENT-TENANT@TEST.COM",
+            DisplayName = "Current Tenant",
+            Status = UserStatus.Active,
+            OnboardingStatus = OnboardingStatus.Completed
+        };
+        var occupant = new User
+        {
+            Id = occupantId,
+            Email = "occupant2@test.com",
+            NormalizedEmail = "OCCUPANT2@TEST.COM",
+            DisplayName = "Occupant",
+            Status = UserStatus.Active,
+            OnboardingStatus = OnboardingStatus.Completed
+        };
+
+        var roomingHouse = new RoomingHouse
+        {
+            Id = roomingHouseId,
+            LandlordUserId = landlordId,
+            Landlord = landlord,
+            Name = "House",
+            AddressLine = "Addr",
+            WardCode = "001",
+            ProvinceCode = "001",
+            AddressDisplay = "Addr Display",
+            ApprovalStatus = RoomingHouseApprovalStatus.Approved,
+            VisibilityStatus = RoomingHouseVisibilityStatus.Visible,
+            CreatedAt = DateTimeOffset.UtcNow,
+            UpdatedAt = DateTimeOffset.UtcNow
+        };
+        var room = new Room
+        {
+            Id = roomId,
+            RoomingHouseId = roomingHouseId,
+            RoomingHouse = roomingHouse,
+            RoomNumber = "201",
+            Status = RoomStatus.Occupied,
+            CreatedAt = DateTimeOffset.UtcNow,
+            UpdatedAt = DateTimeOffset.UtcNow
+        };
+        var mediaAsset = new MediaAsset
+        {
+            Id = mediaAssetId,
+            BucketName = "local-media",
+            ObjectKey = $"private/contract-appendix-pdfs/{mediaAssetId:N}.pdf",
+            OriginalFileName = "appendix.pdf",
+            StoredFileName = "appendix.pdf",
+            ContentType = "application/pdf",
+            FileSize = 10,
+            Scope = MediaScope.ContractAppendixPdf,
+            Visibility = MediaVisibility.Private,
+            Status = MediaStatus.Linked,
+            LinkedEntityType = nameof(ContractFile),
+            LinkedEntityId = fileId,
+            CreatedAt = DateTimeOffset.UtcNow,
+            UpdatedAt = DateTimeOffset.UtcNow
+        };
+
+        var contract = new RentalContract
+        {
+            Id = contractId,
+            RentalRequestId = Guid.NewGuid(),
+            RoomDepositId = Guid.NewGuid(),
+            RoomId = roomId,
+            MainTenantUserId = currentMainTenantId,
+            MainTenantUser = currentMainTenant,
+            Room = room,
+            ContractNumber = "C-002",
+            StartDate = new DateOnly(2026, 7, 1),
+            EndDate = new DateOnly(2027, 7, 1),
+            MonthlyRent = 100,
+            DepositAmount = 100,
+            PaymentDay = 5,
+            Status = RentalContractStatus.Active,
+            CreatedAt = DateTimeOffset.UtcNow,
+            UpdatedAt = DateTimeOffset.UtcNow,
+            Occupants =
+            [
+                new ContractOccupant
+                {
+                    Id = Guid.NewGuid(),
+                    RentalContractId = contractId,
+                    UserId = occupantId,
+                    User = occupant,
+                    FullName = "Occupant",
+                    DateOfBirth = new DateOnly(2000, 1, 1),
+                    MoveInDate = new DateOnly(2026, 7, 1),
+                    Status = ContractOccupantStatus.Active,
+                    CreatedAt = DateTimeOffset.UtcNow,
+                    UpdatedAt = DateTimeOffset.UtcNow
+                }
+            ]
+        };
+
+        var appendix = new ContractAppendix
+        {
+            Id = appendixId,
+            RentalContractId = contractId,
+            RentalContract = contract,
+            AppendixNumber = "PL-002",
+            EffectiveDate = new DateOnly(2026, 8, 1),
+            Status = ContractAppendixStatus.Active,
+            CreatedByUserId = landlordId,
+            AppliedAt = DateTimeOffset.UtcNow,
+            CreatedAt = DateTimeOffset.UtcNow,
+            UpdatedAt = DateTimeOffset.UtcNow,
+            Changes =
+            [
+                new ContractAppendixChange
+                {
+                    Id = Guid.NewGuid(),
+                    RentalContractAppendixId = appendixId,
+                    ChangeType = ContractAppendixChangeType.Update,
+                    TargetType = ContractAppendixTargetType.Contract,
+                    FieldName = "mainTenantUserId",
+                    OldValue = previousMainTenantId.ToString(),
+                    NewValue = currentMainTenantId.ToString(),
+                    SortOrder = 1,
+                    CreatedAt = DateTimeOffset.UtcNow
+                }
+            ],
+            Signatures =
+            [
+                new ContractSignature
+                {
+                    Id = Guid.NewGuid(),
+                    RentalContractAppendixId = appendixId,
+                    SignerUserId = previousMainTenantId,
+                    SignerRole = ContractSignerRole.Tenant,
+                    SignatureMethod = ContractSignatureMethod.EmailOtp,
+                    SignedAt = DateTimeOffset.UtcNow,
+                    CreatedAt = DateTimeOffset.UtcNow
+                }
+            ],
+            Files =
+            [
+                new ContractFile
+                {
+                    Id = fileId,
+                    RentalContractId = contractId,
+                    RentalContractAppendixId = appendixId,
+                    MediaAssetId = mediaAssetId,
+                    MediaAsset = mediaAsset,
+                    Purpose = purpose,
+                    CreatedAt = DateTimeOffset.UtcNow
+                }
+            ]
+        };
+
+        contract.Appendices.Add(appendix);
+
+        fixture.Context.Users.AddRange(landlord, previousMainTenant, currentMainTenant, occupant);
+        fixture.Context.RoomingHouses.Add(roomingHouse);
+        fixture.Context.Rooms.Add(room);
+        fixture.Context.MediaAssets.Add(mediaAsset);
+        fixture.Context.RentalContracts.Add(contract);
+        await fixture.Context.SaveChangesAsync();
+        fixture.Context.ChangeTracker.Clear();
+
+        return (previousMainTenantId, currentMainTenantId, occupantId, mediaAsset);
+    }
+
+    private async Task<(Guid TenantId, Guid OccupantId, MediaAsset MediaAsset)> SeedMeterReadingMediaGraphAsync(InvoiceStatus invoiceStatus)
+    {
+        var landlordId = Guid.NewGuid();
+        var tenantId = Guid.NewGuid();
+        var occupantId = Guid.NewGuid();
+        var roomingHouseId = Guid.NewGuid();
+        var roomId = Guid.NewGuid();
+        var contractId = Guid.NewGuid();
+        var invoiceId = Guid.NewGuid();
+        var meterReadingId = Guid.NewGuid();
+        var mediaAssetId = Guid.NewGuid();
+        var serviceTypeId = Guid.NewGuid();
+
+        var landlord = new User
+        {
+            Id = landlordId,
+            Email = "billing-landlord@test.com",
+            NormalizedEmail = "BILLING-LANDLORD@TEST.COM",
+            DisplayName = "Landlord",
+            Status = UserStatus.Active,
+            OnboardingStatus = OnboardingStatus.Completed
+        };
+        var tenant = new User
+        {
+            Id = tenantId,
+            Email = "billing-tenant@test.com",
+            NormalizedEmail = "BILLING-TENANT@TEST.COM",
+            DisplayName = "Tenant",
+            Status = UserStatus.Active,
+            OnboardingStatus = OnboardingStatus.Completed
+        };
+        var occupant = new User
+        {
+            Id = occupantId,
+            Email = "billing-occupant@test.com",
+            NormalizedEmail = "BILLING-OCCUPANT@TEST.COM",
+            DisplayName = "Occupant",
+            Status = UserStatus.Active,
+            OnboardingStatus = OnboardingStatus.Completed
+        };
+
+        var serviceType = new BillingServiceType
+        {
+            Id = serviceTypeId,
+            Name = "Electric",
+            SupportsMeterReading = true,
+            MeterUnitName = "kWh",
+            IsActive = true
+        };
+
+        var roomingHouse = new RoomingHouse
+        {
+            Id = roomingHouseId,
+            LandlordUserId = landlordId,
+            Landlord = landlord,
+            Name = "Meter House",
+            AddressLine = "Addr",
+            WardCode = "001",
+            ProvinceCode = "001",
+            AddressDisplay = "Addr Display",
+            ApprovalStatus = RoomingHouseApprovalStatus.Approved,
+            VisibilityStatus = RoomingHouseVisibilityStatus.Visible,
+            CreatedAt = DateTimeOffset.UtcNow,
+            UpdatedAt = DateTimeOffset.UtcNow
+        };
+        var room = new Room
+        {
+            Id = roomId,
+            RoomingHouseId = roomingHouseId,
+            RoomingHouse = roomingHouse,
+            RoomNumber = "301",
+            Status = RoomStatus.Occupied,
+            CreatedAt = DateTimeOffset.UtcNow,
+            UpdatedAt = DateTimeOffset.UtcNow
+        };
+        var contract = new RentalContract
+        {
+            Id = contractId,
+            RentalRequestId = Guid.NewGuid(),
+            RoomDepositId = Guid.NewGuid(),
+            RoomId = roomId,
+            MainTenantUserId = tenantId,
+            MainTenantUser = tenant,
+            Room = room,
+            ContractNumber = "C-003",
+            StartDate = new DateOnly(2026, 7, 1),
+            EndDate = new DateOnly(2027, 7, 1),
+            MonthlyRent = 100,
+            DepositAmount = 100,
+            PaymentDay = 5,
+            Status = RentalContractStatus.Active,
+            CreatedAt = DateTimeOffset.UtcNow,
+            UpdatedAt = DateTimeOffset.UtcNow,
+            Occupants =
+            [
+                new ContractOccupant
+                {
+                    Id = Guid.NewGuid(),
+                    RentalContractId = contractId,
+                    UserId = occupantId,
+                    User = occupant,
+                    FullName = "Occupant",
+                    DateOfBirth = new DateOnly(2000, 1, 1),
+                    MoveInDate = new DateOnly(2026, 7, 1),
+                    Status = ContractOccupantStatus.Active,
+                    CreatedAt = DateTimeOffset.UtcNow,
+                    UpdatedAt = DateTimeOffset.UtcNow
+                }
+            ]
+        };
+        var mediaAsset = new MediaAsset
+        {
+            Id = mediaAssetId,
+            OwnerUserId = landlordId,
+            BucketName = "local-media",
+            ObjectKey = $"private/meter-reading-images/{mediaAssetId:N}.jpg",
+            OriginalFileName = "meter-proof.jpg",
+            StoredFileName = "meter-proof.jpg",
+            ContentType = "image/jpeg",
+            FileSize = 10,
+            Scope = MediaScope.MeterReadingImage,
+            Visibility = MediaVisibility.Private,
+            Status = MediaStatus.Linked,
+            LinkedEntityType = nameof(MeterReading),
+            LinkedEntityId = meterReadingId,
+            CreatedAt = DateTimeOffset.UtcNow,
+            UpdatedAt = DateTimeOffset.UtcNow
+        };
+        var meterReading = new MeterReading
+        {
+            Id = meterReadingId,
+            RoomId = roomId,
+            ContractId = contractId,
+            ServiceTypeId = serviceTypeId,
+            BillingPeriodStart = new DateOnly(2026, 7, 1),
+            BillingPeriodEnd = new DateOnly(2026, 7, 31),
+            PreviousReading = 0,
+            CurrentReading = 100,
+            Consumption = 100,
+            ProofMediaAssetId = mediaAssetId,
+            RecordedByLandlordUserId = landlordId,
+            ReadingAt = DateTimeOffset.UtcNow,
+            CreatedAt = DateTimeOffset.UtcNow,
+            UpdatedAt = DateTimeOffset.UtcNow
+        };
+        var invoice = new SmartRentalPlatform.Domain.Entities.Billing.Invoice
+        {
+            Id = invoiceId,
+            ContractId = contractId,
+            RoomId = roomId,
+            TenantUserId = tenantId,
+            LandlordUserId = landlordId,
+            InvoiceNo = "INV-METER-001",
+            BillingPeriodStart = meterReading.BillingPeriodStart,
+            BillingPeriodEnd = meterReading.BillingPeriodEnd,
+            DueDate = new DateOnly(2026, 8, 5),
+            RentAmount = 100,
+            UtilityAmount = 50,
+            ServiceAmount = 0,
+            DiscountAmount = 0,
+            TotalAmount = 150,
+            Status = invoiceStatus,
+            CreatedAt = DateTimeOffset.UtcNow,
+            UpdatedAt = DateTimeOffset.UtcNow
+        };
+        invoice.Items.Add(new InvoiceItem
+        {
+            Id = Guid.NewGuid(),
+            InvoiceId = invoiceId,
+            Invoice = invoice,
+            MeterReadingId = meterReadingId,
+            MeterReading = meterReading,
+            ItemType = InvoiceItemType.Service,
+            Description = "Electric",
+            Quantity = 100,
+            UnitPrice = 1,
+            Amount = 100,
+            CreatedAt = DateTimeOffset.UtcNow
+        });
+
+        fixture.Context.Users.AddRange(landlord, tenant, occupant);
+        fixture.Context.BillingServiceTypes.Add(serviceType);
+        fixture.Context.RoomingHouses.Add(roomingHouse);
+        fixture.Context.Rooms.Add(room);
+        fixture.Context.RentalContracts.Add(contract);
+        fixture.Context.MediaAssets.Add(mediaAsset);
+        fixture.Context.MeterReadings.Add(meterReading);
+        fixture.Context.Invoices.Add(invoice);
+        await fixture.Context.SaveChangesAsync();
+        fixture.Context.ChangeTracker.Clear();
+
+        return (tenantId, occupantId, mediaAsset);
+    }
+}

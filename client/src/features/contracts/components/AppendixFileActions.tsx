@@ -3,6 +3,7 @@ import { getApiErrorMessage } from '../../../shared/api/apiError';
 import { Button } from '../../../shared/components/ui/Button';
 import { contractApi } from '../api';
 import { canOpenFinalAppendixFile } from '../appendixRules';
+import { openContractFileForView } from '../fileAccess';
 import type { ContractAppendixResponse, ContractFileResponse } from '../types';
 
 interface AppendixFileActionsProps {
@@ -32,15 +33,13 @@ export function AppendixFileActions({
     setError(null);
 
     try {
-      const blob = await contractApi.downloadContractFile(contractId, file.id);
-      const url = URL.createObjectURL(blob);
-
       if (mode === 'view') {
-        window.open(url, '_blank', 'noopener,noreferrer');
-        window.setTimeout(() => URL.revokeObjectURL(url), 60_000);
+        await openContractFileForView(contractId, file);
         return;
       }
 
+      const blob = await contractApi.downloadContractFile(contractId, file.id);
+      const url = URL.createObjectURL(blob);
       const link = document.createElement('a');
       link.href = url;
       link.download = buildAppendixFileName(contractNumber, appendix.appendixNumber);

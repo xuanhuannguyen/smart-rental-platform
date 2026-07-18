@@ -156,7 +156,7 @@ export function CreateTerminationInvoiceModal({ contract, onClose, onCreated }: 
         currentReading: response.data.reading,
         aiReading: response.data.reading,
         aiRawText: response.data.rawText,
-        proofImageObjectKey: response.data.proofImageObjectKey,
+        proofMediaAssetId: response.data.proofMediaAssetId ?? null,
         proofImageUrl: response.data.proofImageUrl
       });
     } catch (err) {

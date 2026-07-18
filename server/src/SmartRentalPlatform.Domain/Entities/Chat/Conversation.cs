@@ -1,4 +1,5 @@
 using SmartRentalPlatform.Domain.Entities.Properties;
+using SmartRentalPlatform.Domain.Entities.Media;
 using SmartRentalPlatform.Domain.Entities.Users;
 using SmartRentalPlatform.Domain.Enums.Chat;
 
@@ -21,10 +22,12 @@ public class Conversation
     public bool IsClosed { get; set; }
     public bool RequiresJoinApproval { get; set; }
     public string? AvatarUrl { get; set; }
+    public Guid? AvatarMediaAssetId { get; set; }
 
     public Room? Room { get; set; }
     public RoomingHouse? RoomingHouse { get; set; }
     public User CreatedByUser { get; set; } = null!;
+    public MediaAsset? AvatarMediaAsset { get; set; }
     public ICollection<ConversationParticipant> Participants { get; set; } = new List<ConversationParticipant>();
     public ICollection<ChatMessage> Messages { get; set; } = new List<ChatMessage>();
 }

@@ -12,6 +12,7 @@ using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Diagnostics;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Logging.Abstractions;
 using Microsoft.Extensions.Options;
 using SmartRentalPlatform.Application.Common.Interfaces;
 using SmartRentalPlatform.Infrastructure.Persistence;
@@ -99,6 +100,11 @@ public class CustomWebApplicationFactory : WebApplicationFactory<Program>, IAsyn
     protected override void ConfigureWebHost(IWebHostBuilder builder)
     {
         builder.UseEnvironment("Test");
+        builder.ConfigureLogging(logging =>
+        {
+            logging.ClearProviders();
+            logging.AddProvider(NullLoggerProvider.Instance);
+        });
 
         builder.ConfigureServices(services =>
         {
