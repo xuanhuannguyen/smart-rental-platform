@@ -5,6 +5,7 @@
 !/README.md
 !/docker-compose.yml
 !/docker-compose.prod.yml
+!/vercel.json
 !/quality-gate.ps1
 !/.github/
 !/.github/**
