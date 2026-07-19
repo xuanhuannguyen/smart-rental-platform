@@ -57,6 +57,7 @@ public class MediaController : ControllerBase
         }
 
         var stream = await _mediaStorageService.OpenReadAsync(mediaAsset.ObjectKey, cancellationToken);
+        Response.Headers.CacheControl = "public, max-age=86400, stale-while-revalidate=604800";
         return File(stream, mediaAsset.ContentType, enableRangeProcessing: true);
     }
 

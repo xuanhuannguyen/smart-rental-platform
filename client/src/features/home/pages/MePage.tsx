@@ -60,6 +60,7 @@ type HomeListingCategory = {
 
 /** sessionStorage cache key for home page listing. Bump when the card payload changes. */
 const LISTING_CACHE_KEY = 'srp_home_listing_cache_v2';
+const PROVINCES_CACHE_KEY = 'srp_home_provinces_cache_v1';
 /** Cache TTL: 5 minutes. */
 const LISTING_CACHE_TTL = 5 * 60 * 1000;
 
@@ -72,6 +73,11 @@ const AFFORDABLE_MAX_RENT = 5_000_000;
 
 type ListingCacheEntry = {
   items: HomeListingItem[];
+  timestamp: number;
+};
+
+type ProvincesCacheEntry = {
+  items: Province[];
   timestamp: number;
 };
 
@@ -107,15 +113,21 @@ export function MePage() {
   }, [location]);
 
   const [error, setError] = useState('');
-  const [homeListings, setHomeListings] = useState<HomeListingItem[]>([]);
+  const [homeListings, setHomeListings] = useState<HomeListingItem[]>(
+    () => readTimedCache<ListingCacheEntry>(LISTING_CACHE_KEY, LISTING_CACHE_TTL)?.items ?? []
+  );
   const [recommendedListings, setRecommendedListings] = useState<HomeListingItem[]>([]);
   const [recommendationMeta, setRecommendationMeta] = useState<RecommendationDisplayMeta>(DEFAULT_RECOMMENDATION_META);
   const [searchQuery, setSearchQuery] = useState('');
-  const [loadingHouses, setLoadingHouses] = useState(false);
+  const [loadingHouses, setLoadingHouses] = useState(
+    () => !readTimedCache<ListingCacheEntry>(LISTING_CACHE_KEY, LISTING_CACHE_TTL)
+  );
   const [isCheckingLandlord, setIsCheckingLandlord] = useState(false);
   const [showDropdown, setShowDropdown] = useState(false);
   const [activeLocationMode, setActiveLocationMode] = useState<HeaderLocationMode>(null);
-  const [provinces, setProvinces] = useState<Province[]>([]);
+  const [provinces, setProvinces] = useState<Province[]>(
+    () => readTimedCache<ProvincesCacheEntry>(PROVINCES_CACHE_KEY, LISTING_CACHE_TTL)?.items ?? []
+  );
   const [wards, setWards] = useState<Ward[]>([]);
   const [localProvinceCode, setLocalProvinceCode] = useState('');
   const [localWardCode, setLocalWardCode] = useState('');
@@ -134,30 +146,20 @@ export function MePage() {
 
   useEffect(() => {
     async function loadHomeListings() {
-      setLoadingHouses(true);
-
-      // 1. Try sessionStorage cache first — instant return
-      try {
-        const cached = sessionStorage.getItem(LISTING_CACHE_KEY);
-        if (cached) {
-          const entry: ListingCacheEntry = JSON.parse(cached);
-          if (Date.now() - entry.timestamp < LISTING_CACHE_TTL) {
-            setHomeListings(entry.items);
-            setLoadingHouses(false);
-            return;
-          }
-        }
-      } catch {
-        // Corrupted cache — ignore and re-fetch
+      const cached = readTimedCache<ListingCacheEntry>(LISTING_CACHE_KEY, LISTING_CACHE_TTL);
+      if (cached) {
+        setHomeListings(cached.items);
+        setLoadingHouses(false);
+        return;
       }
 
-      // 2. Fetch from lightweight Select-projection endpoint
+      setLoadingHouses(true);
+
       try {
         const items = await getPublicRoomingHouseListing();
         const mapped = items.map(mapListingItemToHomeItem);
         setHomeListings(mapped);
 
-        // 3. Write to cache for back-navigation
         try {
           const entry: ListingCacheEntry = { items: mapped, timestamp: Date.now() };
           sessionStorage.setItem(LISTING_CACHE_KEY, JSON.stringify(entry));
@@ -230,8 +232,20 @@ export function MePage() {
 
   useEffect(() => {
     async function loadProvinces() {
+      const cached = readTimedCache<ProvincesCacheEntry>(PROVINCES_CACHE_KEY, LISTING_CACHE_TTL);
+      if (cached) {
+        setProvinces(cached.items);
+        return;
+      }
+
       try {
-        setProvinces(await getProvinces());
+        const items = await getProvinces();
+        setProvinces(items);
+        try {
+          sessionStorage.setItem(PROVINCES_CACHE_KEY, JSON.stringify({ items, timestamp: Date.now() }));
+        } catch {
+          // sessionStorage full — silently skip cache
+        }
       } catch {
         setError('Không thể tải danh sách tỉnh/thành phố.');
       }
@@ -559,7 +573,13 @@ function HomeListingCard({ house, onOpen }: { house: HomeListingItem; onOpen: ()
     >
       <div className="card-image-wrapper">
         {house.coverImageUrl ? (
-          <img alt={house.name} src={toPublicListingImageUrl(house.coverImageUrl)} className="card-image" />
+          <img
+            alt={house.name}
+            src={toPublicListingImageUrl(house.coverImageUrl)}
+            className="card-image"
+            loading="lazy"
+            decoding="async"
+          />
         ) : (
           <div className="home-listing-card__placeholder">Chưa có ảnh</div>
         )}
@@ -886,6 +906,24 @@ function prioritizeListingsWithImages(items: HomeListingItem[]) {
 
 function hasCoverImage(item: HomeListingItem) {
   return Boolean(item.coverImageUrl?.trim());
+}
+
+function readTimedCache<T extends { timestamp: number }>(key: string, ttlMs: number): T | null {
+  try {
+    const cached = sessionStorage.getItem(key);
+    if (!cached) return null;
+
+    const entry: T = JSON.parse(cached);
+    if (!entry?.timestamp || Date.now() - entry.timestamp >= ttlMs) {
+      sessionStorage.removeItem(key);
+      return null;
+    }
+
+    return entry;
+  } catch {
+    sessionStorage.removeItem(key);
+    return null;
+  }
 }
 
 function formatListingSummary(house: HomeListingItem) {

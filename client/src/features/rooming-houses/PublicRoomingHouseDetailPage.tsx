@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { Link, useLocation, useNavigate, useParams } from 'react-router-dom';
+import { useLocation, useNavigate, useParams } from 'react-router-dom';
 import { getPublicAvailableRooms, getPublicRoomingHouseDetail } from './api';
 import TenantMapPreview from './components/TenantMapPreview';
 import HouseImageGallery from './components/HouseImageGallery';
@@ -23,6 +23,14 @@ import {
   QuickLandlordMessageDialog,
 } from './components/PublicHouseDetailSections';
 import './PublicRoomingHouseDetailPage.css';
+
+const DETAIL_CACHE_PREFIX = 'srp_public_house_detail_';
+const DETAIL_CACHE_TTL = 5 * 60 * 1000;
+
+type DetailCacheEntry = {
+  item: RoomingHouseDetail;
+  timestamp: number;
+};
 
 export default function PublicRoomingHouseDetailPage() {
   const { id } = useParams();
@@ -62,6 +70,15 @@ export default function PublicRoomingHouseDetailPage() {
     setQuickMessage(defaultQuickMessage);
   }
 
+  function handleBackToListing() {
+    if (window.history.length > 1) {
+      navigate(-1);
+      return;
+    }
+
+    navigate(fromSearch);
+  }
+
   async function handleSendQuickMessage() {
     if (!house) return;
     const content = quickMessage.trim();
@@ -90,6 +107,16 @@ export default function PublicRoomingHouseDetailPage() {
   useEffect(() => {
     async function loadDetail() {
       if (!id) return;
+
+      const cached = readDetailCache(id);
+      if (cached) {
+        setHouse(cached);
+        setLoading(false);
+        setError('');
+        saveRoomingHouseView(cached.id);
+        return;
+      }
+
       setLoading(true);
       setError('');
       try {
@@ -100,6 +127,7 @@ export default function PublicRoomingHouseDetailPage() {
         const detail = { ...data, rooms };
         saveRoomingHouseView(data.id);
         setHouse(detail);
+        writeDetailCache(data.id, detail);
       } catch (loadError) {
         setError(getApiErrorMessage(loadError, 'Không thể tải chi tiết khu trọ.'));
       } finally {
@@ -125,7 +153,9 @@ export default function PublicRoomingHouseDetailPage() {
         <HomeHeader />
         <main className="public-house-detail public-house-detail--state">
           <p>{error || 'Không tìm thấy khu trọ.'}</p>
-          <Link to={fromSearch}>Quay về danh sách</Link>
+          <button className="public-house-detail__back" type="button" onClick={handleBackToListing}>
+            Quay về danh sách
+          </button>
         </main>
       </>
     );
@@ -139,12 +169,12 @@ export default function PublicRoomingHouseDetailPage() {
     <>
       <HomeHeader />
       <main className="public-house-detail">
-        <Link className="public-house-detail__back" to={fromSearch}>
+        <button className="public-house-detail__back" type="button" onClick={handleBackToListing}>
           <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
             <polyline points="15 18 9 12 15 6" />
           </svg>
           <span>Quay về danh sách</span>
-        </Link>
+        </button>
 
         <section className="public-house-detail__hero">
           <HouseImageGallery images={houseImages} houseName={house.name} />
@@ -259,4 +289,31 @@ function getSearchReturnUrl(state: unknown, searchParams: URLSearchParams) {
   }
 
   return '/search';
+}
+
+function readDetailCache(id: string): RoomingHouseDetail | null {
+  try {
+    const cached = sessionStorage.getItem(`${DETAIL_CACHE_PREFIX}${id}`);
+    if (!cached) return null;
+
+    const entry: DetailCacheEntry = JSON.parse(cached);
+    if (!entry?.timestamp || Date.now() - entry.timestamp >= DETAIL_CACHE_TTL) {
+      sessionStorage.removeItem(`${DETAIL_CACHE_PREFIX}${id}`);
+      return null;
+    }
+
+    return entry.item;
+  } catch {
+    sessionStorage.removeItem(`${DETAIL_CACHE_PREFIX}${id}`);
+    return null;
+  }
+}
+
+function writeDetailCache(id: string, item: RoomingHouseDetail) {
+  try {
+    const entry: DetailCacheEntry = { item, timestamp: Date.now() };
+    sessionStorage.setItem(`${DETAIL_CACHE_PREFIX}${id}`, JSON.stringify(entry));
+  } catch {
+    // sessionStorage full — silently skip cache
+  }
 }
