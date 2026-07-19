@@ -34,8 +34,7 @@ internal static class ContractAppendixAccessPolicy
 
     public static void EnsureCanAccess(Guid userId, RentalContract contract)
     {
-        if (contract.Room.RoomingHouse.LandlordUserId == userId ||
-            GetMainTenantUserIds(contract).Contains(userId))
+        if (ContractDocumentAccessPolicy.HasContractRelationship(userId, contract))
         {
             return;
         }
@@ -61,18 +60,34 @@ internal static class ContractAppendixAccessPolicy
 
     public static bool CanViewAppendix(Guid userId, ContractAppendix appendix)
     {
-        RentalContract contract = appendix.RentalContract;
-        if (contract.Room.RoomingHouse.LandlordUserId == userId)
+        var contract = appendix.RentalContract;
+
+        if (appendix.Status is ContractAppendixStatus.Active or ContractAppendixStatus.Cancelled)
         {
-            return true;
+            return ContractDocumentAccessPolicy.CanViewFullAppendix(userId, appendix) ||
+                   ContractDocumentAccessPolicy.CanViewMaskedAppendix(userId, contract, appendix);
         }
 
-        if (GetMainTenantUserIdBeforeAppendix(contract, appendix) == userId)
+        if (appendix.Status == ContractAppendixStatus.PendingSignature)
         {
-            return true;
+            if (appendix.CreatedByUserId == userId)
+            {
+                return true;
+            }
+
+            var creatorSignature = appendix.Signatures.FirstOrDefault(x => x.SignerUserId == appendix.CreatedByUserId);
+            var hasCreatorSigned = creatorSignature != null && creatorSignature.Status == ContractSignatureStatus.Signed;
+
+            if (!hasCreatorSigned)
+            {
+                return false;
+            }
         }
 
-        return IsMainTenantChangedToUser(appendix, userId);
+        return appendix.CreatedByUserId == userId ||
+               contract.Room.RoomingHouse.LandlordUserId == userId ||
+               GetCurrentMainTenantUserId(contract) == userId ||
+               appendix.Signatures.Any(x => x.SignerUserId == userId);
     }
 
     public static ContractSignerRole GetSignerRole(Guid userId, RentalContract contract)

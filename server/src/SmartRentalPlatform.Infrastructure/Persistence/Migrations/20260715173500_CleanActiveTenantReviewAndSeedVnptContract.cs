@@ -9,8 +9,16 @@ namespace SmartRentalPlatform.Infrastructure.Persistence.Migrations
     [Migration("20260715173500_CleanActiveTenantReviewAndSeedVnptContract")]
     public partial class CleanActiveTenantReviewAndSeedVnptContract : Migration
     {
+        private static bool LegacyDemoSeedIsDisabled() => true;
+
         protected override void Up(MigrationBuilder migrationBuilder)
         {
+            if (LegacyDemoSeedIsDisabled())
+            {
+                // Legacy demo seed SQL targets pre-media columns. Current demo data is seeded by DevelopmentDataSeed.
+                return;
+            }
+
             migrationBuilder.Sql("""
                 DO $demo$
                 DECLARE
@@ -153,6 +161,12 @@ namespace SmartRentalPlatform.Infrastructure.Persistence.Migrations
 
         protected override void Down(MigrationBuilder migrationBuilder)
         {
+            if (LegacyDemoSeedIsDisabled())
+            {
+                // No-op: matching legacy demo seed Up() is disabled after media schema cutover.
+                return;
+            }
+
             migrationBuilder.Sql("""
                 UPDATE contract_files
                 SET storage_object_key = 'demo-flow/contracts/active-b201-signed.pdf',

@@ -9,8 +9,16 @@ namespace SmartRentalPlatform.Infrastructure.Persistence.Migrations
     [Migration("20260715180500_FixDemoConversationParticipantSource")]
     public partial class FixDemoConversationParticipantSource : Migration
     {
+        private static bool LegacyDemoSeedIsDisabled() => true;
+
         protected override void Up(MigrationBuilder migrationBuilder)
         {
+            if (LegacyDemoSeedIsDisabled())
+            {
+                // Legacy demo seed SQL targets pre-media columns. Current demo data is seeded by DevelopmentDataSeed.
+                return;
+            }
+
             migrationBuilder.Sql("""
                 UPDATE conversation_participants cp
                 SET source = 'Manual'
@@ -27,7 +35,12 @@ namespace SmartRentalPlatform.Infrastructure.Persistence.Migrations
 
         protected override void Down(MigrationBuilder migrationBuilder)
         {
-            // No-op: 'Direct' is not a valid ConversationParticipantSource value.
+            if (LegacyDemoSeedIsDisabled())
+            {
+                // No-op: matching legacy demo seed Up() is disabled after media schema cutover.
+                return;
+            }
+// No-op: 'Direct' is not a valid ConversationParticipantSource value.
         }
     }
 }

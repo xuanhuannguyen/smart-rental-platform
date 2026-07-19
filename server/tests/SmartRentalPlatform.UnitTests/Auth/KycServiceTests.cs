@@ -214,6 +214,61 @@ public class KycServiceTests : IClassFixture<TestDatabaseFixture>
     }
 
     [Fact]
+    public async Task SubmitAsync_ShouldCreatePendingReview_WhenEkycProviderFails()
+    {
+        var context = _fixture.Context;
+        var user = TestDataBuilder.BuildUser(email: "kyc-provider-failure@example.com", displayName: "Kyc Provider Failure");
+        context.Users.Add(user);
+        await context.SaveChangesAsync();
+
+        var frontAsset = new MediaAsset { Id = Guid.NewGuid(), ObjectKey = "private/kyc-documents/front-provider-failure.jpg", OriginalFileName = "front-provider-failure.jpg", OwnerUserId = user.Id, Scope = MediaScope.KycDocument, Visibility = MediaVisibility.Private, Status = MediaStatus.Uploaded };
+        var backAsset = new MediaAsset { Id = Guid.NewGuid(), ObjectKey = "private/kyc-documents/back-provider-failure.jpg", OriginalFileName = "back-provider-failure.jpg", OwnerUserId = user.Id, Scope = MediaScope.KycDocument, Visibility = MediaVisibility.Private, Status = MediaStatus.Uploaded };
+        var selfieAsset = new MediaAsset { Id = Guid.NewGuid(), ObjectKey = "private/kyc-documents/selfie-provider-failure.jpg", OriginalFileName = "selfie-provider-failure.jpg", OwnerUserId = user.Id, Scope = MediaScope.KycDocument, Visibility = MediaVisibility.Private, Status = MediaStatus.Uploaded };
+        context.MediaAssets.AddRange(frontAsset, backAsset, selfieAsset);
+        await context.SaveChangesAsync();
+
+        _vnptEkycClient.VerifyAsyncFunc = _ => Task.FromResult(new VnptEkycClientResult
+        {
+            SessionId = "session-provider-failure",
+            EkycResult = EkycResult.ProviderError.ToString(),
+            IsProviderFailure = true,
+            ErrorCode = "VNPT_OCR_HTTP",
+            ErrorMessage = "VNPT HTTP 401 Unauthorized."
+        });
+
+        var kycService = CreateService(context);
+        var request = new SubmitKycRequest
+        {
+            DocumentType = KycDocumentType.CCCD.ToString(),
+            SelfieCaptureMethod = SelfieCaptureMethod.Upload.ToString(),
+            FrontMediaAssetId = frontAsset.Id,
+            BackMediaAssetId = backAsset.Id,
+            SelfieMediaAssetId = selfieAsset.Id
+        };
+
+        var result = await kycService.SubmitAsync(user.Id, request, CancellationToken.None);
+
+        Assert.Equal(KycVerificationStatus.PendingAdminReview.ToString(), result.Status);
+        Assert.Equal(EkycResult.ProviderError.ToString(), result.EkycResult);
+        Assert.Equal(KycRiskLevel.High.ToString(), result.RiskLevel);
+        Assert.Equal("Submission received. Your profile is pending admin review.", result.Message);
+
+        context.ChangeTracker.Clear();
+
+        var savedUser = await context.Users.SingleAsync(x => x.Id == user.Id);
+        var savedKyc = await context.KycVerifications.SingleAsync(x => x.UserId == user.Id);
+        var linkedAssets = await context.MediaAssets
+            .Where(x => x.LinkedEntityType == nameof(KycVerification) && x.LinkedEntityId == savedKyc.Id)
+            .ToListAsync();
+
+        Assert.Equal(OnboardingStatus.KycPending, savedUser.OnboardingStatus);
+        Assert.Equal(KycVerificationStatus.PendingAdminReview, savedKyc.Status);
+        Assert.Equal(EkycResult.ProviderError, savedKyc.EkycResult);
+        Assert.Equal("VNPT_OCR_HTTP", savedKyc.EkycErrorCode);
+        Assert.Equal(3, linkedAssets.Count);
+    }
+
+    [Fact]
     public async Task SubmitAsync_ShouldThrowKycBusinessException_WhenDocumentTypeIsInvalid()
     {
         var context = _fixture.Context;

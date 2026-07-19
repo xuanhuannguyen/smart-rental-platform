@@ -9,8 +9,16 @@ namespace SmartRentalPlatform.Infrastructure.Persistence.Migrations
     [Migration("20260715172000_AdjustActiveTenantInvoiceReadyDemo")]
     public partial class AdjustActiveTenantInvoiceReadyDemo : Migration
     {
+        private static bool LegacyDemoSeedIsDisabled() => true;
+
         protected override void Up(MigrationBuilder migrationBuilder)
         {
+            if (LegacyDemoSeedIsDisabled())
+            {
+                // Legacy demo seed SQL targets pre-media columns. Current demo data is seeded by DevelopmentDataSeed.
+                return;
+            }
+
             migrationBuilder.Sql("""
                 CREATE OR REPLACE FUNCTION pg_temp.demo_flow_uuid(input text) RETURNS uuid AS $fn$
                     SELECT (
@@ -257,6 +265,12 @@ namespace SmartRentalPlatform.Infrastructure.Persistence.Migrations
 
         protected override void Down(MigrationBuilder migrationBuilder)
         {
+            if (LegacyDemoSeedIsDisabled())
+            {
+                // No-op: matching legacy demo seed Up() is disabled after media schema cutover.
+                return;
+            }
+
             migrationBuilder.Sql("""
                 UPDATE wallet_accounts
                 SET balance = 3670000,

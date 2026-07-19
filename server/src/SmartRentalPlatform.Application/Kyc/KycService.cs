@@ -133,7 +133,7 @@ public class KycService : IKycService
                         400);
             }
 
-            var finalStatus = ekyc.IsProviderFailure || ekycResult == EkycResult.ProviderError || ekycResult == EkycResult.Failed
+            var finalStatus = ekycResult == EkycResult.Failed && !ekyc.IsProviderFailure
                 ? KycVerificationStatus.EkycFailed
                 : KycVerificationStatus.PendingAdminReview;
 

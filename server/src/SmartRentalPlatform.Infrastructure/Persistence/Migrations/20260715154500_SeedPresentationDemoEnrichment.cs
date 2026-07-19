@@ -11,9 +11,16 @@ namespace SmartRentalPlatform.Infrastructure.Persistence.Migrations
     public partial class SeedPresentationDemoEnrichment : Migration
     {
         private const string DefaultPassword = "Demo@123456";
+        private static bool LegacyDemoSeedIsDisabled() => true;
 
         protected override void Up(MigrationBuilder migrationBuilder)
         {
+            if (LegacyDemoSeedIsDisabled())
+            {
+                // Legacy demo seed SQL targets pre-media columns. Current demo data is seeded by DevelopmentDataSeed.
+                return;
+            }
+
             var passwordHash = Quote(PasswordHash());
 
             migrationBuilder.Sql($$"""
@@ -260,6 +267,12 @@ namespace SmartRentalPlatform.Infrastructure.Persistence.Migrations
 
         protected override void Down(MigrationBuilder migrationBuilder)
         {
+            if (LegacyDemoSeedIsDisabled())
+            {
+                // No-op: matching legacy demo seed Up() is disabled after media schema cutover.
+                return;
+            }
+
             migrationBuilder.Sql("""
                 DELETE FROM review_reports WHERE reason LIKE 'DEMO-ENRICH:%';
                 DELETE FROM rooming_house_reviews WHERE comment LIKE 'DEMO-ENRICH:%';

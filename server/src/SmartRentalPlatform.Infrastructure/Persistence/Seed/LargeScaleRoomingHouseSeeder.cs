@@ -172,6 +172,31 @@ namespace SmartRentalPlatform.Infrastructure.Persistence.Seed
                 )
             ", cancellationToken);
 
+            // 8a. review images
+            await context.Database.ExecuteSqlRawAsync($@"
+                DELETE FROM property_images
+                WHERE rooming_house_review_id IN (
+                    SELECT id FROM rooming_house_reviews
+                    WHERE rental_contract_id IN (
+                        SELECT id FROM contracts
+                        WHERE room_id IN (
+                            SELECT id FROM rooms WHERE rooming_house_id IN ({seededRoomingHouseSubquery})
+                        )
+                    )
+                )
+            ", cancellationToken);
+
+            // 8b. rooming house reviews
+            await context.Database.ExecuteSqlRawAsync($@"
+                DELETE FROM rooming_house_reviews
+                WHERE rental_contract_id IN (
+                    SELECT id FROM contracts
+                    WHERE room_id IN (
+                        SELECT id FROM rooms WHERE rooming_house_id IN ({seededRoomingHouseSubquery})
+                    )
+                )
+            ", cancellationToken);
+
             // 9. contracts
             await context.Database.ExecuteSqlRawAsync($@"
                 DELETE FROM contracts 

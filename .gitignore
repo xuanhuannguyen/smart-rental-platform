@@ -4,14 +4,21 @@
 !/.gitignore
 !/README.md
 !/docker-compose.yml
+!/docker-compose.prod.yml
 !/quality-gate.ps1
+!/.github/
+!/.github/**
 !/client/
 !/client/**
 !/server/
 !/server/**
+!/deploy/
+!/deploy/**
 !/docs/
 !/docs/Media_Manual_Test_Checklist.md
 !/docs/Media_Test_Findings_Summary.md
+!/docs/ProductionDeployment.md
+!/docs/CICD_Demo_Deployment_Guide.md
 !/docs/interval-plan/
 !/docs/interval-plan/Interval2BusinessLogicReport.md
 !/scripts/
@@ -39,11 +46,6 @@
 secrets/
 **/secrets/
 
-# Commit appsettings files with safe defaults/placeholders only.
-# Store real local values in .NET User Secrets or environment variables.
-server/src/SmartRentalPlatform.Api/appsettings.Local.json
-server/src/SmartRentalPlatform.Api/appsettings.*.Local.json
-
 # Private keys, certificate bundles, and provider credential exports
 *.pem
 *.key
@@ -66,6 +68,15 @@ yarn-debug.log*
 yarn-error.log*
 pnpm-debug.log*
 
+# Python virtual environments and bytecode caches
+.venv/
+**/.venv/
+__pycache__/
+**/__pycache__/
+*.py[cod]
+.pytest_cache/
+**/.pytest_cache/
+
 # .NET build output and temporary files
 server/nuget.config
 **/[Bb]in/
@@ -83,6 +94,7 @@ server/nuget.config
 
 # Test/coverage generated output
 server/coverage-report/
+server/artifacts/
 server/tests/**/[Tt]est[Rr]esults/
 server/tests/**/*.trx
 server/tests/**/*.coverage
@@ -122,6 +134,7 @@ Thumbs.db
 # Runtime uploads/private files.
 server/src/SmartRentalPlatform.Api/wwwroot/uploads/**
 server/src/SmartRentalPlatform.Api/private-storage/**
+deploy/secrets.local.md
 
 # Database/runtime data
 *.db

@@ -1,13 +1,20 @@
 using SmartRentalPlatform.Application.Common.Media;
 using SmartRentalPlatform.Contracts.RentalContracts.Responses;
 using SmartRentalPlatform.Domain.Entities.RentalContracts;
+using SmartRentalPlatform.Domain.Enums.RentalContracts;
 
 namespace SmartRentalPlatform.Application.RentalContracts;
 
 internal static class ContractAppendixResponseMapper
 {
-    public static ContractAppendixResponse ToResponse(ContractAppendix appendix)
+    public static ContractAppendixResponse ToResponse(ContractAppendix appendix, Guid userId)
     {
+        var canViewFull = ContractDocumentAccessPolicy.CanViewFullAppendix(userId, appendix);
+        var canViewMasked = ContractDocumentAccessPolicy.CanViewMaskedAppendix(
+            userId,
+            appendix.RentalContract,
+            appendix);
+
         return new ContractAppendixResponse
         {
             Id = appendix.Id,
@@ -28,6 +35,13 @@ internal static class ContractAppendixResponseMapper
                 .Select(ToSignatureResponse)
                 .ToList(),
             Files = appendix.Files
+                .Where(x => x.Purpose is not (
+                    ContractFilePurpose.Preview or
+                    ContractFilePurpose.UnsignedForESign or
+                    ContractFilePurpose.ProviderEvidence))
+                .Where(x => x.Purpose == ContractFilePurpose.MaskedReference
+                    ? canViewMasked
+                    : canViewFull)
                 .OrderByDescending(x => x.CreatedAt)
                 .Select(ToFileResponse)
                 .ToList(),

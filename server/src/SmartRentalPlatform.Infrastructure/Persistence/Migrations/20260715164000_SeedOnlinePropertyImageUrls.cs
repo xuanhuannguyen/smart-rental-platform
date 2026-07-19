@@ -9,8 +9,16 @@ namespace SmartRentalPlatform.Infrastructure.Persistence.Migrations
     [Migration("20260715164000_SeedOnlinePropertyImageUrls")]
     public partial class SeedOnlinePropertyImageUrls : Migration
     {
+        private static bool LegacyDemoSeedIsDisabled() => true;
+
         protected override void Up(MigrationBuilder migrationBuilder)
         {
+            if (LegacyDemoSeedIsDisabled())
+            {
+                // Legacy demo seed SQL targets pre-media columns. Current demo data is seeded by DevelopmentDataSeed.
+                return;
+            }
+
             migrationBuilder.Sql("""
                 CREATE TABLE IF NOT EXISTS demo_property_image_url_backup (
                     image_id uuid PRIMARY KEY,
@@ -83,6 +91,12 @@ namespace SmartRentalPlatform.Infrastructure.Persistence.Migrations
 
         protected override void Down(MigrationBuilder migrationBuilder)
         {
+            if (LegacyDemoSeedIsDisabled())
+            {
+                // No-op: matching legacy demo seed Up() is disabled after media schema cutover.
+                return;
+            }
+
             migrationBuilder.Sql("""
                 UPDATE property_images pi
                 SET image_url = b.image_url,

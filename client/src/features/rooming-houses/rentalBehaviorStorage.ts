@@ -1,7 +1,7 @@
 import type { GuestRoomingHouseRecommendationRequest, RoomingHouseSearchParams } from './types';
 
 const RENTAL_BEHAVIOR_KEY = 'srp_guest_rental_behavior';
-export const GUEST_RECOMMENDATION_CACHE_KEY = 'srp_home_ai_recommendation_cache_v2';
+export const GUEST_RECOMMENDATION_CACHE_KEY = 'srp_home_ai_recommendation_cache_v3';
 const MAX_QUERIES = 10;
 const MAX_IDS = 30;
 const MAX_AMENITIES = 30;

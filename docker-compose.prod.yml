@@ -1,0 +1,140 @@
+services:
+  postgres:
+    image: postgres:16
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB:?POSTGRES_DB is required}
+      POSTGRES_USER: ${POSTGRES_USER:?POSTGRES_USER is required}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?POSTGRES_PASSWORD is required}
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U $$POSTGRES_USER -d $$POSTGRES_DB"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+    networks:
+      - internal
+
+  meter-ai:
+    image: ${METER_AI_IMAGE:?METER_AI_IMAGE is required}
+    restart: unless-stopped
+    environment:
+      ROBOFLOW_API_KEY: ${ROBOFLOW_API_KEY:?ROBOFLOW_API_KEY is required}
+      ROBOFLOW_MODEL_ID: ${ROBOFLOW_MODEL_ID:-utility-meter-reading-dataset-for-automatic-reading-yolo/1}
+      METER_MIN_CONFIDENCE: ${METER_MIN_CONFIDENCE:-0.60}
+      METER_MAX_IMAGE_BYTES: ${METER_MAX_IMAGE_BYTES:-10485760}
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8001/health', timeout=3).read()"]
+      interval: 15s
+      timeout: 5s
+      retries: 10
+    networks:
+      - internal
+
+  api-migrate:
+    image: ${API_IMAGE:?API_IMAGE is required}
+    restart: "no"
+    environment:
+      ASPNETCORE_ENVIRONMENT: Production
+      ConnectionStrings__DefaultConnection: ${CONNECTIONSTRINGS__DEFAULTCONNECTION:?CONNECTIONSTRINGS__DEFAULTCONNECTION is required}
+      Jwt__Issuer: ${JWT__ISSUER:-RentalPlatform}
+      Jwt__Audience: ${JWT__AUDIENCE:-RentalPlatformClient}
+      Jwt__SecretKey: ${JWT__SECRETKEY:?JWT__SECRETKEY is required}
+      Aws__S3__AccessKeyId: ${AWS__S3__ACCESSKEYID:?AWS__S3__ACCESSKEYID is required}
+      Aws__S3__SecretAccessKey: ${AWS__S3__SECRETACCESSKEY:?AWS__S3__SECRETACCESSKEY is required}
+      Aws__S3__Region: ${AWS__S3__REGION:?AWS__S3__REGION is required}
+      Aws__S3__BucketName: ${AWS__S3__BUCKETNAME:?AWS__S3__BUCKETNAME is required}
+    entrypoint: ["/bin/sh", "-c"]
+    command: ["/app/efbundle --connection \"$$ConnectionStrings__DefaultConnection\""]
+    depends_on:
+      postgres:
+        condition: service_healthy
+    networks:
+      - internal
+
+  api:
+    image: ${API_IMAGE:?API_IMAGE is required}
+    restart: unless-stopped
+    environment:
+      ASPNETCORE_ENVIRONMENT: Production
+      ASPNETCORE_URLS: http://+:8080
+      ConnectionStrings__DefaultConnection: ${CONNECTIONSTRINGS__DEFAULTCONNECTION:?CONNECTIONSTRINGS__DEFAULTCONNECTION is required}
+      Cors__AllowedOrigins__0: ${PUBLIC_SITE_URL:?PUBLIC_SITE_URL is required}
+      Jwt__Issuer: ${JWT__ISSUER:-RentalPlatform}
+      Jwt__Audience: ${JWT__AUDIENCE:-RentalPlatformClient}
+      Jwt__SecretKey: ${JWT__SECRETKEY:?JWT__SECRETKEY is required}
+      MeterAi__BaseUrl: http://meter-ai:8001
+      MeterAi__TimeoutSeconds: ${METERAI__TIMEOUTSECONDS:-45}
+      Aws__S3__AccessKeyId: ${AWS__S3__ACCESSKEYID:?AWS__S3__ACCESSKEYID is required}
+      Aws__S3__SecretAccessKey: ${AWS__S3__SECRETACCESSKEY:?AWS__S3__SECRETACCESSKEY is required}
+      Aws__S3__Region: ${AWS__S3__REGION:?AWS__S3__REGION is required}
+      Aws__S3__BucketName: ${AWS__S3__BUCKETNAME:?AWS__S3__BUCKETNAME is required}
+      Email__FromEmail: ${EMAIL__FROMEMAIL:-}
+      Email__FromName: ${EMAIL__FROMNAME:-Smart Rental Platform}
+      Email__Smtp__Host: ${EMAIL__SMTP__HOST:-}
+      Email__Smtp__Port: ${EMAIL__SMTP__PORT:-587}
+      Email__Smtp__Username: ${EMAIL__SMTP__USERNAME:-}
+      Email__Smtp__Password: ${EMAIL__SMTP__PASSWORD:-}
+      Email__Smtp__UseSsl: ${EMAIL__SMTP__USESSL:-false}
+      PayOS__ClientId: ${PAYOS__CLIENTID:-}
+      PayOS__ApiKey: ${PAYOS__APIKEY:-}
+      PayOS__ChecksumKey: ${PAYOS__CHECKSUMKEY:-}
+      PayOS__PayoutClientId: ${PAYOS__PAYOUTCLIENTID:-}
+      PayOS__PayoutApiKey: ${PAYOS__PAYOUTAPIKEY:-}
+      PayOS__PayoutChecksumKey: ${PAYOS__PAYOUTCHECKSUMKEY:-}
+      PayOS__ReturnUrl: ${PAYOS__RETURNURL:-}
+      PayOS__CancelUrl: ${PAYOS__CANCELURL:-}
+      VietMap__ApiKey: ${VIETMAP__APIKEY:-}
+      Gemini__Enabled: ${GEMINI__ENABLED:-false}
+      Gemini__ApiKey: ${GEMINI__APIKEY:-}
+      DeepSeek__Enabled: ${DEEPSEEK__ENABLED:-false}
+      DeepSeek__ApiKey: ${DEEPSEEK__APIKEY:-}
+      ESign__BaseUrl: ${ESIGN__BASEURL:-}
+      ESign__ClientId: ${ESIGN__CLIENTID:-}
+      ESign__ClientSecret: ${ESIGN__CLIENTSECRET:-}
+      ESign__Username: ${ESIGN__USERNAME:-}
+      ESign__Password: ${ESIGN__PASSWORD:-}
+      ESign__CallbackUrl: ${ESIGN__CALLBACKURL:-}
+      ESign__ReturnUrl: ${ESIGN__RETURNURL:-}
+    depends_on:
+      postgres:
+        condition: service_healthy
+      meter-ai:
+        condition: service_healthy
+    networks:
+      - internal
+
+  client:
+    image: ${CLIENT_IMAGE:?CLIENT_IMAGE is required}
+    restart: unless-stopped
+    networks:
+      - internal
+
+  caddy:
+    image: caddy:2.8-alpine
+    restart: unless-stopped
+    environment:
+      SITE_ADDRESS: ${SITE_ADDRESS:-:80}
+      ACME_EMAIL: ${ACME_EMAIL:-}
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./deploy/Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy_data:/data
+      - caddy_config:/config
+    depends_on:
+      - api
+      - client
+    networks:
+      - internal
+
+volumes:
+  postgres_data:
+  caddy_data:
+  caddy_config:
+
+networks:
+  internal:
+    driver: bridge

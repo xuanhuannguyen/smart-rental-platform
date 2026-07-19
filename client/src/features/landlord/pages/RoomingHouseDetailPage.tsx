@@ -273,15 +273,11 @@ export default function RoomingHouseDetailPage() {
         setRentalPolicyForm(emptyRentalPolicyForm);
       }
 
-      // Tải danh sách phòng
-      if (data.rentalPolicy && data.houseRule) {
-        try {
-          const roomsData = await getRoomsByRoomingHouse(id!);
-          setRooms(roomsData);
-        } catch (err) {
-          console.warn('Lỗi tải phòng:', err);
-        }
-      } else {
+      try {
+        const roomsData = await getRoomsByRoomingHouse(id!);
+        setRooms(roomsData);
+      } catch (err) {
+        console.warn('Lỗi tải phòng:', err);
         setRooms([]);
       }
     } catch (err) {

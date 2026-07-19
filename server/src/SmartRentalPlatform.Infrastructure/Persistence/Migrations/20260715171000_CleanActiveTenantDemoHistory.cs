@@ -9,8 +9,16 @@ namespace SmartRentalPlatform.Infrastructure.Persistence.Migrations
     [Migration("20260715171000_CleanActiveTenantDemoHistory")]
     public partial class CleanActiveTenantDemoHistory : Migration
     {
+        private static bool LegacyDemoSeedIsDisabled() => true;
+
         protected override void Up(MigrationBuilder migrationBuilder)
         {
+            if (LegacyDemoSeedIsDisabled())
+            {
+                // Legacy demo seed SQL targets pre-media columns. Current demo data is seeded by DevelopmentDataSeed.
+                return;
+            }
+
             migrationBuilder.Sql("""
                 DO $demo$
                 DECLARE
@@ -166,6 +174,12 @@ namespace SmartRentalPlatform.Infrastructure.Persistence.Migrations
 
         protected override void Down(MigrationBuilder migrationBuilder)
         {
+            if (LegacyDemoSeedIsDisabled())
+            {
+                // No-op: matching legacy demo seed Up() is disabled after media schema cutover.
+                return;
+            }
+
             migrationBuilder.Sql("""
                 UPDATE users
                 SET display_name = 'Học Tiếng Anh - Tenant Active',

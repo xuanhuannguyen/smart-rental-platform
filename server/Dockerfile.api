@@ -1,0 +1,26 @@
+FROM mcr.microsoft.com/dotnet/sdk:10.0 AS build
+WORKDIR /src
+
+COPY . .
+RUN dotnet restore SmartRentalPlatform.slnx
+RUN dotnet build src/SmartRentalPlatform.Api/SmartRentalPlatform.Api.csproj -c Release --no-restore
+RUN dotnet publish src/SmartRentalPlatform.Api/SmartRentalPlatform.Api.csproj -c Release -o /out/api --no-build
+RUN dotnet tool install --global dotnet-ef --version 10.0.8
+ENV PATH="${PATH}:/root/.dotnet/tools"
+RUN dotnet ef migrations bundle \
+    --project src/SmartRentalPlatform.Infrastructure/SmartRentalPlatform.Infrastructure.csproj \
+    --startup-project src/SmartRentalPlatform.Api/SmartRentalPlatform.Api.csproj \
+    --configuration Release \
+    --output /out/efbundle \
+    --no-build
+
+FROM mcr.microsoft.com/dotnet/aspnet:10.0 AS runtime
+WORKDIR /app
+ENV ASPNETCORE_URLS=http://+:8080
+EXPOSE 8080
+
+COPY --from=build /out/api ./
+COPY --from=build /out/efbundle ./efbundle
+RUN chmod +x /app/efbundle
+
+ENTRYPOINT ["dotnet", "SmartRentalPlatform.Api.dll"]

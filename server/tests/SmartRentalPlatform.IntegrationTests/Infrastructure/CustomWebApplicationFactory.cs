@@ -70,6 +70,10 @@ public class CustomWebApplicationFactory : WebApplicationFactory<Program>, IAsyn
         Environment.SetEnvironmentVariable("Jwt__SecretKey", "smart-rental-platform-test-secret-key-32bytes-minimum");
         Environment.SetEnvironmentVariable("Jwt__Issuer", "SmartRentalPlatform.Tests");
         Environment.SetEnvironmentVariable("Jwt__Audience", "SmartRentalPlatform.Tests");
+        Environment.SetEnvironmentVariable("Aws__S3__AccessKeyId", "test-access-key");
+        Environment.SetEnvironmentVariable("Aws__S3__SecretAccessKey", "test-secret-key");
+        Environment.SetEnvironmentVariable("Aws__S3__Region", "ap-southeast-1");
+        Environment.SetEnvironmentVariable("Aws__S3__BucketName", "smart-rental-test-bucket");
     }
 
     public Task InitializeAsync() => Task.CompletedTask;

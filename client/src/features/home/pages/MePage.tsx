@@ -58,8 +58,8 @@ type HomeListingCategory = {
   compact?: boolean;
 };
 
-/** sessionStorage cache key for home page listing. */
-const LISTING_CACHE_KEY = 'srp_home_listing_cache';
+/** sessionStorage cache key for home page listing. Bump when the card payload changes. */
+const LISTING_CACHE_KEY = 'srp_home_listing_cache_v2';
 /** Cache TTL: 5 minutes. */
 const LISTING_CACHE_TTL = 5 * 60 * 1000;
 
