@@ -286,9 +286,11 @@ export function PublicServicePricesSection({ servicePrices }: Pick<RoomingHouseD
 export function PublicAvailableRoomsSection({
   houseId,
   rooms,
+  listingReturnUrl,
 }: {
   houseId: string;
   rooms: RoomInHouseDetail[];
+  listingReturnUrl?: string;
 }) {
   return (
     <section className="public-house-detail__section rooms-section">
@@ -309,7 +311,7 @@ export function PublicAvailableRoomsSection({
       {rooms.length > 0 ? (
         <div className="public-house-detail__rooms">
           {rooms.map((room) => (
-            <PublicRoomCard houseId={houseId} room={room} key={room.id} />
+            <PublicRoomCard houseId={houseId} room={room} listingReturnUrl={listingReturnUrl} key={room.id} />
           ))}
         </div>
       ) : (
@@ -319,12 +321,16 @@ export function PublicAvailableRoomsSection({
   );
 }
 
-function PublicRoomCard({ houseId, room }: { houseId: string; room: RoomInHouseDetail }) {
+function PublicRoomCard({ houseId, room, listingReturnUrl }: { houseId: string; room: RoomInHouseDetail; listingReturnUrl?: string }) {
   const roomImage = room.images.find((image) => image.isCover) ?? room.images[0];
   const lowestRent = getLowestActiveRent(room.priceTiers);
 
   return (
-    <Link to={ROUTE_PATHS.ME.ROOM_DETAIL(houseId, room.id)} className="public-room-card">
+    <Link
+      to={ROUTE_PATHS.ME.ROOM_DETAIL(houseId, room.id)}
+      state={{ fromListing: listingReturnUrl }}
+      className="public-room-card"
+    >
       <div className="public-room-card__img-wrapper">
         {roomImage ? (
           <img alt={`Phòng ${room.roomNumber}`} src={toPublicPropertyImageUrl(roomImage)} />

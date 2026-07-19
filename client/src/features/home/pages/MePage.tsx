@@ -533,7 +533,7 @@ export function MePage() {
                       house={house}
                       onOpen={() => {
                         saveRoomingHouseView(house.id);
-                        navigate(`/rooming-houses/${house.id}`);
+                        navigate(`/rooming-houses/${house.id}`, { state: { fromListing: ROUTE_PATHS.ME.ROOT } });
                       }}
                     />
                   ))}

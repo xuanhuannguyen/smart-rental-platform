@@ -44,7 +44,7 @@ export default function PublicRoomingHouseDetailPage() {
   const [quickMessage, setQuickMessage] = useState('');
   const [quickMessageSending, setQuickMessageSending] = useState(false);
   const [toast, setToast] = useState<{ message: string; type: 'success' | 'error' | 'info' } | null>(null);
-  const fromSearch = getSearchReturnUrl(location.state, new URLSearchParams(location.search));
+  const listingReturnUrl = getListingReturnUrl(location.state, new URLSearchParams(location.search));
 
   const defaultQuickMessage = house
     ? `Xin chào, tôi muốn hỏi về thông tin khu trọ ${house.name}.`
@@ -71,12 +71,7 @@ export default function PublicRoomingHouseDetailPage() {
   }
 
   function handleBackToListing() {
-    if (window.history.length > 1) {
-      navigate(-1);
-      return;
-    }
-
-    navigate(fromSearch);
+    navigate(listingReturnUrl, { replace: true });
   }
 
   async function handleSendQuickMessage() {
@@ -236,7 +231,7 @@ export default function PublicRoomingHouseDetailPage() {
         <PublicHouseRulesSection houseRule={house.houseRule} />
         <PublicRentalPolicySection rentalPolicy={house.rentalPolicy} />
         <PublicServicePricesSection servicePrices={house.servicePrices} />
-        <PublicAvailableRoomsSection houseId={house.id} rooms={availableRooms} />
+        <PublicAvailableRoomsSection houseId={house.id} rooms={availableRooms} listingReturnUrl={listingReturnUrl} />
         <section className="public-house-detail__section reviews-section">
           <div className="section-title-with-icon">
             <div className="section-title-icon-wrapper circle-blue">
@@ -273,7 +268,7 @@ export default function PublicRoomingHouseDetailPage() {
   );
 }
 
-function getSearchReturnUrl(state: unknown, searchParams: URLSearchParams) {
+function getListingReturnUrl(state: unknown, searchParams: URLSearchParams) {
   const stateFromSearch =
     state && typeof state === 'object' && 'fromSearch' in state
       ? (state as { fromSearch?: unknown }).fromSearch
@@ -283,12 +278,21 @@ function getSearchReturnUrl(state: unknown, searchParams: URLSearchParams) {
     return stateFromSearch;
   }
 
+  const stateFromListing =
+    state && typeof state === 'object' && 'fromListing' in state
+      ? (state as { fromListing?: unknown }).fromListing
+      : undefined;
+
+  if (typeof stateFromListing === 'string' && (stateFromListing === '/home' || stateFromListing.startsWith('/search'))) {
+    return stateFromListing;
+  }
+
   const queryFromSearch = searchParams.get('from');
   if (queryFromSearch?.startsWith('/search')) {
     return queryFromSearch;
   }
 
-  return '/search';
+  return '/home';
 }
 
 function readDetailCache(id: string): RoomingHouseDetail | null {
