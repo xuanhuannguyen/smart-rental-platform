@@ -21,6 +21,9 @@ namespace SmartRentalPlatform.Infrastructure.Persistence.Configurations.Properti
             builder.Property(x => x.AmenityId).HasColumnName("amenity_id");
             builder.HasOne(x => x.Room).WithMany(x => x.RoomAmenities).HasForeignKey(x => x.RoomId).OnDelete(DeleteBehavior.Cascade);
             builder.HasOne(x => x.Amenity).WithMany(x => x.RoomAmenities).HasForeignKey(x => x.AmenityId).OnDelete(DeleteBehavior.Restrict);
+
+            builder.HasIndex(x => new { x.AmenityId, x.RoomId })
+                .HasDatabaseName("ix_room_amenities_amenity_room");
         }
     }
 }

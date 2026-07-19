@@ -39,6 +39,10 @@ namespace SmartRentalPlatform.Infrastructure.Persistence.Configurations.Properti
             builder.HasIndex(x => new { x.RentalContractId, x.TenantUserId })
                 .IsUnique()
                 .HasDatabaseName("uix_reviews_contract_tenant");
+            builder.HasIndex(x => new { x.RoomingHouseId, x.IsHidden, x.ModerationStatus, x.CreatedAt })
+                .HasDatabaseName("ix_rooming_house_reviews_public_thread");
+            builder.HasIndex(x => new { x.ModerationStatus, x.AiReviewedAt, x.CreatedAt })
+                .HasDatabaseName("ix_rooming_house_reviews_ai_queue");
 
             builder.HasOne(x => x.RoomingHouse)
                 .WithMany()

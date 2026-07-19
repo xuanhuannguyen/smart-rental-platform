@@ -46,6 +46,14 @@ namespace SmartRentalPlatform.Infrastructure.Persistence.Configurations.Properti
                 .OnDelete(DeleteBehavior.SetNull);
 
             builder.HasIndex(x => x.MediaAssetId);
+            builder.HasIndex(x => new { x.RoomingHouseId, x.MediaAssetId, x.SortOrder })
+                .HasDatabaseName("ix_property_images_house_media_sort");
+            builder.HasIndex(x => new { x.RoomingHouseId, x.IsCover, x.SortOrder })
+                .HasDatabaseName("ix_property_images_house_cover_sort");
+            builder.HasIndex(x => new { x.RoomId, x.MediaAssetId, x.SortOrder })
+                .HasDatabaseName("ix_property_images_room_media_sort");
+            builder.HasIndex(x => new { x.RoomingHouseReviewId, x.SortOrder })
+                .HasDatabaseName("ix_property_images_review_sort");
             builder.HasOne(x => x.RoomingHouseReview).WithMany(x => x.Images).HasForeignKey(x => x.RoomingHouseReviewId).OnDelete(DeleteBehavior.Cascade);
         }
     }

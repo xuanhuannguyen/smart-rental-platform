@@ -21,6 +21,11 @@ namespace SmartRentalPlatform.Infrastructure.Persistence.Configurations.Properti
             builder.Property(x => x.CreatedAt).HasColumnName("created_at") .IsRequired();
             builder.Property(x => x.UpdatedAt).HasColumnName("updated_at").IsRequired();
             builder.HasOne(x => x.Room) .WithMany(x => x.PriceTiers).HasForeignKey(x => x.RoomId).OnDelete(DeleteBehavior.Cascade);
+
+            builder.HasIndex(x => new { x.RoomId, x.IsActive, x.MonthlyRent })
+                .HasDatabaseName("ix_room_price_tiers_room_active_rent");
+            builder.HasIndex(x => new { x.IsActive, x.MonthlyRent, x.RoomId })
+                .HasDatabaseName("ix_room_price_tiers_public_rent");
         }
     }
 }
