@@ -135,6 +135,7 @@ Thumbs.db
 server/src/SmartRentalPlatform.Api/wwwroot/uploads/**
 server/src/SmartRentalPlatform.Api/private-storage/**
 deploy/secrets.local.md
+deploy/*.env.local
 
 # Database/runtime data
 *.db
