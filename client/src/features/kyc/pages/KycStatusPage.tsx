@@ -81,8 +81,8 @@ export function KycStatusPage() {
   };
 
   return (
-    <main className="auth-page" style={{ padding: '40px 24px', background: '#f4f7fb', minHeight: '100vh', display: 'flex', justifyContent: 'center', alignItems: 'flex-start' }}>
-      <section className="auth-panel kyc-panel" style={{ width: '100%', maxWidth: '800px', background: 'transparent', boxShadow: 'none', padding: 0 }}>
+    <main className="auth-page kyc-status-auth-page" style={{ padding: '40px 24px', background: '#f4f7fb', minHeight: '100vh', display: 'flex', justifyContent: 'center', alignItems: 'flex-start' }}>
+      <section className="auth-panel kyc-panel kyc-status-page-container" style={{ width: '100%', maxWidth: '800px', background: 'transparent', boxShadow: 'none' }}>
         <div style={{ marginBottom: '20px', display: 'flex', justifyContent: 'flex-start' }}>
           <button
             type="button"

@@ -92,7 +92,7 @@ export default function SubmitRentalRequestModal({
           </button>
         </header>
 
-        <form onSubmit={handleSubmit} className="rental-modal-form">
+        <form onSubmit={handleSubmit} className="rental-modal-form" noValidate>
           <div className="rental-modal-info">
             <div className="info-icon-wrapper">
               <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">

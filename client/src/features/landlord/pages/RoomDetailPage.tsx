@@ -69,6 +69,8 @@ import './RoomingHouseDetailPage.css';
 
 type RoomTab = 'basic' | 'images' | 'amenities' | 'price';
 type RoomMainTab = 'room-info' | 'tenants' | 'contracts' | 'invoices';
+type OccupantFilter = 'all' | 'active' | 'pending' | 'left';
+const invoiceStatusTabs = ['', 'Issued', 'Paid', 'Overdue', 'Cancelled'];
 
 const emptyRoomForm: CreateRoomRequest = {
   roomNumber: '',
@@ -78,6 +80,71 @@ const emptyRoomForm: CreateRoomRequest = {
   isTieredPricing: false,
   description: '',
 };
+
+function getInvoiceStatusTabIcon(status: string) {
+  const props = { width: 16, height: 16, viewBox: '0 0 24 24', fill: 'none', stroke: 'currentColor', strokeWidth: 2, strokeLinecap: 'round' as const, strokeLinejoin: 'round' as const };
+
+  switch (status) {
+    case 'Issued':
+      return <svg {...props}><circle cx="12" cy="12" r="10" /><polyline points="12 6 12 12 16 14" /></svg>;
+    case 'Paid':
+      return <svg {...props}><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14" /><polyline points="22 4 12 14.01 9 11.01" /></svg>;
+    case 'Overdue':
+      return <svg {...props}><path d="M10.29 3.86 1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z" /><line x1="12" y1="9" x2="12" y2="13" /><line x1="12" y1="17" x2="12.01" y2="17" /></svg>;
+    case 'Cancelled':
+      return <svg {...props}><circle cx="12" cy="12" r="10" /><line x1="15" y1="9" x2="9" y2="15" /><line x1="9" y1="9" x2="15" y2="15" /></svg>;
+    default:
+      return <svg {...props}><line x1="8" y1="6" x2="21" y2="6" /><line x1="8" y1="12" x2="21" y2="12" /><line x1="8" y1="18" x2="21" y2="18" /><line x1="3" y1="6" x2="3.01" y2="6" /><line x1="3" y1="12" x2="3.01" y2="12" /><line x1="3" y1="18" x2="3.01" y2="18" /></svg>;
+  }
+}
+
+function getOccupantFilterTabIcon(filter: OccupantFilter) {
+  const props = {
+    width: 15,
+    height: 15,
+    viewBox: '0 0 24 24',
+    fill: 'none',
+    stroke: 'currentColor',
+    strokeWidth: 2.2,
+    strokeLinecap: 'round' as const,
+    strokeLinejoin: 'round' as const,
+  };
+
+  switch (filter) {
+    case 'active':
+      return (
+        <svg {...props}>
+          <path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2" />
+          <circle cx="9" cy="7" r="4" />
+          <polyline points="16 11 18 13 22 9" />
+        </svg>
+      );
+    case 'pending':
+      return (
+        <svg {...props}>
+          <circle cx="12" cy="12" r="10" />
+          <polyline points="12 6 12 12 16 14" />
+        </svg>
+      );
+    case 'left':
+      return (
+        <svg {...props}>
+          <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4" />
+          <polyline points="16 17 21 12 16 7" />
+          <line x1="21" y1="12" x2="9" y2="12" />
+        </svg>
+      );
+    default:
+      return (
+        <svg {...props}>
+          <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2" />
+          <circle cx="9" cy="7" r="4" />
+          <path d="M23 21v-2a4 4 0 0 0-3-3.87" />
+          <path d="M16 3.13a4 4 0 0 1 0 7.75" />
+        </svg>
+      );
+  }
+}
 
 export default function RoomDetailPage() {
   const { id, roomId } = useParams<{ id: string; roomId?: string }>();
@@ -108,7 +175,7 @@ export default function RoomDetailPage() {
 
   const [activeContract, setActiveContract] = useState<ContractDetailResponse | null>(null);
   const [activeTenants, setActiveTenants] = useState<ContractOccupantResponse[]>([]);
-  const [occupantFilter, setOccupantFilter] = useState<'all' | 'active' | 'pending' | 'left'>('all');
+  const [occupantFilter, setOccupantFilter] = useState<OccupantFilter>('all');
   const [tabLoading, setTabLoading] = useState(false);
   const [contractActionError, setContractActionError] = useState<string | null>(null);
   const [isFileActionLoading, setIsFileActionLoading] = useState(false);
@@ -122,7 +189,26 @@ export default function RoomDetailPage() {
   const [signingAppendixId, setSigningAppendixId] = useState<string | null>(null);
   const [contractInvoices, setContractInvoices] = useState<Invoice[]>([]);
   const [invoiceTabLoading, setInvoiceTabLoading] = useState(false);
+  const [invoiceStatusFilter, setInvoiceStatusFilter] = useState('');
   const [isCreateInvoiceModalOpen, setIsCreateInvoiceModalOpen] = useState(false);
+
+  const visibleContractInvoices = useMemo(() => {
+    if (!invoiceStatusFilter) return contractInvoices;
+    return contractInvoices.filter((invoice) => invoice.status === invoiceStatusFilter);
+  }, [contractInvoices, invoiceStatusFilter]);
+
+  const occupants = useMemo(() => (
+    [...activeTenants].sort((left, right) =>
+      new Date(left.moveInDate).getTime() - new Date(right.moveInDate).getTime()
+    )
+  ), [activeTenants]);
+
+  const filteredOccupants = useMemo(() => occupants.filter((occupant) => {
+    if (occupantFilter === 'active') return occupant.status === 'Active';
+    if (occupantFilter === 'pending') return occupant.status === 'PendingMoveIn';
+    if (occupantFilter === 'left') return occupant.status !== 'Active' && occupant.status !== 'PendingMoveIn';
+    return true;
+  }), [occupants, occupantFilter]);
 
   const pendingChangesAlertInfo = useMemo(() => {
     if (!appendices) return null;
@@ -949,10 +1035,34 @@ export default function RoomDetailPage() {
 
         {/* TAB 2: NGƯỜI Ở */}
         {mainTab === 'tenants' && (
-          <div className="history-detail-content" style={{ marginTop: '20px' }}>
-            {tabLoading && <p>Đang tải danh sách người ở...</p>}
-            {!tabLoading && (
+          <div className="history-detail-secondary-section">
+            <div className="contract-invoices-header history-detail-section-heading">
               <div>
+                <h2>Thông tin người ở</h2>
+                <p>Danh sách người ở của hợp đồng active trong phòng này.</p>
+              </div>
+            </div>
+
+            <Tabs
+              className="attached-bottom"
+              variant="segmented-secondary"
+              activeId={occupantFilter}
+              onChange={(filter) => setOccupantFilter(filter as OccupantFilter)}
+              items={[
+                { id: 'all', label: `Tất cả (${occupants.length})`, icon: getOccupantFilterTabIcon('all') },
+                { id: 'active', label: `Đang ở (${occupants.filter((occupant) => occupant.status === 'Active').length})`, icon: getOccupantFilterTabIcon('active') },
+                { id: 'pending', label: `Chờ dọn vào (${occupants.filter((occupant) => occupant.status === 'PendingMoveIn').length})`, icon: getOccupantFilterTabIcon('pending') },
+                { id: 'left', label: `Đã rời đi / Đã hủy (${occupants.filter((occupant) => occupant.status !== 'Active' && occupant.status !== 'PendingMoveIn').length})`, icon: getOccupantFilterTabIcon('left') },
+              ]}
+            />
+
+            <div className="history-detail-content tab-attached-panel tab-attached-panel--compact">
+              {tabLoading ? (
+                <div className="coming-soon-placeholder">
+                  <p>Đang tải danh sách người ở...</p>
+                </div>
+              ) : (
+                <>
                 {pendingChangesAlertInfo?.hasPendingOccupantChanges && (
                   <div style={{ backgroundColor: '#fffbeb', border: '1px solid #fde68a', color: '#b45309', padding: '12px 16px', borderRadius: '8px', marginBottom: '16px', display: 'flex', alignItems: 'flex-start', gap: '8px' }}>
                     <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ flexShrink: 0, marginTop: '2px' }}>
@@ -965,42 +1075,9 @@ export default function RoomDetailPage() {
                     </div>
                   </div>
                 )}
-                <div className="occupants-filter">
-                  <button
-                    className={`occupant-filter-btn ${occupantFilter === 'all' ? 'active' : ''}`}
-                    onClick={() => setOccupantFilter('all')}
-                  >
-                    Tất cả ({activeTenants.length})
-                  </button>
-                  <button
-                    className={`occupant-filter-btn ${occupantFilter === 'active' ? 'active' : ''}`}
-                    onClick={() => setOccupantFilter('active')}
-                  >
-                    Đang ở ({activeTenants.filter((occupant) => occupant.status === 'Active').length})
-                  </button>
-                  <button
-                    className={`occupant-filter-btn ${occupantFilter === 'pending' ? 'active' : ''}`}
-                    onClick={() => setOccupantFilter('pending')}
-                  >
-                    Chờ dọn vào ({activeTenants.filter((occupant) => occupant.status === 'PendingMoveIn').length})
-                  </button>
-                  <button
-                    className={`occupant-filter-btn ${occupantFilter === 'left' ? 'active' : ''}`}
-                    onClick={() => setOccupantFilter('left')}
-                  >
-                    Đã rời đi / Đã hủy ({activeTenants.filter((occupant) => occupant.status !== 'Active' && occupant.status !== 'PendingMoveIn').length})
-                  </button>
-                </div>
 
                 <div className="occupant-list">
-                  {activeTenants
-                    .filter((occupant) => {
-                      if (occupantFilter === 'active') return occupant.status === 'Active';
-                      if (occupantFilter === 'pending') return occupant.status === 'PendingMoveIn';
-                      if (occupantFilter === 'left') return occupant.status !== 'Active' && occupant.status !== 'PendingMoveIn';
-                      return true;
-                    })
-                    .map((occupant) => (
+                  {filteredOccupants.map((occupant) => (
                       <div key={occupant.id} className="occupant-item">
                         <div className="occupant-info">
                           <h4>{occupant.fullName} - {formatOccupantRole(Boolean(activeContract && occupant.userId === activeContract.mainTenantUserId))}</h4>
@@ -1020,12 +1097,13 @@ export default function RoomDetailPage() {
                         </div>
                       </div>
                     ))}
-                  {activeTenants.length === 0 && (
-                    <div style={{ textAlign: 'center', padding: '20px', color: '#64748b' }}>Không có người ở nào được ghi nhận.</div>
+                  {filteredOccupants.length === 0 && (
+                    <div style={{ textAlign: 'center', padding: '20px', color: '#64748b' }}>Không có người ở nào khớp với bộ lọc.</div>
                   )}
                 </div>
-              </div>
-            )}
+                </>
+              )}
+            </div>
           </div>
         )}
 
@@ -1184,10 +1262,10 @@ export default function RoomDetailPage() {
 
         {/* TAB 4: HÓA ĐƠN */}
         {mainTab === 'invoices' && (
-          <div className="history-detail-content" style={{ marginTop: '20px' }}>
-            <div style={{ display: 'flex', justifyContent: 'space-between', gap: '16px', alignItems: 'center', marginBottom: '16px' }}>
+          <div className="history-detail-secondary-section">
+            <div className="contract-invoices-header history-detail-section-heading">
               <div>
-                <h2>Hóa đơn của hợp đồng hiện tại</h2>
+                <h2>Hóa đơn hằng tháng</h2>
                 <p>Danh sách hóa đơn hằng tháng thuộc hợp đồng active của phòng này.</p>
               </div>
               <Button
@@ -1199,52 +1277,65 @@ export default function RoomDetailPage() {
               </Button>
             </div>
 
-            {tabLoading || invoiceTabLoading ? (
-              <p>Đang tải hóa đơn...</p>
-            ) : !activeContract ? (
-              <p>Không tìm thấy hợp đồng active cho phòng này.</p>
-            ) : contractInvoices.length === 0 ? (
-              <p>Chưa có hóa đơn nào cho hợp đồng {activeContract.contractNumber}.</p>
-            ) : (
-              <div className="table-wrapper">
-                <table className="rooms-table">
-                  <thead>
-                    <tr>
-                      <th>Mã hóa đơn</th>
-                      <th>Kỳ hóa đơn</th>
-                      <th>Tổng tiền</th>
-                      <th>Hạn thanh toán</th>
-                      <th>Trạng thái</th>
-                      <th></th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {contractInvoices.map((invoice) => (
-                      <tr key={invoice.id}>
-                        <td>{invoice.invoiceNo}</td>
-                        <td>{formatDateVi(invoice.billingPeriodStart)} - {formatDateVi(invoice.billingPeriodEnd)}</td>
-                        <td>{formatMoneyString(invoice.totalAmount)} đ</td>
-                        <td>{formatDateVi(invoice.dueDate)}</td>
-                        <td>
+            <Tabs
+              className="attached-bottom"
+              variant="segmented-secondary"
+              activeId={invoiceStatusFilter || 'all'}
+              onChange={(status) => setInvoiceStatusFilter(status === 'all' ? '' : status)}
+              items={invoiceStatusTabs.map((status) => ({
+                id: status || 'all',
+                label: status ? formatInvoiceStatus(status) : 'Tất cả',
+                icon: getInvoiceStatusTabIcon(status),
+              }))}
+            />
+
+            <div className="history-detail-content tab-attached-panel tab-attached-panel--compact">
+              {tabLoading || invoiceTabLoading ? (
+                <div className="coming-soon-placeholder">
+                  <p>Đang tải hóa đơn...</p>
+                </div>
+              ) : !activeContract ? (
+                <div className="coming-soon-placeholder">
+                  <h2>Chưa có hợp đồng</h2>
+                  <p>Không tìm thấy hợp đồng active cho phòng này.</p>
+                </div>
+              ) : visibleContractInvoices.length === 0 ? (
+                <div className="coming-soon-placeholder">
+                  <h2>Chưa có hóa đơn</h2>
+                  <p>Chưa có hóa đơn nào phù hợp với bộ lọc hiện tại.</p>
+                </div>
+              ) : (
+                <div className="contract-invoice-list">
+                  {visibleContractInvoices.map((invoice) => (
+                    <div key={invoice.id} className={`contract-invoice-card ${invoice.status === 'Cancelled' ? 'muted' : ''}`}>
+                      <div>
+                        <div className="contract-invoice-title">
+                          <strong>{invoice.invoiceNo}</strong>
                           <span className={`status-badge ${getInvoiceStatusClass(invoice.status)}`}>
                             {formatInvoiceStatus(invoice.status)}
                           </span>
-                        </td>
-                        <td>
-                          <Button
-                            type="button"
-                            variant="outline"
-                            onClick={() => navigate(ROUTE_PATHS.LANDLORD.INVOICE_DETAIL(invoice.id))}
-                          >
-                            Chi tiết
-                          </Button>
-                        </td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
-            )}
+                        </div>
+                        <div className="contract-invoice-meta">
+                          <span>Kỳ: {formatDateVi(invoice.billingPeriodStart)} - {formatDateVi(invoice.billingPeriodEnd)}</span>
+                          <span>Hạn thanh toán: {formatDateVi(invoice.dueDate)}</span>
+                          <span>Người đứng tên: {invoice.tenantName}</span>
+                        </div>
+                      </div>
+                      <div className="contract-invoice-actions">
+                        <strong>{formatMoneyString(invoice.totalAmount)} đ</strong>
+                        <Button
+                          type="button"
+                          variant="outline"
+                          onClick={() => navigate(ROUTE_PATHS.LANDLORD.INVOICE_DETAIL(invoice.id))}
+                        >
+                          Xem chi tiết
+                        </Button>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
           </div>
         )}
 
@@ -1549,10 +1640,11 @@ function CreateInvoiceWithReadingsModal({
     });
 
     for (const reading of meterReadings) {
-      if (!reading.proofImageObjectKey || reading.aiReading === null || reading.aiReading === undefined || !reading.aiRawText) {
-        setError('Vui lòng upload và đọc ảnh cho tất cả dịch vụ tính theo chỉ số.');
+      if (!Number.isFinite(reading.currentReading)) {
+        setError('Vui lòng nhập chỉ số mới hợp lệ cho tất cả dịch vụ tính theo chỉ số.');
         return;
       }
+
       const latestReading = latestReadingByServiceType[reading.serviceTypeId];
       const previousReading = latestReading?.currentReading ?? reading.previousReading;
       if (previousReading !== null && previousReading !== undefined && reading.currentReading < previousReading) {
@@ -1666,17 +1758,20 @@ function CreateInvoiceWithReadingsModal({
                                   <small>Giữ nguyên từ kỳ trước</small>
                                 </div>
                                 <div className="invoice-create-field">
-                                  <span className="label">Chỉ số mới (AI)</span>
+                                  <span className="label">AI đọc ảnh</span>
                                   <strong>{draft.aiReading ?? '--'} {draft.aiReading !== null ? price.meterUnitName : ''}</strong>
-                                  <small>{draft.aiReading !== null ? 'Đọc từ ảnh' : 'Chưa upload ảnh'}</small>
+                                  <small>{draft.aiReading !== null ? 'Kết quả gợi ý từ ảnh' : 'Tùy chọn, có thể nhập thủ công'}</small>
                                 </div>
                                 <label className="invoice-create-field">
-                                  <span className="label">Chỉ số xác nhận cuối cùng</span>
-                                  <input type="number" min="0" value={draft.currentReading} disabled={draft.aiReading === null} onChange={(event) => updateReading(price.serviceTypeId, { currentReading: Number(event.target.value) })} />
+                                  <span className="label">Chỉ số mới</span>
+                                  <input type="number" min="0" value={draft.currentReading} onChange={(event) => updateReading(price.serviceTypeId, { currentReading: Number(event.target.value) })} />
                                   {draft.aiReading !== null && (
                                     <small className={draft.currentReading === draft.aiReading ? 'meter-ok' : 'meter-edited'}>
                                       {draft.currentReading === draft.aiReading ? '✓ Không chỉnh sửa' : '✓ Đã chỉnh sửa kết quả AI'}
                                     </small>
+                                  )}
+                                  {draft.aiReading === null && (
+                                    <small>Nhập trực tiếp nếu không dùng AI.</small>
                                   )}
                                 </label>
                               </div>
@@ -1692,10 +1787,10 @@ function CreateInvoiceWithReadingsModal({
                               <span className="label">ẢNH ĐỒNG HỒ {price.serviceName.toUpperCase()}</span>
                               {draft.proofImageUrl ? <img src={toAssetUrl(draft.proofImageUrl)} alt={`Đồng hồ ${price.serviceName}`} /> : <div className="meter-image-empty">Chưa có ảnh đồng hồ</div>}
                               <label className="meter-upload-button">
-                                {uploadingServiceId === price.serviceTypeId ? 'AI đang đọc ảnh...' : draft.proofImageUrl ? 'Thay ảnh' : 'Upload & đọc ảnh'}
+                                {uploadingServiceId === price.serviceTypeId ? 'AI đang đọc ảnh...' : draft.proofImageUrl ? 'Thay ảnh' : 'Upload & đọc AI'}
                                 <input type="file" accept="image/jpeg,image/png" disabled={uploadingServiceId !== ''} onChange={(event) => { void handleMeterImage(price.serviceTypeId, event.target.files?.[0]); event.currentTarget.value = ''; }} />
                               </label>
-                              <small>JPG, PNG · tối đa 5MB</small>
+                              <small>Tùy chọn · JPG, PNG · tối đa 5MB</small>
                             </div>
                           </div>
                         );

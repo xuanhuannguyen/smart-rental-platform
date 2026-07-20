@@ -238,7 +238,7 @@ export default function NotificationsPage() {
 
   return (
     <main className="auth-page" style={{ padding: '40px 24px', background: '#f4f7fb', minHeight: '100vh', display: 'flex', justifyContent: 'center', alignItems: 'flex-start', width: '100%' }}>
-      <section className="auth-panel kyc-panel" style={{ width: '100%', maxWidth: '960px', background: 'transparent', boxShadow: 'none', padding: 0 }}>
+      <section className="auth-panel kyc-panel notifications-page-container" style={{ width: '100%', maxWidth: '960px', background: 'transparent', boxShadow: 'none' }}>
         {/* Back Button */}
         <div style={{ marginBottom: '20px', display: 'flex', justifyContent: 'flex-start' }}>
           <button
@@ -290,7 +290,7 @@ export default function NotificationsPage() {
               setActiveTab('all');
             }}
           >
-            Người thuê (Tenant)
+            Người thuê
           </button>
           <button 
             className={`role-switch-btn ${activeRole === 'landlord' ? 'active' : ''}`} 
@@ -299,7 +299,7 @@ export default function NotificationsPage() {
               setActiveTab('all');
             }}
           >
-            Chủ trọ (Landlord)
+            Chủ trọ
           </button>
         </div>
 

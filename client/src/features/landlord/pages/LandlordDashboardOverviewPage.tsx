@@ -4,6 +4,7 @@ import { useNavigate } from 'react-router-dom';
 import { ROUTE_PATHS } from '../../../app/router/routePaths';
 import { getApiErrorMessage } from '../../../shared/api/apiError';
 import { Alert } from '../../../shared/components/ui/Alert';
+import { PageHeader } from '../../../shared/components/ui/PageHeader';
 import { formatDateVi } from '../../../shared/utils/format';
 import { landlordDashboardApi } from '../services/landlordDashboardApi';
 import type { LandlordDashboard, LandlordDashboardInvoice } from '../types/dashboard.types';
@@ -73,149 +74,152 @@ export default function LandlordDashboardOverviewPage() {
   return (
     <div className="landlord-dashboard-page" style={{ display: 'contents' }}>
       <main className="dashboard-main landlord-pr-dashboard">
-        <header className="pr-dashboard-topbar">
-          <div>
-            <span className="pr-kicker">Tổng quan vận hành</span>
-            <h2>Dashboard</h2>
-            <p>Theo dõi tình hình khu trọ và các công việc cần xử lý.</p>
-          </div>
-          <div className="pr-month-filter" aria-label="Tháng thống kê">
-            <button
-              type="button"
-              className="pr-month-step"
-              onClick={() => setSelectedMonth(addMonthsToInputValue(selectedMonth, -1))}
-              aria-label="Xem tháng trước"
-              title="Tháng trước"
-            >
-              <ChevronLeftIcon />
-            </button>
-            <label className="pr-month-picker">
-              <CalendarIcon />
-              <span>Tháng</span>
-              <strong>{monthLabel}</strong>
-              <input
-                type="month"
-                value={selectedMonth}
-                max={currentMonthValue}
-                onChange={(event) => setSelectedMonth(event.target.value || currentMonthValue)}
-              />
-            </label>
-            <button
-              type="button"
-              className="pr-month-step"
-              onClick={() => setSelectedMonth(addMonthsToInputValue(selectedMonth, 1))}
-              disabled={!canGoNextMonth}
-              aria-label="Xem tháng sau"
-              title="Tháng sau"
-            >
-              <ChevronIcon />
-            </button>
-          </div>
-        </header>
-
-        <section className="pr-stat-grid">
-          <MetricCard icon={<BuildingIcon />} label="Tổng khu trọ" value={overview.roomingHouseCount} tone="blue" />
-          <MetricCard icon={<BedIcon />} label="Tổng phòng" value={overview.totalRoomCount} tone="indigo" />
-          <MetricCard icon={<UsersIcon />} label="Đang thuê" value={overview.occupiedRoomCount} tone="green" />
-          <MetricCard
-            icon={<DoorIcon />}
-            label="Phòng trống"
-            value={overview.availableRoomCount}
-            helper={`${overview.occupancyRate}% đã lấp đầy`}
-            tone="orange"
-          />
-          <MetricCard icon={<WalletIcon />} label="Doanh thu tháng này" value={formatMoney(overview.currentMonthRevenue)} tone="purple" />
-          <MetricCard
-            icon={<TrendIcon />}
-            label="Tổng doanh thu đã thanh toán"
-            value={formatMoney(overview.totalPaidRevenue)}
-            tone="mint"
-          />
-        </section>
-
-        <section className="pr-main-grid">
-          <article className="pr-panel pr-chart-panel">
-            <PanelTitle icon={<ChartIcon />} title="Biểu đồ doanh thu 6 tháng" />
-            <div className="pr-chart-unit">Triệu đồng</div>
-            <div className="pr-chart">
-              {dashboard.revenueSeries.map((point) => (
-                <div className="pr-chart-column" key={point.period}>
-                  <span className="pr-chart-value">{point.revenue > 0 ? formatMoney(point.revenue) : '0'}</span>
-                  <div className="pr-chart-track">
-                    <div
-                      className="pr-chart-bar"
-                      style={{ height: `${Math.max(point.revenue / maxRevenue * 100, point.revenue > 0 ? 6 : 0)}%` }}
-                    />
-                  </div>
-                  <small>{formatPeriod(point.period)}</small>
-                </div>
-              ))}
+        <PageHeader
+          icon={<ChartIcon />}
+          eyebrow="Tổng quan vận hành"
+          title="Dashboard"
+          description="Theo dõi tình hình khu trọ và các công việc cần xử lý."
+          rightContent={
+            <div className="pr-month-filter" aria-label="Tháng thống kê">
+              <button
+                type="button"
+                className="pr-month-step"
+                onClick={() => setSelectedMonth(addMonthsToInputValue(selectedMonth, -1))}
+                aria-label="Xem tháng trước"
+                title="Tháng trước"
+              >
+                <ChevronLeftIcon />
+              </button>
+              <label className="pr-month-picker">
+                <CalendarIcon />
+                <span>Tháng</span>
+                <strong>{monthLabel}</strong>
+                <input
+                  type="month"
+                  value={selectedMonth}
+                  max={currentMonthValue}
+                  onChange={(event) => setSelectedMonth(event.target.value || currentMonthValue)}
+                />
+              </label>
+              <button
+                type="button"
+                className="pr-month-step"
+                onClick={() => setSelectedMonth(addMonthsToInputValue(selectedMonth, 1))}
+                disabled={!canGoNextMonth}
+                aria-label="Xem tháng sau"
+                title="Tháng sau"
+              >
+                <ChevronIcon />
+              </button>
             </div>
-          </article>
+          }
+        />
 
-          <div className="pr-summary-grid">
-            <SummaryCard
-              icon={<FileIcon />}
-              title="Tóm tắt hóa đơn"
-              onDetail={() => navigate(ROUTE_PATHS.LANDLORD.INVOICES)}
-              items={[
-                ['Bản nháp', overview.draftInvoiceCount, 'muted'],
-                ['Đã phát hành', overview.issuedInvoiceCount, 'blue'],
-                ['Đã thanh toán', overview.paidInvoiceCount, 'green'],
-                ['Quá hạn', overview.overdueInvoiceCount, 'red']
-              ]}
+        <div className="pr-dashboard-content">
+          <section className="pr-stat-grid">
+            <MetricCard icon={<BuildingIcon />} label="Tổng khu trọ" value={overview.roomingHouseCount} tone="blue" />
+            <MetricCard icon={<BedIcon />} label="Tổng phòng" value={overview.totalRoomCount} tone="indigo" />
+            <MetricCard icon={<UsersIcon />} label="Đang thuê" value={overview.occupiedRoomCount} tone="green" />
+            <MetricCard
+              icon={<DoorIcon />}
+              label="Phòng trống"
+              value={overview.availableRoomCount}
+              helper={`${overview.occupancyRate}% đã lấp đầy`}
+              tone="orange"
             />
-            <SummaryCard
-              icon={<FileIcon />}
-              title="Tóm tắt hợp đồng"
-              onDetail={() => navigate(ROUTE_PATHS.LANDLORD.CONTRACTS)}
-              items={[
-                ['Đang hiệu lực', overview.activeContractCount, 'green'],
-                ['Sắp hết hạn', overview.expiringContractCount, 'amber'],
-                ['Hết hạn', overview.expiredContractCount, 'red']
-              ]}
+            <MetricCard icon={<WalletIcon />} label="Doanh thu tháng này" value={formatMoney(overview.currentMonthRevenue)} tone="purple" />
+            <MetricCard
+              icon={<TrendIcon />}
+              label="Tổng doanh thu đã thanh toán"
+              value={formatMoney(overview.totalPaidRevenue)}
+              tone="mint"
             />
-            <SummaryCard
-              icon={<UsersIcon />}
-              title="Yêu cầu thuê"
-              onDetail={() => navigate(ROUTE_PATHS.LANDLORD.RENTAL_REQUESTS)}
-              items={[
-                ['Chờ duyệt', overview.pendingRentalRequestCount, 'amber'],
-                ['Đã chấp nhận', overview.acceptedRentalRequestCount, 'green'],
-                ['Từ chối', overview.rejectedRentalRequestCount, 'red']
-              ]}
-            />
-            <SummaryCard
-              icon={<CalendarIcon />}
-              title="Lịch hẹn xem phòng"
-              onDetail={() => navigate(ROUTE_PATHS.LANDLORD.VIEWING_APPOINTMENTS)}
-              items={[
-                ['Hôm nay', overview.todayAppointmentCount, 'blue'],
-                ['Sắp tới', overview.upcomingAppointmentCount, 'violet'],
-                ['Hoàn thành', overview.completedAppointmentCount, 'green']
-              ]}
-            />
-          </div>
-        </section>
+          </section>
 
-        <section className="pr-bottom-grid">
-          <article className="pr-panel">
-            <PanelTitle icon={<WarningIcon />} title="Cảnh báo cần xử lý" />
-            <ActionList
-              items={[
-                ['Hóa đơn quá hạn', overview.overdueInvoiceCount, 'red', () => navigate(ROUTE_PATHS.LANDLORD.INVOICES)],
-                ['Hợp đồng sắp hết hạn', overview.expiringContractCount, 'orange', () => navigate(ROUTE_PATHS.LANDLORD.CONTRACTS)],
-                ['Yêu cầu thuê chờ duyệt', overview.pendingRentalRequestCount, 'yellow', () => navigate(ROUTE_PATHS.LANDLORD.RENTAL_REQUESTS)],
-                ['Lịch xem phòng hôm nay', overview.todayAppointmentCount, 'violet', () => navigate(ROUTE_PATHS.LANDLORD.VIEWING_APPOINTMENTS)]
-              ]}
-            />
-          </article>
+          <section className="pr-main-grid">
+            <article className="pr-panel pr-chart-panel">
+              <PanelTitle icon={<ChartIcon />} title="Biểu đồ doanh thu 6 tháng" />
+              <div className="pr-chart-unit">Triệu đồng</div>
+              <div className="pr-chart">
+                {dashboard.revenueSeries.map((point) => (
+                  <div className="pr-chart-column" key={point.period}>
+                    <span className="pr-chart-value">{point.revenue > 0 ? formatMoney(point.revenue) : '0'}</span>
+                    <div className="pr-chart-track">
+                      <div
+                        className="pr-chart-bar"
+                        style={{ height: `${Math.max(point.revenue / maxRevenue * 100, point.revenue > 0 ? 6 : 0)}%` }}
+                      />
+                    </div>
+                    <small>{formatPeriod(point.period)}</small>
+                  </div>
+                ))}
+              </div>
+            </article>
 
-          <article className="pr-panel pr-invoice-panel">
-            <PanelTitle icon={<FileIcon />} title="Hóa đơn gần đây" />
-            <InvoiceTable invoices={dashboard.recentInvoices} onViewAll={() => navigate(ROUTE_PATHS.LANDLORD.INVOICES)} />
-          </article>
-        </section>
+            <div className="pr-summary-grid">
+              <SummaryCard
+                icon={<FileIcon />}
+                title="Tóm tắt hóa đơn"
+                onDetail={() => navigate(ROUTE_PATHS.LANDLORD.INVOICES)}
+                items={[
+                  ['Bản nháp', overview.draftInvoiceCount, 'muted'],
+                  ['Đã phát hành', overview.issuedInvoiceCount, 'blue'],
+                  ['Đã thanh toán', overview.paidInvoiceCount, 'green'],
+                  ['Quá hạn', overview.overdueInvoiceCount, 'red']
+                ]}
+              />
+              <SummaryCard
+                icon={<FileIcon />}
+                title="Tóm tắt hợp đồng"
+                onDetail={() => navigate(ROUTE_PATHS.LANDLORD.CONTRACTS)}
+                items={[
+                  ['Đang hiệu lực', overview.activeContractCount, 'green'],
+                  ['Sắp hết hạn', overview.expiringContractCount, 'amber'],
+                  ['Hết hạn', overview.expiredContractCount, 'red']
+                ]}
+              />
+              <SummaryCard
+                icon={<UsersIcon />}
+                title="Yêu cầu thuê"
+                onDetail={() => navigate(ROUTE_PATHS.LANDLORD.RENTAL_REQUESTS)}
+                items={[
+                  ['Chờ duyệt', overview.pendingRentalRequestCount, 'amber'],
+                  ['Đã chấp nhận', overview.acceptedRentalRequestCount, 'green'],
+                  ['Từ chối', overview.rejectedRentalRequestCount, 'red']
+                ]}
+              />
+              <SummaryCard
+                icon={<CalendarIcon />}
+                title="Lịch hẹn xem phòng"
+                onDetail={() => navigate(ROUTE_PATHS.LANDLORD.VIEWING_APPOINTMENTS)}
+                items={[
+                  ['Hôm nay', overview.todayAppointmentCount, 'blue'],
+                  ['Sắp tới', overview.upcomingAppointmentCount, 'violet'],
+                  ['Hoàn thành', overview.completedAppointmentCount, 'green']
+                ]}
+              />
+            </div>
+          </section>
+
+          <section className="pr-bottom-grid">
+            <article className="pr-panel">
+              <PanelTitle icon={<WarningIcon />} title="Cảnh báo cần xử lý" />
+              <ActionList
+                items={[
+                  ['Hóa đơn quá hạn', overview.overdueInvoiceCount, 'red', () => navigate(ROUTE_PATHS.LANDLORD.INVOICES)],
+                  ['Hợp đồng sắp hết hạn', overview.expiringContractCount, 'orange', () => navigate(ROUTE_PATHS.LANDLORD.CONTRACTS)],
+                  ['Yêu cầu thuê chờ duyệt', overview.pendingRentalRequestCount, 'yellow', () => navigate(ROUTE_PATHS.LANDLORD.RENTAL_REQUESTS)],
+                  ['Lịch xem phòng hôm nay', overview.todayAppointmentCount, 'violet', () => navigate(ROUTE_PATHS.LANDLORD.VIEWING_APPOINTMENTS)]
+                ]}
+              />
+            </article>
+
+            <article className="pr-panel pr-invoice-panel">
+              <PanelTitle icon={<FileIcon />} title="Hóa đơn gần đây" />
+              <InvoiceTable invoices={dashboard.recentInvoices} onViewAll={() => navigate(ROUTE_PATHS.LANDLORD.INVOICES)} />
+            </article>
+          </section>
+        </div>
       </main>
     </div>
   );

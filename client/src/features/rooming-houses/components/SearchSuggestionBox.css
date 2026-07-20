@@ -226,7 +226,7 @@
   .search-suggestion-box__dropdown {
     left: 50%;
     transform: translateX(-50%);
-    width: calc(100vw - 24px);
+    width: calc(100dvw - 24px);
     padding: 16px;
   }
 }
