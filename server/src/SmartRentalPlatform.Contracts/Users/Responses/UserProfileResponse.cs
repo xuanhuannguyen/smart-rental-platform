@@ -17,5 +17,6 @@ public class UserProfileResponse
     public bool IdentityVerified { get; set; }
     public bool ProfileCompleted { get; set; }
     public string? AvatarUrl { get; set; }
+    public Guid? AvatarMediaAssetId { get; set; }
     public bool IsGoogleUser { get; set; }
 }

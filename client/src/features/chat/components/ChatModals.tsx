@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { Avatar } from '../../../shared/components/Avatar';
-import { getQuickContacts, searchChatUsers, getActiveTenantsByRoomingHouse, getEligibleMembers, getFilterRoomingHouses, uploadChatImage } from '../api';
+import { getQuickContacts, searchChatUsers, getActiveTenantsByRoomingHouse, getEligibleMembers, getFilterRoomingHouses, uploadChatAvatar } from '../api';
 import type { ChatUser, ChatFilterRoomingHouse, ChatParticipant } from '../types';
 import { getMyRoomingHouses } from '../../rooming-houses/api';
 import type { RoomingHouseSummary } from '../../rooming-houses/types';
@@ -30,7 +30,7 @@ export function UserSearchModal({
   requiresApproval = false,
   isAdminOrOwner = false
 }: UserSearchModalProps) {
-  const [tab, setTab] = useState<'quick' | 'search'>('quick');
+  const [tab, setTab] = useState<'quick' | 'search'>(conversationId && !roomingHouseId ? 'search' : 'quick');
   const [email, setEmail] = useState('');
   const [searchResults, setSearchResults] = useState<ChatUser[]>([]);
   const [selected, setSelected] = useState<ChatUser[]>([]);
@@ -101,6 +101,25 @@ export function UserSearchModal({
         ? prev.filter(item => item.userId !== user.userId)
         : [...prev, user]
     );
+  }
+
+  function toggleAllVisible(users: ChatUser[]) {
+    if (single) return;
+    const allSelected = users.every(user => selected.some(item => item.userId === user.userId));
+    setSelected(prev => {
+      if (allSelected) {
+        const visibleIds = new Set(users.map(user => user.userId));
+        return prev.filter(user => !visibleIds.has(user.userId));
+      }
+
+      const next = [...prev];
+      for (const user of users) {
+        if (!next.some(item => item.userId === user.userId)) {
+          next.push(user);
+        }
+      }
+      return next;
+    });
   }
 
   const excluded = new Set(excludedUserIds);
@@ -249,24 +268,40 @@ export function UserSearchModal({
                     ? 'Nhập tối thiểu 3 ký tự email và nhấn Tìm kiếm.'
                     : 'Không tìm thấy người dùng phù hợp với email này.')}
             </div>
-          ) : combined.map(user => (
-            <button
-              key={user.userId}
-              type="button"
-              onClick={() => toggle(user)}
-              className={selected.some(item => item.userId === user.userId) ? 'selected' : ''}
-              disabled={submitting}
-            >
-              <Avatar name={user.displayName} url={user.avatarUrl} />
-              <span>
-                <strong>{user.displayName}</strong>
-                <small>
-                  {user.email}
-                  {user.contextLabel ? ` • ${user.contextLabel}` : ''}
-                </small>
-              </span>
-            </button>
-          ))}
+          ) : (
+            <>
+              {tab === 'quick' && !single && (
+                <button
+                  type="button"
+                  className="chat-user-results__select-all"
+                  onClick={() => toggleAllVisible(combined)}
+                  disabled={submitting}
+                >
+                  {combined.every(user => selected.some(item => item.userId === user.userId))
+                    ? 'Bỏ chọn tất cả'
+                    : `Chọn tất cả (${combined.length})`}
+                </button>
+              )}
+              {combined.map(user => (
+                <button
+                  key={user.userId}
+                  type="button"
+                  onClick={() => toggle(user)}
+                  className={selected.some(item => item.userId === user.userId) ? 'selected' : ''}
+                  disabled={submitting}
+                >
+                  <Avatar name={user.displayName} url={user.avatarUrl} />
+                  <span>
+                    <strong>{user.displayName}</strong>
+                    <small>
+                      {user.email}
+                      {user.contextLabel ? ` • ${user.contextLabel}` : ''}
+                    </small>
+                  </span>
+                </button>
+              ))}
+            </>
+          )}
         </div>
         <footer>
           <span>{selected.length} người được chọn</span>
@@ -285,7 +320,7 @@ export function UserSearchModal({
 
 interface CreateGroupModalProps {
   onClose: () => void;
-  onSubmit: (title: string, users: ChatUser[], roomingHouseId?: string | null, avatarUrl?: string | null) => Promise<void>;
+  onSubmit: (title: string, users: ChatUser[], roomingHouseId?: string | null, avatarMediaAssetId?: string | null) => Promise<void>;
 }
 
 export function CreateGroupModal({ onClose, onSubmit }: CreateGroupModalProps) {
@@ -358,6 +393,24 @@ export function CreateGroupModal({ onClose, onSubmit }: CreateGroupModalProps) {
     );
   }
 
+  function toggleAllVisible(users: ChatUser[]) {
+    const allSelected = users.every(user => selected.some(item => item.userId === user.userId));
+    setSelected(prev => {
+      if (allSelected) {
+        const visibleIds = new Set(users.map(user => user.userId));
+        return prev.filter(user => !visibleIds.has(user.userId));
+      }
+
+      const next = [...prev];
+      for (const user of users) {
+        if (!next.some(item => item.userId === user.userId)) {
+          next.push(user);
+        }
+      }
+      return next;
+    });
+  }
+
   const handleCreate = async () => {
     if (selected.length < 2) {
       alert('Nhóm chat phải có ít nhất 3 thành viên (bao gồm cả bạn). Vui lòng chọn ít nhất 2 thành viên khác.');
@@ -366,11 +419,12 @@ export function CreateGroupModal({ onClose, onSubmit }: CreateGroupModalProps) {
     if (submitting) return;
     setSubmitting(true);
     try {
-      let uploadedUrl: string | null = null;
+      let avatarMediaAssetId: string | null = null;
       if (avatarFile) {
-        uploadedUrl = await uploadChatImage(avatarFile);
+        const uploaded = await uploadChatAvatar(avatarFile);
+        avatarMediaAssetId = uploaded.mediaAssetId;
       }
-      await onSubmit(title || 'Nhóm trò chuyện', selected, selectedHouseId || null, uploadedUrl);
+      await onSubmit(title || 'Nhóm trò chuyện', selected, selectedHouseId || null, avatarMediaAssetId);
     } catch (err) {
       alert('Lỗi tạo nhóm: ' + (err instanceof Error ? err.message : ''));
     } finally {
@@ -555,6 +609,18 @@ export function CreateGroupModal({ onClose, onSubmit }: CreateGroupModalProps) {
             </div>
           ) : (
             <div className="chat-user-results" style={{ flex: 1, overflowY: 'auto', maxHeight: '240px' }}>
+              {tab === 'quick' && (
+                <button
+                  type="button"
+                  className="chat-user-results__select-all"
+                  onClick={() => toggleAllVisible(currentList)}
+                  disabled={submitting}
+                >
+                  {currentList.every(user => selected.some(item => item.userId === user.userId))
+                    ? 'Bỏ chọn tất cả'
+                    : `Chọn tất cả (${currentList.length})`}
+                </button>
+              )}
               {currentList.map(user => (
                 <button
                   key={user.userId}

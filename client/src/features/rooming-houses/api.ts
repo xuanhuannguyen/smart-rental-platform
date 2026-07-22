@@ -16,6 +16,7 @@ import type {
   RoomingHouseSearchParams,
   RentalPolicy,
   RoomingHouseBasicInfoRequest,
+  RoomInHouseDetail,
   RoomingHouseRule,
   RoomingHouseDetail,
   RoomingHouseOnboarding,
@@ -128,6 +129,13 @@ export async function chatRoomingHouseAssistant(
 export async function getPublicRoomingHouseDetail(id: string): Promise<RoomingHouseDetail> {
   const data = await apiClient<ApiResponse<RoomingHouseDetail>>(
     `/api/public/rooming-houses/${id}`
+  );
+  return data.data;
+}
+
+export async function getPublicAvailableRooms(roomingHouseId: string): Promise<RoomInHouseDetail[]> {
+  const data = await apiClient<ApiResponse<RoomInHouseDetail[]>>(
+    ENDPOINTS.PUBLIC.ROOMS(roomingHouseId)
   );
   return data.data;
 }

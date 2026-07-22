@@ -1,4 +1,3 @@
-using Microsoft.AspNetCore.Http;
 using System.ComponentModel.DataAnnotations;
 
 namespace SmartRentalPlatform.Contracts.Kyc.Requests;
@@ -8,13 +7,13 @@ public class SubmitKycRequest
     public string DocumentType { get; set; } = default!;
 
     [Required]
-    public IFormFile FrontImage { get; set; } = default!;
+    public Guid FrontMediaAssetId { get; set; }
 
     [Required]
-    public IFormFile BackImage { get; set; } = default!;
+    public Guid BackMediaAssetId { get; set; }
 
     [Required]
-    public IFormFile SelfieImage { get; set; } = default!;
+    public Guid SelfieMediaAssetId { get; set; }
 
     public string SelfieCaptureMethod { get; set; } = default!;
 }

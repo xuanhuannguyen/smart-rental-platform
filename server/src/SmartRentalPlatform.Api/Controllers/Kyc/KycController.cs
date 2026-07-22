@@ -15,27 +15,24 @@ public class KycController : ControllerBase
 {
     private readonly IKycService _kycService;
     private readonly IVnptEkycClient _vnptEkycClient;
-    private readonly IPrivateStorageService _storage;
     private readonly ICurrentUserService _currentUserService;
     private readonly IWebHostEnvironment _environment;
 
     public KycController(
         IKycService kycService,
         IVnptEkycClient vnptEkycClient,
-        IPrivateStorageService storage,
         ICurrentUserService currentUserService,
         IWebHostEnvironment environment)
     {
         _kycService = kycService;
         _vnptEkycClient = vnptEkycClient;
-        _storage = storage;
         _currentUserService = currentUserService;
         _environment = environment;
     }
 
     [HttpPost("submissions")]
     public async Task<ActionResult<ApiResponse<KycSubmissionResponse>>> Submit(
-        [FromForm] SubmitKycRequest request,
+        [FromBody] SubmitKycRequest request,
         CancellationToken cancellationToken)
     {
         var userId = GetCurrentUserId();
@@ -108,16 +105,25 @@ public class KycController : ControllerBase
         }
 
         var userId = GetCurrentUserId();
-        var frontKey = await UploadTestImageAsync(userId, "front", request.FrontImage, cancellationToken);
-        var backKey = await UploadTestImageAsync(userId, "back", request.BackImage, cancellationToken);
+        await using var frontStream = request.FrontImage.OpenReadStream();
+        await using var backStream = request.BackImage.OpenReadStream();
 
         var vnpt = await _vnptEkycClient.VerifyAsync(new VnptEkycVerifyInput
         {
             UserId = userId,
             DocumentType = request.DocumentType,
-            FrontImageObjectKey = frontKey,
-            BackImageObjectKey = backKey,
-            SelfieImageObjectKey = string.Empty,
+            FrontImage = new VnptEkycFileInput
+            {
+                Content = frontStream,
+                FileName = request.FrontImage.FileName,
+                ContentType = request.FrontImage.ContentType
+            },
+            BackImage = new VnptEkycFileInput
+            {
+                Content = backStream,
+                FileName = request.BackImage.FileName,
+                ContentType = request.BackImage.ContentType
+            },
             SelfieCaptureMethod = "Upload",
             DocumentOnly = true
         }, cancellationToken);
@@ -145,9 +151,7 @@ public class KycController : ControllerBase
                 ErrorCode = vnpt.ErrorCode,
                 ErrorMessage = vnpt.ErrorMessage,
                 IsProviderFailure = vnpt.IsProviderFailure,
-                IsDocumentUnreadable = vnpt.IsDocumentUnreadable,
-                FrontImageObjectKey = frontKey,
-                BackImageObjectKey = backKey
+                IsDocumentUnreadable = vnpt.IsDocumentUnreadable
             }
         });
     }
@@ -155,22 +159,5 @@ public class KycController : ControllerBase
     private Guid GetCurrentUserId()
     {
         return _currentUserService.GetRequiredUserIdForAction();
-    }
-
-    private async Task<string> UploadTestImageAsync(
-        Guid userId,
-        string label,
-        IFormFile file,
-        CancellationToken cancellationToken)
-    {
-        var extension = Path.GetExtension(file.FileName);
-        if (string.IsNullOrWhiteSpace(extension))
-        {
-            extension = ".jpg";
-        }
-
-        var objectKey = $"kyc-tests/{userId:N}/{label}-{Guid.NewGuid():N}{extension}";
-        await using var stream = file.OpenReadStream();
-        return await _storage.UploadAsync(stream, file.ContentType, objectKey, cancellationToken);
     }
 }

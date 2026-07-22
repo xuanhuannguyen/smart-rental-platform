@@ -274,12 +274,12 @@ export function NotificationBell({ navigateOnly = false, navigateTo }: Notificat
     }
   }, []);
 
-  // Poll unread count every 30 seconds
+  // Poll unread count frequently so cross-account demo actions surface without a manual reload.
   useEffect(() => {
     if (!currentUser) return;
 
     void loadUnreadCount();
-    const interval = setInterval(loadUnreadCount, 30000);
+    const interval = setInterval(loadUnreadCount, 8000);
     return () => clearInterval(interval);
   }, [currentUser, loadUnreadCount]);
 
@@ -287,7 +287,7 @@ export function NotificationBell({ navigateOnly = false, navigateTo }: Notificat
   useEffect(() => {
     if (!currentUser || !isOpen || navigateOnly) return;
 
-    const interval = setInterval(loadNotifications, 30000);
+    const interval = setInterval(loadNotifications, 8000);
     return () => clearInterval(interval);
   }, [currentUser, isOpen, navigateOnly, loadNotifications]);
 

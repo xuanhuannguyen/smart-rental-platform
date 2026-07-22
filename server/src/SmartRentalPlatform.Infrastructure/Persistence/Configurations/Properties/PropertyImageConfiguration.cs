@@ -1,9 +1,7 @@
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Metadata.Builders;
+using SmartRentalPlatform.Domain.Entities.Media;
 using SmartRentalPlatform.Domain.Entities.Properties;
-using System;
-using System.Collections.Generic;
-using System.Text;
 
 namespace SmartRentalPlatform.Infrastructure.Persistence.Configurations.Properties
 {
@@ -19,19 +17,43 @@ namespace SmartRentalPlatform.Infrastructure.Persistence.Configurations.Properti
                     "(rooming_house_id IS NULL AND room_id IS NOT NULL AND rooming_house_review_id IS NULL) OR " +
                     "(rooming_house_id IS NULL AND room_id IS NULL AND rooming_house_review_id IS NOT NULL)");
             });
+
             builder.HasKey(x => x.Id);
             builder.Property(x => x.Id).HasColumnName("id");
             builder.Property(x => x.RoomingHouseId).HasColumnName("rooming_house_id");
             builder.Property(x => x.RoomId).HasColumnName("room_id");
+            builder.Property(x => x.MediaAssetId).HasColumnName("media_asset_id");
             builder.Property(x => x.RoomingHouseReviewId).HasColumnName("rooming_house_review_id");
-            builder.Property(x => x.ObjectKey).HasColumnName("object_key").HasColumnType("text").IsRequired();
             builder.Property(x => x.ImageUrl).HasColumnName("image_url").HasColumnType("text").IsRequired();
             builder.Property(x => x.Caption).HasColumnName("caption").HasMaxLength(255);
             builder.Property(x => x.IsCover).HasColumnName("is_cover").HasDefaultValue(false).IsRequired();
             builder.Property(x => x.SortOrder).HasColumnName("sort_order").HasDefaultValue(0).IsRequired();
             builder.Property(x => x.CreatedAt).HasColumnName("created_at").IsRequired();
-            builder.HasOne(x => x.RoomingHouse).WithMany(x => x.Images).HasForeignKey(x => x.RoomingHouseId).OnDelete(DeleteBehavior.Cascade);
-            builder.HasOne(x => x.Room).WithMany(x => x.Images).HasForeignKey(x => x.RoomId).OnDelete(DeleteBehavior.Cascade);
+
+            builder.HasOne(x => x.RoomingHouse)
+                .WithMany(x => x.Images)
+                .HasForeignKey(x => x.RoomingHouseId)
+                .OnDelete(DeleteBehavior.Cascade);
+
+            builder.HasOne(x => x.Room)
+                .WithMany(x => x.Images)
+                .HasForeignKey(x => x.RoomId)
+                .OnDelete(DeleteBehavior.Cascade);
+
+            builder.HasOne<MediaAsset>(x => x.MediaAsset)
+                .WithMany()
+                .HasForeignKey(x => x.MediaAssetId)
+                .OnDelete(DeleteBehavior.SetNull);
+
+            builder.HasIndex(x => x.MediaAssetId);
+            builder.HasIndex(x => new { x.RoomingHouseId, x.MediaAssetId, x.SortOrder })
+                .HasDatabaseName("ix_property_images_house_media_sort");
+            builder.HasIndex(x => new { x.RoomingHouseId, x.IsCover, x.SortOrder })
+                .HasDatabaseName("ix_property_images_house_cover_sort");
+            builder.HasIndex(x => new { x.RoomId, x.MediaAssetId, x.SortOrder })
+                .HasDatabaseName("ix_property_images_room_media_sort");
+            builder.HasIndex(x => new { x.RoomingHouseReviewId, x.SortOrder })
+                .HasDatabaseName("ix_property_images_review_sort");
             builder.HasOne(x => x.RoomingHouseReview).WithMany(x => x.Images).HasForeignKey(x => x.RoomingHouseReviewId).OnDelete(DeleteBehavior.Cascade);
         }
     }

@@ -136,7 +136,7 @@ public class RoomAccessService
         var hasHouseRule = await context.RoomingHouseRules
             .AnyAsync(
                 x => x.RoomingHouseId == roomingHouseId &&
-                     x.PdfObjectKey != string.Empty,
+                     x.MediaAssetId.HasValue,
                 cancellationToken);
 
         if (!hasHouseRule)

@@ -690,9 +690,7 @@
 
 .invoice-create-meter-card {
   display: grid;
-
   grid-template-columns: minmax(0, 1fr) minmax(220px, 280px);
-
   gap: 12px;
   border: 1px solid #dbe3ef;
   border-radius: 8px;
@@ -1261,6 +1259,165 @@
   min-width: 0;
   display: grid;
   gap: 14px;
+}
+
+.meter-reading-title {
+  display: block;
+  color: #0f172a;
+  font-size: 15px;
+  line-height: 1.4;
+}
+
+.meter-reading-fields {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 12px;
+}
+
+.invoice-create-field small {
+  color: #64748b;
+  font-size: 12px;
+  line-height: 1.35;
+}
+
+.invoice-create-field .meter-ok {
+  color: #047857;
+  font-weight: 700;
+}
+
+.invoice-create-field .meter-edited {
+  color: #b45309;
+  font-weight: 700;
+}
+
+.meter-calculation {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 18px minmax(0, 1fr) 18px minmax(0, 1fr);
+  align-items: stretch;
+  gap: 12px;
+}
+
+.meter-calculation span {
+  min-width: 0;
+  border: 1px solid #e2e8f0;
+  border-radius: 8px;
+  min-height: 76px;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  padding: 12px 14px;
+  background: #f8fafc;
+}
+
+.meter-calculation small {
+  display: block;
+  margin-bottom: 4px;
+  color: #64748b;
+  font-size: 11px;
+  font-weight: 800;
+  letter-spacing: 0;
+}
+
+.meter-calculation strong {
+  display: block;
+  color: #0f172a;
+  font-size: 15px;
+  line-height: 1.35;
+  overflow-wrap: anywhere;
+}
+
+.meter-calculation b {
+  align-self: center;
+  color: #94a3b8;
+}
+
+.meter-calculation .meter-amount {
+  color: #ef4444;
+}
+
+.meter-image-panel {
+  min-width: 0;
+  display: grid;
+  align-content: start;
+  gap: 10px;
+  border: 1px solid #e2e8f0;
+  border-radius: 8px;
+  padding: 12px;
+  background: #f8fafc;
+}
+
+.meter-image-panel > .label {
+  color: #64748b;
+  font-size: 12px;
+  font-weight: 800;
+  text-transform: uppercase;
+}
+
+.meter-image-panel img,
+.meter-image-empty {
+  width: 100%;
+  aspect-ratio: 4 / 3;
+  border: 1px solid #dbe3ef;
+  border-radius: 8px;
+  background: #ffffff;
+}
+
+.meter-image-panel img {
+  display: block;
+  object-fit: cover;
+}
+
+.meter-image-empty {
+  display: grid;
+  place-items: center;
+  padding: 12px;
+  color: #64748b;
+  font-size: 13px;
+  text-align: center;
+}
+
+.meter-upload-button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 40px;
+  border: 1px solid #2563eb;
+  border-radius: 8px;
+  padding: 8px 12px;
+  background: #2563eb;
+  color: #ffffff;
+  font-size: 13px;
+  font-weight: 800;
+  cursor: pointer;
+  transition: background 0.18s ease, box-shadow 0.18s ease, transform 0.18s ease;
+}
+
+.meter-upload-button:hover {
+  background: #1d4ed8;
+  box-shadow: 0 8px 16px rgba(37, 99, 235, 0.18);
+}
+
+.meter-upload-button:has(input:disabled) {
+  cursor: progress;
+  opacity: 0.72;
+}
+
+.meter-upload-button input {
+  display: none;
+}
+
+.meter-image-panel > small {
+  color: #64748b;
+  font-size: 12px;
+  text-align: center;
+}
+
+.meter-reading-main {
+  min-width: 0;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr) minmax(220px, 1fr);
+  gap: 14px;
+  align-items: stretch;
 }
 
 .meter-reading-title {

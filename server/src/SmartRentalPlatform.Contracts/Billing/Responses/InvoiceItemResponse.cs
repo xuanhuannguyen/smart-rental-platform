@@ -5,6 +5,7 @@ public sealed record InvoiceItemResponse(
     Guid? ServiceTypeId,
     string? ServiceName,
     Guid? MeterReadingId,
+    Guid? MeterReadingProofMediaAssetId,
     string? MeterReadingProofImageUrl,
     string ItemType,
     string Description,

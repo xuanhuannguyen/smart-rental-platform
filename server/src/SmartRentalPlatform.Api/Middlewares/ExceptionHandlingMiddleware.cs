@@ -68,7 +68,7 @@ public class ExceptionHandlingMiddleware
                 Success = false,
                 ErrorCode = "INTERNAL_SERVER_ERROR",
                 Message = "Đã xảy ra lỗi hệ thống. Vui lòng thử lại sau.",
-                Details = _environment.IsDevelopment()
+                Details = _environment.IsDevelopment() || _environment.IsEnvironment("Test")
                     ? new
                     {
                         exception = ex.GetType().FullName,

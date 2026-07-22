@@ -22,7 +22,9 @@ public sealed record LatestMeterReadingResponse(
     DateOnly BillingPeriodEnd,
     decimal PreviousReading,
     decimal CurrentReading,
-    decimal Consumption);
+    decimal Consumption,
+    Guid? ProofMediaAssetId,
+    string? ProofImageUrl);
 
 public sealed record RoomInvoicePreviewResponse(
     Guid RoomId,

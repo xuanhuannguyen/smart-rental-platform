@@ -89,8 +89,8 @@ public class RoomingHouseSubmissionService : IRoomingHouseSubmissionService
 
         ValidateLegalDocumentFields(
             roomingHouse.LegalDocument.DocumentType.ToString(),
-            roomingHouse.LegalDocument.FrontImageObjectKey,
-            roomingHouse.LegalDocument.BackImageObjectKey,
+            roomingHouse.LegalDocument.FrontMediaAssetId,
+            roomingHouse.LegalDocument.BackMediaAssetId,
             roomingHouse.LegalDocument.DocumentNumberMasked);
     }
 
@@ -188,19 +188,19 @@ public class RoomingHouseSubmissionService : IRoomingHouseSubmissionService
                 new { field = fieldName });
         }
 
-        if (imageList.Any(x => string.IsNullOrWhiteSpace(x.ObjectKey)))
+        if (imageList.Any(x => !x.MediaAssetId.HasValue))
         {
             throw new BadRequestException(
                 ErrorCodes.ValidationError,
-                "Mã lưu trữ ảnh là bắt buộc.",
+                "Media asset ảnh là bắt buộc.",
                 new { field = fieldName });
         }
     }
 
     private static LegalDocumentType ValidateLegalDocumentFields(
         string documentTypeValue,
-        string frontImageObjectKey,
-        string backImageObjectKey,
+        Guid? frontMediaAssetId,
+        Guid? backMediaAssetId,
         string documentNumber)
     {
         if (!Enum.TryParse<LegalDocumentType>(documentTypeValue, ignoreCase: true, out var documentType))
@@ -211,20 +211,20 @@ public class RoomingHouseSubmissionService : IRoomingHouseSubmissionService
                 new { field = nameof(documentTypeValue) });
         }
 
-        if (string.IsNullOrWhiteSpace(frontImageObjectKey))
+        if (!frontMediaAssetId.HasValue)
         {
             throw new BadRequestException(
                 ErrorCodes.ValidationError,
-                "Mã lưu trữ ảnh mặt trước giấy tờ là bắt buộc.",
-                new { field = nameof(frontImageObjectKey) });
+                "Media asset ảnh mặt trước giấy tờ là bắt buộc.",
+                new { field = nameof(frontMediaAssetId) });
         }
 
-        if (string.IsNullOrWhiteSpace(backImageObjectKey))
+        if (!backMediaAssetId.HasValue)
         {
             throw new BadRequestException(
                 ErrorCodes.ValidationError,
-                "Mã lưu trữ ảnh mặt sau giấy tờ là bắt buộc.",
-                new { field = nameof(backImageObjectKey) });
+                "Media asset ảnh mặt sau giấy tờ là bắt buộc.",
+                new { field = nameof(backMediaAssetId) });
         }
 
         if (string.IsNullOrWhiteSpace(documentNumber))

@@ -1,5 +1,5 @@
 import { Alert } from '../../../shared/components/ui/Alert';
-import { useState } from 'react';
+import { useRef, useState } from 'react';
 import { rentalRequestApi } from '../api';
 import { getApiErrorMessage } from '../../../shared/api/apiError';
 import { Toast } from '../../../shared/components/ui/Toast';
@@ -10,6 +10,8 @@ interface SubmitRentalRequestModalProps {
   roomNumber: string;
   houseName: string;
   maxOccupants: number;
+  minRentalMonths?: number | null;
+  maxRentalMonths?: number | null;
   onClose: () => void;
   onSuccess: (message: string) => void;
 }
@@ -24,6 +26,12 @@ function addDays(days: number) {
   return toDateInput(date);
 }
 
+function addMonths(dateInput: string, months: number) {
+  const date = new Date(`${dateInput}T00:00:00`);
+  date.setMonth(date.getMonth() + months);
+  return toDateInput(date);
+}
+
 const minimumStartDate = addDays(3);
 
 export default function SubmitRentalRequestModal({
@@ -31,20 +39,29 @@ export default function SubmitRentalRequestModal({
   roomNumber,
   houseName,
   maxOccupants,
+  minRentalMonths,
+  maxRentalMonths,
   onClose,
   onSuccess,
 }: SubmitRentalRequestModalProps) {
+  const policyMinMonths = Math.max(1, minRentalMonths ?? 6);
+  const policyMaxMonths = Math.max(policyMinMonths, maxRentalMonths ?? 120);
+  const defaultStartDate = addDays(7);
+
   const [desiredStartDate, setDesiredStartDate] = useState(addDays(7));
-  const [expectedEndDate, setExpectedEndDate] = useState(addDays(97));
+  const [expectedEndDate, setExpectedEndDate] = useState(addMonths(defaultStartDate, policyMinMonths));
   const [expectedOccupantCount, setExpectedOccupantCount] = useState<number>(1);
   const [tenantNote, setTenantNote] = useState('');
   
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const [toast, setToast] = useState<{ message: string; type: 'success' | 'error' | 'info' } | null>(null);
+  const submittingRef = useRef(false);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (submittingRef.current) return;
+
     if (!desiredStartDate || !expectedEndDate) {
       setError('Vui lòng chọn ngày dự kiến bắt đầu và kết thúc.');
       return;
@@ -60,6 +77,14 @@ export default function SubmitRentalRequestModal({
       return;
     }
 
+    const minimumEndDate = addMonths(desiredStartDate, policyMinMonths);
+    const maximumEndDate = addMonths(desiredStartDate, policyMaxMonths);
+    if (expectedEndDate < minimumEndDate || expectedEndDate > maximumEndDate) {
+      setError(`Thời gian thuê phải nằm trong chính sách của khu trọ (${policyMinMonths}-${policyMaxMonths} tháng).`);
+      return;
+    }
+
+    submittingRef.current = true;
     setLoading(true);
     setError('');
 
@@ -75,6 +100,7 @@ export default function SubmitRentalRequestModal({
     } catch (err) {
       setToast({ message: getApiErrorMessage(err, 'Không thể gửi yêu cầu thuê. Vui lòng thử lại.'), type: 'error' });
     } finally {
+      submittingRef.current = false;
       setLoading(false);
     }
   };
@@ -145,7 +171,11 @@ export default function SubmitRentalRequestModal({
                   type="date"
                   min={minimumStartDate}
                   value={desiredStartDate}
-                  onChange={(e) => setDesiredStartDate(e.target.value)}
+                  onChange={(e) => {
+                    const nextStartDate = e.target.value;
+                    setDesiredStartDate(nextStartDate);
+                    setExpectedEndDate(addMonths(nextStartDate, policyMinMonths));
+                  }}
                   disabled={loading}
                   required
                 />
@@ -166,6 +196,8 @@ export default function SubmitRentalRequestModal({
                 <input
                   id="expectedEndDate"
                   type="date"
+                  min={addMonths(desiredStartDate, policyMinMonths)}
+                  max={addMonths(desiredStartDate, policyMaxMonths)}
                   value={expectedEndDate}
                   onChange={(e) => setExpectedEndDate(e.target.value)}
                   disabled={loading}
@@ -182,6 +214,9 @@ export default function SubmitRentalRequestModal({
               </div>
             </div>
           </div>
+          <p className="field-helper-text">
+            Chính sách khu trọ: thuê từ {policyMinMonths} đến {policyMaxMonths} tháng.
+          </p>
 
           <div className="rental-modal-field">
             <label htmlFor="expectedOccupantCount">Số người dự kiến ở <span className="required">*</span></label>

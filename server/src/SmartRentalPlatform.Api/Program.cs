@@ -1,19 +1,12 @@
-using System.Threading.RateLimiting;
-using Microsoft.AspNetCore.RateLimiting;
 using SmartRentalPlatform.Api.Extensions;
 using SmartRentalPlatform.Api.Middlewares;
 using SmartRentalPlatform.Application;
-using SmartRentalPlatform.Application.Common.Interfaces;
 using SmartRentalPlatform.Infrastructure;
-using SmartRentalPlatform.Infrastructure.Persistence;
-using SmartRentalPlatform.Infrastructure.Persistence.Seed;
-using SmartRentalPlatform.Infrastructure.Persistence.Seeders;
 using QuestPDF.Infrastructure;
 using SmartRentalPlatform.Api.Hubs;
 
 var builder = WebApplication.CreateBuilder(args);
 
-builder.Configuration.AddJsonFile("appsettings.Local.json", optional: true, reloadOnChange: true);
 builder.Logging.ClearProviders();
 builder.Logging.AddConsole();
 builder.Logging.AddDebug();
@@ -31,33 +24,9 @@ builder.Services.AddSwaggerDocumentation();
 builder.Services.AddJwtAuthentication(builder.Configuration);
 
 // Cho phép frontend React gọi backend.
-builder.Services.AddClientCors();
+builder.Services.AddClientCors(builder.Configuration);
 
-// Rate limiting: 10 requests / phút cho AI chatbot endpoint.
-builder.Services.AddRateLimiter(options =>
-{
-    options.AddFixedWindowLimiter("AiChat", config =>
-    {
-        config.PermitLimit = 10;
-        config.Window = TimeSpan.FromMinutes(1);
-        config.QueueProcessingOrder = QueueProcessingOrder.OldestFirst;
-        config.QueueLimit = 2;
-    });
-
-    options.OnRejected = async (context, cancellationToken) =>
-    {
-        context.HttpContext.Response.StatusCode = StatusCodes.Status429TooManyRequests;
-        context.HttpContext.Response.ContentType = "application/json";
-        await context.HttpContext.Response.WriteAsJsonAsync(
-            new SmartRentalPlatform.Contracts.Common.ApiErrorResponse
-            {
-                Success = false,
-                ErrorCode = "TOO_MANY_REQUESTS",
-                Message = "Bạn đã gửi quá nhiều yêu cầu. Vui lòng thử lại sau 1 phút.",
-                Details = new { retryAfter = "1 minute" }
-            }, cancellationToken);
-    };
-});
+builder.Services.AddApiRateLimiting();
 
 // Đăng ký các layer tự viết.
 builder.Services.AddApplication();
@@ -65,22 +34,89 @@ builder.Services.AddInfrastructure(builder.Configuration);
 
 var app = builder.Build();
 
-if (ShouldSeedDevelopmentData(app))
+if (args.Length > 0 && (args[0] == "seed-display-data" || args[0] == "validate-display-seed"))
 {
     await using var scope = app.Services.CreateAsyncScope();
-    var dbContext = scope.ServiceProvider.GetRequiredService<AppDbContext>();
-    var passwordService = scope.ServiceProvider.GetRequiredService<IPasswordService>();
-    await DevelopmentDataSeed.SeedAdminAsync(dbContext, passwordService);
-    await DevelopmentDataSeed.SeedAsync(dbContext, passwordService);
+    var dbContext = scope.ServiceProvider.GetRequiredService<SmartRentalPlatform.Infrastructure.Persistence.AppDbContext>();
+    var mediaStorageService = scope.ServiceProvider.GetRequiredService<SmartRentalPlatform.Application.Common.Interfaces.Media.IMediaStorageService>();
+    var mediaObjectKeyFactory = scope.ServiceProvider.GetRequiredService<SmartRentalPlatform.Application.Common.Interfaces.Media.IMediaObjectKeyFactory>();
+    var passwordService = scope.ServiceProvider.GetRequiredService<SmartRentalPlatform.Application.Common.Interfaces.IPasswordService>();
+    
+    var runner = new SmartRentalPlatform.Infrastructure.Persistence.Seed.DisplayCatalogSeedRunner(
+        dbContext,
+        mediaStorageService,
+        mediaObjectKeyFactory,
+        passwordService);
+        
+    if (args[0] == "seed-display-data")
+    {
+        int count = 500;
+        int assetCount = 180;
+        bool uploadMedia = true;
+        string version = "display-catalog-v1";
+        string? mediaSource = null;
+        
+        for (int i = 1; i < args.Length; i++)
+        {
+            if (args[i] == "--count" && i + 1 < args.Length)
+            {
+                int.TryParse(args[i + 1], out count);
+            }
+            else if (args[i] == "--asset-count" && i + 1 < args.Length)
+            {
+                int.TryParse(args[i + 1], out assetCount);
+            }
+            else if (args[i] == "--upload-media" && i + 1 < args.Length)
+            {
+                bool.TryParse(args[i + 1], out uploadMedia);
+            }
+            else if (args[i] == "--version" && i + 1 < args.Length)
+            {
+                version = args[i + 1];
+            }
+            else if (args[i] == "--media-source" && i + 1 < args.Length)
+            {
+                mediaSource = args[i + 1];
+            }
+        }
+        
+        try
+        {
+            await runner.RunSeedAsync(count, assetCount, uploadMedia, version, mediaSource);
+            Environment.Exit(0);
+        }
+        catch (Exception ex)
+        {
+            Console.Error.WriteLine($"Seeding failed: {ex}");
+            Environment.Exit(1);
+        }
+    }
+    else if (args[0] == "validate-display-seed")
+    {
+        string version = "display-catalog-v1";
+        for (int i = 1; i < args.Length; i++)
+        {
+            if (args[i] == "--version" && i + 1 < args.Length)
+            {
+                version = args[i + 1];
+            }
+        }
+        
+        try
+        {
+            var report = await runner.RunValidateAsync(version);
+            Environment.Exit(report.IsValid ? 0 : 1);
+        }
+        catch (Exception ex)
+        {
+            Console.Error.WriteLine($"Validation failed: {ex}");
+            Environment.Exit(1);
+        }
+    }
 }
 
-if (ShouldSeedWalletQaData(app))
-{
-    await using var scope = app.Services.CreateAsyncScope();
-    var dbContext = scope.ServiceProvider.GetRequiredService<AppDbContext>();
-    var passwordService = scope.ServiceProvider.GetRequiredService<IPasswordService>();
-    await WalletQaDataSeeder.SeedAsync(dbContext, passwordService);
-}
+await app.InitializeDevelopmentDatabaseAsync();
+await app.SeedConfiguredDemoDataAsync();
 
 // Chỉ bật Swagger ở môi trường Development.
 app.UseSwaggerDocumentation();
@@ -96,73 +132,15 @@ app.UseCors(CorsExtensions.ClientAppPolicyName);
 // Rate limiting middleware — phải sau CORS, trước controllers.
 app.UseRateLimiter();
 
-app.UseStaticFiles(new StaticFileOptions
-{
-    OnPrepareResponse = ctx =>
-    {
-        ctx.Context.Response.Headers["Access-Control-Allow-Origin"] = "*";
-    }
-});
+app.UsePublicStaticFiles();
 
 app.UseAuthentication();
 app.UseAuthorization();
 
-if (app.Environment.IsDevelopment())
-{
-    app.MapPost("/dev/email/test-otp", async (
-        TestEmailOtpRequest request,
-        IEmailSender emailSender,
-        CancellationToken cancellationToken) =>
-    {
-        if (string.IsNullOrWhiteSpace(request.Email))
-        {
-            return Results.BadRequest(new
-            {
-                success = false,
-                message = "Email is required."
-            });
-        }
-
-        var otp = Random.Shared.Next(0, 1_000_000).ToString("D6");
-        var displayName = string.IsNullOrWhiteSpace(request.DisplayName)
-            ? "Tester"
-            : request.DisplayName.Trim();
-
-        await emailSender.SendEmailVerificationOtpAsync(
-            request.Email.Trim(),
-            displayName,
-            otp,
-            cancellationToken);
-
-        return Results.Ok(new
-        {
-            success = true,
-            email = request.Email.Trim(),
-            otp,
-            message = "Test OTP email sent in Development environment."
-        });
-    })
-    .AllowAnonymous()
-    .WithTags("Dev");
-}
-
+app.MapDevelopmentEndpoints();
 app.MapControllers();
 app.MapHub<ChatHub>("/hubs/chat");
 
 app.Run();
-
-static bool ShouldSeedDevelopmentData(WebApplication app)
-{
-    return app.Environment.IsDevelopment() &&
-        app.Configuration.GetValue("SeedData:Development:Enabled", false);
-}
-
-static bool ShouldSeedWalletQaData(WebApplication app)
-{
-    return app.Environment.IsDevelopment() &&
-        app.Configuration.GetValue("SeedData:WalletQa:Enabled", false);
-}
-
-public sealed record TestEmailOtpRequest(string Email, string? DisplayName);
 
 public partial class Program;

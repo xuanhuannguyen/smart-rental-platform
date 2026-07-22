@@ -7,7 +7,7 @@ export interface Amenity {
 
 export interface PropertyImage {
   id: string;
-  objectKey: string;
+  mediaAssetId?: string | null;
   imageUrl: string;
   caption?: string | null;
   isCover: boolean;
@@ -17,10 +17,13 @@ export interface PropertyImage {
 
 export interface LegalDocument {
   roomingHouseId: string;
+  frontMediaAssetId?: string | null;
+  backMediaAssetId?: string | null;
+  extraMediaAssetId?: string | null;
   documentType: string;
-  frontImageObjectKey: string;
-  backImageObjectKey: string;
-  extraImageObjectKey?: string | null;
+  frontImageUrl?: string | null;
+  backImageUrl?: string | null;
+  extraImageUrl?: string | null;
   documentNumberMasked: string;
   uploadedAt: string;
   createdAt: string;
@@ -42,8 +45,8 @@ export interface RentalPolicy {
 }
 
 export interface FileUploadResponse {
-  objectKey: string;
   url: string;
+  mediaAssetId?: string | null;
 }
 
 export interface RoomingHouseOnboarding<TRoomingHouse = any> {

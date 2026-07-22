@@ -64,7 +64,9 @@ internal static class ContractAppendixStateGuard
 
     public static void EnsureAppendixCanPreview(ContractAppendix appendix)
     {
-        if (appendix.Status is not ContractAppendixStatus.Active)
+        if (appendix.Status is not (
+            ContractAppendixStatus.Active or
+            ContractAppendixStatus.Cancelled))
         {
             return;
         }

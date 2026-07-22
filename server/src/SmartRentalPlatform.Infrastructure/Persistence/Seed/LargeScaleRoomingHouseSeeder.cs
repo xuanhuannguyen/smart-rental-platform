@@ -1,8 +1,13 @@
 using Microsoft.EntityFrameworkCore;
+using SmartRentalPlatform.Application.Common.Interfaces.Media;
+using SmartRentalPlatform.Application.Common.Media;
+using SmartRentalPlatform.Application.Common.Models.Media;
 using SmartRentalPlatform.Domain.Entities.Administrative;
+using SmartRentalPlatform.Domain.Entities.Media;
 using SmartRentalPlatform.Domain.Entities.Properties;
 using SmartRentalPlatform.Domain.Entities.Users;
 using SmartRentalPlatform.Domain.Enums;
+using SmartRentalPlatform.Domain.Enums.Media;
 using SmartRentalPlatform.Domain.Enums.Properties;
 using SmartRentalPlatform.Domain.Enums.Users;
 using System;
@@ -15,6 +20,13 @@ namespace SmartRentalPlatform.Infrastructure.Persistence.Seed
 {
     public static class LargeScaleRoomingHouseSeeder
     {
+        public const int TargetRoomingHouseCount = 50;
+
+        private static readonly Guid LegacySearchMockLandlordId =
+            Guid.Parse("90000000-0000-0000-0000-000000000002");
+
+        private static readonly byte[] PlaceholderImageBytes = Convert.FromBase64String(
+            "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO5Wv7sAAAAASUVORK5CYII=");
         private static readonly string[] UnsplashPhotoIds = new[]
         {
             "photo-1522708323590-d24dbb6b0267", "photo-1502672260266-1c1ef2d93688", "photo-1493809842364-78817add7ffb", 
@@ -48,7 +60,11 @@ namespace SmartRentalPlatform.Infrastructure.Persistence.Seed
             "Nguyễn Trãi", "Lê Lợi", "Trần Hưng Đạo", "Nguyễn Huệ", "Hai Bà Trưng", "Phan Chu Trinh", "Bùi Thị Xuân", "Nguyễn Thị Minh Khai", "Lê Hồng Phong", "Điện Biên Phủ", "Trần Phú", "Kim Mã", "Cầu Giấy", "Nguyễn Văn Cừ", "Phạm Văn Đồng", "Cách Mạng Tháng Tám", "Nam Kỳ Khởi Nghĩa"
         };
 
-        public static async Task SeedAsync(AppDbContext context, CancellationToken cancellationToken = default)
+        public static async Task SeedAsync(
+            AppDbContext context,
+            IMediaStorageService mediaStorageService,
+            IMediaObjectKeyFactory mediaObjectKeyFactory,
+            CancellationToken cancellationToken = default)
         {
             var defaultHouseGuids = new[]
             {
@@ -62,9 +78,9 @@ namespace SmartRentalPlatform.Infrastructure.Persistence.Seed
             var defaultHouseIdsCsv = string.Join(",", defaultHouseGuids.Select(id => $"'{id}'"));
             var dummyLandlordId = Guid.Parse("10000000-0000-0000-0000-000000009999");
             var seededRoomingHouseSubquery =
-                $"SELECT id FROM rooming_houses WHERE landlord_user_id = '{dummyLandlordId}' AND id NOT IN ({defaultHouseIdsCsv})";
+                $"SELECT id FROM rooming_houses WHERE landlord_user_id IN ('{dummyLandlordId}', '{LegacySearchMockLandlordId}') AND id NOT IN ({defaultHouseIdsCsv})";
 
-            // Refresh only generated mock houses. Do not delete user-created rooming houses on development startup.
+            // Refresh generated houses from both the legacy search migration and the current dev seeder.
             // 1. contract_appendix_changes
             await context.Database.ExecuteSqlRawAsync($@"
                 DELETE FROM contract_appendix_changes 
@@ -156,6 +172,31 @@ namespace SmartRentalPlatform.Infrastructure.Persistence.Seed
                 )
             ", cancellationToken);
 
+            // 8a. review images
+            await context.Database.ExecuteSqlRawAsync($@"
+                DELETE FROM property_images
+                WHERE rooming_house_review_id IN (
+                    SELECT id FROM rooming_house_reviews
+                    WHERE rental_contract_id IN (
+                        SELECT id FROM contracts
+                        WHERE room_id IN (
+                            SELECT id FROM rooms WHERE rooming_house_id IN ({seededRoomingHouseSubquery})
+                        )
+                    )
+                )
+            ", cancellationToken);
+
+            // 8b. rooming house reviews
+            await context.Database.ExecuteSqlRawAsync($@"
+                DELETE FROM rooming_house_reviews
+                WHERE rental_contract_id IN (
+                    SELECT id FROM contracts
+                    WHERE room_id IN (
+                        SELECT id FROM rooms WHERE rooming_house_id IN ({seededRoomingHouseSubquery})
+                    )
+                )
+            ", cancellationToken);
+
             // 9. contracts
             await context.Database.ExecuteSqlRawAsync($@"
                 DELETE FROM contracts 
@@ -208,6 +249,18 @@ namespace SmartRentalPlatform.Infrastructure.Persistence.Seed
             await context.Database.ExecuteSqlRawAsync($@"
                 DELETE FROM property_images 
                 WHERE rooming_house_id IN ({seededRoomingHouseSubquery})
+            ", cancellationToken);
+
+            await context.Database.ExecuteSqlRawAsync($@"
+                DELETE FROM media_assets
+                WHERE owner_user_id IN ('{dummyLandlordId}', '{LegacySearchMockLandlordId}')
+                  AND linked_entity_type = 'PropertyImage'
+                  AND scope IN ('RoomingHouseImage', 'RoomImage')
+                  AND NOT EXISTS (
+                        SELECT 1
+                        FROM property_images pi
+                        WHERE pi.media_asset_id = media_assets.id
+                  )
             ", cancellationToken);
 
             // Xóa room_amenities
@@ -270,12 +323,13 @@ namespace SmartRentalPlatform.Infrastructure.Persistence.Seed
 
             // Kiểm tra số lượng khu trọ hiện tại
             var currentCount = await context.RoomingHouses.CountAsync(cancellationToken);
-            if (currentCount >= 500)
+            if (currentCount >= TargetRoomingHouseCount)
             {
                 return;
             }
 
-            int targetCount = 500 - currentCount;
+            int targetCount = TargetRoomingHouseCount - currentCount;
+            int danangTargetCount = Math.Max(1, targetCount / 5);
 
             // Lấy danh sách Tỉnh/Thành
             var provinces = await context.AdministrativeProvinces
@@ -391,9 +445,9 @@ namespace SmartRentalPlatform.Infrastructure.Persistence.Seed
 
             for (int i = 0; i < targetCount; i++)
             {
-                // Phân bổ: 100 nhà trọ mock đầu tiên ở Đà Nẵng, còn lại ở các tỉnh thành khác
+                // Giữ khoảng 20% dữ liệu mock ở Đà Nẵng, phần còn lại phân bổ sang các tỉnh khác.
                 AdministrativeWard ward;
-                if (i < 100)
+                if (i < danangTargetCount)
                 {
                     ward = danangWards[random.Next(danangWards.Count)];
                 }
@@ -459,38 +513,22 @@ namespace SmartRentalPlatform.Infrastructure.Persistence.Seed
                 };
                 context.RoomingHouses.Add(house);
 
-                // 5. Thêm PropertyImage (3-5 ảnh)
-                int imgCount = random.Next(3, 6);
-                var chosenPhotoIds = UnsplashPhotoIds.OrderBy(x => random.Next()).Take(imgCount).ToList();
-                for (int j = 0; j < chosenPhotoIds.Count; j++)
-                {
-                    var imgUrl = $"https://images.unsplash.com/{chosenPhotoIds[j]}?auto=format&fit=crop&w=800&q=80&sig={random.Next(1, 10000)}";
-                    context.PropertyImages.Add(new PropertyImage
-                    {
-                        Id = Guid.NewGuid(),
-                        RoomingHouseId = houseId,
-                        ImageUrl = imgUrl,
-                        ObjectKey = $"seed/houses/{houseId}/image_{j}.jpg",
-                        Caption = $"Ảnh tổng quan {j + 1} của {houseName}",
-                        IsCover = j == 0,
-                        SortOrder = j,
-                        CreatedAt = seededAt
-                    });
-                }
+                await AddPublicPropertyImageAsync(
+                    context,
+                    mediaStorageService,
+                    mediaObjectKeyFactory,
+                    landlordId,
+                    MediaScope.RoomingHouseImage,
+                    roomingHouseId: houseId,
+                    roomId: null,
+                    fileName: $"rooming-house-{houseId:N}-cover.png",
+                    caption: $"Ảnh tổng quan của {houseName}",
+                    isCover: true,
+                    sortOrder: 1,
+                    createdAt: seededAt,
+                    cancellationToken);
 
-                // 6. Thêm RoomingHouseLegalDocument
-                context.RoomingHouseLegalDocuments.Add(new RoomingHouseLegalDocument
-                {
-                    RoomingHouseId = houseId,
-                    DocumentType = LegalDocumentType.LAND_USE_CERTIFICATE,
-                    FrontImageObjectKey = $"seed/legal/{houseId}/front.jpg",
-                    BackImageObjectKey = $"seed/legal/{houseId}/back.jpg",
-                    DocumentNumberMasked = $"*****{random.Next(1000, 9999)}",
-                    DocumentNumberHash = $"seed-legal-hash-{houseId}",
-                    UploadedAt = seededAt,
-                    CreatedAt = seededAt,
-                    UpdatedAt = seededAt
-                });
+                // 6. Legal documents are intentionally not seeded with fake object keys.
 
                 // 7. Thêm Tiện ích khu trọ (5-8 tiện ích)
                 int houseAmenityCount = random.Next(5, Math.Min(9, houseAmenities.Count + 1));
@@ -541,24 +579,20 @@ namespace SmartRentalPlatform.Infrastructure.Persistence.Seed
                         UpdatedAt = seededAt
                     });
 
-                    // 10. Thêm 3-5 ảnh cho mỗi phòng trọ
-                    int roomImgCount = random.Next(3, 6);
-                    var chosenRoomPhotoIds = UnsplashPhotoIds.OrderBy(x => random.Next()).Take(roomImgCount).ToList();
-                    for (int k = 0; k < chosenRoomPhotoIds.Count; k++)
-                    {
-                        var roomImgUrl = $"https://images.unsplash.com/{chosenRoomPhotoIds[k]}?auto=format&fit=crop&w=800&q=80&sig={random.Next(1, 10000)}";
-                        context.PropertyImages.Add(new PropertyImage
-                        {
-                            Id = Guid.NewGuid(),
-                            RoomId = roomId,
-                            ImageUrl = roomImgUrl,
-                            ObjectKey = $"seed/rooms/{roomId}/image_{k}.jpg",
-                            Caption = $"Ảnh phòng {roomNumber} - góc chụp {k + 1}",
-                            IsCover = k == 0,
-                            SortOrder = k,
-                            CreatedAt = seededAt
-                        });
-                    }
+                    await AddPublicPropertyImageAsync(
+                        context,
+                        mediaStorageService,
+                        mediaObjectKeyFactory,
+                        landlordId,
+                        MediaScope.RoomImage,
+                        roomingHouseId: null,
+                        roomId: roomId,
+                        fileName: $"room-{roomId:N}-cover.png",
+                        caption: $"Ảnh phòng {roomNumber}",
+                        isCover: true,
+                        sortOrder: 1,
+                        createdAt: seededAt,
+                        cancellationToken);
 
                     // 11. Thêm tiện ích phòng trọ (3-5 tiện ích)
                     int roomAmenityCount = random.Next(3, Math.Min(6, roomAmenities.Count + 1));
@@ -581,6 +615,83 @@ namespace SmartRentalPlatform.Infrastructure.Persistence.Seed
             }
 
             await context.SaveChangesAsync(cancellationToken);
+        }
+
+        private static async Task AddPublicPropertyImageAsync(
+            AppDbContext context,
+            IMediaStorageService mediaStorageService,
+            IMediaObjectKeyFactory mediaObjectKeyFactory,
+            Guid ownerUserId,
+            MediaScope scope,
+            Guid? roomingHouseId,
+            Guid? roomId,
+            string fileName,
+            string caption,
+            bool isCover,
+            int sortOrder,
+            DateTimeOffset createdAt,
+            CancellationToken cancellationToken)
+        {
+            var propertyImageId = Guid.NewGuid();
+            var objectKey = mediaObjectKeyFactory.Create(scope, MediaVisibility.Public, fileName);
+            var storedObject = await UploadPlaceholderImageAsync(
+                mediaStorageService,
+                objectKey.ObjectKey,
+                fileName,
+                cancellationToken);
+            var mediaAssetId = Guid.NewGuid();
+
+            context.MediaAssets.Add(new MediaAsset
+            {
+                Id = mediaAssetId,
+                OwnerUserId = ownerUserId,
+                BucketName = storedObject.BucketName,
+                ObjectKey = storedObject.ObjectKey,
+                OriginalFileName = fileName,
+                StoredFileName = storedObject.StoredFileName,
+                ContentType = "image/png",
+                FileSize = PlaceholderImageBytes.Length,
+                Scope = scope,
+                Visibility = MediaVisibility.Public,
+                Status = MediaStatus.Linked,
+                LinkedEntityType = nameof(PropertyImage),
+                LinkedEntityId = propertyImageId,
+                CreatedAt = createdAt,
+                UpdatedAt = createdAt
+            });
+
+            context.PropertyImages.Add(new PropertyImage
+            {
+                Id = propertyImageId,
+                RoomingHouseId = roomingHouseId,
+                RoomId = roomId,
+                MediaAssetId = mediaAssetId,
+                ImageUrl = PublicMediaPathBuilder.Build(mediaAssetId),
+                Caption = caption,
+                IsCover = isCover,
+                SortOrder = sortOrder,
+                CreatedAt = createdAt
+            });
+        }
+
+        private static async Task<MediaStoredObjectResult> UploadPlaceholderImageAsync(
+            IMediaStorageService mediaStorageService,
+            string objectKey,
+            string fileName,
+            CancellationToken cancellationToken)
+        {
+            await using var content = new MemoryStream(PlaceholderImageBytes, writable: false);
+            return await mediaStorageService.UploadAsync(
+                new MediaUploadRequest
+                {
+                    Content = content,
+                    OriginalFileName = fileName,
+                    ContentType = "image/png",
+                    FileSize = PlaceholderImageBytes.Length,
+                    ObjectKey = objectKey,
+                    Visibility = MediaVisibility.Public
+                },
+                cancellationToken);
         }
     }
 }

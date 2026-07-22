@@ -1,0 +1,7 @@
+**/bin/
+**/obj/
+**/TestResults/
+**/*.trx
+coverage-report/
+meter-ai/.venv/
+meter-ai/__pycache__/

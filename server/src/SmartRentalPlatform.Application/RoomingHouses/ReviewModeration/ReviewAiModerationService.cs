@@ -2,6 +2,7 @@ using System.Text.Json;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging;
 using SmartRentalPlatform.Application.Common.Interfaces;
+using SmartRentalPlatform.Application.Common.Interfaces.Media;
 using SmartRentalPlatform.Application.RoomingHouses.Helpers;
 using SmartRentalPlatform.Domain.Entities.Properties;
 using SmartRentalPlatform.Domain.Enums.Properties;
@@ -19,20 +20,20 @@ public sealed class ReviewAiModerationService : IReviewAiModerationService
     private readonly IAppDbContext context;
     private readonly IAiStructuredOutputService primaryAi;
     private readonly IBackupAiStructuredOutputService backupAi;
-    private readonly IPrivateStorageService storage;
+    private readonly IMediaAccessService mediaAccessService;
     private readonly ILogger<ReviewAiModerationService> logger;
 
     public ReviewAiModerationService(
         IAppDbContext context,
         IAiStructuredOutputService primaryAi,
         IBackupAiStructuredOutputService backupAi,
-        IPrivateStorageService storage,
+        IMediaAccessService mediaAccessService,
         ILogger<ReviewAiModerationService> logger)
     {
         this.context = context;
         this.primaryAi = primaryAi;
         this.backupAi = backupAi;
-        this.storage = storage;
+        this.mediaAccessService = mediaAccessService;
         this.logger = logger;
     }
 
@@ -77,13 +78,14 @@ public sealed class ReviewAiModerationService : IReviewAiModerationService
             tenantName = review.TenantUser.DisplayName,
             review.Rating,
             review.Comment,
-            imageCount = review.Images.Count,
+            imageCount = review.Images.Count(x => x.MediaAssetId.HasValue),
             images = review.Images
+                .Where(x => x.MediaAssetId.HasValue)
                 .OrderBy(x => x.SortOrder)
                 .Select(x => new
                 {
                     x.Id,
-                    x.ObjectKey,
+                    x.MediaAssetId,
                     x.Caption,
                     x.SortOrder
                 })
@@ -212,26 +214,31 @@ public sealed class ReviewAiModerationService : IReviewAiModerationService
     {
         var images = new List<AiImageInput>();
 
-        foreach (var image in review.Images.OrderBy(x => x.SortOrder).Take(4))
+        foreach (var image in review.Images
+                     .Where(x => x.MediaAssetId.HasValue)
+                     .OrderBy(x => x.SortOrder)
+                     .Take(4))
         {
-            if (string.IsNullOrWhiteSpace(image.ObjectKey))
-            {
-                continue;
-            }
-
             try
             {
-                await using var stream = await storage.OpenReadAsync(image.ObjectKey, cancellationToken);
+                var mediaAssetId = image.MediaAssetId!.Value;
+                var accessResult = await mediaAccessService.OpenReadAsync(
+                    mediaAssetId,
+                    review.TenantUserId,
+                    cancellationToken);
+                await using var stream = accessResult.Stream;
                 using var memory = new MemoryStream();
                 await stream.CopyToAsync(memory, cancellationToken);
                 images.Add(new AiImageInput(
-                    Path.GetFileName(image.ObjectKey),
-                    GuessImageContentType(image.ObjectKey),
+                    string.IsNullOrWhiteSpace(accessResult.DownloadFileName)
+                        ? $"{image.Id:N}.jpg"
+                        : accessResult.DownloadFileName,
+                    accessResult.ContentType,
                     memory.ToArray()));
             }
             catch (Exception ex)
             {
-                logger.LogWarning(ex, "Could not load review image {ObjectKey} for AI moderation.", image.ObjectKey);
+                logger.LogWarning(ex, "Could not load review image {MediaAssetId} for AI moderation.", image.MediaAssetId);
             }
         }
 
@@ -327,18 +334,6 @@ public sealed class ReviewAiModerationService : IReviewAiModerationService
 
     private static string Truncate(string value, int maxLength)
         => value.Length <= maxLength ? value : value[..maxLength];
-
-    private static string GuessImageContentType(string objectKey)
-    {
-        var extension = Path.GetExtension(objectKey).ToLowerInvariant();
-        return extension switch
-        {
-            ".jpg" or ".jpeg" => "image/jpeg",
-            ".png" => "image/png",
-            ".webp" => "image/webp",
-            _ => "image/jpeg"
-        };
-    }
 
     private sealed class ModerationDecisionPayload
     {

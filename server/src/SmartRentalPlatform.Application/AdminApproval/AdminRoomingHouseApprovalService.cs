@@ -1,6 +1,7 @@
 using Microsoft.EntityFrameworkCore;
 using SmartRentalPlatform.Contracts.Admin;
 using SmartRentalPlatform.Application.Common.Interfaces;
+using SmartRentalPlatform.Application.Common.Media;
 using SmartRentalPlatform.Application.Users;
 using SmartRentalPlatform.Contracts.Amenities;
 using SmartRentalPlatform.Contracts.LegalDocuments;
@@ -104,22 +105,28 @@ public class AdminRoomingHouseApprovalService : IAdminRoomingHouseApprovalServic
                 : new RoomingHouseLegalDocumentResponse
                 {
                     RoomingHouseId = house.LegalDocument.RoomingHouseId,
+                    FrontMediaAssetId = house.LegalDocument.FrontMediaAssetId,
+                    BackMediaAssetId = house.LegalDocument.BackMediaAssetId,
+                    ExtraMediaAssetId = house.LegalDocument.ExtraMediaAssetId,
                     DocumentType = house.LegalDocument.DocumentType.ToString(),
-                    FrontImageObjectKey = house.LegalDocument.FrontImageObjectKey,
-                    BackImageObjectKey = house.LegalDocument.BackImageObjectKey,
-                    ExtraImageObjectKey = house.LegalDocument.ExtraImageObjectKey,
+                    FrontImageUrl = BuildPrivateLegalDocumentUrl(house.LegalDocument.FrontMediaAssetId),
+                    BackImageUrl = BuildPrivateLegalDocumentUrl(house.LegalDocument.BackMediaAssetId),
+                    ExtraImageUrl = BuildOptionalPrivateLegalDocumentUrl(house.LegalDocument.ExtraMediaAssetId),
                     DocumentNumberMasked = house.LegalDocument.DocumentNumberMasked,
                     UploadedAt = house.LegalDocument.UploadedAt,
                     CreatedAt = house.LegalDocument.CreatedAt,
                     UpdatedAt = house.LegalDocument.UpdatedAt
                 },
             Images = house.Images
+                .Where(x => x.MediaAssetId.HasValue)
                 .OrderBy(x => x.SortOrder)
                 .Select(x => new PropertyImageResponse
                 {
                     Id = x.Id,
-                    ObjectKey = x.ObjectKey,
-                    ImageUrl = x.ImageUrl,
+                    MediaAssetId = x.MediaAssetId,
+                    ImageUrl = x.MediaAssetId.HasValue
+                        ? PublicMediaPathBuilder.Build(x.MediaAssetId.Value)
+                        : string.Empty,
                     Caption = x.Caption,
                     IsCover = x.IsCover,
                     SortOrder = x.SortOrder,
@@ -150,6 +157,20 @@ public class AdminRoomingHouseApprovalService : IAdminRoomingHouseApprovalServic
                 })
                 .ToList()
         };
+    }
+
+    private static string BuildPrivateLegalDocumentUrl(Guid? mediaAssetId)
+    {
+        return mediaAssetId.HasValue
+            ? PrivateMediaPathBuilder.Build(mediaAssetId.Value)
+            : string.Empty;
+    }
+
+    private static string? BuildOptionalPrivateLegalDocumentUrl(Guid? mediaAssetId)
+    {
+        return mediaAssetId.HasValue
+            ? PrivateMediaPathBuilder.Build(mediaAssetId.Value)
+            : null;
     }
 
     public async Task<bool> ApproveAsync(

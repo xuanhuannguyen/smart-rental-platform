@@ -1,6 +1,7 @@
 import React, { useEffect, useRef, useState } from 'react';
 import type { ChatMessage } from '../types';
-import { toAssetUrl } from '../../../shared/api/assets';
+import { downloadChatFile } from '../api';
+import { usePrivateChatMediaObjectUrl } from './PrivateChatImage';
 import './MessageBubbleItem.css';
 
 interface MessageBubbleItemProps {
@@ -12,6 +13,8 @@ interface MessageBubbleItemProps {
 export function MessageBubbleItem({ message, mine, onDelete }: MessageBubbleItemProps) {
   const [menuOpen, setMenuOpen] = useState(false);
   const menuRef = useRef<HTMLDivElement>(null);
+  const imageMediaAssetId = message.messageType === 'Image' ? message.mediaAssetId : null;
+  const { objectUrl: imageObjectUrl, error: imageLoadError } = usePrivateChatMediaObjectUrl(imageMediaAssetId);
 
   useEffect(() => {
     function handleClickOutside(event: MouseEvent) {
@@ -37,15 +40,27 @@ export function MessageBubbleItem({ message, mine, onDelete }: MessageBubbleItem
     return parseFloat((bytes / Math.pow(k, i)).toFixed(1)) + ' ' + sizes[i];
   };
 
-  const handleDownloadFile = () => {
-    if (message.fileUrl) {
-      window.open(toAssetUrl(message.fileUrl), '_blank');
+  const handleDownloadFile = async () => {
+    if (!message.mediaAssetId) return;
+
+    try {
+      const blob = await downloadChatFile(message.mediaAssetId);
+      const objectUrl = URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      link.href = objectUrl;
+      link.download = message.fileName ?? 'file';
+      document.body.appendChild(link);
+      link.click();
+      link.remove();
+      window.setTimeout(() => URL.revokeObjectURL(objectUrl), 0);
+    } catch {
+      window.alert('Không thể tải tệp. Vui lòng thử lại.');
     }
   };
 
   const handleViewImage = () => {
-    if (message.imageUrl) {
-      window.open(toAssetUrl(message.imageUrl), '_blank');
+    if (imageObjectUrl) {
+      window.open(imageObjectUrl, '_blank', 'noopener,noreferrer');
     }
   };
 
@@ -57,15 +72,21 @@ export function MessageBubbleItem({ message, mine, onDelete }: MessageBubbleItem
           
           {isDeleted ? (
             <span className="message-text-deleted">Tin nhắn đã bị xóa</span>
-          ) : message.messageType === 'Image' && message.imageUrl ? (
+          ) : message.messageType === 'Image' && message.mediaAssetId ? (
             <div className="message-image-container" onClick={handleViewImage}>
-              <img src={toAssetUrl(message.imageUrl)} alt="Ảnh chat" className="chat-bubble-image" />
+              {imageLoadError ? (
+                <span className="chat-media-error">Không tải được ảnh.</span>
+              ) : imageObjectUrl ? (
+                <img src={imageObjectUrl} alt="Ảnh chat" className="chat-bubble-image" />
+              ) : (
+                <span className="chat-media-loading">Đang tải ảnh...</span>
+              )}
               <div className="image-overlay">
                 <span>Xem ảnh</span>
               </div>
             </div>
-          ) : message.messageType === 'File' && message.fileUrl ? (
-            <div className="message-file-card" onClick={handleDownloadFile}>
+          ) : message.messageType === 'File' && message.mediaAssetId ? (
+            <div className="message-file-card" onClick={() => void handleDownloadFile()}>
               <div className="file-icon">
                 <svg viewBox="0 0 24 24" width="28" height="28" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                   <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" />
@@ -110,13 +131,13 @@ export function MessageBubbleItem({ message, mine, onDelete }: MessageBubbleItem
             
             {menuOpen && (
               <div className="message-actions-dropdown">
-                {message.messageType === 'Image' && message.imageUrl && (
+                {message.messageType === 'Image' && message.mediaAssetId && (
                   <button type="button" className="dropdown-item" onClick={() => { setMenuOpen(false); handleViewImage(); }}>
                     Xem ảnh
                   </button>
                 )}
-                {message.messageType === 'File' && message.fileUrl && (
-                  <button type="button" className="dropdown-item" onClick={() => { setMenuOpen(false); handleDownloadFile(); }}>
+                {message.messageType === 'File' && message.mediaAssetId && (
+                  <button type="button" className="dropdown-item" onClick={() => { setMenuOpen(false); void handleDownloadFile(); }}>
                     Mở/Tải file
                   </button>
                 )}

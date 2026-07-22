@@ -109,16 +109,18 @@ export interface AdminRoomingHouseDetail extends AdminRoomingHouseListItem {
   reviewedByAdminId?: string | null;
   reviewedAt?: string | null;
   legalDocument?: {
+    frontMediaAssetId?: string | null;
+    backMediaAssetId?: string | null;
+    extraMediaAssetId?: string | null;
     documentType: string;
-    frontImageObjectKey: string;
-    backImageObjectKey: string;
-    extraImageObjectKey?: string | null;
+    frontImageUrl?: string | null;
+    backImageUrl?: string | null;
+    extraImageUrl?: string | null;
     documentNumberMasked: string;
     uploadedAt: string;
   } | null;
   images: Array<{
     id: string;
-    objectKey: string;
     imageUrl: string;
     caption?: string | null;
     isCover: boolean;

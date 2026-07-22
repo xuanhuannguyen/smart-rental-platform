@@ -1,11 +1,10 @@
 import { Alert } from '../../../shared/components/ui/Alert';
-import { toAssetUrl } from '../../../shared/api/assets';
+import { PrivateMediaImage } from '../../../shared/components/media/PrivateMediaImage';
 import { useState, useEffect, useMemo, type FormEvent } from 'react';
 import { useParams, useNavigate, useLocation } from 'react-router-dom';
 import { useAuth } from '../../../app/providers/AuthProvider';
 import { ROUTE_PATHS } from '../../../app/router/routePaths';
 import { getApiErrorMessage } from '../../../shared/api/apiError';
-import { toAssetUrl } from '../../../shared/api/assets';
 import { Button } from '../../../shared/components/ui/Button';
 import { Tabs } from '../../../shared/components/ui/Tabs';
 import { PageHeader } from '../../../shared/components/ui/PageHeader';
@@ -45,6 +44,7 @@ import {
   loadAccessibleContractFiles,
 } from '../../contracts/appendixFiles';
 import { AppendixFileActions } from '../../contracts/components/AppendixFileActions';
+import { openContractFileForView } from '../../contracts/fileAccess';
 import { LandlordCreateAppendixModalV2 } from '../../contracts/components/LandlordCreateAppendixModalV2';
 import type { Amenity, PropertyImageRequest } from '../../rooming-houses/types';
 import { getAmenities } from '../../rooming-houses/api';
@@ -530,15 +530,14 @@ export default function RoomDetailPage() {
       setIsFileActionLoading(true);
 
       const file = await resolveRawContractFile(activeContract.id);
-      const blob = await contractApi.downloadContractFile(activeContract.id, file.id);
-      const url = URL.createObjectURL(blob);
 
       if (mode === 'view') {
-        window.open(url, '_blank', 'noopener,noreferrer');
-        window.setTimeout(() => URL.revokeObjectURL(url), 60_000);
+        await openContractFileForView(activeContract.id, file);
         return;
       }
 
+      const blob = await contractApi.downloadContractFile(activeContract.id, file.id);
+      const url = URL.createObjectURL(blob);
       const link = document.createElement('a');
       link.href = url;
       link.download = `${activeContract.contractNumber}-${file.purpose.toLowerCase()}.pdf`;
@@ -1425,7 +1424,7 @@ type ReadingDraft = {
   hasPreviousReading: boolean;
   currentReading: number;
   hasCurrentReading: boolean;
-  proofImageObjectKey: string;
+  proofMediaAssetId?: string | null;
   proofImageUrl: string;
   aiReading: number | null;
   aiRawText: string;
@@ -1436,7 +1435,7 @@ const emptyInvoiceReadingDraft: ReadingDraft = {
   hasPreviousReading: false,
   currentReading: 0,
   hasCurrentReading: false,
-  proofImageObjectKey: '',
+  proofMediaAssetId: null,
   proofImageUrl: '',
   aiReading: null,
   aiRawText: '',
@@ -1464,7 +1463,6 @@ function CreateInvoiceWithReadingsModal({
   const [submitting, setSubmitting] = useState(false);
   const [uploadingServiceId, setUploadingServiceId] = useState('');
   const [error, setError] = useState('');
-  const [uploadingServiceId, setUploadingServiceId] = useState('');
   const latestReadingByServiceType = Object.fromEntries(
     (preview?.meteredServices ?? []).map((service) => [service.serviceTypeId, service.latestReading ?? null])
   );
@@ -1538,6 +1536,7 @@ function CreateInvoiceWithReadingsModal({
             hasPreviousReading: Boolean(latestReading),
             currentReading: latestReading?.currentReading ?? 0,
             hasCurrentReading: false,
+            proofMediaAssetId: null,
           };
         });
         setReadings(nextReadings);
@@ -1611,7 +1610,7 @@ function CreateInvoiceWithReadingsModal({
         hasCurrentReading: true,
         aiReading: response.data.reading,
         aiRawText: response.data.rawText,
-        proofImageObjectKey: response.data.proofImageObjectKey,
+        proofMediaAssetId: response.data.proofMediaAssetId ?? null,
         proofImageUrl: response.data.proofImageUrl,
       });
     } catch (err) {
@@ -1642,7 +1641,7 @@ function CreateInvoiceWithReadingsModal({
         serviceTypeId: price.serviceTypeId,
         previousReading: latestReading ? null : Number(draft.previousReading),
         currentReading: Number(draft.currentReading),
-        proofImageObjectKey: draft.proofImageObjectKey.trim() || null,
+        proofMediaAssetId: draft.proofMediaAssetId || null,
         aiReading: draft.aiReading,
         aiRawText: draft.aiRawText.trim() || null,
       };
@@ -1659,6 +1658,11 @@ function CreateInvoiceWithReadingsModal({
         setError(`Vui lòng nhập chỉ số mới ${price?.serviceName ?? ''}.`.trim());
         return;
       }
+      if (!Number.isFinite(reading.currentReading)) {
+        setError('Vui lòng nhập chỉ số mới hợp lệ cho tất cả dịch vụ tính theo chỉ số.');
+        return;
+      }
+
       const latestReading = latestReadingByServiceType[reading.serviceTypeId];
       const previousReading = latestReading?.currentReading ?? reading.previousReading;
       if (previousReading !== null && previousReading !== undefined && reading.currentReading < previousReading) {
@@ -1822,6 +1826,9 @@ function CreateInvoiceWithReadingsModal({
                                           : '✓ Đã chỉnh sửa kết quả AI'}
                                     </small>
                                   )}
+                                  {draft.aiReading === null && (
+                                    <small>Nhập trực tiếp nếu không dùng AI.</small>
+                                  )}
                                 </label>
                               </div>
                               <div className="meter-calculation">
@@ -1834,12 +1841,12 @@ function CreateInvoiceWithReadingsModal({
                             </div>
                             <div className="meter-image-panel">
                               <span className="label">ẢNH ĐỒNG HỒ {price.serviceName.toUpperCase()}</span>
-                              {draft.proofImageUrl ? <img src={toAssetUrl(draft.proofImageUrl)} alt={`Đồng hồ ${price.serviceName}`} /> : <div className="meter-image-empty">Chưa có ảnh đồng hồ</div>}
+                              {draft.proofImageUrl ? <PrivateMediaImage source={draft.proofImageUrl} alt={`Đồng hồ ${price.serviceName}`} /> : <div className="meter-image-empty">Chưa có ảnh đồng hồ</div>}
                               <label className="meter-upload-button">
-                                {uploadingServiceId === price.serviceTypeId ? 'AI đang đọc ảnh...' : draft.proofImageUrl ? 'Thay ảnh' : 'Upload & đọc ảnh'}
+                                {uploadingServiceId === price.serviceTypeId ? 'AI đang đọc ảnh...' : draft.proofImageUrl ? 'Thay ảnh' : 'Upload & đọc AI'}
                                 <input type="file" accept="image/jpeg,image/png" disabled={uploadingServiceId !== ''} onChange={(event) => { void handleMeterImage(price.serviceTypeId, event.target.files?.[0]); event.currentTarget.value = ''; }} />
                               </label>
-                              <small>JPG, PNG · tối đa 5MB</small>
+                              <small>Tùy chọn · JPG, PNG · tối đa 5MB</small>
                             </div>
                           </div>
                         );
@@ -2146,7 +2153,6 @@ function getInvoiceStatusClass(status: string) {
 function isRoomEditLocked(room: Room | null) {
   return room?.status === 'Reserved' || room?.status === 'Occupied';
 }
-
 
 function getAppendixStatusClass(status: ContractAppendixStatus) {
   switch (status) {

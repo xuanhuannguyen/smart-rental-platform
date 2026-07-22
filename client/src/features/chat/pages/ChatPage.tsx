@@ -17,6 +17,7 @@ import {
   sendMessage,
   uploadChatFile,
   uploadChatImage,
+  uploadChatAvatar,
   downloadChatFile,
   createJoinRequest,
   getJoinRequests,
@@ -33,6 +34,7 @@ import {
 import { ChatComposer } from '../components/ChatComposer';
 import { CreateGroupModal, OwnerTransferModal, UserSearchModal } from '../components/ChatModals';
 import { ChatDetailsPanel } from '../components/ChatDetailsPanel';
+import { PrivateChatImage, usePrivateChatMediaObjectUrl } from '../components/PrivateChatImage';
 import type { ChatMessage, Conversation, SendChatMessageRequest, ConversationJoinRequest, ChatParticipant, ChatUser } from '../types';
 import { useChatHub } from '../useChatHub';
 import './ChatPage.css';
@@ -353,7 +355,7 @@ export function ChatPage() {
 
       // Only auto-select if no conversation is currently active
       if (!currentActiveId && !urlId) {
-        const firstValid = items.find(c => c.lastMessageAt || c.lastMessagePreview);
+        const firstValid = items.find(c => c.lastMessageAt || c.lastMessagePreview || c.type === 'Group');
         selectConversation(firstValid?.id ?? null);
       } else if (urlId && !currentActiveId) {
         // Restore from URL on initial load
@@ -483,6 +485,7 @@ export function ChatPage() {
       senderName: currentUser.displayName,
       messageType: request.messageType,
       content: request.content,
+      mediaAssetId: request.mediaAssetId,
       imageUrl: request.imageUrl,
       fileName: request.fileName,
       fileUrl: request.fileUrl,
@@ -520,8 +523,8 @@ export function ChatPage() {
     if (!file) return;
     setImageUploading(true);
     try {
-      const imageUrl = await uploadChatImage(file);
-      await handleSend({ messageType: 'Image', imageUrl });
+      const uploaded = await uploadChatImage(file);
+      await handleSend({ messageType: 'Image', mediaAssetId: uploaded.mediaAssetId });
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Tải ảnh thất bại.');
     } finally {
@@ -536,8 +539,8 @@ export function ChatPage() {
       const meta = await uploadChatFile(file);
       await handleSend({
         messageType: 'File',
+        mediaAssetId: meta.mediaAssetId,
         fileName: meta.fileName,
-        fileUrl: meta.url,
         fileContentType: meta.contentType,
         fileType: meta.contentType,
         fileSize: meta.size
@@ -998,8 +1001,8 @@ export function ChatPage() {
                       height: '36px',
                       borderRadius: '50%',
                       border: '1px solid #dce6f3',
-                      backgroundColor: (activeConversation.type === 'Group' ? showMembers : showDetails) ? '#eef5ff' : '#ffffff',
-                      color: (activeConversation.type === 'Group' ? showMembers : showDetails) ? '#3b82f6' : '#1e3a5f',
+                      backgroundColor: (activeConversation.type === 'Group' ? showMembers || showDetails : showDetails) ? '#eef5ff' : '#ffffff',
+                      color: (activeConversation.type === 'Group' ? showMembers || showDetails : showDetails) ? '#3b82f6' : '#1e3a5f',
                       cursor: 'pointer',
                       display: 'flex',
                       alignItems: 'center',
@@ -1034,85 +1037,70 @@ export function ChatPage() {
                   )}
                   <div ref={listEndRef} />
                 </div>
+              </div>
 
-                 {showMembers && activeConversation.type === 'Group' && (
-                  <MemberPanel
-                    conversation={activeConversation}
-                    currentUserId={currentUser?.userId ?? ''}
-                    onLeave={handleLeaveGroup}
-                    onClose={handleCloseGroup}
-                    onRemove={handleRemoveMember}
-                    onAdd={handleAddMembers}
-                    onUpdateConversation={upsertConversation}
-                    messages={messages}
-                  />
-                )}
+              {showMembers && activeConversation.type === 'Group' && (
+                <MemberPanel
+                  conversation={activeConversation}
+                  messages={messages}
+                  currentUserId={currentUser?.userId ?? ''}
+                  onLeave={handleLeaveGroup}
+                  onClose={handleCloseGroup}
+                  onRemove={handleRemoveMember}
+                  onAdd={handleAddMembers}
+                  onHide={() => setShowMembers(false)}
+                  onUpdateConversation={upsertConversation}
+                  onOpenDetails={() => {
+                    setShowMembers(false);
+                    setShowDetails(true);
+                  }}
+                />
+              )}
 
-                {showDetails && (
+              {showDetails && (
+                <div className="chat-details-popover">
+                  <button
+                    type="button"
+                    className="chat-popover-close"
+                    onClick={() => {
+                      setShowDetails(false);
+                      if (activeConversation.type === 'Group') {
+                        setShowMembers(true);
+                      }
+                    }}
+                    aria-label="Đóng file và ảnh"
+                  >
+                    ×
+                  </button>
                   <ChatDetailsPanel
                     messages={messages}
                     onClearHistory={() => void handleClearConversation(activeConversation.id)}
                   />
-                )}
-              </div>
+                </div>
+              )}
 
               {activeConversation.inboxStatus === 'Pending' ? (
                 activeConversation.createdByUserId === currentUser?.userId ? (
-                  <div style={{
-                    backgroundColor: '#f1f5f9',
-                    borderTop: '1px solid #e2e8f0',
-                    padding: '16px',
-                    textAlign: 'center',
-                    color: '#64748b',
-                    fontSize: '0.95rem',
-                    fontWeight: 500
-                  }}>
+                  <div className="chat-approval-bar chat-approval-bar--waiting">
                     Đang chờ chủ trọ phê duyệt yêu cầu nhắn tin của bạn...
                   </div>
                 ) : (
-                  <div style={{
-                    backgroundColor: '#f8fafc',
-                    borderTop: '1px solid #e2e8f0',
-                    padding: '20px',
-                    display: 'flex',
-                    flexDirection: 'column',
-                    alignItems: 'center',
-                    gap: '12px',
-                    textAlign: 'center',
-                    borderBottomLeftRadius: '12px',
-                    borderBottomRightRadius: '12px'
-                  }}>
-                    <div style={{ fontSize: '0.95rem', fontWeight: 500, color: '#334155' }}>
+                  <div className="chat-approval-bar">
+                    <div className="chat-approval-bar__text">
                       Người dùng này muốn gửi tin nhắn liên hệ về khu trọ <strong>{activeConversation.roomingHouseName || 'của bạn'}</strong>.
                     </div>
-                    <div style={{ display: 'flex', gap: '16px' }}>
+                    <div className="chat-approval-bar__actions">
                       <button
                         type="button"
                         onClick={() => void handleAcceptContact(activeConversation.id)}
-                        style={{
-                          padding: '8px 24px',
-                          borderRadius: '6px',
-                          backgroundColor: '#10b981',
-                          color: '#fff',
-                          border: 'none',
-                          fontWeight: 600,
-                          cursor: 'pointer'
-                        }}
+                        className="chat-accept-btn"
                       >
                         Chấp nhận
                       </button>
                       <button
                         type="button"
                         onClick={() => void handleRejectContact(activeConversation.id)}
-                        style={{
-                          padding: '8px 24px',
-                          borderRadius: '6px',
-                          backgroundColor: '#ef4444',
-                          color: '#fff',
-                          border: 'none',
-                          fontWeight: 600,
-                          cursor: 'pointer'
-                        }}
+                        className="chat-reject-btn"
                       >
                         Từ chối
                       </button>
@@ -1153,8 +1141,8 @@ export function ChatPage() {
       {showGroupModal && (
         <CreateGroupModal
           onClose={() => setShowGroupModal(false)}
-          onSubmit={async (title: string, users: ChatUser[], roomingHouseId?: string | null, avatarUrl?: string | null) => {
-            const conversation = await createGroupConversation(title, users.map(user => user.userId), roomingHouseId, avatarUrl);
+          onSubmit={async (title: string, users: ChatUser[], roomingHouseId?: string | null, avatarMediaAssetId?: string | null) => {
+            const conversation = await createGroupConversation(title, users.map(user => user.userId), roomingHouseId, avatarMediaAssetId);
             upsertConversation(conversation);
             selectConversation(conversation.id);
             setShowGroupModal(false);
@@ -1176,10 +1164,14 @@ export function ChatPage() {
 
 function MessageBubble({ message, mine }: { message: ChatMessage; mine: boolean }) {
   const { currentUser } = useAuth();
+  const imageMediaAssetId = message.messageType === 'Image' ? message.mediaAssetId : null;
+  const { objectUrl: imageObjectUrl, error: imageLoadError } = usePrivateChatMediaObjectUrl(imageMediaAssetId);
   
   const handleDownload = async () => {
+    if (!message.mediaAssetId) return;
+
     try {
-      const blob = await downloadChatFile(message.conversationId, message.id);
+      const blob = await downloadChatFile(message.mediaAssetId);
       const objectUrl = URL.createObjectURL(blob);
       const link = document.createElement('a');
       link.href = objectUrl;
@@ -1187,7 +1179,7 @@ function MessageBubble({ message, mine }: { message: ChatMessage; mine: boolean 
       document.body.appendChild(link);
       link.click();
       link.remove();
-      URL.revokeObjectURL(objectUrl);
+      window.setTimeout(() => URL.revokeObjectURL(objectUrl), 0);
     } catch {
       alert('Không thể tải tệp. Vui lòng thử lại.');
     }
@@ -1213,9 +1205,19 @@ function MessageBubble({ message, mine }: { message: ChatMessage; mine: boolean 
     <div className={`message-row ${mine ? 'mine' : ''}`}>
       <div className={`message-bubble message-bubble--${message.messageType.toLowerCase()}`}>
         {!mine && <span className="message-sender">{message.senderName}</span>}
-        {message.messageType === 'Image' && message.imageUrl ? (
-          <img src={toAssetUrl(message.imageUrl)} alt="Ảnh chat" />
-        ) : message.messageType === 'File' ? (
+        {message.messageType === 'Image' && message.mediaAssetId ? (
+          imageLoadError ? (
+            <span className="chat-media-error">Không tải được ảnh.</span>
+          ) : imageObjectUrl ? (
+            <img
+              src={imageObjectUrl}
+              alt="Ảnh chat"
+              onClick={() => window.open(imageObjectUrl, '_blank', 'noopener,noreferrer')}
+            />
+          ) : (
+            <span className="chat-media-loading">Đang tải ảnh...</span>
+          )
+        ) : message.messageType === 'File' && message.mediaAssetId ? (
           <div className="message-file-card">
             <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
               <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" />
@@ -1240,22 +1242,26 @@ function MessageBubble({ message, mine }: { message: ChatMessage; mine: boolean 
 
 function MemberPanel({
   conversation,
+  messages,
   currentUserId,
   onLeave,
   onClose,
   onRemove,
   onAdd,
+  onHide,
   onUpdateConversation,
-  messages
+  onOpenDetails
 }: {
   conversation: Conversation;
+  messages: ChatMessage[];
   currentUserId: string;
   onLeave: () => Promise<void>;
   onClose: () => Promise<void>;
   onRemove: (userId: string) => Promise<void>;
   onAdd: (userIds: string[]) => Promise<void>;
+  onHide: () => void;
   onUpdateConversation: (conversation: Conversation) => void;
-  messages: ChatMessage[];
+  onOpenDetails: () => void;
 }) {
   const [showAdd, setShowAdd] = useState(false);
   const [subTab, setSubTab] = useState<'members' | 'requests'>('members');
@@ -1275,8 +1281,8 @@ function MemberPanel({
     if (!file) return;
     setUpdatingGroup(true);
     try {
-      const url = await uploadChatImage(file);
-      const updated = await updateConversation(conversation.id, undefined, url);
+      const uploaded = await uploadChatAvatar(file);
+      const updated = await updateConversation(conversation.id, undefined, uploaded.mediaAssetId);
       onUpdateConversation(updated);
     } catch (err) {
       alert('Cập nhật ảnh đại diện nhóm thất bại: ' + (err instanceof Error ? err.message : ''));
@@ -1299,10 +1305,42 @@ function MemberPanel({
     }
   };
 
-  const mediaMessages = messages.filter((m) => m.messageType === 'Image' && m.imageUrl && !m.deletedAt);
-  const fileMessages = messages.filter((m) => m.messageType === 'File' && m.fileUrl && !m.deletedAt);
+  const mediaMessages = messages.filter((m) => m.messageType === 'Image' && m.mediaAssetId && !m.deletedAt);
+  const fileMessages = messages.filter((m) => m.messageType === 'File' && m.mediaAssetId && !m.deletedAt);
   const [showMediaList, setShowMediaList] = useState(true);
   const [showFileList, setShowFileList] = useState(false);
+
+  const downloadSharedFile = async (message: ChatMessage) => {
+    if (!message.mediaAssetId) return;
+
+    try {
+      const blob = await downloadChatFile(message.mediaAssetId);
+      const objectUrl = URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      link.href = objectUrl;
+      link.download = message.fileName || 'file';
+      document.body.appendChild(link);
+      link.click();
+      link.remove();
+      window.setTimeout(() => URL.revokeObjectURL(objectUrl), 0);
+    } catch {
+      alert('Không thể tải tệp.');
+    }
+  };
+
+  const handleClearAvatar = async () => {
+    if (!window.confirm('Gỡ ảnh đại diện hiện tại của nhóm?')) return;
+
+    setUpdatingGroup(true);
+    try {
+      const updated = await updateConversation(conversation.id, undefined, undefined, true);
+      onUpdateConversation(updated);
+    } catch (err) {
+      alert('Gỡ ảnh đại diện nhóm thất bại: ' + (err instanceof Error ? err.message : ''));
+    } finally {
+      setUpdatingGroup(false);
+    }
+  };
 
   const isAdminOrOwner = conversation.isCurrentUserOwner;
 
@@ -1379,66 +1417,12 @@ function MemberPanel({
   return (
     <aside className="member-panel">
       <header style={{ borderBottom: '1px solid #e2e8f0', paddingBottom: '8px', marginBottom: '12px' }}>
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px' }}>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', width: '100%', marginBottom: '8px' }}>
           <h3 style={{ margin: 0, fontSize: '16px', fontWeight: 600 }}>Quản lý nhóm</h3>
-          {conversation.roomingHouseId && (
-            <button
-              type="button"
-              onClick={() => setShowAdd(true)}
-              style={{
-                padding: '4px 8px',
-                backgroundColor: '#3b82f6',
-                color: '#fff',
-                border: 'none',
-                borderRadius: '4px',
-                fontSize: '13px',
-                fontWeight: 600,
-                cursor: 'pointer'
-              }}
-            >
-              Thêm
-            </button>
-          )}
-        </div>
-
-        {isAdminOrOwner && (
-          <div style={{ display: 'flex', gap: '8px' }}>
-            <button
-              type="button"
-              onClick={() => setSubTab('members')}
-              style={{
-                flex: 1,
-                padding: '6px',
-                border: 'none',
-                borderRadius: '4px',
-                fontSize: '13px',
-                fontWeight: 600,
-                backgroundColor: subTab === 'members' ? '#eff6ff' : 'transparent',
-                color: subTab === 'members' ? '#2563eb' : '#64748b',
-                cursor: 'pointer'
-              }}
-            >
-              Thành viên ({conversation.participants.filter(p => !p.leftAt).length})
-            </button>
-            <button
-              type="button"
-              onClick={() => setSubTab('requests')}
-              style={{
-                flex: 1,
-                padding: '6px',
-                border: 'none',
-                borderRadius: '4px',
-                fontSize: '13px',
-                fontWeight: 600,
-                backgroundColor: subTab === 'requests' ? '#eff6ff' : 'transparent',
-                color: subTab === 'requests' ? '#2563eb' : '#64748b',
-                cursor: 'pointer'
-              }}
-            >
-              Chờ duyệt
-            </button>
+          <div className="member-panel__header-actions">
+            <button type="button" className="member-panel__close" onClick={onHide} aria-label="Đóng quản lý nhóm">⋮</button>
           </div>
-        )}
+        </div>
       </header>
 
       {isAdminOrOwner && (
@@ -1507,6 +1491,26 @@ function MemberPanel({
               </button>
             </div>
           </div>
+          {(conversation.avatarMediaAssetId || conversation.avatarUrl) && (
+            <button
+              type="button"
+              onClick={() => void handleClearAvatar()}
+              disabled={updatingGroup}
+              style={{
+                alignSelf: 'flex-start',
+                padding: '4px 8px',
+                border: '1px solid #fecaca',
+                borderRadius: '4px',
+                backgroundColor: '#fff',
+                color: '#dc2626',
+                fontSize: '12px',
+                fontWeight: 600,
+                cursor: updatingGroup ? 'not-allowed' : 'pointer'
+              }}
+            >
+              Gỡ ảnh đại diện
+            </button>
+          )}
         </div>
       )}
 
@@ -1516,22 +1520,23 @@ function MemberPanel({
         </p>
       )}
 
-      {subTab === 'members' ? (
+      {isAdminOrOwner && (
         <>
-          {isAdminOrOwner && (
-            <div
-              style={{
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'space-between',
-                padding: '8px',
-                backgroundColor: '#f8fafc',
-                borderRadius: '6px',
-                marginBottom: '12px',
-                fontSize: '13px'
-              }}
-            >
-              <span style={{ fontWeight: 500, color: '#475569' }}>Yêu cầu duyệt thành viên</span>
+          <div
+            style={{
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'space-between',
+              gap: '10px',
+              padding: '10px',
+              backgroundColor: '#f8fafc',
+              borderRadius: '8px',
+              marginBottom: '8px',
+              fontSize: '13px'
+            }}
+          >
+            <span style={{ fontWeight: 500, color: '#475569' }}>Yêu cầu duyệt thành viên</span>
+            <div style={{ display: 'inline-flex', alignItems: 'center', gap: '10px', flexShrink: 0 }}>
               <input
                 type="checkbox"
                 checked={conversation.requiresJoinApproval}
@@ -1539,9 +1544,48 @@ function MemberPanel({
                 disabled={approvalLoading}
                 style={{ cursor: 'pointer', width: '16px', height: '16px' }}
               />
+              <button
+                type="button"
+                className="member-panel__add-button"
+                onClick={() => setShowAdd(true)}
+              >
+                Thêm
+              </button>
             </div>
-          )}
+          </div>
 
+          <div className="member-panel__tab-row">
+            <button
+              type="button"
+              onClick={() => setSubTab('members')}
+              className={subTab === 'members' ? 'active' : ''}
+            >
+              Thành viên ({conversation.participants.filter(p => !p.leftAt).length})
+            </button>
+            <button
+              type="button"
+              onClick={() => setSubTab('requests')}
+              className={subTab === 'requests' ? 'active' : ''}
+            >
+              Chờ duyệt
+            </button>
+            <button type="button" className="member-panel__media-button" onClick={onOpenDetails}>
+              File & Ảnh
+            </button>
+          </div>
+        </>
+      )}
+
+      {!isAdminOrOwner && (
+        <div className="member-panel__tab-row member-panel__tab-row--single">
+          <button type="button" className="member-panel__media-button" onClick={onOpenDetails}>
+            File & Ảnh
+          </button>
+        </div>
+      )}
+
+      {subTab === 'members' ? (
+        <>
           <div className="member-list" style={{ display: 'flex', flexDirection: 'column', gap: '8px', flex: 1, overflowY: 'auto' }}>
             {conversation.participants.map(participant => (
               <div
@@ -1758,11 +1802,11 @@ function MemberPanel({
               </div>
             ) : (
               mediaMessages.map(m => (
-                <img
+                <PrivateChatImage
                   key={m.id}
-                  src={toAssetUrl(m.imageUrl!)}
+                  mediaAssetId={m.mediaAssetId!}
                   alt="shared media"
-                  onClick={() => window.open(toAssetUrl(m.imageUrl!), '_blank')}
+                  openOnClick
                   style={{ width: '100%', height: '82px', objectFit: 'cover', borderRadius: '8px', cursor: 'pointer', border: '1px solid #e2e8f0' }}
                 />
               ))
@@ -1780,7 +1824,7 @@ function MemberPanel({
               fileMessages.map(m => (
                 <div
                   key={m.id}
-                  onClick={() => window.open(toAssetUrl(m.fileUrl!), '_blank')}
+                  onClick={() => void downloadSharedFile(m)}
                   style={{
                     display: 'flex',
                     alignItems: 'center',

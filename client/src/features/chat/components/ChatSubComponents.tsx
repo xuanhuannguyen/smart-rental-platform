@@ -104,7 +104,8 @@ export function MemberPanel({
   onLeave,
   onClose,
   onRemove,
-  onAdd
+  onAdd,
+  onHide
 }: {
   conversation: Conversation;
   currentUserId: string;
@@ -112,16 +113,26 @@ export function MemberPanel({
   onClose: () => Promise<void>;
   onRemove: (userId: string) => Promise<void>;
   onAdd: (userIds: string[]) => Promise<void>;
+  onHide?: () => void;
 }) {
   const [showAdd, setShowAdd] = useState(false);
+  const activeMembers = conversation.participants.filter(participant => !participant.leftAt).length;
 
   return (
     <aside className="member-panel">
       <header>
-        <h3>Thành viên</h3>
-        {conversation.isCurrentUserOwner && (
-          <button type="button" onClick={() => setShowAdd(true)}>Thêm</button>
-        )}
+        <div>
+          <h3>Thành viên nhóm</h3>
+          <p>{activeMembers} thành viên đang hoạt động</p>
+        </div>
+        <div className="member-panel__header-actions">
+          {conversation.isCurrentUserOwner && (
+            <button type="button" onClick={() => setShowAdd(true)}>Thêm</button>
+          )}
+          {onHide && (
+            <button type="button" className="member-panel__close" onClick={onHide} aria-label="Đóng danh sách thành viên">×</button>
+          )}
+        </div>
       </header>
       <div className="member-list">
         {conversation.participants.map(participant => (

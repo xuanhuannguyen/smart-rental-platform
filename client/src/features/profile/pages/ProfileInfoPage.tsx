@@ -14,7 +14,7 @@ import { profileApi } from '../services/profileApi';
 import type { UserProfileResponse } from '../types/profile.types';
 import { uploadImage } from '../../files/api';
 import { getApiErrorMessage } from '../../../shared/api/apiError';
-import { toAssetUrl } from '../../../shared/api/assets';
+import { toAvatarImageUrl } from '../../../shared/api/assets';
 import { AvatarCropper, cropAvatar } from '../../../shared/components/ui/AvatarCropper';
 import './MyProfilePage.css'; // Reuse original CSS for now
 
@@ -65,7 +65,8 @@ export function ProfileInfoPage() {
     phoneNumber: '',
     emergencyContactName: '',
     emergencyContactPhone: '',
-    avatarUrl: ''
+    avatarUrl: '',
+    avatarMediaAssetId: null as string | null
   });
 
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
@@ -97,7 +98,8 @@ export function ProfileInfoPage() {
         phoneNumber: profileResponse.data?.phoneNumber || '',
         emergencyContactName: profileResponse.data?.emergencyContactName || '',
         emergencyContactPhone: profileResponse.data?.emergencyContactPhone || '',
-        avatarUrl: profileResponse.data?.avatarUrl || ''
+        avatarUrl: profileResponse.data?.avatarUrl || '',
+        avatarMediaAssetId: profileResponse.data?.avatarMediaAssetId || null
       });
     } catch (loadError) {
       setProfileError(getApiErrorMessage(loadError, 'Không thể tải hồ sơ.'));
@@ -151,12 +153,12 @@ export function ProfileInfoPage() {
     setIsSavingProfile(true);
 
     try {
-      let finalAvatarUrl = profileForm.avatarUrl;
+      let finalAvatarMediaAssetId = profileForm.avatarMediaAssetId;
       if (selectedFile || isCropChanged) {
-        const srcToCrop = previewUrl || toAssetUrl(profileForm.avatarUrl);
+        const srcToCrop = previewUrl || toAvatarImageUrl(profileForm);
         const croppedFile = await cropAvatar(srcToCrop, cropParams.zoom, cropParams.position);
         const uploadResult = await uploadImage(croppedFile, 'Avatar');
-        finalAvatarUrl = uploadResult.url;
+        finalAvatarMediaAssetId = uploadResult.mediaAssetId || null;
       }
 
       const response = await profileApi.updateProfile({
@@ -164,13 +166,14 @@ export function ProfileInfoPage() {
         phoneNumber: profileForm.phoneNumber.trim() || null,
         emergencyContactName: profileForm.emergencyContactName.trim() || null,
         emergencyContactPhone: profileForm.emergencyContactPhone.trim() || null,
-        avatarUrl: finalAvatarUrl || null
+        avatarMediaAssetId: finalAvatarMediaAssetId || null
       });
 
       setProfile(response.data);
       setProfileForm(current => ({
         ...current,
-        avatarUrl: response.data?.avatarUrl || ''
+        avatarUrl: response.data?.avatarUrl || '',
+        avatarMediaAssetId: response.data?.avatarMediaAssetId || null
       }));
 
       setSelectedFile(null);
@@ -233,7 +236,6 @@ export function ProfileInfoPage() {
         {!isLoading ? (
           <form className="auth-form" onSubmit={handleSaveProfile}>
             {profileError ? <Alert type="error">{profileError}</Alert> : null}
-            
 
             {/* Avatar Section */}
             <div className="profile-avatar-row">
@@ -244,7 +246,7 @@ export function ProfileInfoPage() {
                       {previewUrl || isCropChanged ? (
                         <div className="profile-avatar-preview-wrapper">
                           <img
-                            src={previewUrl || toAssetUrl(profileForm.avatarUrl)}
+                            src={previewUrl || toAvatarImageUrl(profileForm)}
                             alt="Avatar"
                             className="profile-avatar-preview-img"
                             style={{
@@ -254,7 +256,7 @@ export function ProfileInfoPage() {
                         </div>
                       ) : (
                         <img
-                          src={toAssetUrl(profileForm.avatarUrl)}
+                          src={toAvatarImageUrl(profileForm)}
                           alt="Avatar"
                           className="profile-avatar-preview"
                         />
@@ -264,7 +266,7 @@ export function ProfileInfoPage() {
                         className="profile-avatar-edit-overlay"
                         title="Chỉnh sửa khung ảnh"
                         onClick={() => {
-                          const currentSrc = previewUrl || toAssetUrl(profileForm.avatarUrl);
+                          const currentSrc = previewUrl || toAvatarImageUrl(profileForm);
                           if (currentSrc) {
                             const finalSrc = currentSrc.startsWith('blob:') 
                               ? currentSrc 
@@ -316,7 +318,7 @@ export function ProfileInfoPage() {
                 <div className="profile-avatar-container">
                   {profileForm.avatarUrl && profileForm.avatarUrl.trim() !== '' ? (
                     <img
-                      src={toAssetUrl(profileForm.avatarUrl)}
+                      src={toAvatarImageUrl(profileForm)}
                       alt="Avatar"
                       className="profile-avatar-preview"
                     />
@@ -468,7 +470,8 @@ export function ProfileInfoPage() {
                     phoneNumber: profile?.phoneNumber || '',
                     emergencyContactName: profile?.emergencyContactName || '',
                     emergencyContactPhone: profile?.emergencyContactPhone || '',
-                    avatarUrl: profile?.avatarUrl || ''
+                    avatarUrl: profile?.avatarUrl || '',
+                    avatarMediaAssetId: profile?.avatarMediaAssetId || null
                   });
                   setSelectedFile(null);
                   setCropParams({ zoom: 1, position: { x: 0, y: 0 } });

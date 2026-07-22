@@ -8,6 +8,8 @@ namespace SmartRentalPlatform.Application.Rooms;
 
 internal static class RoomValidationRules
 {
+    private const int MaxPropertyImages = 10;
+
     public static void ValidateRoomFields(
         string roomNumber,
         int floor,
@@ -57,6 +59,14 @@ internal static class RoomValidationRules
                 new { field = nameof(images) });
         }
 
+        if (images.Count > MaxPropertyImages)
+        {
+            throw new BadRequestException(
+                ErrorCodes.ValidationError,
+                $"Phòng chỉ được có tối đa {MaxPropertyImages} ảnh.",
+                new { field = nameof(images), max = MaxPropertyImages });
+        }
+
         var coverCount = images.Count(x => x.IsCover);
         if (coverCount != 1)
         {
@@ -66,11 +76,11 @@ internal static class RoomValidationRules
                 new { field = nameof(images) });
         }
 
-        if (images.Any(x => string.IsNullOrWhiteSpace(x.ObjectKey)))
+        if (images.Any(x => !x.MediaAssetId.HasValue))
         {
             throw new BadRequestException(
                 ErrorCodes.ValidationError,
-                "Mã lưu trữ ảnh là bắt buộc.",
+                "Mỗi ảnh phòng phải có mediaAssetId hợp lệ.",
                 new { field = nameof(images) });
         }
     }
@@ -96,11 +106,11 @@ internal static class RoomValidationRules
                 new { field = nameof(images) });
         }
 
-        if (imageList.Any(x => string.IsNullOrWhiteSpace(x.ObjectKey)))
+        if (imageList.Any(x => !x.MediaAssetId.HasValue))
         {
             throw new BadRequestException(
                 ErrorCodes.ValidationError,
-                "Mã lưu trữ ảnh là bắt buộc.",
+                "Media asset ảnh là bắt buộc.",
                 new { field = nameof(images) });
         }
     }

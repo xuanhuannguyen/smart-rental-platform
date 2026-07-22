@@ -20,6 +20,7 @@ public sealed class ConversationResponse
     public bool CanManageMembers { get; set; }
     public string InboxStatus { get; set; } = "Main";
     public string? AvatarUrl { get; set; }
+    public Guid? AvatarMediaAssetId { get; set; }
     public List<ChatParticipantResponse> Participants { get; set; } = new();
 }
 

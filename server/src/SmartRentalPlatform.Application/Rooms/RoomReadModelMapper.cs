@@ -2,6 +2,7 @@ using SmartRentalPlatform.Contracts.Amenities;
 using SmartRentalPlatform.Contracts.PropertyImages;
 using SmartRentalPlatform.Contracts.RoomPriceTiers;
 using SmartRentalPlatform.Contracts.Rooms;
+using SmartRentalPlatform.Application.Common.Media;
 using SmartRentalPlatform.Domain.Entities.Properties;
 
 namespace SmartRentalPlatform.Application.Rooms;
@@ -34,12 +35,13 @@ internal static class RoomReadModelMapper
                 })
                 .ToList(),
             Images = room.Images
+                .Where(x => x.MediaAssetId.HasValue)
                 .OrderBy(x => x.SortOrder)
                 .Select(x => new PropertyImageResponse
                 {
                     Id = x.Id,
-                    ObjectKey = x.ObjectKey,
-                    ImageUrl = x.ImageUrl,
+                    MediaAssetId = x.MediaAssetId,
+                    ImageUrl = BuildPublicImageUrl(x.MediaAssetId),
                     Caption = x.Caption,
                     IsCover = x.IsCover,
                     SortOrder = x.SortOrder,
@@ -58,8 +60,11 @@ internal static class RoomReadModelMapper
         };
     }
 
-    public static string BuildImageUrl(string objectKey)
+    private static string BuildPublicImageUrl(Guid? mediaAssetId)
     {
-        return $"/uploads/{objectKey}";
+        return mediaAssetId.HasValue
+            ? PublicMediaPathBuilder.Build(mediaAssetId.Value)
+            : string.Empty;
     }
+
 }

@@ -15,6 +15,13 @@ public interface IFileStorageService
         FileUploadScope scope,
         CancellationToken cancellationToken = default);
 
+    Task<FileUploadResponse> UploadFileAsync(
+        Stream content,
+        string fileName,
+        string? contentType,
+        FileUploadScope scope,
+        CancellationToken cancellationToken = default);
+
     Task<FileUploadResponse> UploadPdfAsync(
         Stream content,
         string fileName,

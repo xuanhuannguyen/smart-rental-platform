@@ -1,5 +1,6 @@
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Metadata.Builders;
+using SmartRentalPlatform.Domain.Entities.Media;
 using SmartRentalPlatform.Domain.Entities.RentalContracts;
 using SmartRentalPlatform.Domain.Enums.RentalContracts;
 
@@ -16,7 +17,7 @@ public class ContractFileConfiguration : IEntityTypeConfiguration<ContractFile>
         builder.Property(x => x.Id).HasColumnName("id");
         builder.Property(x => x.RentalContractId).HasColumnName("contract_id").IsRequired();
         builder.Property(x => x.RentalContractAppendixId).HasColumnName("appendix_id");
-        builder.Property(x => x.StorageObjectKey).HasColumnName("storage_object_key").HasColumnType("text").IsRequired();
+        builder.Property(x => x.MediaAssetId).HasColumnName("media_asset_id");
         builder.Property(x => x.Purpose)
             .HasColumnName("purpose")
             .HasConversion<string>()
@@ -24,6 +25,7 @@ public class ContractFileConfiguration : IEntityTypeConfiguration<ContractFile>
             .HasDefaultValue(ContractFilePurpose.Preview)
             .IsRequired();
         builder.Property(x => x.ContentType).HasColumnName("content_type").HasMaxLength(100).IsRequired();
+        builder.Property(x => x.FileUrl).HasColumnName("file_url").HasColumnType("text");
         builder.Property(x => x.Sha256Hash).HasColumnName("sha256_hash").HasMaxLength(64);
         builder.Property(x => x.IsLegallySigned).HasColumnName("is_legally_signed").IsRequired();
         builder.Property(x => x.ContractSigningEnvelopeId).HasColumnName("signing_envelope_id");
@@ -39,6 +41,11 @@ public class ContractFileConfiguration : IEntityTypeConfiguration<ContractFile>
             .HasForeignKey(x => x.RentalContractAppendixId)
             .OnDelete(DeleteBehavior.Cascade);
 
+        builder.HasOne<MediaAsset>(x => x.MediaAsset)
+            .WithMany()
+            .HasForeignKey(x => x.MediaAssetId)
+            .OnDelete(DeleteBehavior.Restrict);
+        
         builder.HasOne(x => x.ContractSigningEnvelope)
             .WithMany()
             .HasForeignKey(x => x.ContractSigningEnvelopeId)
@@ -46,6 +53,7 @@ public class ContractFileConfiguration : IEntityTypeConfiguration<ContractFile>
 
         builder.HasIndex(x => x.RentalContractId);
         builder.HasIndex(x => x.RentalContractAppendixId);
+        builder.HasIndex(x => x.MediaAssetId);
         builder.HasIndex(x => new { x.RentalContractId, x.RentalContractAppendixId, x.Purpose });
         builder.HasIndex(x => x.ContractSigningEnvelopeId);
         builder.HasIndex(x => x.Sha256Hash);

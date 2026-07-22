@@ -48,6 +48,7 @@ export interface Conversation {
   participants: ChatParticipant[];
   // Stash additions
   avatarUrl?: string | null;
+  avatarMediaAssetId?: string | null;
   requiresJoinApproval?: boolean;
   isCurrentUserAdmin?: boolean;
   canManageMembers?: boolean;
@@ -82,6 +83,7 @@ export interface ChatMessage {
   senderAvatarUrl?: string | null;
   messageType: ChatMessageType;
   content?: string | null;
+  mediaAssetId?: string | null;
   imageUrl?: string | null;
   fileUrl?: string | null;
   fileName?: string | null;
@@ -97,6 +99,7 @@ export interface ChatMessage {
 export interface SendChatMessageRequest {
   messageType: ChatMessageType;
   content?: string | null;
+  mediaAssetId?: string | null;
   imageUrl?: string | null;
   fileUrl?: string | null;
   fileName?: string | null;

@@ -3,8 +3,8 @@ import { useAuth } from '../../../app/providers/AuthProvider';
 import { apiClient } from '../../../shared/api/apiClient';
 import { getApiErrorMessage } from '../../../shared/api/apiError';
 import type { ApiResponse } from '../../../shared/api/apiResponse.types';
-import { toAssetUrl } from '../../../shared/api/assets';
 import { ENDPOINTS } from '../../../shared/api/endpoints';
+import { PrivateMediaImage } from '../../../shared/components/media/PrivateMediaImage';
 import { Alert } from '../../../shared/components/ui/Alert';
 import { Toast } from '../../../shared/components/ui/Toast';
 import { Button } from '../../../shared/components/ui/Button';
@@ -28,9 +28,12 @@ interface OccupantForm {
   moveInDate: string;
   documentType: string;
   documentNumber: string;
-  frontImageObjectKey: string;
-  backImageObjectKey: string;
-  extraImageObjectKey: string;
+  frontMediaAssetId: string | null;
+  frontImageUrl: string;
+  backMediaAssetId: string | null;
+  backImageUrl: string;
+  extraMediaAssetId: string | null;
+  extraImageUrl: string;
 }
 
 interface OccupantAccountLookupResponse {
@@ -68,9 +71,12 @@ function createMainTenantForm(email?: string | null, moveInDate?: string): Occup
     moveInDate: moveInDate ?? toDateInput(),
     documentType: 'CCCD',
     documentNumber: '',
-    frontImageObjectKey: '',
-    backImageObjectKey: '',
-    extraImageObjectKey: ''
+    frontMediaAssetId: null,
+    frontImageUrl: '',
+    backMediaAssetId: null,
+    backImageUrl: '',
+    extraMediaAssetId: null,
+    extraImageUrl: ''
   };
 }
 
@@ -90,9 +96,12 @@ function createEmptyOccupantForm(moveInDate: string): OccupantForm {
     moveInDate,
     documentType: 'CCCD',
     documentNumber: '',
-    frontImageObjectKey: '',
-    backImageObjectKey: '',
-    extraImageObjectKey: ''
+    frontMediaAssetId: null,
+    frontImageUrl: '',
+    backMediaAssetId: null,
+    backImageUrl: '',
+    extraMediaAssetId: null,
+    extraImageUrl: ''
   };
 }
 
@@ -119,9 +128,12 @@ function mapOccupantToForm(
     moveInDate: toDateInput(occupant.moveInDate),
     documentType: occupant.document?.documentType ?? 'CCCD',
     documentNumber: '',
-    frontImageObjectKey: occupant.document?.frontImageObjectKey ?? '',
-    backImageObjectKey: occupant.document?.backImageObjectKey ?? '',
-    extraImageObjectKey: occupant.document?.extraImageObjectKey ?? ''
+    frontMediaAssetId: occupant.document?.frontMediaAssetId ?? null,
+    frontImageUrl: occupant.document?.frontImageUrl ?? '',
+    backMediaAssetId: occupant.document?.backMediaAssetId ?? null,
+    backImageUrl: occupant.document?.backImageUrl ?? '',
+    extraMediaAssetId: occupant.document?.extraMediaAssetId ?? null,
+    extraImageUrl: occupant.document?.extraImageUrl ?? ''
   };
 }
 
@@ -242,7 +254,7 @@ export function ContractOccupantsSetupModal({
     });
   };
 
-  const updateOccupant = (id: string, field: keyof OccupantForm, value: string | boolean) => {
+  const updateOccupant = (id: string, field: keyof OccupantForm, value: string | boolean | null) => {
     setOccupants((current) =>
       current.map((occupant) =>
         occupant.id === id
@@ -320,7 +332,11 @@ export function ContractOccupantsSetupModal({
       return 'Cần nhập ngày sinh người ở.';
     }
 
-    if (!occupant.documentType.trim() || !occupant.documentNumber.trim() || !occupant.frontImageObjectKey.trim()) {
+    if (
+      !occupant.documentType.trim() ||
+      !occupant.documentNumber.trim() ||
+      !occupant.frontMediaAssetId
+    ) {
       return 'Người ở nhập thủ công cần có loại giấy tờ, số giấy tờ và ảnh mặt trước.';
     }
 
@@ -381,7 +397,7 @@ export function ContractOccupantsSetupModal({
 
   const uploadDocumentImage = async (
     occupantId: string,
-    field: 'frontImageObjectKey' | 'backImageObjectKey' | 'extraImageObjectKey',
+    field: 'front' | 'back' | 'extra',
     file: File | null
   ) => {
     if (!file) {
@@ -394,7 +410,8 @@ export function ContractOccupantsSetupModal({
 
     try {
       const uploaded = await uploadImage(file, 'LegalDocument');
-      updateOccupant(occupantId, field, uploaded.objectKey);
+      updateOccupant(occupantId, `${field}MediaAssetId` as keyof OccupantForm, uploaded.mediaAssetId || null);
+      updateOccupant(occupantId, `${field}ImageUrl` as keyof OccupantForm, uploaded.url);
     } catch (err) {
       setToast({ message: getApiErrorMessage(err, 'Không thể tải ảnh giấy tờ lên.'), type: 'error' });
     } finally {
@@ -439,9 +456,9 @@ export function ContractOccupantsSetupModal({
             ? {
                 documentType: occupant.documentType,
                 documentNumber: occupant.documentNumber.trim(),
-                frontImageObjectKey: occupant.frontImageObjectKey.trim(),
-                backImageObjectKey: occupant.backImageObjectKey.trim() || null,
-                extraImageObjectKey: occupant.extraImageObjectKey.trim() || null
+                frontMediaAssetId: occupant.frontMediaAssetId || null,
+                backMediaAssetId: occupant.backMediaAssetId || null,
+                extraMediaAssetId: occupant.extraMediaAssetId || null
               }
             : null
         }))
@@ -591,26 +608,35 @@ export function ContractOccupantsSetupModal({
                         <DocumentImageUploadField
                           label="Ảnh mặt trước giấy tờ"
                           required
-                          objectKey={occupant.frontImageObjectKey}
-                          uploading={uploadingField === `${occupant.id}:frontImageObjectKey`}
-                          onUpload={(file) => void uploadDocumentImage(occupant.id, 'frontImageObjectKey', file)}
-                          onRemove={() => updateOccupant(occupant.id, 'frontImageObjectKey', '')}
+                          imageUrl={occupant.frontImageUrl}
+                          uploading={uploadingField === `${occupant.id}:front`}
+                          onUpload={(file) => void uploadDocumentImage(occupant.id, 'front', file)}
+                          onRemove={() => {
+                            updateOccupant(occupant.id, 'frontMediaAssetId', null);
+                            updateOccupant(occupant.id, 'frontImageUrl', '');
+                          }}
                         />
 
                         <DocumentImageUploadField
                           label="Ảnh mặt sau giấy tờ"
-                          objectKey={occupant.backImageObjectKey}
-                          uploading={uploadingField === `${occupant.id}:backImageObjectKey`}
-                          onUpload={(file) => void uploadDocumentImage(occupant.id, 'backImageObjectKey', file)}
-                          onRemove={() => updateOccupant(occupant.id, 'backImageObjectKey', '')}
+                          imageUrl={occupant.backImageUrl}
+                          uploading={uploadingField === `${occupant.id}:back`}
+                          onUpload={(file) => void uploadDocumentImage(occupant.id, 'back', file)}
+                          onRemove={() => {
+                            updateOccupant(occupant.id, 'backMediaAssetId', null);
+                            updateOccupant(occupant.id, 'backImageUrl', '');
+                          }}
                         />
 
                         <DocumentImageUploadField
                           label="Ảnh bổ sung"
-                          objectKey={occupant.extraImageObjectKey}
-                          uploading={uploadingField === `${occupant.id}:extraImageObjectKey`}
-                          onUpload={(file) => void uploadDocumentImage(occupant.id, 'extraImageObjectKey', file)}
-                          onRemove={() => updateOccupant(occupant.id, 'extraImageObjectKey', '')}
+                          imageUrl={occupant.extraImageUrl}
+                          uploading={uploadingField === `${occupant.id}:extra`}
+                          onUpload={(file) => void uploadDocumentImage(occupant.id, 'extra', file)}
+                          onRemove={() => {
+                            updateOccupant(occupant.id, 'extraMediaAssetId', null);
+                            updateOccupant(occupant.id, 'extraImageUrl', '');
+                          }}
                         />
                       </>
                     )}
@@ -678,7 +704,7 @@ export function ContractOccupantsSetupModal({
 
 interface DocumentImageUploadFieldProps {
   label: string;
-  objectKey: string;
+  imageUrl?: string;
   required?: boolean;
   uploading: boolean;
   onUpload: (file: File | null) => void;
@@ -687,21 +713,22 @@ interface DocumentImageUploadFieldProps {
 
 function DocumentImageUploadField({
   label,
-  objectKey,
+  imageUrl,
   required = false,
   uploading,
   onUpload,
   onRemove
 }: DocumentImageUploadFieldProps) {
+  const previewSrc = imageUrl || '';
   return (
     <div className="form-group">
       <label>
         {label} {required ? '*' : ''}
       </label>
-      {objectKey ? (
+      {previewSrc ? (
         <div style={{ display: 'grid', gap: 8 }}>
-          <img
-            src={toAssetUrl(objectKey)}
+          <PrivateMediaImage
+            source={previewSrc}
             alt={label}
             style={{
               width: '100%',
@@ -711,7 +738,6 @@ function DocumentImageUploadField({
               border: '1px solid #e2e8f0'
             }}
           />
-          <span style={{ fontSize: 12, color: '#64748b', wordBreak: 'break-all' }}>{objectKey}</span>
         </div>
       ) : (
         <div
@@ -736,7 +762,7 @@ function DocumentImageUploadField({
           color: '#2563eb',
           textDecoration: 'underline'
         }}>
-          {uploading ? 'Đang tải...' : objectKey ? 'Thay ảnh' : 'Tải ảnh'}
+          {uploading ? 'Đang tải...' : previewSrc ? 'Thay ảnh' : 'Tải ảnh'}
           <input
             type="file"
             accept="image/*"
@@ -748,13 +774,13 @@ function DocumentImageUploadField({
             }}
           />
         </label>
-        {objectKey && (
+        {previewSrc && (
           <button type="button" className="remove-btn" onClick={onRemove} disabled={uploading}>
             Xóa
           </button>
         )}
       </div>
-      {required && <input value={objectKey} onChange={() => undefined} required style={{ display: 'none' }} />}
+      {required && <input value={previewSrc} onChange={() => undefined} required style={{ display: 'none' }} />}
     </div>
   );
 }

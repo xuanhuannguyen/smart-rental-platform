@@ -17,5 +17,5 @@ public class UpdateUserProfileRequest
     [MaxLength(20, ErrorMessage = "Số điện thoại khẩn cấp không được vượt quá 20 ký tự.")]
     public string? EmergencyContactPhone { get; set; }
 
-    public string? AvatarUrl { get; set; }
+    public Guid? AvatarMediaAssetId { get; set; }
 }

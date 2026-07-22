@@ -1,6 +1,7 @@
 import type { GuestRoomingHouseRecommendationRequest, RoomingHouseSearchParams } from './types';
 
 const RENTAL_BEHAVIOR_KEY = 'srp_guest_rental_behavior';
+export const GUEST_RECOMMENDATION_CACHE_KEY = 'srp_home_ai_recommendation_cache_v3';
 const MAX_QUERIES = 10;
 const MAX_IDS = 30;
 const MAX_AMENITIES = 30;
@@ -53,7 +54,14 @@ export function hasUsableRentalBehavior() {
     behavior.clickedRoomingHouseIds.length > 0 ||
     behavior.preferredAmenityIds.length > 0 ||
     behavior.preferredRoomAmenityIds.length > 0 ||
-    Boolean(behavior.provinceCode || behavior.wardCode || behavior.minPrice || behavior.maxPrice);
+    Boolean(
+      behavior.provinceCode ||
+      behavior.wardCode ||
+      behavior.minPrice ||
+      behavior.maxPrice ||
+      behavior.minAreaM2 ||
+      behavior.maxAreaM2
+    );
 }
 
 export function saveSearchBehavior(params: RoomingHouseSearchParams) {
@@ -104,6 +112,15 @@ function updateBehavior(updater: (current: RentalBehaviorStorage) => RentalBehav
   const next = updater(current);
   next.updatedAt = new Date().toISOString();
   localStorage.setItem(RENTAL_BEHAVIOR_KEY, JSON.stringify(next));
+  invalidateGuestRecommendationCache();
+}
+
+export function invalidateGuestRecommendationCache() {
+  try {
+    sessionStorage.removeItem(GUEST_RECOMMENDATION_CACHE_KEY);
+  } catch {
+    // Storage can be unavailable in private mode or blocked browser contexts.
+  }
 }
 
 function createEmptyBehavior(): RentalBehaviorStorage {

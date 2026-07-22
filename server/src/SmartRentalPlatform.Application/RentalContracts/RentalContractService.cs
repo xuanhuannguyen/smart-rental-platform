@@ -9,16 +9,19 @@ using Microsoft.EntityFrameworkCore.Query;
 using SmartRentalPlatform.Application.Billing;
 using SmartRentalPlatform.Application.Common.Exceptions;
 using SmartRentalPlatform.Application.Common.Interfaces;
+using SmartRentalPlatform.Application.Common.Media;
 using SmartRentalPlatform.Application.Wallets;
 using SmartRentalPlatform.Contracts.Common;
 using SmartRentalPlatform.Contracts.RentalContracts;
 using SmartRentalPlatform.Contracts.RentalContracts.Requests;
 using SmartRentalPlatform.Contracts.RentalContracts.Responses;
+using SmartRentalPlatform.Domain.Entities.Media;
 using SmartRentalPlatform.Domain.Entities.Properties;
 using SmartRentalPlatform.Domain.Entities.Rental;
 using SmartRentalPlatform.Domain.Entities.RentalContracts;
 using SmartRentalPlatform.Domain.Entities.Users;
 using SmartRentalPlatform.Domain.Enums.Billing;
+using SmartRentalPlatform.Domain.Enums.Media;
 using SmartRentalPlatform.Domain.Enums.Properties;
 using SmartRentalPlatform.Domain.Enums.Payments;
 using SmartRentalPlatform.Domain.Enums.Rental;
@@ -28,6 +31,8 @@ namespace SmartRentalPlatform.Application.RentalContracts;
 
 public class RentalContractService : IRentalContractService
 {
+	private sealed record LinkedMediaAssetResolution(Guid MediaAssetId);
+
 	private static readonly TimeSpan TenantSignatureTtl = TimeSpan.FromHours(48);
 
 	private readonly IAppDbContext context;
@@ -214,13 +219,35 @@ public class RentalContractService : IRentalContractService
 							DocumentNumberMasked = RentalContractDocumentHelper.MaskDocumentNumber(documentRequest.DocumentNumber),
 							DocumentNumberHash = documentHelper.HashDocumentNumber(documentRequest.DocumentNumber),
 							DocumentNumberEncrypted = documentHelper.EncryptDocumentNumber(documentRequest.DocumentNumber),
-							FrontImageObjectKey = documentRequest.FrontImageObjectKey.Trim(),
-							BackImageObjectKey = RentalContractTextHelper.NormalizeOptionalText(documentRequest.BackImageObjectKey),
-							ExtraImageObjectKey = RentalContractTextHelper.NormalizeOptionalText(documentRequest.ExtraImageObjectKey),
 							UploadedAt = now,
 							CreatedAt = now,
 							UpdatedAt = now
 						};
+						LinkedMediaAssetResolution frontAsset = await EnsureContractOccupantDocumentMediaAssetAsync(
+							tenantUserId,
+							newDoc,
+							documentRequest.FrontMediaAssetId,
+							newDoc.FrontMediaAssetId,
+							nameof(documentRequest.FrontMediaAssetId),
+							now,
+							cancellationToken);
+						LinkedMediaAssetResolution? backAsset = await EnsureOptionalContractOccupantDocumentMediaAssetAsync(
+							tenantUserId,
+							newDoc,
+							documentRequest.BackMediaAssetId,
+							newDoc.BackMediaAssetId,
+							now,
+							cancellationToken);
+						LinkedMediaAssetResolution? extraAsset = await EnsureOptionalContractOccupantDocumentMediaAssetAsync(
+							tenantUserId,
+							newDoc,
+							documentRequest.ExtraMediaAssetId,
+							newDoc.ExtraMediaAssetId,
+							now,
+							cancellationToken);
+						newDoc.FrontMediaAssetId = frontAsset.MediaAssetId;
+						newDoc.BackMediaAssetId = backAsset?.MediaAssetId;
+						newDoc.ExtraMediaAssetId = extraAsset?.MediaAssetId;
 						occupant.Documents.Add(newDoc);
 						context.ContractOccupantDocuments.Add(newDoc);
 					}
@@ -459,19 +486,22 @@ public class RentalContractService : IRentalContractService
 				RentalContractLifecycleHelper.EnsureDepositReadyForSettlement(deposit);
 
 				var settlementGroupId = Guid.NewGuid();
-				await walletService.ReleaseReservedWithinTransactionAsync(
+				await walletService.TransferFromReservedWithinTransactionAsync(
 					landlordWallet.Id,
+					tenantWallet.Id,
 					deposit.DepositAmount,
-					WalletTransactionType.DepositForfeitRelease,
-					RentalContractLifecycleHelper.CreateDepositSettlementMetadata(deposit, settlementGroupId, "Tenant contract rejection deposit forfeiture."),
+					deposit.DepositAmount,
+					WalletTransactionType.DepositRefundDebit,
+					WalletTransactionType.DepositRefundCredit,
+					RentalContractLifecycleHelper.CreateDepositSettlementMetadata(deposit, settlementGroupId, "Tenant contract rejection deposit refund."),
 					cancellationToken);
 
-				contract.RoomDeposit.Status = RoomDepositStatus.Forfeited;
-				contract.RoomDeposit.RefundedAt = null;
-				contract.RoomDeposit.RefundAmount = default(decimal);
-				contract.RoomDeposit.ForfeitedAt = now;
-				contract.RoomDeposit.ForfeitedAmount = contract.RoomDeposit.DepositAmount;
-				contract.RoomDeposit.RefundTransferGroupId = null;
+				contract.RoomDeposit.Status = RoomDepositStatus.Refunded;
+				contract.RoomDeposit.RefundedAt = now;
+				contract.RoomDeposit.RefundAmount = contract.RoomDeposit.DepositAmount;
+				contract.RoomDeposit.ForfeitedAt = null;
+				contract.RoomDeposit.ForfeitedAmount = default(decimal);
+				contract.RoomDeposit.RefundTransferGroupId = settlementGroupId;
 				contract.RentalRequest.Status = RentalRequestStatus.Cancelled;
 			}
 
@@ -676,20 +706,23 @@ public class RentalContractService : IRentalContractService
 				throw new ForbiddenException("RENTAL_CONTRACT_FORBIDDEN", "Không có quyền thao tác.");
 			}
 			var settlementGroupId = Guid.NewGuid();
-			await walletService.ReleaseReservedWithinTransactionAsync(
+			await walletService.TransferFromReservedWithinTransactionAsync(
 				landlordWallet.Id,
+				tenantWallet.Id,
 				deposit.DepositAmount,
-				WalletTransactionType.DepositForfeitRelease,
-				RentalContractLifecycleHelper.CreateDepositSettlementMetadata(deposit, settlementGroupId, "Tenant unilateral termination deposit forfeiture."),
+				deposit.DepositAmount,
+				WalletTransactionType.DepositRefundDebit,
+				WalletTransactionType.DepositRefundCredit,
+				RentalContractLifecycleHelper.CreateDepositSettlementMetadata(deposit, settlementGroupId, "Tenant unilateral termination deposit refund."),
 				cancellationToken);
 			contract.Status = RentalContractStatus.Cancelled;
-			deposit.Status = RoomDepositStatus.Forfeited;
-			deposit.RefundAmount = default(decimal);
-			deposit.ForfeitedAmount = deposit.DepositAmount;
-			deposit.ForfeitedAt = now;
-			deposit.RefundedAt = null;
-			deposit.RefundTransferGroupId = null;
-			contract.StatusReason = $"Người thuê đơn phương chấm dứt. Tịch thu cọc: {deposit.DepositAmount:N0} VNĐ. Lý do: {reasonText}";
+			deposit.Status = RoomDepositStatus.Refunded;
+			deposit.RefundAmount = deposit.DepositAmount;
+			deposit.ForfeitedAmount = default(decimal);
+			deposit.ForfeitedAt = null;
+			deposit.RefundedAt = now;
+			deposit.RefundTransferGroupId = settlementGroupId;
+			contract.StatusReason = $"Người thuê đơn phương chấm dứt. Hoàn cọc: {deposit.DepositAmount:N0} VNĐ. Lý do: {reasonText}";
 			break;
 		}
 		case ContractTerminationType.NormalExpiration:
@@ -935,6 +968,183 @@ public class RentalContractService : IRentalContractService
 			.Include((RentalContract x) => x.Appendices)
 			.ThenInclude((ContractAppendix x) => x.Changes)
 			.Include((RentalContract x) => x.Signatures);
+	}
+
+	private async Task<LinkedMediaAssetResolution> EnsureContractOccupantDocumentMediaAssetAsync(
+		Guid ownerUserId,
+		ContractOccupantDocument document,
+		Guid? requestedMediaAssetId,
+		Guid? existingMediaAssetId,
+		string requiredFieldName,
+		DateTimeOffset now,
+		CancellationToken cancellationToken)
+	{
+		if (!requestedMediaAssetId.HasValue)
+		{
+			throw new BadRequestException(
+				"VALIDATION_ERROR",
+				"Media asset là bắt buộc.",
+				new { field = requiredFieldName });
+		}
+
+		MediaAsset mediaAsset = await ResolveLinkedMediaAssetAsync(
+			requestedMediaAssetId.Value,
+			existingMediaAssetId,
+			ownerUserId,
+			MediaScope.KycDocument,
+			MediaVisibility.Private,
+			nameof(ContractOccupantDocument),
+			document.Id,
+			now,
+			cancellationToken);
+
+		return new LinkedMediaAssetResolution(mediaAsset.Id);
+	}
+
+	private async Task<LinkedMediaAssetResolution?> EnsureOptionalContractOccupantDocumentMediaAssetAsync(
+		Guid ownerUserId,
+		ContractOccupantDocument document,
+		Guid? requestedMediaAssetId,
+		Guid? existingMediaAssetId,
+		DateTimeOffset now,
+		CancellationToken cancellationToken)
+	{
+		if (!requestedMediaAssetId.HasValue)
+		{
+			if (existingMediaAssetId.HasValue)
+			{
+				MediaAsset? existingMediaAsset = await context.MediaAssets
+					.FirstOrDefaultAsync(x => x.Id == existingMediaAssetId.Value, cancellationToken);
+				if (existingMediaAsset is not null)
+				{
+					existingMediaAsset.LinkedEntityType = null;
+					existingMediaAsset.LinkedEntityId = null;
+					existingMediaAsset.Status = MediaStatus.Uploaded;
+					existingMediaAsset.UpdatedAt = now;
+				}
+			}
+
+			return null;
+		}
+
+		return await EnsureContractOccupantDocumentMediaAssetAsync(
+			ownerUserId,
+			document,
+			requestedMediaAssetId,
+			existingMediaAssetId,
+			nameof(requestedMediaAssetId),
+			now,
+			cancellationToken);
+	}
+
+	private async Task<MediaAsset> ResolveLinkedMediaAssetAsync(
+		Guid requestedMediaAssetId,
+		Guid? existingMediaAssetId,
+		Guid ownerUserId,
+		MediaScope scope,
+		MediaVisibility visibility,
+		string linkedEntityType,
+		Guid linkedEntityId,
+		DateTimeOffset now,
+		CancellationToken cancellationToken)
+	{
+		MediaAsset? mediaAsset = await context.MediaAssets
+			.FirstOrDefaultAsync(x => x.Id == requestedMediaAssetId, cancellationToken);
+		if (mediaAsset is null)
+		{
+			throw new BadRequestException(
+				ErrorCodes.ValidationError,
+				"Media asset được chọn không tồn tại.",
+				new { mediaAssetId = requestedMediaAssetId });
+		}
+
+		EnsureContractOccupantDocumentAssetIsReusable(
+			mediaAsset,
+			ownerUserId,
+			scope,
+			visibility,
+			linkedEntityType,
+			linkedEntityId);
+
+		if (existingMediaAssetId.HasValue && existingMediaAssetId != mediaAsset.Id)
+		{
+			MediaAsset? previousMediaAsset = await context.MediaAssets
+				.FirstOrDefaultAsync(x => x.Id == existingMediaAssetId.Value, cancellationToken);
+			if (previousMediaAsset is not null)
+			{
+				previousMediaAsset.LinkedEntityType = null;
+				previousMediaAsset.LinkedEntityId = null;
+				previousMediaAsset.Status = MediaStatus.Uploaded;
+				previousMediaAsset.UpdatedAt = now;
+			}
+		}
+
+		mediaAsset.OwnerUserId = ownerUserId;
+		mediaAsset.Scope = scope;
+		mediaAsset.Visibility = visibility;
+		mediaAsset.Status = MediaStatus.Linked;
+		mediaAsset.LinkedEntityType = linkedEntityType;
+		mediaAsset.LinkedEntityId = linkedEntityId;
+		mediaAsset.DeletedAt = null;
+		mediaAsset.UpdatedAt = now;
+
+		return mediaAsset;
+	}
+
+	private static void EnsureContractOccupantDocumentAssetIsReusable(
+		MediaAsset mediaAsset,
+		Guid ownerUserId,
+		MediaScope expectedScope,
+		MediaVisibility expectedVisibility,
+		string linkedEntityType,
+		Guid linkedEntityId)
+	{
+		if (mediaAsset.OwnerUserId.HasValue && mediaAsset.OwnerUserId.Value != ownerUserId)
+		{
+			throw new BadRequestException(
+				ErrorCodes.ImageInvalidOwner,
+				"Bạn không có quyền sử dụng media asset giấy tờ này.",
+				new { mediaAssetId = mediaAsset.Id });
+		}
+
+		if (mediaAsset.Scope != expectedScope || mediaAsset.Visibility != expectedVisibility)
+		{
+			throw new BadRequestException(
+				ErrorCodes.ValidationError,
+				"Media asset không phù hợp với giấy tờ tùy thân.",
+				new
+				{
+					mediaAssetId = mediaAsset.Id,
+					expectedScope = expectedScope.ToString()
+				});
+		}
+
+		if (mediaAsset.Status is MediaStatus.PendingUpload or MediaStatus.Deleted)
+		{
+			throw new BadRequestException(
+				ErrorCodes.ValidationError,
+				"Media asset giấy tờ chưa sẵn sàng để liên kết.",
+				new
+				{
+					mediaAssetId = mediaAsset.Id,
+					status = mediaAsset.Status.ToString()
+				});
+		}
+
+		if (mediaAsset.Status == MediaStatus.Linked &&
+			(!string.Equals(mediaAsset.LinkedEntityType, linkedEntityType, StringComparison.Ordinal) ||
+			 mediaAsset.LinkedEntityId != linkedEntityId))
+		{
+			throw new BadRequestException(
+				ErrorCodes.ValidationError,
+				"Media asset giấy tờ đã được liên kết với bản ghi khác.",
+				new
+				{
+					mediaAssetId = mediaAsset.Id,
+					currentLinkedEntityType = mediaAsset.LinkedEntityType,
+					currentLinkedEntityId = mediaAsset.LinkedEntityId
+				});
+		}
 	}
 
 }

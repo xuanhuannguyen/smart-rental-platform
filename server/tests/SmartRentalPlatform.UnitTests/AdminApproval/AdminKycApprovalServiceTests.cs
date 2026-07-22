@@ -57,7 +57,10 @@ public class AdminKycApprovalServiceTests : IDisposable
         Assert.NotNull(result);
         Assert.Equal(user.Email, result.UserEmail);
         Assert.Equal(KycDocumentType.CCCD.ToString(), result.DocumentType);
-        Assert.Contains("front%2Fkey%201", result.FrontImageUrl);
+        Assert.Equal(kyc.FrontMediaAssetId, result.FrontMediaAssetId);
+        Assert.Equal(kyc.BackMediaAssetId, result.BackMediaAssetId);
+        Assert.Equal(kyc.SelfieMediaAssetId, result.SelfieMediaAssetId);
+        Assert.Equal($"/api/admin/media/private/{kyc.FrontMediaAssetId:D}", result.FrontImageUrl);
         Assert.Equal(DocumentCheckResult.Valid.ToString(), result.DocumentCheckResult);
     }
 
@@ -151,6 +154,7 @@ public class AdminKycApprovalServiceTests : IDisposable
 
         Assert.Equal([newer.Id, older.Id], result.Select(x => x.Id));
         Assert.Equal("Newer", result[0].OcrFullName);
+        Assert.Equal(newer.FrontMediaAssetId, result[0].FrontMediaAssetId);
     }
 
     private static KycVerification BuildKyc(
@@ -171,9 +175,9 @@ public class AdminKycApprovalServiceTests : IDisposable
             DocumentType = KycDocumentType.CCCD,
             EkycProvider = EkycProvider.VNPT,
             EkycSessionId = Guid.NewGuid().ToString("N"),
-            FrontImageObjectKey = frontKey,
-            BackImageObjectKey = backKey,
-            SelfieImageObjectKey = selfieKey,
+            FrontMediaAssetId = Guid.NewGuid(),
+            BackMediaAssetId = Guid.NewGuid(),
+            SelfieMediaAssetId = Guid.NewGuid(),
             OcrFullName = fullName,
             OcrCitizenIdMasked = "012******789",
             CitizenIdHash = Guid.NewGuid().ToString("N"),

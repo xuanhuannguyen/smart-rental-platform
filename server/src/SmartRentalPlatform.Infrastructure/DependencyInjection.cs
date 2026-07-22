@@ -1,9 +1,13 @@
+using Amazon.S3;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.AspNetCore.DataProtection;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Options;
+using System.Net;
+using System.Net.Sockets;
 using SmartRentalPlatform.Application.Common.Interfaces;
+using SmartRentalPlatform.Application.Common.Interfaces.Media;
 using SmartRentalPlatform.Application.Common.Options;
 using SmartRentalPlatform.Infrastructure.Caching;
 using SmartRentalPlatform.Infrastructure.BackgroundServices;
@@ -18,6 +22,7 @@ using SmartRentalPlatform.Infrastructure.ExternalServices.Ai;
 using SmartRentalPlatform.Infrastructure.ExternalServices.VietMap;
 using SmartRentalPlatform.Infrastructure.ExternalServices.Ai;
 using SmartRentalPlatform.Infrastructure.Identity;
+using SmartRentalPlatform.Infrastructure.Media;
 using SmartRentalPlatform.Infrastructure.Options;
 using SmartRentalPlatform.Infrastructure.Persistence;
 using SmartRentalPlatform.Infrastructure.Security;
@@ -46,7 +51,20 @@ public static class DependencyInjection
         services.AddScoped<IGoogleAuthService, GoogleAuthService>();
         services.AddHttpContextAccessor();
         services.AddScoped<ICurrentUserService, CurrentUserService>();
-        services.AddScoped<IFileStorageService, LocalFileStorageService>();
+        services.AddScoped<IFileStorageService, MediaBackedFileStorageService>();
+        services.AddSingleton<IMediaObjectKeyFactory, MediaObjectKeyFactory>();
+        services.Configure<S3StorageOptions>(configuration.GetSection(S3StorageOptions.SectionPath));
+        services.AddSingleton<IAmazonS3>(provider =>
+        {
+            var options = provider.GetRequiredService<IOptions<S3StorageOptions>>().Value;
+            return S3StorageService.CreateClient(options);
+        });
+        services.AddScoped<S3StorageService>();
+        services.AddScoped<IMediaStorageService>(provider => provider.GetRequiredService<S3StorageService>());
+        services.AddScoped<IMediaAssetService, MediaAssetService>();
+        services.AddScoped<IMediaAccessService, MediaAccessService>();
+        services.AddScoped<IMediaWorkflowService, MediaWorkflowService>();
+        services.AddScoped<IMediaPermissionService, DefaultMediaPermissionService>();
         services.Configure<MeterAiOptions>(configuration.GetSection(MeterAiOptions.SectionName));
         services.AddHttpClient<IMeterAiClient, MeterAiClient>((provider, client) =>
         {
@@ -86,7 +104,6 @@ public static class DependencyInjection
         services.AddMemoryCache();
         services.AddSingleton<IChatPresenceTracker, InMemoryChatPresenceTracker>();
         services.AddScoped<IConversationCacheService, ConversationCacheService>();
-        services.AddScoped<IPrivateStorageService, LocalPrivateStorageService>();
         services.AddScoped<IHashService, Sha256HashService>();
         services.AddScoped<ISensitiveDataProtector, DataProtectionSensitiveDataProtector>();
         services.AddHostedService<RoomDepositExpirationWorker>();
@@ -104,6 +121,39 @@ public static class DependencyInjection
             var options = provider.GetRequiredService<IOptions<PayOSOptions>>().Value;
             client.BaseAddress = new Uri(options.BaseUrl.TrimEnd('/') + "/");
             client.Timeout = TimeSpan.FromSeconds(options.TimeoutSeconds);
+        })
+        .ConfigurePrimaryHttpMessageHandler(() => new SocketsHttpHandler
+        {
+            ConnectCallback = async (context, cancellationToken) =>
+            {
+                var addresses = await Dns.GetHostAddressesAsync(
+                    context.DnsEndPoint.Host,
+                    AddressFamily.InterNetwork,
+                    cancellationToken);
+
+                if (addresses.Length == 0)
+                {
+                    throw new HttpRequestException($"No IPv4 address found for {context.DnsEndPoint.Host}.");
+                }
+
+                var socket = new Socket(SocketType.Stream, ProtocolType.Tcp)
+                {
+                    NoDelay = true
+                };
+
+                try
+                {
+                    await socket.ConnectAsync(
+                        new IPEndPoint(addresses[0], context.DnsEndPoint.Port),
+                        cancellationToken);
+                    return new NetworkStream(socket, ownsSocket: true);
+                }
+                catch
+                {
+                    socket.Dispose();
+                    throw;
+                }
+            }
         });
         services.AddScoped<IPayOSClient, PayOSClient>();
         services.AddScoped<IPayOSWebhookSignatureVerifier, PayOSWebhookSignatureVerifier>();

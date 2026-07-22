@@ -6,7 +6,7 @@ import { getApiErrorMessage } from '../../../shared/api/apiError';
 import { Toast } from '../../../shared/components/ui/Toast';
 import { Tabs } from '../../../shared/components/ui/Tabs';
 import { PageHeader } from '../../../shared/components/ui/PageHeader';
-import { toAssetUrl } from '../../../shared/api/assets';
+import { PrivateMediaImage } from '../../../shared/components/media/PrivateMediaImage';
 import { formatDateVi, formatMoneyString, parseMoneyString } from '../../../shared/utils/format';
 import { formatStatus, getStatusToneClass } from '../../../shared/utils/status';
 import {
@@ -273,15 +273,11 @@ export default function RoomingHouseDetailPage() {
         setRentalPolicyForm(emptyRentalPolicyForm);
       }
 
-      // Tải danh sách phòng
-      if (data.rentalPolicy && data.houseRule) {
-        try {
-          const roomsData = await getRoomsByRoomingHouse(id!);
-          setRooms(roomsData);
-        } catch (err) {
-          console.warn('Lỗi tải phòng:', err);
-        }
-      } else {
+      try {
+        const roomsData = await getRoomsByRoomingHouse(id!);
+        setRooms(roomsData);
+      } catch (err) {
+        console.warn('Lỗi tải phòng:', err);
         setRooms([]);
       }
     } catch (err) {
@@ -855,9 +851,9 @@ export default function RoomingHouseDetailPage() {
               <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(240px, 1fr))', gap: '20px' }}>
                 <div>
                   <h4 style={{ fontSize: '14px', fontWeight: 600, color: '#334155', marginBottom: '10px' }}>Mặt trước giấy tờ</h4>
-                  {house.legalDocument?.frontImageObjectKey ? (
-                    <img
-                      src={toAssetUrl(house.legalDocument.frontImageObjectKey)}
+                  {house.legalDocument?.frontImageUrl ? (
+                    <PrivateMediaImage
+                      source={house.legalDocument.frontImageUrl}
                       alt="Front"
                       style={{ width: '100%', maxHeight: '240px', objectFit: 'contain', border: '1px solid #e2e8f0', borderRadius: '12px', background: '#f8fafc', padding: '6px' }}
                     />
@@ -868,9 +864,9 @@ export default function RoomingHouseDetailPage() {
 
                 <div>
                   <h4 style={{ fontSize: '14px', fontWeight: 600, color: '#334155', marginBottom: '10px' }}>Mặt sau giấy tờ</h4>
-                  {house.legalDocument?.backImageObjectKey ? (
-                    <img
-                      src={toAssetUrl(house.legalDocument.backImageObjectKey)}
+                  {house.legalDocument?.backImageUrl ? (
+                    <PrivateMediaImage
+                      source={house.legalDocument.backImageUrl}
                       alt="Back"
                       style={{ width: '100%', maxHeight: '240px', objectFit: 'contain', border: '1px solid #e2e8f0', borderRadius: '12px', background: '#f8fafc', padding: '6px' }}
                     />
@@ -879,11 +875,11 @@ export default function RoomingHouseDetailPage() {
                   )}
                 </div>
 
-                {house.legalDocument?.extraImageObjectKey && (
+                {house.legalDocument?.extraImageUrl && (
                   <div>
                     <h4 style={{ fontSize: '14px', fontWeight: 600, color: '#334155', marginBottom: '10px' }}>Ảnh bổ sung</h4>
-                    <img
-                      src={toAssetUrl(house.legalDocument.extraImageObjectKey)}
+                    <PrivateMediaImage
+                      source={house.legalDocument.extraImageUrl}
                       alt="Extra"
                       style={{ width: '100%', maxHeight: '240px', objectFit: 'contain', border: '1px solid #e2e8f0', borderRadius: '12px', background: '#f8fafc', padding: '6px' }}
                     />

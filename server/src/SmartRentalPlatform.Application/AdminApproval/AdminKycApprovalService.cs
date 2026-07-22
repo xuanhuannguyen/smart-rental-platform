@@ -1,4 +1,5 @@
 using Microsoft.EntityFrameworkCore;
+using SmartRentalPlatform.Application.Common.Media;
 using SmartRentalPlatform.Contracts.Admin;
 using SmartRentalPlatform.Application.Common.Interfaces;
 using SmartRentalPlatform.Domain.Entities.Users;
@@ -87,9 +88,12 @@ public class AdminKycApprovalService(IAppDbContext context) : IAdminKycApprovalS
             EkycResult = kyc.EkycResult.ToString(),
             EkycErrorCode = kyc.EkycErrorCode,
             EkycErrorMessage = kyc.EkycErrorMessage,
-            FrontImageUrl = BuildPrivateMediaUrl(kyc.FrontImageObjectKey),
-            BackImageUrl = BuildPrivateMediaUrl(kyc.BackImageObjectKey),
-            SelfieImageUrl = BuildPrivateMediaUrl(kyc.SelfieImageObjectKey),
+            FrontMediaAssetId = kyc.FrontMediaAssetId,
+            BackMediaAssetId = kyc.BackMediaAssetId,
+            SelfieMediaAssetId = kyc.SelfieMediaAssetId,
+            FrontImageUrl = BuildPrivateMediaUrl(kyc.FrontMediaAssetId),
+            BackImageUrl = BuildPrivateMediaUrl(kyc.BackMediaAssetId),
+            SelfieImageUrl = BuildPrivateMediaUrl(kyc.SelfieMediaAssetId),
             RejectedReason = kyc.RejectedReason,
             ReviewedByAdminId = kyc.ReviewedByAdminId,
             ReviewedAt = kyc.ReviewedAt
@@ -227,9 +231,11 @@ public class AdminKycApprovalService(IAppDbContext context) : IAdminKycApprovalS
         profile.UpdatedAt = now;
     }
 
-    private static string BuildPrivateMediaUrl(string objectKey)
+    private static string BuildPrivateMediaUrl(Guid? mediaAssetId)
     {
-        return $"/api/admin/media/private?objectKey={Uri.EscapeDataString(objectKey)}";
+        return mediaAssetId.HasValue
+            ? AdminPrivateMediaPathBuilder.Build(mediaAssetId.Value)
+            : string.Empty;
     }
 
     public async Task<List<AdminKycDetailResponse>> GetHistoryAsync(
@@ -265,9 +271,12 @@ public class AdminKycApprovalService(IAppDbContext context) : IAdminKycApprovalS
                 EkycResult = kyc.EkycResult.ToString(),
                 EkycErrorCode = kyc.EkycErrorCode,
                 EkycErrorMessage = kyc.EkycErrorMessage,
-                FrontImageUrl = BuildPrivateMediaUrl(kyc.FrontImageObjectKey),
-                BackImageUrl = BuildPrivateMediaUrl(kyc.BackImageObjectKey),
-                SelfieImageUrl = BuildPrivateMediaUrl(kyc.SelfieImageObjectKey),
+                FrontMediaAssetId = kyc.FrontMediaAssetId,
+                BackMediaAssetId = kyc.BackMediaAssetId,
+                SelfieMediaAssetId = kyc.SelfieMediaAssetId,
+                FrontImageUrl = BuildPrivateMediaUrl(kyc.FrontMediaAssetId),
+                BackImageUrl = BuildPrivateMediaUrl(kyc.BackMediaAssetId),
+                SelfieImageUrl = BuildPrivateMediaUrl(kyc.SelfieMediaAssetId),
                 RejectedReason = kyc.RejectedReason,
                 ReviewedByAdminId = kyc.ReviewedByAdminId,
                 ReviewedAt = kyc.ReviewedAt

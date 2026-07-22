@@ -29,5 +29,10 @@ public class RoomConfiguration : IEntityTypeConfiguration<Room>
         builder.Property(x => x.UpdatedAt).HasColumnName("updated_at").IsRequired();
         builder.Property(x => x.DeletedAt).HasColumnName("deleted_at");
         builder.HasOne(x => x.RoomingHouse).WithMany(x => x.Rooms).HasForeignKey(x => x.RoomingHouseId).OnDelete(DeleteBehavior.Restrict);
+
+        builder.HasIndex(x => new { x.RoomingHouseId, x.Status, x.DeletedAt })
+            .HasDatabaseName("ix_rooms_house_status_active");
+        builder.HasIndex(x => new { x.Status, x.DeletedAt, x.AreaM2, x.MaxOccupants })
+            .HasDatabaseName("ix_rooms_public_filters");
     }
 }

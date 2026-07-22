@@ -12,6 +12,7 @@ using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Diagnostics;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Logging.Abstractions;
 using Microsoft.Extensions.Options;
 using SmartRentalPlatform.Application.Common.Interfaces;
 using SmartRentalPlatform.Infrastructure.Persistence;
@@ -69,6 +70,10 @@ public class CustomWebApplicationFactory : WebApplicationFactory<Program>, IAsyn
         Environment.SetEnvironmentVariable("Jwt__SecretKey", "smart-rental-platform-test-secret-key-32bytes-minimum");
         Environment.SetEnvironmentVariable("Jwt__Issuer", "SmartRentalPlatform.Tests");
         Environment.SetEnvironmentVariable("Jwt__Audience", "SmartRentalPlatform.Tests");
+        Environment.SetEnvironmentVariable("Aws__S3__AccessKeyId", "test-access-key");
+        Environment.SetEnvironmentVariable("Aws__S3__SecretAccessKey", "test-secret-key");
+        Environment.SetEnvironmentVariable("Aws__S3__Region", "ap-southeast-1");
+        Environment.SetEnvironmentVariable("Aws__S3__BucketName", "smart-rental-test-bucket");
     }
 
     public Task InitializeAsync() => Task.CompletedTask;
@@ -99,6 +104,11 @@ public class CustomWebApplicationFactory : WebApplicationFactory<Program>, IAsyn
     protected override void ConfigureWebHost(IWebHostBuilder builder)
     {
         builder.UseEnvironment("Test");
+        builder.ConfigureLogging(logging =>
+        {
+            logging.ClearProviders();
+            logging.AddProvider(NullLoggerProvider.Instance);
+        });
 
         builder.ConfigureServices(services =>
         {

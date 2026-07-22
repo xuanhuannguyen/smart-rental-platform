@@ -12,9 +12,7 @@ import PublicRoomingHouseDetailPage from '../../features/rooming-houses/PublicRo
 import SearchRoomingHousesPage from '../../features/rooming-houses/SearchRoomingHousesPage';
 import PublicRoomDetailPage from '../../features/rooms/pages/PublicRoomDetailPage';
 import LandlordDashboardPage from '../../features/landlord/pages/LandlordDashboardPage';
-
-
-import LandlordDashboardOverviewPage from '../../features/landlord/pages/LandlordDashboardOverviewPage';
+import LandlordRoomingHousesPage from '../../features/landlord/pages/LandlordRoomingHousesPage';
 import { LandlordRentalRequestsPage } from '../../features/landlord/pages/LandlordRentalRequestsPage';
 import RoomingHouseDetailPage from '../../features/landlord/pages/RoomingHouseDetailPage';
 import RoomDetailPage from '../../features/landlord/pages/RoomDetailPage';

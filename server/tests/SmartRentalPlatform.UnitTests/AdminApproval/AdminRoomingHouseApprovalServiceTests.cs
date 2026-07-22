@@ -3,8 +3,10 @@ using SmartRentalPlatform.Application.Users;
 using SmartRentalPlatform.Contracts.Users;
 using SmartRentalPlatform.Contracts.Users.Requests;
 using SmartRentalPlatform.Contracts.Users.Responses;
+using SmartRentalPlatform.Domain.Entities.Media;
 using SmartRentalPlatform.Domain.Entities.Properties;
 using SmartRentalPlatform.Domain.Enums.Properties;
+using SmartRentalPlatform.Domain.Enums.Media;
 using SmartRentalPlatform.UnitTests.Common;
 
 namespace SmartRentalPlatform.UnitTests.AdminApproval;
@@ -40,6 +42,10 @@ public class AdminRoomingHouseApprovalServiceTests : IDisposable
     {
         var landlord = TestDataBuilder.BuildUser(email: "detail-house@unit.test", displayName: "House Landlord");
         var house = TestDataBuilder.BuildRoomingHouse(landlord.Id, name: "Detail House", status: RoomingHouseApprovalStatus.Pending);
+        var firstImageAssetId = Guid.NewGuid();
+        var secondImageAssetId = Guid.NewGuid();
+        var firstImageUrl = $"/api/media/public/{firstImageAssetId:D}";
+        var secondImageUrl = $"/api/media/public/{secondImageAssetId:D}";
         var roomA = TestDataBuilder.BuildRoom(house.Id, roomNumber: "102");
         roomA.Floor = 2;
         var roomB = TestDataBuilder.BuildRoom(house.Id, roomNumber: "101");
@@ -53,13 +59,46 @@ public class AdminRoomingHouseApprovalServiceTests : IDisposable
         _fixture.Context.Amenities.Add(amenity);
         _fixture.Context.RoomingHouseAmenities.Add(new RoomingHouseAmenity { RoomingHouseId = house.Id, AmenityId = amenity.Id });
         _fixture.Context.PropertyImages.AddRange(
-            new PropertyImage { Id = Guid.NewGuid(), RoomingHouseId = house.Id, ObjectKey = "second", ImageUrl = "/second.jpg", SortOrder = 2, CreatedAt = DateTimeOffset.UtcNow },
-            new PropertyImage { Id = Guid.NewGuid(), RoomingHouseId = house.Id, ObjectKey = "first", ImageUrl = "/first.jpg", SortOrder = 1, CreatedAt = DateTimeOffset.UtcNow });
+            new PropertyImage { Id = Guid.NewGuid(), RoomingHouseId = house.Id, MediaAssetId = secondImageAssetId, ImageUrl = secondImageUrl, SortOrder = 2, CreatedAt = DateTimeOffset.UtcNow },
+            new PropertyImage { Id = Guid.NewGuid(), RoomingHouseId = house.Id, MediaAssetId = firstImageAssetId, ImageUrl = firstImageUrl, SortOrder = 1, CreatedAt = DateTimeOffset.UtcNow });
+        var frontAssetId = Guid.NewGuid();
+        var backAssetId = Guid.NewGuid();
+        _fixture.Context.MediaAssets.AddRange(
+            new MediaAsset
+            {
+                Id = frontAssetId,
+                BucketName = "local-media",
+                ObjectKey = "private/legal/front.jpg",
+                OriginalFileName = "front.jpg",
+                StoredFileName = "front.jpg",
+                ContentType = "image/jpeg",
+                FileSize = 10,
+                Scope = MediaScope.RoomingHouseLegalDocument,
+                Visibility = MediaVisibility.Private,
+                Status = MediaStatus.Linked,
+                CreatedAt = DateTimeOffset.UtcNow,
+                UpdatedAt = DateTimeOffset.UtcNow
+            },
+            new MediaAsset
+            {
+                Id = backAssetId,
+                BucketName = "local-media",
+                ObjectKey = "private/legal/back.jpg",
+                OriginalFileName = "back.jpg",
+                StoredFileName = "back.jpg",
+                ContentType = "image/jpeg",
+                FileSize = 10,
+                Scope = MediaScope.RoomingHouseLegalDocument,
+                Visibility = MediaVisibility.Private,
+                Status = MediaStatus.Linked,
+                CreatedAt = DateTimeOffset.UtcNow,
+                UpdatedAt = DateTimeOffset.UtcNow
+            });
         _fixture.Context.RoomingHouseLegalDocuments.Add(new RoomingHouseLegalDocument
         {
             RoomingHouseId = house.Id,
-            FrontImageObjectKey = "front",
-            BackImageObjectKey = "back",
+            FrontMediaAssetId = frontAssetId,
+            BackMediaAssetId = backAssetId,
             DocumentNumberMasked = "123***",
             DocumentNumberHash = "hash",
             UploadedAt = DateTimeOffset.UtcNow,
@@ -75,7 +114,10 @@ public class AdminRoomingHouseApprovalServiceTests : IDisposable
         Assert.NotNull(result);
         Assert.Equal(house.Id, result.Id);
         Assert.NotNull(result.LegalDocument);
-        Assert.Equal(["first", "second"], result.Images.Select(x => x.ObjectKey));
+        Assert.Equal(frontAssetId, result.LegalDocument.FrontMediaAssetId);
+        Assert.Equal($"/api/media/private/{frontAssetId:D}", result.LegalDocument.FrontImageUrl);
+        Assert.Equal([firstImageUrl, secondImageUrl], result.Images.Select(x => x.ImageUrl));
+        Assert.Equal(firstImageAssetId, result.Images[0].MediaAssetId);
         var mappedAmenity = Assert.Single(result.Amenities);
         Assert.Equal("Unit Amenity", mappedAmenity.Name);
         Assert.Equal([roomB.Id, roomA.Id], result.Rooms.Select(x => x.Id));
@@ -89,6 +131,45 @@ public class AdminRoomingHouseApprovalServiceTests : IDisposable
         var result = await service.GetDetailAsync(Guid.NewGuid());
 
         Assert.Null(result);
+    }
+
+    [Fact]
+    public async Task GetDetailAsync_ShouldExcludeLegacyPropertyImagesWithoutMediaAssetId()
+    {
+        var landlord = TestDataBuilder.BuildUser(email: "legacy-image-house@unit.test", displayName: "Legacy Image House");
+        var house = TestDataBuilder.BuildRoomingHouse(landlord.Id, name: "Legacy Image Detail", status: RoomingHouseApprovalStatus.Pending);
+        var migratedAssetId = Guid.NewGuid();
+
+        _fixture.Context.Users.Add(landlord);
+        _fixture.Context.RoomingHouses.Add(house);
+        _fixture.Context.PropertyImages.AddRange(
+            new PropertyImage
+            {
+                Id = Guid.NewGuid(),
+                RoomingHouseId = house.Id,
+                ImageUrl = "/uploads/legacy-house-image.jpg",
+                SortOrder = 0,
+                CreatedAt = DateTimeOffset.UtcNow
+            },
+            new PropertyImage
+            {
+                Id = Guid.NewGuid(),
+                RoomingHouseId = house.Id,
+                MediaAssetId = migratedAssetId,
+                ImageUrl = "/uploads/stale-house-image.jpg",
+                SortOrder = 1,
+                CreatedAt = DateTimeOffset.UtcNow
+            });
+        await _fixture.Context.SaveChangesAsync();
+
+        var service = CreateService();
+
+        var result = await service.GetDetailAsync(house.Id);
+
+        Assert.NotNull(result);
+        var image = Assert.Single(result!.Images);
+        Assert.Equal(migratedAssetId, image.MediaAssetId);
+        Assert.Equal($"/api/media/public/{migratedAssetId:D}", image.ImageUrl);
     }
 
     [Fact]

@@ -22,6 +22,8 @@ namespace SmartRentalPlatform.Infrastructure.Persistence.Configurations.Administ
             builder.Property(x => x.CreatedAt).HasColumnName("created_at").IsRequired();
             builder.Property(x => x.UpdatedAt).HasColumnName("updated_at").IsRequired();
             builder.HasOne(x => x.Province).WithMany(x => x.Wards).HasForeignKey(x => x.ProvinceCode).OnDelete(DeleteBehavior.Restrict);
+            builder.HasIndex(x => new { x.ProvinceCode, x.IsActive, x.Name })
+                .HasDatabaseName("ix_administrative_wards_province_active_name");
             builder.HasData(AdministrativeSeed.GetWards());
 
         }

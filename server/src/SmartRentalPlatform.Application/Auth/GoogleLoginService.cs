@@ -2,6 +2,7 @@ using Microsoft.AspNetCore.Http;
 using Microsoft.EntityFrameworkCore;
 using SmartRentalPlatform.Application.Common.Exceptions;
 using SmartRentalPlatform.Application.Common.Interfaces;
+using SmartRentalPlatform.Application.Common.Media;
 using SmartRentalPlatform.Contracts.Auth;
 using SmartRentalPlatform.Contracts.Common;
 using SmartRentalPlatform.Domain.Entities.Users;
@@ -113,7 +114,13 @@ public class GoogleLoginService : IGoogleLoginService
 
         await dbContext.SaveChangesAsync(cancellationToken);
 
-        return BuildGoogleLoginResponse(user, roles, false, accessToken, refreshToken);
+        return await BuildGoogleLoginResponseAsync(
+            user,
+            roles,
+            false,
+            accessToken,
+            refreshToken,
+            cancellationToken);
     }
 
     private async Task<User> CreateGoogleUserAsync(
@@ -201,19 +208,27 @@ public class GoogleLoginService : IGoogleLoginService
         }
     }
 
-    private static GoogleLoginResponse BuildGoogleLoginResponse(
+    private async Task<GoogleLoginResponse> BuildGoogleLoginResponseAsync(
         User user,
         IReadOnlyCollection<string> roles,
         bool requiresEmailVerification,
         string? accessToken,
-        string? refreshToken)
+        string? refreshToken,
+        CancellationToken cancellationToken)
     {
+        var avatarUrl = await AvatarMediaUrlResolver.ResolveAsync(
+            dbContext,
+            user.AvatarUrl,
+            user.AvatarMediaAssetId,
+            cancellationToken);
+
         return new GoogleLoginResponse
         {
             UserId = user.Id,
             Email = user.Email,
             DisplayName = user.DisplayName,
-            AvatarUrl = user.AvatarUrl,
+            AvatarUrl = avatarUrl,
+            AvatarMediaAssetId = user.AvatarMediaAssetId,
             IsGoogleUser = true,
             EmailConfirmed = user.EmailConfirmed,
             RequiresEmailVerification = requiresEmailVerification,

@@ -1,7 +1,8 @@
 import { useEffect, useMemo, useRef, useState, type FormEvent, type ReactNode } from 'react';
 import { Link } from 'react-router-dom';
 import { getApiErrorMessage } from '../../../shared/api/apiError';
-import { toAssetUrl } from '../../../shared/api/assets';
+import { toPublicListingImageUrl } from '../../../shared/api/assets';
+import { contactLandlord } from '../../chat/api';
 import { chatRoomingHouseAssistant } from '../api';
 import type { NearbyPlace, RoomingHouseAiChatResponse, RoomingHouseSearchItem } from '../types';
 import './RentalAiChatbot.css';
@@ -56,6 +57,7 @@ export default function RentalAiChatbot({ context, roomingHouseId, title }: Rent
   const [loading, setLoading] = useState(false);
   const [conversationId, setConversationId] = useState<string | null>(initialSession.conversationId);
   const [messages, setMessages] = useState<ChatMessage[]>(initialSession.messages);
+  const [contactingLandlord, setContactingLandlord] = useState(false);
   const inputRef = useRef<HTMLInputElement | null>(null);
   const messagesEndRef = useRef<HTMLDivElement | null>(null);
 
@@ -140,6 +142,44 @@ export default function RentalAiChatbot({ context, roomingHouseId, title }: Rent
     void submitMessage(input);
   }
 
+  async function handleContactLandlord() {
+    if (!roomingHouseId || contactingLandlord) return;
+
+    const content = input.trim() || `Em muốn hỏi thêm về ${title || 'khu trọ này'}. Chủ trọ tư vấn giúp em với ạ.`;
+    setContactingLandlord(true);
+    try {
+      const conversation = await contactLandlord(roomingHouseId, content);
+      window.dispatchEvent(new CustomEvent('open-chat-bubble', {
+        detail: { conversationId: conversation.id }
+      }));
+      window.dispatchEvent(new CustomEvent('refresh-chat-list'));
+      setInput('');
+      const assistantMessage: ChatMessage = {
+        id: crypto.randomUUID(),
+        role: 'assistant',
+        text: 'Mình đã gửi tin nhắn này cho chủ trọ. Bạn có thể tiếp tục trao đổi trong khung chat.'
+      };
+      setMessages(current => {
+        const nextMessages = [...current, assistantMessage];
+        saveChatSession(conversationId, nextMessages);
+        return nextMessages;
+      });
+    } catch (error) {
+      const assistantMessage: ChatMessage = {
+        id: crypto.randomUUID(),
+        role: 'assistant',
+        text: getApiErrorMessage(error, 'Chưa gửi được tin nhắn cho chủ trọ. Bạn thử lại sau nhé.')
+      };
+      setMessages(current => {
+        const nextMessages = [...current, assistantMessage];
+        saveChatSession(conversationId, nextMessages);
+        return nextMessages;
+      });
+    } finally {
+      setContactingLandlord(false);
+    }
+  }
+
   return (
     <div className={`rental-ai-chatbot ${open ? 'rental-ai-chatbot--open' : ''}`}>
       {open && (
@@ -216,6 +256,16 @@ export default function RentalAiChatbot({ context, roomingHouseId, title }: Rent
           </div>
 
           <form className="rental-ai-chatbot__form" onSubmit={handleSubmit}>
+            {context === 'detail' && roomingHouseId && (
+              <button
+                type="button"
+                className="rental-ai-chatbot__contact-landlord"
+                onClick={() => void handleContactLandlord()}
+                disabled={loading || contactingLandlord}
+              >
+                {contactingLandlord ? 'Đang gửi cho chủ trọ...' : 'Nhắn chủ trọ'}
+              </button>
+            )}
             <div className="rental-ai-chatbot__input-group">
               <button type="button" className="rental-ai-chatbot__input-icon-btn" aria-label="Biểu cảm">
                 <SmileyIcon />
@@ -486,7 +536,7 @@ function ChatResponseBlocks({
 }
 
 function RoomingHouseMiniCard({ house }: { house: RoomingHouseSearchItem }) {
-  const imageUrl = house.coverImageUrl ? toAssetUrl(house.coverImageUrl) : '';
+  const imageUrl = house.coverImageUrl ? toPublicListingImageUrl(house.coverImageUrl) : '';
   return (
     <Link className="rental-ai-chatbot__house" to={`/rooming-houses/${house.id}`}>
       <div className="rental-ai-chatbot__house-image">

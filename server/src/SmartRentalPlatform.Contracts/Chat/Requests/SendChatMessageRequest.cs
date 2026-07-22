@@ -4,6 +4,7 @@ public sealed class SendChatMessageRequest
 {
     public string MessageType { get; set; } = string.Empty;
     public string? Content { get; set; }
+    public Guid? MediaAssetId { get; set; }
     public string? ImageUrl { get; set; }
     public string? FileUrl { get; set; }
     public string? FileName { get; set; }

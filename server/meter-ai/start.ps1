@@ -6,10 +6,20 @@ param(
 $ErrorActionPreference = 'Stop'
 $serviceDir = Split-Path -Parent $MyInvocation.MyCommand.Path
 $python = Join-Path $serviceDir '.venv\Scripts\python.exe'
+$envFile = Join-Path $serviceDir '.env'
+
+if ([string]::IsNullOrWhiteSpace($ApiKey) -and (Test-Path $envFile)) {
+    $apiKeyLine = Get-Content $envFile |
+        Where-Object { $_ -match '^\s*ROBOFLOW_API_KEY\s*=' } |
+        Select-Object -First 1
+    if ($apiKeyLine) {
+        $ApiKey = ($apiKeyLine -replace '^\s*ROBOFLOW_API_KEY\s*=', '').Trim().Trim('"').Trim("'")
+    }
+}
 
 if ([string]::IsNullOrWhiteSpace($ApiKey) -or
     $ApiKey -match 'YOUR|REPLACE|API_KEY_MỚI|API_KEY_MOI') {
-    throw 'Thiếu ROBOFLOW_API_KEY hợp lệ. Chạy: .\start.ps1 -ApiKey "your-real-key"'
+    throw 'Thiếu ROBOFLOW_API_KEY hợp lệ. Tạo server/meter-ai/.env hoặc chạy: .\start.ps1 -ApiKey "your-real-key"'
 }
 
 $listener = Get-NetTCPConnection -LocalPort $Port -State Listen -ErrorAction SilentlyContinue

@@ -1,7 +1,7 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { Button } from '../../../shared/components/ui/Button';
 import { getApiErrorMessage } from '../../../shared/api/apiError';
-import { toAssetUrl } from '../../../shared/api/assets';
+import { toPublicPropertyImageUrl } from '../../../shared/api/assets';
 import { Toast } from '../../../shared/components/ui/Toast';
 import { createRoomingHouseReview, updateRoomingHouseReview } from '../api';
 import type { RoomingHouseReviewResponse, PropertyImageRequest } from '../types';
@@ -37,20 +37,20 @@ export const InlineReviewForm: React.FC<InlineReviewFormProps> = ({
   const [rating, setRating] = useState<number>(review?.rating || 0);
   const [comment, setComment] = useState<string>(review?.comment || '');
   const [isFocused, setIsFocused] = useState(false);
-  
+
   // For edit mode: track which old images are kept
   const [retainedImages, setRetainedImages] = useState<PropertyImageRequest[]>(
     mode === 'edit' && review ? review.images : []
   );
-  
+
   // For new images
   const [newImages, setNewImages] = useState<File[]>([]);
   const [newImagePreviews, setNewImagePreviews] = useState<string[]>([]);
-  
-  
+
+
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [toast, setToast] = useState<{ message: string; type: 'success' | 'error' | 'info' } | null>(null);
-  
+
   const fileInputRef = useRef<HTMLInputElement>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
 
@@ -58,7 +58,7 @@ export const InlineReviewForm: React.FC<InlineReviewFormProps> = ({
     // Generate previews for new images
     const previews = newImages.map((file) => URL.createObjectURL(file));
     setNewImagePreviews(previews);
-    
+
     // Cleanup URLs when component unmounts or images change
     return () => {
       previews.forEach((url) => URL.revokeObjectURL(url));
@@ -121,7 +121,7 @@ export const InlineReviewForm: React.FC<InlineReviewFormProps> = ({
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (disabled) return;
-    
+
     if (rating === 0) {
       setToast({ message: 'Vui lòng chọn số sao đánh giá.', type: 'info' });
       return;
@@ -139,7 +139,7 @@ export const InlineReviewForm: React.FC<InlineReviewFormProps> = ({
           comment,
           images: newImages.length > 0 ? newImages : undefined,
         });
-        
+
         // Reset form after successful create
         setRating(0);
         setComment('');
@@ -181,7 +181,7 @@ export const InlineReviewForm: React.FC<InlineReviewFormProps> = ({
           )}
         </div>
       )}
-      
+
       <div className="inline-review-form-body">
         <form onSubmit={handleSubmit}>
           {(!disabled || mode === 'edit') && (
@@ -217,7 +217,7 @@ export const InlineReviewForm: React.FC<InlineReviewFormProps> = ({
             <div className="inline-image-preview-grid">
               {retainedImages.map((img) => (
                 <div key={img.id} className="image-preview-item">
-                  <img src={toAssetUrl(img.imageUrl || img.objectKey)} alt="Đã lưu" />
+                  <img src={toPublicPropertyImageUrl(img)} alt="Đã lưu" />
                   {!disabled && (
                     <button type="button" className="image-remove-btn" onClick={() => removeRetainedImage(img.id)}>
                       &times;
@@ -241,9 +241,9 @@ export const InlineReviewForm: React.FC<InlineReviewFormProps> = ({
           {showActions && !disabled && (
             <div className="inline-form-actions">
               <div className="inline-form-tools">
-                <button 
-                  type="button" 
-                  className="icon-btn tool-btn" 
+                <button
+                  type="button"
+                  className="icon-btn tool-btn"
                   onClick={() => fileInputRef.current?.click()}
                   disabled={!canAddImages}
                   title="Đính kèm ảnh"

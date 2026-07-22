@@ -20,6 +20,8 @@ namespace SmartRentalPlatform.Infrastructure.Persistence.Configurations.Administ
             builder.Property(x => x.IsActive).HasColumnName("is_active").HasDefaultValue(true).IsRequired();
             builder.Property(x => x.CreatedAt).HasColumnName("created_at").IsRequired();
             builder.Property(x => x.UpdatedAt).HasColumnName("updated_at").IsRequired();
+            builder.HasIndex(x => new { x.IsActive, x.Name })
+                .HasDatabaseName("ix_administrative_provinces_active_name");
             builder.HasData(AdministrativeSeed.GetProvinces());
         }
     }

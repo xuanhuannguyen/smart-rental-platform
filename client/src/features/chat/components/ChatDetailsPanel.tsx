@@ -1,7 +1,7 @@
 import { useState } from 'react';
-import { toAssetUrl } from '../../../shared/api/assets';
-import { tokenStorage } from '../../../shared/api/tokenStorage';
+import { downloadChatFile } from '../api';
 import type { ChatMessage } from '../types';
+import { PrivateChatImage } from './PrivateChatImage';
 
 export interface ChatDetailsPanelProps {
   messages: ChatMessage[];
@@ -13,8 +13,8 @@ export function ChatDetailsPanel({ messages, onClearHistory }: ChatDetailsPanelP
   const [showMediaList, setShowMediaList] = useState(true);
   const [showFileList, setShowFileList] = useState(false);
 
-  const mediaMessages = messages.filter((m) => m.messageType === 'Image' && m.imageUrl && !m.deletedAt);
-  const fileMessages = messages.filter((m) => m.messageType === 'File' && m.fileUrl && !m.deletedAt);
+  const mediaMessages = messages.filter((m) => m.messageType === 'Image' && m.mediaAssetId && !m.deletedAt);
+  const fileMessages = messages.filter((m) => m.messageType === 'File' && m.mediaAssetId && !m.deletedAt);
 
   return (
     <div className="chat-details-panel" style={{
@@ -80,13 +80,13 @@ export function ChatDetailsPanel({ messages, onClearHistory }: ChatDetailsPanelP
             ) : (
               <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '6px' }}>
                 {mediaMessages.map(msg => (
-                  <a key={msg.id} href={toAssetUrl(msg.imageUrl || '')} target="_blank" rel="noopener noreferrer">
-                    <img 
-                      src={toAssetUrl(msg.imageUrl || '')} 
-                      alt="media" 
-                      style={{ width: '100%', height: '70px', objectFit: 'cover', borderRadius: '4px', border: '1px solid #e2e8f0' }} 
-                    />
-                  </a>
+                  <PrivateChatImage
+                    key={msg.id}
+                    mediaAssetId={msg.mediaAssetId!}
+                    alt="Ảnh đã chia sẻ"
+                    openOnClick
+                    style={{ width: '100%', height: '70px', objectFit: 'cover', borderRadius: '4px', border: '1px solid #e2e8f0', cursor: 'pointer' }}
+                  />
                 ))}
               </div>
             )}
@@ -126,18 +126,18 @@ export function ChatDetailsPanel({ messages, onClearHistory }: ChatDetailsPanelP
                     <button 
                       type="button" 
                       onClick={async () => {
+                        if (!msg.mediaAssetId) return;
+
                         try {
-                          const token = tokenStorage.getAccessToken();
-                          const url = `/api/chat/conversations/${msg.conversationId}/messages/${msg.id}/file`;
-                          const res = await fetch(url, { headers: token ? { Authorization: `Bearer ${token}` } : {} });
-                          if (!res.ok) throw new Error();
-                          const blob = await res.blob();
+                          const blob = await downloadChatFile(msg.mediaAssetId);
+                          const objectUrl = URL.createObjectURL(blob);
                           const link = document.createElement('a');
-                          link.href = URL.createObjectURL(blob);
+                          link.href = objectUrl;
                           link.download = msg.fileName || 'file';
                           document.body.appendChild(link);
                           link.click();
                           link.remove();
+                          window.setTimeout(() => URL.revokeObjectURL(objectUrl), 0);
                         } catch {
                           alert('Không thể tải tệp.');
                         }

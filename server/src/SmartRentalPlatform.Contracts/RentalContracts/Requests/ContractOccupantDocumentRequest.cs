@@ -6,9 +6,9 @@ public class ContractOccupantDocumentRequest
 
     public string? DocumentNumber { get; set; }
 
-    public string FrontImageObjectKey { get; set; } = string.Empty;
+    public Guid? FrontMediaAssetId { get; set; }
 
-    public string? BackImageObjectKey { get; set; }
+    public Guid? BackMediaAssetId { get; set; }
 
-    public string? ExtraImageObjectKey { get; set; }
+    public Guid? ExtraMediaAssetId { get; set; }
 }

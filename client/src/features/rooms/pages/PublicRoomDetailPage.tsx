@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { Link, useParams, useNavigate, useLocation } from 'react-router-dom';
-import { getPublicRoomingHouseDetail } from '../../rooming-houses/api';
+import { getPublicAvailableRooms, getPublicRoomingHouseDetail } from '../../rooming-houses/api';
 import HouseImageGallery from '../../rooming-houses/components/HouseImageGallery';
 import type { RoomingHouseDetail, RoomInHouseDetail } from '../../rooming-houses/types';
 import { getApiErrorMessage } from '../../../shared/api/apiError';
@@ -80,6 +80,7 @@ export default function PublicRoomDetailPage() {
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [isRentalModalOpen, setIsRentalModalOpen] = useState(false);
   const [toast, setToast] = useState<{ message: string; type: 'success' | 'error' | 'info' } | null>(null);
+  const listingReturnUrl = getListingReturnUrl(location.state);
 
   const handleBookingClick = () => {
     if (!currentUser) {
@@ -95,8 +96,11 @@ export default function PublicRoomDetailPage() {
       setLoading(true);
       setError('');
       try {
-        const data = await getPublicRoomingHouseDetail(houseId);
-        setHouse(data);
+        const [data, rooms] = await Promise.all([
+          getPublicRoomingHouseDetail(houseId),
+          getPublicAvailableRooms(houseId),
+        ]);
+        setHouse({ ...data, rooms });
       } catch (loadError) {
         setError(getApiErrorMessage(loadError, 'Không thể tải chi tiết phòng trọ.'));
       } finally {
@@ -136,7 +140,13 @@ export default function PublicRoomDetailPage() {
         <HomeHeader />
         <main className="public-room-detail public-room-detail--state">
           <Alert type="error">Không tìm thấy thông tin phòng trọ này.</Alert>
-          <Link to={`/rooming-houses/${house.id}`} className="public-room-detail__home-link">Quay lại khu trọ</Link>
+          <Link
+            to={`/rooming-houses/${house.id}`}
+            state={{ fromListing: listingReturnUrl }}
+            className="public-room-detail__home-link"
+          >
+            Quay lại khu trọ
+          </Link>
         </main>
       </>
     );
@@ -150,7 +160,7 @@ export default function PublicRoomDetailPage() {
     <>
       <HomeHeader />
       <main className="public-room-detail">
-        <Link className="public-room-detail__back" to={`/rooming-houses/${house.id}`}>
+        <Link className="public-room-detail__back" to={`/rooming-houses/${house.id}`} state={{ fromListing: listingReturnUrl }}>
           <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
             <polyline points="15 18 9 12 15 6" />
           </svg>
@@ -344,6 +354,8 @@ export default function PublicRoomDetailPage() {
             roomNumber={room.roomNumber}
             houseName={house.name}
             maxOccupants={room.maxOccupants}
+            minRentalMonths={house.rentalPolicy?.minRentalMonths}
+            maxRentalMonths={house.rentalPolicy?.maxRentalMonths}
             onClose={() => setIsRentalModalOpen(false)}
             onSuccess={(msg) => {
               setToast({ message: msg, type: 'success' });
@@ -354,4 +366,26 @@ export default function PublicRoomDetailPage() {
       </main>
     </>
   );
+}
+
+function getListingReturnUrl(state: unknown) {
+  const stateFromSearch =
+    state && typeof state === 'object' && 'fromSearch' in state
+      ? (state as { fromSearch?: unknown }).fromSearch
+      : undefined;
+
+  if (typeof stateFromSearch === 'string' && stateFromSearch.startsWith('/search')) {
+    return stateFromSearch;
+  }
+
+  const stateFromListing =
+    state && typeof state === 'object' && 'fromListing' in state
+      ? (state as { fromListing?: unknown }).fromListing
+      : undefined;
+
+  if (typeof stateFromListing === 'string' && (stateFromListing === '/home' || stateFromListing.startsWith('/search'))) {
+    return stateFromListing;
+  }
+
+  return '/home';
 }
