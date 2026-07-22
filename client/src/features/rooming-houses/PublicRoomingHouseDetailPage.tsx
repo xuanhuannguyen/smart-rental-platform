@@ -45,6 +45,7 @@ export default function PublicRoomingHouseDetailPage() {
   const [quickMessageSending, setQuickMessageSending] = useState(false);
   const [toast, setToast] = useState<{ message: string; type: 'success' | 'error' | 'info' } | null>(null);
   const listingReturnUrl = getListingReturnUrl(location.state, new URLSearchParams(location.search));
+  const listingReturnState = getListingReturnState(location.state);
 
   const defaultQuickMessage = house
     ? `Xin chào, tôi muốn hỏi về thông tin khu trọ ${house.name}.`
@@ -71,7 +72,11 @@ export default function PublicRoomingHouseDetailPage() {
   }
 
   function handleBackToListing() {
-    navigate(listingReturnUrl, { replace: true });
+    navigate(listingReturnUrl, {
+      replace: true,
+      preventScrollReset: true,
+      state: listingReturnState,
+    });
   }
 
   async function handleSendQuickMessage() {
@@ -283,7 +288,7 @@ function getListingReturnUrl(state: unknown, searchParams: URLSearchParams) {
       ? (state as { fromListing?: unknown }).fromListing
       : undefined;
 
-  if (typeof stateFromListing === 'string' && (stateFromListing === '/home' || stateFromListing.startsWith('/search'))) {
+  if (typeof stateFromListing === 'string' && (stateFromListing.startsWith('/home') || stateFromListing.startsWith('/search'))) {
     return stateFromListing;
   }
 
@@ -293,6 +298,15 @@ function getListingReturnUrl(state: unknown, searchParams: URLSearchParams) {
   }
 
   return '/home';
+}
+
+function getListingReturnState(state: unknown) {
+  const homeScroll =
+    state && typeof state === 'object' && 'homeScroll' in state
+      ? (state as { homeScroll?: unknown }).homeScroll
+      : undefined;
+
+  return homeScroll ? { restoreHomeScroll: homeScroll } : undefined;
 }
 
 function readDetailCache(id: string): RoomingHouseDetail | null {

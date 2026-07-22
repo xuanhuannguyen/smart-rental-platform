@@ -61,8 +61,10 @@ type HomeListingCategory = {
 /** sessionStorage cache key for home page listing. Bump when the card payload changes. */
 const LISTING_CACHE_KEY = 'srp_home_listing_cache_v2';
 const PROVINCES_CACHE_KEY = 'srp_home_provinces_cache_v1';
+const HOME_SCROLL_CACHE_KEY = 'srp_home_scroll_restore_v1';
 /** Cache TTL: 5 minutes. */
 const LISTING_CACHE_TTL = 5 * 60 * 1000;
+let homeScrollSnapshot: HomeScrollCacheEntry | null = null;
 
 /** A rooming house is considered "new" if created within this many days. */
 const NEW_LISTING_DAYS = 14;
@@ -90,6 +92,13 @@ type RecommendationDisplayMeta = {
 type RecommendationCacheEntry = ListingCacheEntry & {
   behaviorKey: string;
   meta: RecommendationDisplayMeta;
+};
+
+type HomeScrollCacheEntry = {
+  y: number;
+  cardKey?: string;
+  viewportOffsetTop?: number;
+  timestamp: number;
 };
 
 const DEFAULT_RECOMMENDATION_META: RecommendationDisplayMeta = {
@@ -136,6 +145,7 @@ export function MePage() {
   const [centerLat, setCenterLat] = useState<number | null>(null);
   const [centerLng, setCenterLng] = useState<number | null>(null);
   const dropdownRef = useRef<HTMLDivElement>(null);
+  const restoredScrollKeyRef = useRef<string | null>(null);
 
   // Chuyển hướng bắt buộc nếu user đã đăng nhập nhưng chưa xác thực email
   useEffect(() => {
@@ -312,6 +322,95 @@ export function MePage() {
     ],
     [homeListings, recommendationMeta, recommendedListings]
   );
+
+  useEffect(() => {
+    const scrollSnapshot = readHomeScrollPositionFromSearchParams(new URLSearchParams(location.search));
+    if (!scrollSnapshot) {
+      return;
+    }
+
+    const startedAt = Date.now();
+    const restoreInterval = window.setInterval(() => {
+      window.scrollTo({ top: scrollSnapshot.y, behavior: 'auto' });
+
+      const reachedTarget = Math.abs(window.scrollY - scrollSnapshot.y) <= 4;
+      const timedOut = Date.now() - startedAt >= 2500;
+      if (reachedTarget || timedOut) {
+        window.clearInterval(restoreInterval);
+      }
+    }, 50);
+
+    return () => window.clearInterval(restoreInterval);
+  }, [location.search]);
+
+  useEffect(() => {
+    if (loadingHouses || listingCategories.length === 0) {
+      return;
+    }
+
+    const scrollSnapshot = readHomeScrollPosition(location.state, new URLSearchParams(location.search));
+    if (!scrollSnapshot) {
+      return;
+    }
+
+    const restoreKey = buildHomeScrollRestoreRequestKey(scrollSnapshot);
+    if (restoredScrollKeyRef.current === restoreKey) {
+      return;
+    }
+
+    restoredScrollKeyRef.current = restoreKey;
+
+    let cancelled = false;
+    let frameId = 0;
+    const startedAt = performance.now();
+    const maxRestoreDurationMs = 2500;
+
+    const restore = () => {
+      if (cancelled) return;
+
+      const expectedDocumentTop =
+        typeof scrollSnapshot.viewportOffsetTop === 'number'
+          ? scrollSnapshot.y + scrollSnapshot.viewportOffsetTop
+          : null;
+      const targetCard = scrollSnapshot.cardKey
+        ? findHomeCardByRestoreKey(scrollSnapshot.cardKey, expectedDocumentTop)
+        : null;
+      if (targetCard && typeof scrollSnapshot.viewportOffsetTop === 'number') {
+        const nextY = window.scrollY + targetCard.getBoundingClientRect().top - scrollSnapshot.viewportOffsetTop;
+        window.scrollTo({ top: Math.max(0, nextY), behavior: 'auto' });
+      } else {
+        window.scrollTo({ top: scrollSnapshot.y, behavior: 'auto' });
+      }
+
+      const maxScrollY = Math.max(0, document.documentElement.scrollHeight - window.innerHeight);
+      const reachedTarget = targetCard && typeof scrollSnapshot.viewportOffsetTop === 'number'
+        ? Math.abs(targetCard.getBoundingClientRect().top - scrollSnapshot.viewportOffsetTop) <= 4
+        : Math.abs(window.scrollY - Math.min(scrollSnapshot.y, maxScrollY)) <= 4 && maxScrollY >= scrollSnapshot.y;
+      const timedOut = performance.now() - startedAt >= maxRestoreDurationMs;
+
+      if (reachedTarget || timedOut) {
+        clearHomeScrollPosition();
+        return;
+      }
+
+      frameId = window.requestAnimationFrame(restore);
+    };
+
+    frameId = window.requestAnimationFrame(restore);
+
+    return () => {
+      cancelled = true;
+      window.cancelAnimationFrame(frameId);
+    };
+  }, [listingCategories.length, loadingHouses, location.search, location.state]);
+
+  useEffect(() => {
+    return () => {
+      if (!readHomeScrollPosition()?.cardKey) {
+        saveHomeScrollPosition();
+      }
+    };
+  }, []);
 
   async function handleLandlordRegister() {
     setIsCheckingLandlord(true);
@@ -494,8 +593,8 @@ export function MePage() {
           <p className="feedback-state">Chưa có khu trọ công khai đang còn phòng.</p>
         ) : (
           <div className="home-listing-categories">
-            {listingCategories.map((category) => (
-              <section className="home-listing-category" key={category.id}>
+            {listingCategories.map((category, categoryIndex) => (
+              <section className="home-listing-category" key={`${category.id}-${categoryIndex}`}>
                 <div className="home-listings-header">
                   <div className="category-title-container">
                     <p className="eyebrow">
@@ -527,13 +626,19 @@ export function MePage() {
                 </div>
 
                 <div className={`home-listings-grid ${category.compact ? 'home-listings-grid--compact' : ''}`}>
-                  {category.items.map((house) => (
+                  {category.items.map((house, index) => (
                     <HomeListingCard
-                      key={`${category.id}-${house.id}`}
+                      key={`${category.id}-${categoryIndex}-${index}-${house.id}`}
+                      restoreKey={`${category.id}-${categoryIndex}-${index}-${house.id}`}
                       house={house}
-                      onOpen={() => {
+                      onOpen={(homeScroll) => {
                         saveRoomingHouseView(house.id);
-                        navigate(`/rooming-houses/${house.id}`, { state: { fromListing: ROUTE_PATHS.ME.ROOT } });
+                        navigate(`/rooming-houses/${house.id}`, {
+                          state: {
+                            fromListing: buildHomeRestoreUrl(homeScroll),
+                            homeScroll,
+                          },
+                        });
                       }}
                     />
                   ))}
@@ -553,7 +658,8 @@ export function MePage() {
   );
 }
 
-function HomeListingCard({ house, onOpen }: { house: HomeListingItem; onOpen: () => void }) {
+function HomeListingCard({ house, restoreKey, onOpen }: { house: HomeListingItem; restoreKey: string; onOpen: (homeScroll: HomeScrollCacheEntry) => void }) {
+  const cardRef = useRef<HTMLElement>(null);
   const roomsText = `${house.availableRooms ?? 0} phòng trống`;
   const areaText = house.minAreaM2 != null
     ? `Từ ${house.minAreaM2} m²`
@@ -564,9 +670,18 @@ function HomeListingCard({ house, onOpen }: { house: HomeListingItem; onOpen: ()
 
   return (
     <article
+      ref={cardRef}
+      data-home-card-key={restoreKey}
       className="home-listing-card"
-      onClick={onOpen}
-      onKeyDown={e => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); onOpen(); } }}
+      onClick={() => {
+        onOpen(saveHomeScrollPosition(restoreKey, cardRef.current));
+      }}
+      onKeyDown={e => {
+        if (e.key === 'Enter' || e.key === ' ') {
+          e.preventDefault();
+          onOpen(saveHomeScrollPosition(restoreKey, cardRef.current));
+        }
+      }}
       role="button"
       tabIndex={0}
       aria-label={`Xem chi tiết ${house.name}`}
@@ -707,6 +822,157 @@ function getAmenityIcon(name: string) {
       <polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2" />
     </svg>
   );
+}
+
+function saveHomeScrollPosition(cardKey?: string, element?: HTMLElement | null) {
+  const viewportOffsetTop = element?.getBoundingClientRect().top;
+  const entry: HomeScrollCacheEntry = {
+    y: window.scrollY,
+    cardKey,
+    viewportOffsetTop: typeof viewportOffsetTop === 'number' ? viewportOffsetTop : undefined,
+    timestamp: Date.now(),
+  };
+
+  homeScrollSnapshot = entry;
+
+  try {
+    sessionStorage.setItem(HOME_SCROLL_CACHE_KEY, JSON.stringify(entry));
+  } catch {
+    // sessionStorage full — skip restoring scroll
+  }
+
+  return entry;
+}
+
+function buildHomeRestoreUrl(snapshot: HomeScrollCacheEntry) {
+  const params = new URLSearchParams();
+  params.set('restoreY', String(Math.round(snapshot.y)));
+  params.set('restoreAt', String(snapshot.timestamp));
+  if (snapshot.cardKey) {
+    params.set('restoreCard', snapshot.cardKey);
+  }
+  if (typeof snapshot.viewportOffsetTop === 'number') {
+    params.set('restoreOffset', String(Math.round(snapshot.viewportOffsetTop)));
+  }
+
+  return `${ROUTE_PATHS.ME.ROOT}?${params.toString()}`;
+}
+
+function readHomeScrollPosition(routeState?: unknown, searchParams?: URLSearchParams) {
+  const searchSnapshot = searchParams ? readHomeScrollPositionFromSearchParams(searchParams) : null;
+  if (searchSnapshot) {
+    return searchSnapshot;
+  }
+
+  const routeSnapshot = readHomeScrollPositionFromRouteState(routeState);
+  if (routeSnapshot) {
+    return routeSnapshot;
+  }
+
+  if (homeScrollSnapshot && Date.now() - homeScrollSnapshot.timestamp < LISTING_CACHE_TTL) {
+    return {
+      ...homeScrollSnapshot,
+      y: Math.max(0, homeScrollSnapshot.y),
+    };
+  }
+
+  try {
+    const cached = sessionStorage.getItem(HOME_SCROLL_CACHE_KEY);
+    if (!cached) return null;
+
+    const entry: HomeScrollCacheEntry = JSON.parse(cached);
+    if (!entry || Date.now() - entry.timestamp >= LISTING_CACHE_TTL) {
+      clearHomeScrollPosition();
+      return null;
+    }
+
+    if (!Number.isFinite(entry.y)) {
+      return null;
+    }
+
+    return {
+      ...entry,
+      y: Math.max(0, entry.y),
+    };
+  } catch {
+    clearHomeScrollPosition();
+    return null;
+  }
+}
+
+function readHomeScrollPositionFromSearchParams(searchParams: URLSearchParams) {
+  const y = Number(searchParams.get('restoreY'));
+  const timestamp = Number(searchParams.get('restoreAt'));
+  if (!Number.isFinite(y) || !Number.isFinite(timestamp) || Date.now() - timestamp >= LISTING_CACHE_TTL) {
+    return null;
+  }
+
+  const offset = Number(searchParams.get('restoreOffset'));
+  const cardKey = searchParams.get('restoreCard') ?? undefined;
+  return {
+    y: Math.max(0, y),
+    cardKey,
+    viewportOffsetTop: Number.isFinite(offset) ? offset : undefined,
+    timestamp,
+  };
+}
+
+function buildHomeScrollRestoreRequestKey(snapshot: HomeScrollCacheEntry) {
+  return [
+    snapshot.timestamp,
+    Math.round(snapshot.y),
+    snapshot.cardKey ?? '',
+    typeof snapshot.viewportOffsetTop === 'number' ? Math.round(snapshot.viewportOffsetTop) : '',
+  ].join(':');
+}
+
+function readHomeScrollPositionFromRouteState(routeState: unknown) {
+  const restoreHomeScroll =
+    routeState && typeof routeState === 'object' && 'restoreHomeScroll' in routeState
+      ? (routeState as { restoreHomeScroll?: unknown }).restoreHomeScroll
+      : undefined;
+
+  if (!restoreHomeScroll || typeof restoreHomeScroll !== 'object') {
+    return null;
+  }
+
+  const entry = restoreHomeScroll as Partial<HomeScrollCacheEntry>;
+  if (!Number.isFinite(entry.y) || !entry.timestamp || Date.now() - entry.timestamp >= LISTING_CACHE_TTL) {
+    return null;
+  }
+
+  return {
+    y: Math.max(0, Number(entry.y)),
+    cardKey: typeof entry.cardKey === 'string' ? entry.cardKey : undefined,
+    viewportOffsetTop: Number.isFinite(entry.viewportOffsetTop) ? Number(entry.viewportOffsetTop) : undefined,
+    timestamp: entry.timestamp,
+  };
+}
+
+function clearHomeScrollPosition() {
+  homeScrollSnapshot = null;
+  try {
+    sessionStorage.removeItem(HOME_SCROLL_CACHE_KEY);
+  } catch {
+    // sessionStorage unavailable — memory cache was already cleared
+  }
+}
+
+function findHomeCardByRestoreKey(restoreKey: string, expectedDocumentTop: number | null) {
+  const candidates = Array.from(document.querySelectorAll<HTMLElement>('[data-home-card-key]'))
+    .filter((element) => element.dataset.homeCardKey === restoreKey);
+
+  if (candidates.length <= 1 || expectedDocumentTop == null) {
+    return candidates[0] ?? null;
+  }
+
+  return candidates.reduce((closest, candidate) => {
+    const closestTop = window.scrollY + closest.getBoundingClientRect().top;
+    const candidateTop = window.scrollY + candidate.getBoundingClientRect().top;
+    return Math.abs(candidateTop - expectedDocumentTop) < Math.abs(closestTop - expectedDocumentTop)
+      ? candidate
+      : closest;
+  }, candidates[0]);
 }
 
 function mapListingItemToHomeItem(item: RoomingHouseListingItem): HomeListingItem {

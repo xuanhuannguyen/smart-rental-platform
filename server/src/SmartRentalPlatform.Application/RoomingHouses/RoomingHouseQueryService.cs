@@ -811,7 +811,7 @@ public partial class RoomingHouseQueryService : IRoomingHouseQueryService
         Guid roomingHouseId,
         CancellationToken cancellationToken = default)
     {
-        var house = await BuildRoomingHouseQuery()
+        var house = await BuildPublicRoomingHouseDetailQuery()
             .FirstOrDefaultAsync(
                 x => x.Id == roomingHouseId &&
                      x.DeletedAt == null &&
@@ -819,7 +819,27 @@ public partial class RoomingHouseQueryService : IRoomingHouseQueryService
                      x.VisibilityStatus == RoomingHouseVisibilityStatus.Visible,
                 cancellationToken);
 
-        return house is null ? null : RoomingHouseReadModelMapper.ToDetailResponse(house);
+        if (house is null)
+        {
+            return null;
+        }
+
+        var response = RoomingHouseReadModelMapper.ToDetailResponse(house);
+        var roomStats = await context.Rooms
+            .AsNoTracking()
+            .Where(x => x.RoomingHouseId == roomingHouseId && x.DeletedAt == null)
+            .GroupBy(_ => 1)
+            .Select(g => new
+            {
+                TotalRooms = g.Count(),
+                AvailableRooms = g.Count(x => x.Status == RoomStatus.Available),
+            })
+            .FirstOrDefaultAsync(cancellationToken);
+
+        response.TotalRooms = roomStats?.TotalRooms ?? 0;
+        response.AvailableRooms = roomStats?.AvailableRooms ?? 0;
+
+        return response;
     }
 
     public async Task<List<RoomingHouseResponse>> GetByLandlordAsync(
@@ -872,6 +892,7 @@ public partial class RoomingHouseQueryService : IRoomingHouseQueryService
     {
         return context.RoomingHouses
             .AsNoTracking()
+            .AsSplitQuery()
             .Include(x => x.Province)
             .Include(x => x.Ward)
             .Include(x => x.LegalDocument)
@@ -887,6 +908,23 @@ public partial class RoomingHouseQueryService : IRoomingHouseQueryService
             .Include(x => x.Rooms)
                 .ThenInclude(x => x.RoomAmenities)
                     .ThenInclude(x => x.Amenity)
+            .Include(x => x.RoomingHouseAmenities)
+                .ThenInclude(x => x.Amenity);
+    }
+
+    private IQueryable<RoomingHouse> BuildPublicRoomingHouseDetailQuery()
+    {
+        return context.RoomingHouses
+            .AsNoTracking()
+            .AsSplitQuery()
+            .Include(x => x.Province)
+            .Include(x => x.Ward)
+            .Include(x => x.LegalDocument)
+            .Include(x => x.RentalPolicy)
+            .Include(x => x.HouseRule)
+            .Include(x => x.Images)
+            .Include(x => x.ServicePrices)
+                .ThenInclude(x => x.ServiceType)
             .Include(x => x.RoomingHouseAmenities)
                 .ThenInclude(x => x.Amenity);
     }
