@@ -2,6 +2,7 @@
 using System;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
 using SmartRentalPlatform.Infrastructure.Persistence;
@@ -11,9 +12,11 @@ using SmartRentalPlatform.Infrastructure.Persistence;
 namespace SmartRentalPlatform.Infrastructure.Persistence.Migrations
 {
     [DbContext(typeof(AppDbContext))]
-    partial class AppDbContextModelSnapshot : ModelSnapshot
+    [Migration("20260701043000_RenameMeterReadingOcrAuditToAi")]
+    partial class RenameMeterReadingOcrAuditToAi
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        /// <inheritdoc />
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder
@@ -106,9 +109,6 @@ namespace SmartRentalPlatform.Infrastructure.Persistence.Migrations
                         .HasColumnName("updated_at");
 
                     b.HasKey("Code");
-
-                    b.HasIndex("IsActive", "Name")
-                        .HasDatabaseName("ix_administrative_provinces_active_name");
 
                     b.ToTable("administrative_provinces", (string)null);
 
@@ -462,8 +462,7 @@ namespace SmartRentalPlatform.Infrastructure.Persistence.Migrations
 
                     b.HasKey("Code");
 
-                    b.HasIndex("ProvinceCode", "IsActive", "Name")
-                        .HasDatabaseName("ix_administrative_wards_province_active_name");
+                    b.HasIndex("ProvinceCode");
 
                     b.ToTable("administrative_wards", (string)null);
 
@@ -33951,15 +33950,6 @@ namespace SmartRentalPlatform.Infrastructure.Persistence.Migrations
                         .HasColumnType("uuid")
                         .HasColumnName("id");
 
-                    b.Property<string>("AiRawText")
-                        .HasColumnType("text")
-                        .HasColumnName("ai_raw_text");
-
-                    b.Property<decimal?>("AiReading")
-                        .HasPrecision(12, 2)
-                        .HasColumnType("numeric(12,2)")
-                        .HasColumnName("ai_reading");
-
                     b.Property<DateOnly>("BillingPeriodEnd")
                         .HasColumnType("date")
                         .HasColumnName("billing_period_end");
@@ -34000,9 +33990,9 @@ namespace SmartRentalPlatform.Infrastructure.Persistence.Migrations
                         .HasColumnType("numeric(12,2)")
                         .HasColumnName("previous_reading");
 
-                    b.Property<Guid?>("ProofMediaAssetId")
-                        .HasColumnType("uuid")
-                        .HasColumnName("proof_media_asset_id");
+                    b.Property<string>("ProofImageObjectKey")
+                        .HasColumnType("text")
+                        .HasColumnName("proof_image_object_key");
 
                     b.Property<DateTimeOffset>("ReadingAt")
                         .HasColumnType("timestamp with time zone")
@@ -34030,8 +34020,6 @@ namespace SmartRentalPlatform.Infrastructure.Persistence.Migrations
 
                     b.HasKey("Id");
 
-                    b.HasIndex("ProofMediaAssetId");
-
                     b.HasIndex("RecordedByLandlordUserId");
 
                     b.HasIndex("RoomId");
@@ -34041,475 +34029,6 @@ namespace SmartRentalPlatform.Infrastructure.Persistence.Migrations
                     b.HasIndex("ContractId", "ServiceTypeId", "BillingPeriodStart", "BillingPeriodEnd");
 
                     b.ToTable("meter_readings", (string)null);
-                });
-
-            modelBuilder.Entity("SmartRentalPlatform.Domain.Entities.Chat.ChatMessage", b =>
-                {
-                    b.Property<Guid>("Id")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("uuid")
-                        .HasColumnName("id");
-
-                    b.Property<string>("Content")
-                        .HasColumnType("text")
-                        .HasColumnName("content");
-
-                    b.Property<Guid>("ConversationId")
-                        .HasColumnType("uuid")
-                        .HasColumnName("conversation_id");
-
-                    b.Property<DateTimeOffset>("CreatedAt")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("timestamp with time zone")
-                        .HasColumnName("created_at")
-                        .HasDefaultValueSql("now()");
-
-                    b.Property<DateTimeOffset?>("DeletedAt")
-                        .HasColumnType("timestamp with time zone")
-                        .HasColumnName("deleted_at");
-
-                    b.Property<string>("FileContentType")
-                        .HasMaxLength(100)
-                        .HasColumnType("character varying(100)")
-                        .HasColumnName("file_content_type");
-
-                    b.Property<string>("FileName")
-                        .HasMaxLength(255)
-                        .HasColumnType("character varying(255)")
-                        .HasColumnName("file_name");
-
-                    b.Property<long?>("FileSize")
-                        .HasColumnType("bigint")
-                        .HasColumnName("file_size");
-
-                    b.Property<string>("FileUrl")
-                        .HasMaxLength(1000)
-                        .HasColumnType("character varying(1000)")
-                        .HasColumnName("file_url");
-
-                    b.Property<string>("ImageUrl")
-                        .HasMaxLength(1000)
-                        .HasColumnType("character varying(1000)")
-                        .HasColumnName("image_url");
-
-                    b.Property<Guid?>("MediaAssetId")
-                        .HasColumnType("uuid")
-                        .HasColumnName("media_asset_id");
-
-                    b.Property<string>("MessageType")
-                        .IsRequired()
-                        .HasMaxLength(20)
-                        .HasColumnType("character varying(20)")
-                        .HasColumnName("message_type");
-
-                    b.Property<Guid>("SenderId")
-                        .HasColumnType("uuid")
-                        .HasColumnName("sender_id");
-
-                    b.HasKey("Id");
-
-                    b.HasIndex("MediaAssetId")
-                        .IsUnique()
-                        .HasDatabaseName("ux_chat_messages_media_asset_id");
-
-                    b.HasIndex("SenderId");
-
-                    b.HasIndex("ConversationId", "CreatedAt")
-                        .HasDatabaseName("ix_chat_messages_conversation_created_at");
-
-                    b.ToTable("chat_messages", (string)null);
-                });
-
-            modelBuilder.Entity("SmartRentalPlatform.Domain.Entities.Chat.Conversation", b =>
-                {
-                    b.Property<Guid>("Id")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("uuid")
-                        .HasColumnName("id");
-
-                    b.Property<Guid?>("AvatarMediaAssetId")
-                        .HasColumnType("uuid")
-                        .HasColumnName("avatar_media_asset_id");
-
-                    b.Property<string>("AvatarUrl")
-                        .HasMaxLength(1000)
-                        .HasColumnType("character varying(1000)")
-                        .HasColumnName("avatar_url");
-
-                    b.Property<DateTimeOffset>("CreatedAt")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("timestamp with time zone")
-                        .HasColumnName("created_at")
-                        .HasDefaultValueSql("now()");
-
-                    b.Property<Guid>("CreatedByUserId")
-                        .HasColumnType("uuid")
-                        .HasColumnName("created_by_user_id");
-
-                    b.Property<Guid?>("DirectUserAId")
-                        .HasColumnType("uuid")
-                        .HasColumnName("direct_user_a_id");
-
-                    b.Property<Guid?>("DirectUserBId")
-                        .HasColumnType("uuid")
-                        .HasColumnName("direct_user_b_id");
-
-                    b.Property<bool>("IsClosed")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("boolean")
-                        .HasDefaultValue(false)
-                        .HasColumnName("is_closed");
-
-                    b.Property<DateTimeOffset?>("LastMessageAt")
-                        .HasColumnType("timestamp with time zone")
-                        .HasColumnName("last_message_at");
-
-                    b.Property<string>("LastMessagePreview")
-                        .HasMaxLength(500)
-                        .HasColumnType("character varying(500)")
-                        .HasColumnName("last_message_preview");
-
-                    b.Property<bool>("RequiresJoinApproval")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("boolean")
-                        .HasDefaultValue(false)
-                        .HasColumnName("requires_join_approval");
-
-                    b.Property<Guid?>("RoomId")
-                        .HasColumnType("uuid")
-                        .HasColumnName("room_id");
-
-                    b.Property<Guid?>("RoomingHouseId")
-                        .HasColumnType("uuid")
-                        .HasColumnName("rooming_house_id");
-
-                    b.Property<string>("Title")
-                        .HasMaxLength(200)
-                        .HasColumnType("character varying(200)")
-                        .HasColumnName("title");
-
-                    b.Property<string>("Type")
-                        .IsRequired()
-                        .HasMaxLength(20)
-                        .HasColumnType("character varying(20)")
-                        .HasColumnName("type");
-
-                    b.Property<DateTimeOffset>("UpdatedAt")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("timestamp with time zone")
-                        .HasColumnName("updated_at")
-                        .HasDefaultValueSql("now()");
-
-                    b.HasKey("Id");
-
-                    b.HasIndex("AvatarMediaAssetId")
-                        .IsUnique()
-                        .HasDatabaseName("ux_conversations_avatar_media_asset_id");
-
-                    b.HasIndex("CreatedByUserId");
-
-                    b.HasIndex("LastMessageAt")
-                        .HasDatabaseName("ix_conversations_last_message_at");
-
-                    b.HasIndex("RoomId");
-
-                    b.HasIndex("RoomingHouseId");
-
-                    b.HasIndex("DirectUserAId", "DirectUserBId")
-                        .IsUnique()
-                        .HasDatabaseName("ux_conversations_direct_pair")
-                        .HasFilter("\"type\" = 'Direct' AND \"direct_user_a_id\" IS NOT NULL AND \"direct_user_b_id\" IS NOT NULL");
-
-                    b.HasIndex("Type", "RoomId")
-                        .HasDatabaseName("ix_conversations_type_room_id");
-
-                    b.ToTable("conversations", (string)null);
-                });
-
-            modelBuilder.Entity("SmartRentalPlatform.Domain.Entities.Chat.ConversationJoinRequest", b =>
-                {
-                    b.Property<Guid>("Id")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("uuid")
-                        .HasColumnName("id");
-
-                    b.Property<Guid>("ConversationId")
-                        .HasColumnType("uuid")
-                        .HasColumnName("conversation_id");
-
-                    b.Property<DateTimeOffset>("CreatedAt")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("timestamp with time zone")
-                        .HasColumnName("created_at")
-                        .HasDefaultValueSql("now()");
-
-                    b.Property<Guid>("RequesterUserId")
-                        .HasColumnType("uuid")
-                        .HasColumnName("requester_user_id");
-
-                    b.Property<DateTimeOffset?>("ReviewedAt")
-                        .HasColumnType("timestamp with time zone")
-                        .HasColumnName("reviewed_at");
-
-                    b.Property<Guid?>("ReviewedByUserId")
-                        .HasColumnType("uuid")
-                        .HasColumnName("reviewed_by_user_id");
-
-                    b.Property<string>("Status")
-                        .IsRequired()
-                        .HasMaxLength(20)
-                        .HasColumnType("character varying(20)")
-                        .HasColumnName("status");
-
-                    b.HasKey("Id");
-
-                    b.HasIndex("ConversationId");
-
-                    b.HasIndex("RequesterUserId");
-
-                    b.HasIndex("ReviewedByUserId");
-
-                    b.ToTable("conversation_join_requests", (string)null);
-                });
-
-            modelBuilder.Entity("SmartRentalPlatform.Domain.Entities.Chat.ConversationParticipant", b =>
-                {
-                    b.Property<Guid>("ConversationId")
-                        .HasColumnType("uuid")
-                        .HasColumnName("conversation_id");
-
-                    b.Property<Guid>("UserId")
-                        .HasColumnType("uuid")
-                        .HasColumnName("user_id");
-
-                    b.Property<Guid?>("AddedByUserId")
-                        .HasColumnType("uuid")
-                        .HasColumnName("added_by_user_id");
-
-                    b.Property<string>("InboxStatus")
-                        .IsRequired()
-                        .ValueGeneratedOnAdd()
-                        .HasMaxLength(20)
-                        .HasColumnType("character varying(20)")
-                        .HasDefaultValue("Main")
-                        .HasColumnName("inbox_status");
-
-                    b.Property<DateTimeOffset?>("InboxStatusUpdatedAt")
-                        .HasColumnType("timestamp with time zone")
-                        .HasColumnName("inbox_status_updated_at");
-
-                    b.Property<Guid?>("InboxStatusUpdatedByUserId")
-                        .HasColumnType("uuid")
-                        .HasColumnName("inbox_status_updated_by_user_id");
-
-                    b.Property<bool>("IsMuted")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("boolean")
-                        .HasDefaultValue(false)
-                        .HasColumnName("is_muted");
-
-                    b.Property<DateTimeOffset>("JoinedAt")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("timestamp with time zone")
-                        .HasColumnName("joined_at")
-                        .HasDefaultValueSql("now()");
-
-                    b.Property<DateTimeOffset?>("LastReadAt")
-                        .HasColumnType("timestamp with time zone")
-                        .HasColumnName("last_read_at");
-
-                    b.Property<DateTimeOffset?>("LeftAt")
-                        .HasColumnType("timestamp with time zone")
-                        .HasColumnName("left_at");
-
-                    b.Property<string>("Role")
-                        .IsRequired()
-                        .HasMaxLength(20)
-                        .HasColumnType("character varying(20)")
-                        .HasColumnName("role");
-
-                    b.Property<string>("Source")
-                        .IsRequired()
-                        .HasMaxLength(30)
-                        .HasColumnType("character varying(30)")
-                        .HasColumnName("source");
-
-                    b.Property<int>("UnreadCount")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("integer")
-                        .HasDefaultValue(0)
-                        .HasColumnName("unread_count");
-
-                    b.HasKey("ConversationId", "UserId");
-
-                    b.HasIndex("AddedByUserId");
-
-                    b.HasIndex("InboxStatusUpdatedByUserId");
-
-                    b.HasIndex("UserId", "LeftAt", "UnreadCount")
-                        .HasDatabaseName("ix_conversation_participants_user_left_unread");
-
-                    b.ToTable("conversation_participants", (string)null);
-                });
-
-            modelBuilder.Entity("SmartRentalPlatform.Domain.Entities.Media.MediaAsset", b =>
-                {
-                    b.Property<Guid>("Id")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("uuid")
-                        .HasColumnName("id");
-
-                    b.Property<string>("BucketName")
-                        .IsRequired()
-                        .HasColumnType("text")
-                        .HasColumnName("bucket_name");
-
-                    b.Property<string>("ContentType")
-                        .IsRequired()
-                        .HasColumnType("text")
-                        .HasColumnName("content_type");
-
-                    b.Property<DateTimeOffset>("CreatedAt")
-                        .HasColumnType("timestamp with time zone")
-                        .HasColumnName("created_at");
-
-                    b.Property<DateTimeOffset?>("DeletedAt")
-                        .HasColumnType("timestamp with time zone")
-                        .HasColumnName("deleted_at");
-
-                    b.Property<string>("FileHash")
-                        .HasColumnType("text")
-                        .HasColumnName("file_hash");
-
-                    b.Property<long>("FileSize")
-                        .HasColumnType("bigint")
-                        .HasColumnName("file_size");
-
-                    b.Property<Guid?>("LinkedEntityId")
-                        .HasColumnType("uuid")
-                        .HasColumnName("linked_entity_id");
-
-                    b.Property<string>("LinkedEntityType")
-                        .HasColumnType("text")
-                        .HasColumnName("linked_entity_type");
-
-                    b.Property<string>("ObjectKey")
-                        .IsRequired()
-                        .HasColumnType("text")
-                        .HasColumnName("object_key");
-
-                    b.Property<string>("OriginalFileName")
-                        .IsRequired()
-                        .HasColumnType("text")
-                        .HasColumnName("original_file_name");
-
-                    b.Property<Guid?>("OwnerUserId")
-                        .HasColumnType("uuid")
-                        .HasColumnName("owner_user_id");
-
-                    b.Property<string>("Scope")
-                        .IsRequired()
-                        .HasMaxLength(50)
-                        .HasColumnType("character varying(50)")
-                        .HasColumnName("scope");
-
-                    b.Property<string>("Status")
-                        .IsRequired()
-                        .ValueGeneratedOnAdd()
-                        .HasMaxLength(30)
-                        .HasColumnType("character varying(30)")
-                        .HasDefaultValue("PendingUpload")
-                        .HasColumnName("status");
-
-                    b.Property<string>("StoredFileName")
-                        .IsRequired()
-                        .HasColumnType("text")
-                        .HasColumnName("stored_file_name");
-
-                    b.Property<DateTimeOffset>("UpdatedAt")
-                        .HasColumnType("timestamp with time zone")
-                        .HasColumnName("updated_at");
-
-                    b.Property<string>("Visibility")
-                        .IsRequired()
-                        .ValueGeneratedOnAdd()
-                        .HasMaxLength(20)
-                        .HasColumnType("character varying(20)")
-                        .HasDefaultValue("Private")
-                        .HasColumnName("visibility");
-
-                    b.HasKey("Id");
-
-                    b.HasIndex("CreatedAt");
-
-                    b.HasIndex("DeletedAt");
-
-                    b.HasIndex("ObjectKey")
-                        .IsUnique();
-
-                    b.HasIndex("OwnerUserId");
-
-                    b.HasIndex("LinkedEntityType", "LinkedEntityId");
-
-                    b.HasIndex("Scope", "Status");
-
-                    b.ToTable("media_assets", (string)null);
-                });
-
-            modelBuilder.Entity("SmartRentalPlatform.Domain.Entities.Media.MediaAuditLog", b =>
-                {
-                    b.Property<Guid>("Id")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("uuid")
-                        .HasColumnName("id");
-
-                    b.Property<string>("Action")
-                        .IsRequired()
-                        .HasMaxLength(50)
-                        .HasColumnType("character varying(50)")
-                        .HasColumnName("action");
-
-                    b.Property<Guid?>("ActorUserId")
-                        .HasColumnType("uuid")
-                        .HasColumnName("actor_user_id");
-
-                    b.Property<DateTimeOffset>("CreatedAt")
-                        .HasColumnType("timestamp with time zone")
-                        .HasColumnName("created_at");
-
-                    b.Property<string>("IpAddress")
-                        .HasMaxLength(64)
-                        .HasColumnType("character varying(64)")
-                        .HasColumnName("ip_address");
-
-                    b.Property<Guid>("MediaAssetId")
-                        .HasColumnType("uuid")
-                        .HasColumnName("media_asset_id");
-
-                    b.Property<string>("MetadataJson")
-                        .HasColumnType("text")
-                        .HasColumnName("metadata_json");
-
-                    b.Property<string>("Reason")
-                        .HasColumnType("text")
-                        .HasColumnName("reason");
-
-                    b.Property<string>("UserAgent")
-                        .HasMaxLength(512)
-                        .HasColumnType("character varying(512)")
-                        .HasColumnName("user_agent");
-
-                    b.HasKey("Id");
-
-                    b.HasIndex("ActorUserId");
-
-                    b.HasIndex("CreatedAt");
-
-                    b.HasIndex("MediaAssetId");
-
-                    b.HasIndex("MediaAssetId", "CreatedAt");
-
-                    b.ToTable("media_audit_logs", (string)null);
                 });
 
             modelBuilder.Entity("SmartRentalPlatform.Domain.Entities.Notifications.Notification", b =>
@@ -34950,133 +34469,6 @@ namespace SmartRentalPlatform.Infrastructure.Persistence.Migrations
                         });
                 });
 
-            modelBuilder.Entity("SmartRentalPlatform.Domain.Entities.Payments.WithdrawalRequest", b =>
-                {
-                    b.Property<Guid>("Id")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("uuid")
-                        .HasColumnName("id");
-
-                    b.Property<string>("AccountName")
-                        .IsRequired()
-                        .HasMaxLength(200)
-                        .HasColumnType("character varying(200)")
-                        .HasColumnName("account_name");
-
-                    b.Property<string>("AccountNumber")
-                        .IsRequired()
-                        .HasMaxLength(100)
-                        .HasColumnType("character varying(100)")
-                        .HasColumnName("account_number");
-
-                    b.Property<decimal>("Amount")
-                        .HasPrecision(18, 2)
-                        .HasColumnType("numeric(18,2)")
-                        .HasColumnName("amount");
-
-                    b.Property<string>("BankBin")
-                        .IsRequired()
-                        .HasMaxLength(50)
-                        .HasColumnType("character varying(50)")
-                        .HasColumnName("bank_bin");
-
-                    b.Property<DateTimeOffset>("CreatedAt")
-                        .HasColumnType("timestamp with time zone")
-                        .HasColumnName("created_at");
-
-                    b.Property<string>("Description")
-                        .HasMaxLength(500)
-                        .HasColumnType("character varying(500)")
-                        .HasColumnName("description");
-
-                    b.Property<decimal>("Fee")
-                        .HasPrecision(18, 2)
-                        .HasColumnType("numeric(18,2)")
-                        .HasColumnName("fee");
-
-                    b.Property<string>("IdempotencyKey")
-                        .IsRequired()
-                        .HasMaxLength(100)
-                        .HasColumnType("character varying(100)")
-                        .HasColumnName("idempotency_key");
-
-                    b.Property<string>("ProviderOrderCode")
-                        .IsRequired()
-                        .HasMaxLength(100)
-                        .HasColumnType("character varying(100)")
-                        .HasColumnName("provider_order_code");
-
-                    b.Property<string>("ProviderTransactionCode")
-                        .HasColumnType("text")
-                        .HasColumnName("provider_transaction_code");
-
-                    b.Property<string>("Status")
-                        .IsRequired()
-                        .HasMaxLength(50)
-                        .HasColumnType("character varying(50)")
-                        .HasColumnName("status");
-
-                    b.Property<DateTimeOffset>("UpdatedAt")
-                        .HasColumnType("timestamp with time zone")
-                        .HasColumnName("updated_at");
-
-                    b.Property<Guid>("WalletAccountId")
-                        .HasColumnType("uuid")
-                        .HasColumnName("wallet_account_id");
-
-                    b.HasKey("Id");
-
-                    b.HasIndex("IdempotencyKey")
-                        .IsUnique();
-
-                    b.HasIndex("ProviderOrderCode")
-                        .IsUnique();
-
-                    b.HasIndex("WalletAccountId");
-
-                    b.ToTable("withdrawal_requests", (string)null);
-                });
-
-            modelBuilder.Entity("SmartRentalPlatform.Domain.Entities.Payments.WithdrawalWebhookLog", b =>
-                {
-                    b.Property<Guid>("Id")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("uuid")
-                        .HasColumnName("id");
-
-                    b.Property<string>("Payload")
-                        .IsRequired()
-                        .HasColumnType("text")
-                        .HasColumnName("payload");
-
-                    b.Property<string>("ProviderOrderCode")
-                        .IsRequired()
-                        .HasMaxLength(100)
-                        .HasColumnType("character varying(100)")
-                        .HasColumnName("provider_order_code");
-
-                    b.Property<DateTimeOffset>("ReceivedAt")
-                        .HasColumnType("timestamp with time zone")
-                        .HasColumnName("received_at");
-
-                    b.Property<string>("Status")
-                        .IsRequired()
-                        .HasMaxLength(50)
-                        .HasColumnType("character varying(50)")
-                        .HasColumnName("status");
-
-                    b.Property<Guid>("WithdrawalRequestId")
-                        .HasColumnType("uuid")
-                        .HasColumnName("withdrawal_request_id");
-
-                    b.HasKey("Id");
-
-                    b.HasIndex("WithdrawalRequestId", "Status")
-                        .IsUnique();
-
-                    b.ToTable("withdrawal_webhook_logs", (string)null);
-                });
-
             modelBuilder.Entity("SmartRentalPlatform.Domain.Entities.Properties.Amenity", b =>
                 {
                     b.Property<int>("Id")
@@ -35192,27 +34584,6 @@ namespace SmartRentalPlatform.Infrastructure.Persistence.Migrations
                         });
                 });
 
-            modelBuilder.Entity("SmartRentalPlatform.Domain.Entities.Properties.FavoriteRoomingHouse", b =>
-                {
-                    b.Property<Guid>("UserId")
-                        .HasColumnType("uuid")
-                        .HasColumnName("user_id");
-
-                    b.Property<Guid>("RoomingHouseId")
-                        .HasColumnType("uuid")
-                        .HasColumnName("rooming_house_id");
-
-                    b.Property<DateTimeOffset>("CreatedAt")
-                        .HasColumnType("timestamp with time zone")
-                        .HasColumnName("created_at");
-
-                    b.HasKey("UserId", "RoomingHouseId");
-
-                    b.HasIndex("RoomingHouseId");
-
-                    b.ToTable("favorite_rooming_houses", (string)null);
-                });
-
             modelBuilder.Entity("SmartRentalPlatform.Domain.Entities.Properties.PropertyImage", b =>
                 {
                     b.Property<Guid>("Id")
@@ -35240,9 +34611,10 @@ namespace SmartRentalPlatform.Infrastructure.Persistence.Migrations
                         .HasDefaultValue(false)
                         .HasColumnName("is_cover");
 
-                    b.Property<Guid?>("MediaAssetId")
-                        .HasColumnType("uuid")
-                        .HasColumnName("media_asset_id");
+                    b.Property<string>("ObjectKey")
+                        .IsRequired()
+                        .HasColumnType("text")
+                        .HasColumnName("object_key");
 
                     b.Property<Guid?>("RoomId")
                         .HasColumnType("uuid")
@@ -35252,10 +34624,6 @@ namespace SmartRentalPlatform.Infrastructure.Persistence.Migrations
                         .HasColumnType("uuid")
                         .HasColumnName("rooming_house_id");
 
-                    b.Property<Guid?>("RoomingHouseReviewId")
-                        .HasColumnType("uuid")
-                        .HasColumnName("rooming_house_review_id");
-
                     b.Property<int>("SortOrder")
                         .ValueGeneratedOnAdd()
                         .HasColumnType("integer")
@@ -35264,23 +34632,13 @@ namespace SmartRentalPlatform.Infrastructure.Persistence.Migrations
 
                     b.HasKey("Id");
 
-                    b.HasIndex("MediaAssetId");
+                    b.HasIndex("RoomId");
 
-                    b.HasIndex("RoomingHouseReviewId", "SortOrder")
-                        .HasDatabaseName("ix_property_images_review_sort");
-
-                    b.HasIndex("RoomId", "MediaAssetId", "SortOrder")
-                        .HasDatabaseName("ix_property_images_room_media_sort");
-
-                    b.HasIndex("RoomingHouseId", "IsCover", "SortOrder")
-                        .HasDatabaseName("ix_property_images_house_cover_sort");
-
-                    b.HasIndex("RoomingHouseId", "MediaAssetId", "SortOrder")
-                        .HasDatabaseName("ix_property_images_house_media_sort");
+                    b.HasIndex("RoomingHouseId");
 
                     b.ToTable("property_images", null, t =>
                         {
-                            t.HasCheckConstraint("ck_property_images_owner_exclusive", "(rooming_house_id IS NOT NULL AND room_id IS NULL AND rooming_house_review_id IS NULL) OR (rooming_house_id IS NULL AND room_id IS NOT NULL AND rooming_house_review_id IS NULL) OR (rooming_house_id IS NULL AND room_id IS NULL AND rooming_house_review_id IS NOT NULL)");
+                            t.HasCheckConstraint("ck_property_images_owner_exclusive", "(rooming_house_id IS NOT NULL AND room_id IS NULL) OR (rooming_house_id IS NULL AND room_id IS NOT NULL)");
                         });
                 });
 
@@ -35347,55 +34705,6 @@ namespace SmartRentalPlatform.Infrastructure.Persistence.Migrations
                         });
                 });
 
-            modelBuilder.Entity("SmartRentalPlatform.Domain.Entities.Properties.ReviewReport", b =>
-                {
-                    b.Property<Guid>("Id")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("uuid")
-                        .HasColumnName("id");
-
-                    b.Property<string>("AdminNote")
-                        .HasColumnType("text")
-                        .HasColumnName("admin_note");
-
-                    b.Property<DateTimeOffset>("CreatedAt")
-                        .HasColumnType("timestamp with time zone")
-                        .HasColumnName("created_at");
-
-                    b.Property<string>("Reason")
-                        .IsRequired()
-                        .HasColumnType("text")
-                        .HasColumnName("reason");
-
-                    b.Property<Guid>("ReporterUserId")
-                        .HasColumnType("uuid")
-                        .HasColumnName("reporter_user_id");
-
-                    b.Property<DateTimeOffset?>("ResolvedAt")
-                        .HasColumnType("timestamp with time zone")
-                        .HasColumnName("resolved_at");
-
-                    b.Property<Guid>("RoomingHouseReviewId")
-                        .HasColumnType("uuid")
-                        .HasColumnName("rooming_house_review_id");
-
-                    b.Property<string>("Status")
-                        .IsRequired()
-                        .HasMaxLength(30)
-                        .HasColumnType("character varying(30)")
-                        .HasColumnName("status");
-
-                    b.HasKey("Id");
-
-                    b.HasIndex("ReporterUserId");
-
-                    b.HasIndex("RoomingHouseReviewId", "ReporterUserId")
-                        .IsUnique()
-                        .HasDatabaseName("uix_reports_review_reporter");
-
-                    b.ToTable("review_reports", (string)null);
-                });
-
             modelBuilder.Entity("SmartRentalPlatform.Domain.Entities.Properties.Room", b =>
                 {
                     b.Property<Guid>("Id")
@@ -35458,11 +34767,7 @@ namespace SmartRentalPlatform.Infrastructure.Persistence.Migrations
 
                     b.HasKey("Id");
 
-                    b.HasIndex("RoomingHouseId", "Status", "DeletedAt")
-                        .HasDatabaseName("ix_rooms_house_status_active");
-
-                    b.HasIndex("Status", "DeletedAt", "AreaM2", "MaxOccupants")
-                        .HasDatabaseName("ix_rooms_public_filters");
+                    b.HasIndex("RoomingHouseId");
 
                     b.ToTable("rooms", (string)null);
                 });
@@ -35479,8 +34784,7 @@ namespace SmartRentalPlatform.Infrastructure.Persistence.Migrations
 
                     b.HasKey("RoomId", "AmenityId");
 
-                    b.HasIndex("AmenityId", "RoomId")
-                        .HasDatabaseName("ix_room_amenities_amenity_room");
+                    b.HasIndex("AmenityId");
 
                     b.ToTable("room_amenities", (string)null);
                 });
@@ -35521,11 +34825,7 @@ namespace SmartRentalPlatform.Infrastructure.Persistence.Migrations
 
                     b.HasKey("Id");
 
-                    b.HasIndex("IsActive", "MonthlyRent", "RoomId")
-                        .HasDatabaseName("ix_room_price_tiers_public_rent");
-
-                    b.HasIndex("RoomId", "IsActive", "MonthlyRent")
-                        .HasDatabaseName("ix_room_price_tiers_room_active_rent");
+                    b.HasIndex("RoomId");
 
                     b.ToTable("room_price_tiers", (string)null);
                 });
@@ -35552,12 +34852,6 @@ namespace SmartRentalPlatform.Infrastructure.Persistence.Migrations
                         .HasMaxLength(30)
                         .HasColumnType("character varying(30)")
                         .HasColumnName("approval_status");
-
-                    b.Property<double>("AverageRating")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("double precision")
-                        .HasDefaultValue(0.0)
-                        .HasColumnName("average_rating");
 
                     b.Property<DateTimeOffset>("CreatedAt")
                         .HasColumnType("timestamp with time zone")
@@ -35613,12 +34907,6 @@ namespace SmartRentalPlatform.Infrastructure.Persistence.Migrations
                         .HasColumnType("uuid")
                         .HasColumnName("reviewed_by_admin_id");
 
-                    b.Property<int>("TotalReviews")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("integer")
-                        .HasDefaultValue(0)
-                        .HasColumnName("total_reviews");
-
                     b.Property<DateTimeOffset>("UpdatedAt")
                         .HasColumnType("timestamp with time zone")
                         .HasColumnName("updated_at");
@@ -35637,21 +34925,13 @@ namespace SmartRentalPlatform.Infrastructure.Persistence.Migrations
 
                     b.HasKey("Id");
 
+                    b.HasIndex("LandlordUserId");
+
+                    b.HasIndex("ProvinceCode");
+
                     b.HasIndex("ReviewedByAdminId");
 
                     b.HasIndex("WardCode");
-
-                    b.HasIndex("Latitude", "Longitude")
-                        .HasDatabaseName("ix_rooming_houses_geo_bounds");
-
-                    b.HasIndex("LandlordUserId", "DeletedAt", "CreatedAt")
-                        .HasDatabaseName("ix_rooming_houses_landlord_dashboard");
-
-                    b.HasIndex("ApprovalStatus", "VisibilityStatus", "DeletedAt", "CreatedAt")
-                        .HasDatabaseName("ix_rooming_houses_public_listing");
-
-                    b.HasIndex("ProvinceCode", "WardCode", "ApprovalStatus", "VisibilityStatus", "DeletedAt")
-                        .HasDatabaseName("ix_rooming_houses_public_location");
 
                     b.ToTable("rooming_houses", (string)null);
                 });
@@ -35668,8 +34948,7 @@ namespace SmartRentalPlatform.Infrastructure.Persistence.Migrations
 
                     b.HasKey("RoomingHouseId", "AmenityId");
 
-                    b.HasIndex("AmenityId", "RoomingHouseId")
-                        .HasDatabaseName("ix_rooming_house_amenities_amenity_house");
+                    b.HasIndex("AmenityId");
 
                     b.ToTable("rooming_house_amenities", (string)null);
                 });
@@ -35680,9 +34959,10 @@ namespace SmartRentalPlatform.Infrastructure.Persistence.Migrations
                         .HasColumnType("uuid")
                         .HasColumnName("rooming_house_id");
 
-                    b.Property<Guid?>("BackMediaAssetId")
-                        .HasColumnType("uuid")
-                        .HasColumnName("back_media_asset_id");
+                    b.Property<string>("BackImageObjectKey")
+                        .IsRequired()
+                        .HasColumnType("text")
+                        .HasColumnName("back_image_object_key");
 
                     b.Property<DateTimeOffset>("CreatedAt")
                         .HasColumnType("timestamp with time zone")
@@ -35707,13 +34987,14 @@ namespace SmartRentalPlatform.Infrastructure.Persistence.Migrations
                         .HasDefaultValue("LAND_USE_CERTIFICATE")
                         .HasColumnName("document_type");
 
-                    b.Property<Guid?>("ExtraMediaAssetId")
-                        .HasColumnType("uuid")
-                        .HasColumnName("extra_media_asset_id");
+                    b.Property<string>("ExtraImageObjectKey")
+                        .HasColumnType("text")
+                        .HasColumnName("extra_image_object_key");
 
-                    b.Property<Guid?>("FrontMediaAssetId")
-                        .HasColumnType("uuid")
-                        .HasColumnName("front_media_asset_id");
+                    b.Property<string>("FrontImageObjectKey")
+                        .IsRequired()
+                        .HasColumnType("text")
+                        .HasColumnName("front_image_object_key");
 
                     b.Property<DateTimeOffset>("UpdatedAt")
                         .HasColumnType("timestamp with time zone")
@@ -35725,127 +35006,7 @@ namespace SmartRentalPlatform.Infrastructure.Persistence.Migrations
 
                     b.HasKey("RoomingHouseId");
 
-                    b.HasIndex("BackMediaAssetId");
-
-                    b.HasIndex("ExtraMediaAssetId");
-
-                    b.HasIndex("FrontMediaAssetId");
-
                     b.ToTable("rooming_house_legal_documents", (string)null);
-                });
-
-            modelBuilder.Entity("SmartRentalPlatform.Domain.Entities.Properties.RoomingHouseReview", b =>
-                {
-                    b.Property<Guid>("Id")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("uuid")
-                        .HasColumnName("id");
-
-                    b.Property<string>("AdminNote")
-                        .HasColumnType("text")
-                        .HasColumnName("admin_note");
-
-                    b.Property<DateTimeOffset?>("AdminReviewedAt")
-                        .HasColumnType("timestamp with time zone")
-                        .HasColumnName("admin_reviewed_at");
-
-                    b.Property<string>("AiModerationCategories")
-                        .HasColumnType("text")
-                        .HasColumnName("ai_moderation_categories");
-
-                    b.Property<string>("AiModerationJson")
-                        .HasColumnType("text")
-                        .HasColumnName("ai_moderation_json");
-
-                    b.Property<string>("AiModerationProvider")
-                        .HasMaxLength(32)
-                        .HasColumnType("character varying(32)")
-                        .HasColumnName("ai_moderation_provider");
-
-                    b.Property<string>("AiModerationRiskLevel")
-                        .HasMaxLength(32)
-                        .HasColumnType("character varying(32)")
-                        .HasColumnName("ai_moderation_risk_level");
-
-                    b.Property<DateTimeOffset?>("AiReviewedAt")
-                        .HasColumnType("timestamp with time zone")
-                        .HasColumnName("ai_reviewed_at");
-
-                    b.Property<string>("Comment")
-                        .HasColumnType("text")
-                        .HasColumnName("comment");
-
-                    b.Property<DateTimeOffset>("CreatedAt")
-                        .HasColumnType("timestamp with time zone")
-                        .HasColumnName("created_at");
-
-                    b.Property<bool>("IsHidden")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("boolean")
-                        .HasDefaultValue(false)
-                        .HasColumnName("is_hidden");
-
-                    b.Property<string>("LandlordReply")
-                        .HasColumnType("text")
-                        .HasColumnName("landlord_reply");
-
-                    b.Property<DateTimeOffset?>("LandlordReplyCreatedAt")
-                        .HasColumnType("timestamp with time zone")
-                        .HasColumnName("landlord_reply_created_at");
-
-                    b.Property<string>("ModerationReason")
-                        .HasColumnType("text")
-                        .HasColumnName("moderation_reason");
-
-                    b.Property<string>("ModerationStatus")
-                        .IsRequired()
-                        .ValueGeneratedOnAdd()
-                        .HasMaxLength(32)
-                        .HasColumnType("character varying(32)")
-                        .HasDefaultValue("Approved")
-                        .HasColumnName("moderation_status");
-
-                    b.Property<int>("Rating")
-                        .HasColumnType("integer")
-                        .HasColumnName("rating");
-
-                    b.Property<Guid>("RentalContractId")
-                        .HasColumnType("uuid")
-                        .HasColumnName("rental_contract_id");
-
-                    b.Property<Guid?>("ReviewedByAdminId")
-                        .HasColumnType("uuid")
-                        .HasColumnName("reviewed_by_admin_id");
-
-                    b.Property<Guid>("RoomingHouseId")
-                        .HasColumnType("uuid")
-                        .HasColumnName("rooming_house_id");
-
-                    b.Property<Guid>("TenantUserId")
-                        .HasColumnType("uuid")
-                        .HasColumnName("tenant_user_id");
-
-                    b.Property<DateTimeOffset?>("UpdatedAt")
-                        .HasColumnType("timestamp with time zone")
-                        .HasColumnName("updated_at");
-
-                    b.HasKey("Id");
-
-                    b.HasIndex("ReviewedByAdminId");
-
-                    b.HasIndex("TenantUserId");
-
-                    b.HasIndex("RentalContractId", "TenantUserId")
-                        .IsUnique()
-                        .HasDatabaseName("uix_reviews_contract_tenant");
-
-                    b.HasIndex("ModerationStatus", "AiReviewedAt", "CreatedAt")
-                        .HasDatabaseName("ix_rooming_house_reviews_ai_queue");
-
-                    b.HasIndex("RoomingHouseId", "IsHidden", "ModerationStatus", "CreatedAt")
-                        .HasDatabaseName("ix_rooming_house_reviews_public_thread");
-
-                    b.ToTable("rooming_house_reviews", (string)null);
                 });
 
             modelBuilder.Entity("SmartRentalPlatform.Domain.Entities.Properties.RoomingHouseRule", b =>
@@ -35879,13 +35040,14 @@ namespace SmartRentalPlatform.Infrastructure.Persistence.Migrations
                         .HasColumnType("text")
                         .HasColumnName("guest_policy");
 
-                    b.Property<Guid?>("MediaAssetId")
-                        .HasColumnType("uuid")
-                        .HasColumnName("media_asset_id");
-
                     b.Property<string>("ParkingPolicy")
                         .HasColumnType("text")
                         .HasColumnName("parking_policy");
+
+                    b.Property<string>("PdfObjectKey")
+                        .IsRequired()
+                        .HasColumnType("text")
+                        .HasColumnName("pdf_object_key");
 
                     b.Property<string>("QuietHours")
                         .HasColumnType("text")
@@ -35914,8 +35076,6 @@ namespace SmartRentalPlatform.Infrastructure.Persistence.Migrations
                         .HasColumnName("utility_policy");
 
                     b.HasKey("Id");
-
-                    b.HasIndex("MediaAssetId");
 
                     b.HasIndex("RoomingHouseId")
                         .IsUnique();
@@ -36383,16 +35543,6 @@ namespace SmartRentalPlatform.Infrastructure.Persistence.Migrations
                         .HasColumnType("uuid")
                         .HasColumnName("id");
 
-                    b.Property<string>("ContentType")
-                        .IsRequired()
-                        .HasMaxLength(100)
-                        .HasColumnType("character varying(100)")
-                        .HasColumnName("content_type");
-
-                    b.Property<Guid?>("ContractSigningEnvelopeId")
-                        .HasColumnType("uuid")
-                        .HasColumnName("signing_envelope_id");
-
                     b.Property<DateTimeOffset>("CreatedAt")
                         .HasColumnType("timestamp with time zone")
                         .HasColumnName("created_at");
@@ -36401,21 +35551,13 @@ namespace SmartRentalPlatform.Infrastructure.Persistence.Migrations
                         .HasColumnType("text")
                         .HasColumnName("file_url");
 
-                    b.Property<bool>("IsLegallySigned")
-                        .HasColumnType("boolean")
-                        .HasColumnName("is_legally_signed");
-
-                    b.Property<Guid?>("MediaAssetId")
-                        .HasColumnType("uuid")
-                        .HasColumnName("media_asset_id");
-
-                    b.Property<string>("Purpose")
+                    b.Property<string>("FileVariant")
                         .IsRequired()
                         .ValueGeneratedOnAdd()
-                        .HasMaxLength(50)
-                        .HasColumnType("character varying(50)")
-                        .HasDefaultValue("Preview")
-                        .HasColumnName("purpose");
+                        .HasMaxLength(30)
+                        .HasColumnType("character varying(30)")
+                        .HasDefaultValue("Raw")
+                        .HasColumnName("file_variant");
 
                     b.Property<Guid?>("RentalContractAppendixId")
                         .HasColumnType("uuid")
@@ -36425,24 +35567,18 @@ namespace SmartRentalPlatform.Infrastructure.Persistence.Migrations
                         .HasColumnType("uuid")
                         .HasColumnName("contract_id");
 
-                    b.Property<string>("Sha256Hash")
-                        .HasMaxLength(64)
-                        .HasColumnType("character varying(64)")
-                        .HasColumnName("sha256_hash");
+                    b.Property<string>("StorageObjectKey")
+                        .IsRequired()
+                        .HasColumnType("text")
+                        .HasColumnName("storage_object_key");
 
                     b.HasKey("Id");
-
-                    b.HasIndex("ContractSigningEnvelopeId");
-
-                    b.HasIndex("MediaAssetId");
 
                     b.HasIndex("RentalContractAppendixId");
 
                     b.HasIndex("RentalContractId");
 
-                    b.HasIndex("Sha256Hash");
-
-                    b.HasIndex("RentalContractId", "RentalContractAppendixId", "Purpose");
+                    b.HasIndex("RentalContractId", "RentalContractAppendixId", "FileVariant");
 
                     b.ToTable("contract_files", (string)null);
                 });
@@ -36528,9 +35664,9 @@ namespace SmartRentalPlatform.Infrastructure.Persistence.Migrations
                         .HasColumnType("uuid")
                         .HasColumnName("id");
 
-                    b.Property<Guid?>("BackMediaAssetId")
-                        .HasColumnType("uuid")
-                        .HasColumnName("back_media_asset_id");
+                    b.Property<string>("BackImageObjectKey")
+                        .HasColumnType("text")
+                        .HasColumnName("back_image_object_key");
 
                     b.Property<DateTimeOffset>("CreatedAt")
                         .HasColumnType("timestamp with time zone")
@@ -36555,13 +35691,14 @@ namespace SmartRentalPlatform.Infrastructure.Persistence.Migrations
                         .HasColumnType("character varying(50)")
                         .HasColumnName("document_type");
 
-                    b.Property<Guid?>("ExtraMediaAssetId")
-                        .HasColumnType("uuid")
-                        .HasColumnName("extra_media_asset_id");
+                    b.Property<string>("ExtraImageObjectKey")
+                        .HasColumnType("text")
+                        .HasColumnName("extra_image_object_key");
 
-                    b.Property<Guid?>("FrontMediaAssetId")
-                        .HasColumnType("uuid")
-                        .HasColumnName("front_media_asset_id");
+                    b.Property<string>("FrontImageObjectKey")
+                        .IsRequired()
+                        .HasColumnType("text")
+                        .HasColumnName("front_image_object_key");
 
                     b.Property<Guid>("RentalContractOccupantId")
                         .HasColumnType("uuid")
@@ -36577,13 +35714,7 @@ namespace SmartRentalPlatform.Infrastructure.Persistence.Migrations
 
                     b.HasKey("Id");
 
-                    b.HasIndex("BackMediaAssetId");
-
                     b.HasIndex("DocumentNumberHash");
-
-                    b.HasIndex("ExtraMediaAssetId");
-
-                    b.HasIndex("FrontMediaAssetId");
 
                     b.HasIndex("RentalContractOccupantId")
                         .IsUnique();
@@ -36598,25 +35729,6 @@ namespace SmartRentalPlatform.Infrastructure.Persistence.Migrations
                         .HasColumnType("uuid")
                         .HasColumnName("id");
 
-                    b.Property<string>("CertificateIssuer")
-                        .HasMaxLength(1000)
-                        .HasColumnType("character varying(1000)")
-                        .HasColumnName("certificate_issuer");
-
-                    b.Property<string>("CertificateSerialNumber")
-                        .HasMaxLength(255)
-                        .HasColumnType("character varying(255)")
-                        .HasColumnName("certificate_serial_number");
-
-                    b.Property<string>("CertificateSubject")
-                        .HasMaxLength(1000)
-                        .HasColumnType("character varying(1000)")
-                        .HasColumnName("certificate_subject");
-
-                    b.Property<Guid?>("ContractSigningEnvelopeId")
-                        .HasColumnType("uuid")
-                        .HasColumnName("signing_envelope_id");
-
                     b.Property<DateTimeOffset>("CreatedAt")
                         .HasColumnType("timestamp with time zone")
                         .HasColumnName("created_at");
@@ -36625,29 +35737,6 @@ namespace SmartRentalPlatform.Infrastructure.Persistence.Migrations
                         .HasMaxLength(100)
                         .HasColumnType("character varying(100)")
                         .HasColumnName("ip_address");
-
-                    b.Property<DateTimeOffset?>("NotifiedAt")
-                        .HasColumnType("timestamp with time zone")
-                        .HasColumnName("notified_at");
-
-                    b.Property<string>("Provider")
-                        .HasMaxLength(50)
-                        .HasColumnType("character varying(50)")
-                        .HasColumnName("provider");
-
-                    b.Property<string>("ProviderEnvelopeId")
-                        .HasMaxLength(255)
-                        .HasColumnType("character varying(255)")
-                        .HasColumnName("provider_envelope_id");
-
-                    b.Property<string>("ProviderEvidenceJson")
-                        .HasColumnType("jsonb")
-                        .HasColumnName("provider_evidence_json");
-
-                    b.Property<string>("ProviderParticipantId")
-                        .HasMaxLength(255)
-                        .HasColumnType("character varying(255)")
-                        .HasColumnName("provider_participant_id");
 
                     b.Property<Guid?>("RentalContractAppendixId")
                         .HasColumnType("uuid")
@@ -36663,14 +35752,13 @@ namespace SmartRentalPlatform.Infrastructure.Persistence.Migrations
                         .HasColumnType("character varying(50)")
                         .HasColumnName("signature_method");
 
-                    b.Property<DateTimeOffset?>("SignedAt")
+                    b.Property<string>("SignatureText")
+                        .HasColumnType("text")
+                        .HasColumnName("signature_text");
+
+                    b.Property<DateTimeOffset>("SignedAt")
                         .HasColumnType("timestamp with time zone")
                         .HasColumnName("signed_at");
-
-                    b.Property<string>("SignedFileSha256Hash")
-                        .HasMaxLength(64)
-                        .HasColumnType("character varying(64)")
-                        .HasColumnName("signed_file_sha256_hash");
 
                     b.Property<string>("SignerRole")
                         .IsRequired()
@@ -36682,28 +35770,11 @@ namespace SmartRentalPlatform.Infrastructure.Persistence.Migrations
                         .HasColumnType("uuid")
                         .HasColumnName("signer_user_id");
 
-                    b.Property<int>("SigningOrder")
-                        .HasColumnType("integer")
-                        .HasColumnName("signing_order");
-
-                    b.Property<string>("SigningUrl")
-                        .HasMaxLength(2000)
-                        .HasColumnType("character varying(2000)")
-                        .HasColumnName("signing_url");
-
-                    b.Property<string>("Status")
-                        .IsRequired()
-                        .HasMaxLength(50)
-                        .HasColumnType("character varying(50)")
-                        .HasColumnName("status");
-
                     b.Property<string>("UserAgent")
                         .HasColumnType("text")
                         .HasColumnName("user_agent");
 
                     b.HasKey("Id");
-
-                    b.HasIndex("ContractSigningEnvelopeId");
 
                     b.HasIndex("RentalContractAppendixId");
 
@@ -36723,200 +35794,6 @@ namespace SmartRentalPlatform.Infrastructure.Persistence.Migrations
                         {
                             t.HasCheckConstraint("ck_contract_signatures_target_exclusive", "(contract_id IS NOT NULL AND appendix_id IS NULL) OR (contract_id IS NULL AND appendix_id IS NOT NULL)");
                         });
-                });
-
-            modelBuilder.Entity("SmartRentalPlatform.Domain.Entities.RentalContracts.ContractSigningEnvelope", b =>
-                {
-                    b.Property<Guid>("Id")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("uuid")
-                        .HasColumnName("id");
-
-                    b.Property<DateTimeOffset?>("CompletedAt")
-                        .HasColumnType("timestamp with time zone")
-                        .HasColumnName("completed_at");
-
-                    b.Property<DateTimeOffset>("CreatedAt")
-                        .HasColumnType("timestamp with time zone")
-                        .HasColumnName("created_at");
-
-                    b.Property<DateTimeOffset?>("DocumentPreparedAt")
-                        .HasColumnType("timestamp with time zone")
-                        .HasColumnName("document_prepared_at");
-
-                    b.Property<string>("DocumentSnapshotEncrypted")
-                        .HasColumnType("text")
-                        .HasColumnName("document_snapshot_encrypted");
-
-                    b.Property<string>("DocumentSnapshotSha256Hash")
-                        .HasMaxLength(64)
-                        .HasColumnType("character varying(64)")
-                        .HasColumnName("document_snapshot_sha256_hash");
-
-                    b.Property<string>("DocumentTemplateVersion")
-                        .HasMaxLength(40)
-                        .HasColumnType("character varying(40)")
-                        .HasColumnName("document_template_version");
-
-                    b.Property<Guid?>("EvidenceFileMediaAssetId")
-                        .HasColumnType("uuid")
-                        .HasColumnName("evidence_file_media_asset_id");
-
-                    b.Property<DateTimeOffset?>("ExpiresAt")
-                        .HasColumnType("timestamp with time zone")
-                        .HasColumnName("expires_at");
-
-                    b.Property<string>("Provider")
-                        .IsRequired()
-                        .HasMaxLength(50)
-                        .HasColumnType("character varying(50)")
-                        .HasColumnName("provider");
-
-                    b.Property<string>("ProviderEnvelopeId")
-                        .HasMaxLength(255)
-                        .HasColumnType("character varying(255)")
-                        .HasColumnName("provider_envelope_id");
-
-                    b.Property<string>("ProviderStatusReason")
-                        .HasMaxLength(2000)
-                        .HasColumnType("character varying(2000)")
-                        .HasColumnName("provider_status_reason");
-
-                    b.Property<Guid?>("RentalContractAppendixId")
-                        .HasColumnType("uuid")
-                        .HasColumnName("appendix_id");
-
-                    b.Property<Guid?>("RentalContractId")
-                        .HasColumnType("uuid")
-                        .HasColumnName("contract_id");
-
-                    b.Property<DateTimeOffset?>("SentAt")
-                        .HasColumnType("timestamp with time zone")
-                        .HasColumnName("sent_at");
-
-                    b.Property<Guid?>("SignedFileMediaAssetId")
-                        .HasColumnType("uuid")
-                        .HasColumnName("signed_file_media_asset_id");
-
-                    b.Property<string>("SignedFileSha256Hash")
-                        .HasMaxLength(64)
-                        .HasColumnType("character varying(64)")
-                        .HasColumnName("signed_file_sha256_hash");
-
-                    b.Property<string>("Status")
-                        .IsRequired()
-                        .HasMaxLength(50)
-                        .HasColumnType("character varying(50)")
-                        .HasColumnName("status");
-
-                    b.Property<string>("Title")
-                        .HasMaxLength(1000)
-                        .HasColumnType("character varying(1000)")
-                        .HasColumnName("title");
-
-                    b.Property<Guid?>("UnsignedFileMediaAssetId")
-                        .HasColumnType("uuid")
-                        .HasColumnName("unsigned_file_media_asset_id");
-
-                    b.Property<string>("UnsignedFileSha256Hash")
-                        .HasMaxLength(64)
-                        .HasColumnType("character varying(64)")
-                        .HasColumnName("unsigned_file_sha256_hash");
-
-                    b.HasKey("Id");
-
-                    b.HasIndex("EvidenceFileMediaAssetId");
-
-                    b.HasIndex("SignedFileMediaAssetId");
-
-                    b.HasIndex("UnsignedFileMediaAssetId");
-
-                    b.HasIndex("Provider", "ProviderEnvelopeId")
-                        .IsUnique()
-                        .HasFilter("provider_envelope_id IS NOT NULL");
-
-                    b.HasIndex("RentalContractAppendixId", "Status");
-
-                    b.HasIndex("RentalContractId", "Status");
-
-                    b.ToTable("contract_signing_envelopes", (string)null);
-                });
-
-            modelBuilder.Entity("SmartRentalPlatform.Domain.Entities.RentalContracts.ESignWebhookLog", b =>
-                {
-                    b.Property<Guid>("Id")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("uuid")
-                        .HasColumnName("id");
-
-                    b.Property<string>("ErrorMessage")
-                        .HasMaxLength(2000)
-                        .HasColumnType("character varying(2000)")
-                        .HasColumnName("error_message");
-
-                    b.Property<string>("IdempotencyKey")
-                        .HasMaxLength(255)
-                        .HasColumnType("character varying(255)")
-                        .HasColumnName("idempotency_key");
-
-                    b.Property<DateTimeOffset?>("ProcessedAt")
-                        .HasColumnType("timestamp with time zone")
-                        .HasColumnName("processed_at");
-
-                    b.Property<string>("ProcessingStatus")
-                        .IsRequired()
-                        .HasMaxLength(50)
-                        .HasColumnType("character varying(50)")
-                        .HasColumnName("processing_status");
-
-                    b.Property<string>("Provider")
-                        .IsRequired()
-                        .HasMaxLength(50)
-                        .HasColumnType("character varying(50)")
-                        .HasColumnName("provider");
-
-                    b.Property<string>("ProviderEnvelopeId")
-                        .HasMaxLength(255)
-                        .HasColumnType("character varying(255)")
-                        .HasColumnName("provider_envelope_id");
-
-                    b.Property<string>("ProviderEventId")
-                        .HasMaxLength(100)
-                        .HasColumnType("character varying(100)")
-                        .HasColumnName("provider_event_id");
-
-                    b.Property<string>("RawPayload")
-                        .IsRequired()
-                        .HasColumnType("text")
-                        .HasColumnName("raw_payload");
-
-                    b.Property<string>("RawPayloadHash")
-                        .IsRequired()
-                        .HasMaxLength(64)
-                        .HasColumnType("character varying(64)")
-                        .HasColumnName("raw_payload_hash");
-
-                    b.Property<DateTimeOffset>("ReceivedAt")
-                        .HasColumnType("timestamp with time zone")
-                        .HasColumnName("received_at");
-
-                    b.Property<string>("SignatureStatus")
-                        .IsRequired()
-                        .HasMaxLength(50)
-                        .HasColumnType("character varying(50)")
-                        .HasColumnName("signature_status");
-
-                    b.Property<Guid?>("SigningEnvelopeId")
-                        .HasColumnType("uuid")
-                        .HasColumnName("signing_envelope_id");
-
-                    b.HasKey("Id");
-
-                    b.HasIndex("IdempotencyKey");
-
-                    b.HasIndex("Provider", "ProviderEnvelopeId");
-
-                    b.ToTable("esign_webhook_logs", (string)null);
                 });
 
             modelBuilder.Entity("SmartRentalPlatform.Domain.Entities.RentalContracts.RentalContract", b =>
@@ -37098,9 +35975,10 @@ namespace SmartRentalPlatform.Infrastructure.Persistence.Migrations
                         .HasColumnType("uuid")
                         .HasColumnName("id");
 
-                    b.Property<Guid?>("BackMediaAssetId")
-                        .HasColumnType("uuid")
-                        .HasColumnName("back_media_asset_id");
+                    b.Property<string>("BackImageObjectKey")
+                        .IsRequired()
+                        .HasColumnType("text")
+                        .HasColumnName("back_image_object_key");
 
                     b.Property<string>("CitizenIdHash")
                         .IsRequired()
@@ -37164,9 +36042,10 @@ namespace SmartRentalPlatform.Infrastructure.Persistence.Migrations
                         .HasColumnType("numeric(5,4)")
                         .HasColumnName("face_match_score");
 
-                    b.Property<Guid?>("FrontMediaAssetId")
-                        .HasColumnType("uuid")
-                        .HasColumnName("front_media_asset_id");
+                    b.Property<string>("FrontImageObjectKey")
+                        .IsRequired()
+                        .HasColumnType("text")
+                        .HasColumnName("front_image_object_key");
 
                     b.Property<string>("LivenessResult")
                         .HasMaxLength(50)
@@ -37225,9 +36104,10 @@ namespace SmartRentalPlatform.Infrastructure.Persistence.Migrations
                         .HasColumnType("character varying(30)")
                         .HasColumnName("selfie_capture_method");
 
-                    b.Property<Guid?>("SelfieMediaAssetId")
-                        .HasColumnType("uuid")
-                        .HasColumnName("selfie_media_asset_id");
+                    b.Property<string>("SelfieImageObjectKey")
+                        .IsRequired()
+                        .HasColumnType("text")
+                        .HasColumnName("selfie_image_object_key");
 
                     b.Property<string>("Status")
                         .IsRequired()
@@ -37251,17 +36131,11 @@ namespace SmartRentalPlatform.Infrastructure.Persistence.Migrations
 
                     b.HasKey("Id");
 
-                    b.HasIndex("BackMediaAssetId");
-
                     b.HasIndex("CitizenIdHash");
 
                     b.HasIndex("CreatedAt");
 
-                    b.HasIndex("FrontMediaAssetId");
-
                     b.HasIndex("ReviewedByAdminId");
-
-                    b.HasIndex("SelfieMediaAssetId");
 
                     b.HasIndex("Status");
 
@@ -37393,10 +36267,6 @@ namespace SmartRentalPlatform.Infrastructure.Persistence.Migrations
                         .HasDefaultValue(0)
                         .HasColumnName("access_failed_count");
 
-                    b.Property<Guid?>("AvatarMediaAssetId")
-                        .HasColumnType("uuid")
-                        .HasColumnName("avatar_media_asset_id");
-
                     b.Property<string>("AvatarUrl")
                         .HasColumnType("text")
                         .HasColumnName("avatar_url");
@@ -37477,8 +36347,6 @@ namespace SmartRentalPlatform.Infrastructure.Persistence.Migrations
                         .HasDefaultValueSql("now()");
 
                     b.HasKey("Id");
-
-                    b.HasIndex("AvatarMediaAssetId");
 
                     b.HasIndex("NormalizedEmail")
                         .IsUnique();
@@ -37722,11 +36590,6 @@ namespace SmartRentalPlatform.Infrastructure.Persistence.Migrations
                         .OnDelete(DeleteBehavior.Restrict)
                         .IsRequired();
 
-                    b.HasOne("SmartRentalPlatform.Domain.Entities.Media.MediaAsset", "ProofMediaAsset")
-                        .WithMany()
-                        .HasForeignKey("ProofMediaAssetId")
-                        .OnDelete(DeleteBehavior.SetNull);
-
                     b.HasOne("SmartRentalPlatform.Domain.Entities.Users.User", "RecordedByLandlord")
                         .WithMany()
                         .HasForeignKey("RecordedByLandlordUserId")
@@ -37745,8 +36608,6 @@ namespace SmartRentalPlatform.Infrastructure.Persistence.Migrations
                         .OnDelete(DeleteBehavior.Restrict)
                         .IsRequired();
 
-                    b.Navigation("ProofMediaAsset");
-
                     b.Navigation("RecordedByLandlord");
 
                     b.Navigation("RentalContract");
@@ -37754,134 +36615,6 @@ namespace SmartRentalPlatform.Infrastructure.Persistence.Migrations
                     b.Navigation("Room");
 
                     b.Navigation("ServiceType");
-                });
-
-            modelBuilder.Entity("SmartRentalPlatform.Domain.Entities.Chat.ChatMessage", b =>
-                {
-                    b.HasOne("SmartRentalPlatform.Domain.Entities.Chat.Conversation", "Conversation")
-                        .WithMany("Messages")
-                        .HasForeignKey("ConversationId")
-                        .OnDelete(DeleteBehavior.Cascade)
-                        .IsRequired();
-
-                    b.HasOne("SmartRentalPlatform.Domain.Entities.Media.MediaAsset", "MediaAsset")
-                        .WithMany()
-                        .HasForeignKey("MediaAssetId")
-                        .OnDelete(DeleteBehavior.SetNull);
-
-                    b.HasOne("SmartRentalPlatform.Domain.Entities.Users.User", "Sender")
-                        .WithMany()
-                        .HasForeignKey("SenderId")
-                        .OnDelete(DeleteBehavior.Restrict)
-                        .IsRequired();
-
-                    b.Navigation("Conversation");
-
-                    b.Navigation("MediaAsset");
-
-                    b.Navigation("Sender");
-                });
-
-            modelBuilder.Entity("SmartRentalPlatform.Domain.Entities.Chat.Conversation", b =>
-                {
-                    b.HasOne("SmartRentalPlatform.Domain.Entities.Media.MediaAsset", "AvatarMediaAsset")
-                        .WithMany()
-                        .HasForeignKey("AvatarMediaAssetId")
-                        .OnDelete(DeleteBehavior.SetNull);
-
-                    b.HasOne("SmartRentalPlatform.Domain.Entities.Users.User", "CreatedByUser")
-                        .WithMany()
-                        .HasForeignKey("CreatedByUserId")
-                        .OnDelete(DeleteBehavior.Restrict)
-                        .IsRequired();
-
-                    b.HasOne("SmartRentalPlatform.Domain.Entities.Properties.Room", "Room")
-                        .WithMany()
-                        .HasForeignKey("RoomId")
-                        .OnDelete(DeleteBehavior.Restrict);
-
-                    b.HasOne("SmartRentalPlatform.Domain.Entities.Properties.RoomingHouse", "RoomingHouse")
-                        .WithMany()
-                        .HasForeignKey("RoomingHouseId")
-                        .OnDelete(DeleteBehavior.Restrict);
-
-                    b.Navigation("AvatarMediaAsset");
-
-                    b.Navigation("CreatedByUser");
-
-                    b.Navigation("Room");
-
-                    b.Navigation("RoomingHouse");
-                });
-
-            modelBuilder.Entity("SmartRentalPlatform.Domain.Entities.Chat.ConversationJoinRequest", b =>
-                {
-                    b.HasOne("SmartRentalPlatform.Domain.Entities.Chat.Conversation", "Conversation")
-                        .WithMany()
-                        .HasForeignKey("ConversationId")
-                        .OnDelete(DeleteBehavior.Cascade)
-                        .IsRequired();
-
-                    b.HasOne("SmartRentalPlatform.Domain.Entities.Users.User", "RequesterUser")
-                        .WithMany()
-                        .HasForeignKey("RequesterUserId")
-                        .OnDelete(DeleteBehavior.Restrict)
-                        .IsRequired();
-
-                    b.HasOne("SmartRentalPlatform.Domain.Entities.Users.User", "ReviewedByUser")
-                        .WithMany()
-                        .HasForeignKey("ReviewedByUserId")
-                        .OnDelete(DeleteBehavior.Restrict);
-
-                    b.Navigation("Conversation");
-
-                    b.Navigation("RequesterUser");
-
-                    b.Navigation("ReviewedByUser");
-                });
-
-            modelBuilder.Entity("SmartRentalPlatform.Domain.Entities.Chat.ConversationParticipant", b =>
-                {
-                    b.HasOne("SmartRentalPlatform.Domain.Entities.Users.User", "AddedByUser")
-                        .WithMany()
-                        .HasForeignKey("AddedByUserId")
-                        .OnDelete(DeleteBehavior.Restrict);
-
-                    b.HasOne("SmartRentalPlatform.Domain.Entities.Chat.Conversation", "Conversation")
-                        .WithMany("Participants")
-                        .HasForeignKey("ConversationId")
-                        .OnDelete(DeleteBehavior.Cascade)
-                        .IsRequired();
-
-                    b.HasOne("SmartRentalPlatform.Domain.Entities.Users.User", "InboxStatusUpdatedByUser")
-                        .WithMany()
-                        .HasForeignKey("InboxStatusUpdatedByUserId")
-                        .OnDelete(DeleteBehavior.Restrict);
-
-                    b.HasOne("SmartRentalPlatform.Domain.Entities.Users.User", "User")
-                        .WithMany()
-                        .HasForeignKey("UserId")
-                        .OnDelete(DeleteBehavior.Restrict)
-                        .IsRequired();
-
-                    b.Navigation("AddedByUser");
-
-                    b.Navigation("Conversation");
-
-                    b.Navigation("InboxStatusUpdatedByUser");
-
-                    b.Navigation("User");
-                });
-
-            modelBuilder.Entity("SmartRentalPlatform.Domain.Entities.Media.MediaAuditLog", b =>
-                {
-                    b.HasOne("SmartRentalPlatform.Domain.Entities.Media.MediaAsset", "MediaAsset")
-                        .WithMany("AuditLogs")
-                        .HasForeignKey("MediaAssetId")
-                        .OnDelete(DeleteBehavior.Cascade)
-                        .IsRequired();
-
-                    b.Navigation("MediaAsset");
                 });
 
             modelBuilder.Entity("SmartRentalPlatform.Domain.Entities.Notifications.Notification", b =>
@@ -37954,52 +36687,8 @@ namespace SmartRentalPlatform.Infrastructure.Persistence.Migrations
                     b.Navigation("WalletAccount");
                 });
 
-            modelBuilder.Entity("SmartRentalPlatform.Domain.Entities.Payments.WithdrawalRequest", b =>
-                {
-                    b.HasOne("SmartRentalPlatform.Domain.Entities.Payments.WalletAccount", "WalletAccount")
-                        .WithMany()
-                        .HasForeignKey("WalletAccountId")
-                        .OnDelete(DeleteBehavior.Restrict)
-                        .IsRequired();
-
-                    b.Navigation("WalletAccount");
-                });
-
-            modelBuilder.Entity("SmartRentalPlatform.Domain.Entities.Payments.WithdrawalWebhookLog", b =>
-                {
-                    b.HasOne("SmartRentalPlatform.Domain.Entities.Payments.WithdrawalRequest", null)
-                        .WithMany()
-                        .HasForeignKey("WithdrawalRequestId")
-                        .OnDelete(DeleteBehavior.Cascade)
-                        .IsRequired();
-                });
-
-            modelBuilder.Entity("SmartRentalPlatform.Domain.Entities.Properties.FavoriteRoomingHouse", b =>
-                {
-                    b.HasOne("SmartRentalPlatform.Domain.Entities.Properties.RoomingHouse", "RoomingHouse")
-                        .WithMany()
-                        .HasForeignKey("RoomingHouseId")
-                        .OnDelete(DeleteBehavior.Cascade)
-                        .IsRequired();
-
-                    b.HasOne("SmartRentalPlatform.Domain.Entities.Users.User", "User")
-                        .WithMany()
-                        .HasForeignKey("UserId")
-                        .OnDelete(DeleteBehavior.Cascade)
-                        .IsRequired();
-
-                    b.Navigation("RoomingHouse");
-
-                    b.Navigation("User");
-                });
-
             modelBuilder.Entity("SmartRentalPlatform.Domain.Entities.Properties.PropertyImage", b =>
                 {
-                    b.HasOne("SmartRentalPlatform.Domain.Entities.Media.MediaAsset", "MediaAsset")
-                        .WithMany()
-                        .HasForeignKey("MediaAssetId")
-                        .OnDelete(DeleteBehavior.SetNull);
-
                     b.HasOne("SmartRentalPlatform.Domain.Entities.Properties.Room", "Room")
                         .WithMany("Images")
                         .HasForeignKey("RoomId")
@@ -38010,18 +36699,9 @@ namespace SmartRentalPlatform.Infrastructure.Persistence.Migrations
                         .HasForeignKey("RoomingHouseId")
                         .OnDelete(DeleteBehavior.Cascade);
 
-                    b.HasOne("SmartRentalPlatform.Domain.Entities.Properties.RoomingHouseReview", "RoomingHouseReview")
-                        .WithMany("Images")
-                        .HasForeignKey("RoomingHouseReviewId")
-                        .OnDelete(DeleteBehavior.Cascade);
-
-                    b.Navigation("MediaAsset");
-
                     b.Navigation("Room");
 
                     b.Navigation("RoomingHouse");
-
-                    b.Navigation("RoomingHouseReview");
                 });
 
             modelBuilder.Entity("SmartRentalPlatform.Domain.Entities.Properties.RentalPolicy", b =>
@@ -38033,25 +36713,6 @@ namespace SmartRentalPlatform.Infrastructure.Persistence.Migrations
                         .IsRequired();
 
                     b.Navigation("RoomingHouse");
-                });
-
-            modelBuilder.Entity("SmartRentalPlatform.Domain.Entities.Properties.ReviewReport", b =>
-                {
-                    b.HasOne("SmartRentalPlatform.Domain.Entities.Users.User", "ReporterUser")
-                        .WithMany()
-                        .HasForeignKey("ReporterUserId")
-                        .OnDelete(DeleteBehavior.Restrict)
-                        .IsRequired();
-
-                    b.HasOne("SmartRentalPlatform.Domain.Entities.Properties.RoomingHouseReview", "RoomingHouseReview")
-                        .WithMany()
-                        .HasForeignKey("RoomingHouseReviewId")
-                        .OnDelete(DeleteBehavior.Restrict)
-                        .IsRequired();
-
-                    b.Navigation("ReporterUser");
-
-                    b.Navigation("RoomingHouseReview");
                 });
 
             modelBuilder.Entity("SmartRentalPlatform.Domain.Entities.Properties.Room", b =>
@@ -38150,21 +36811,6 @@ namespace SmartRentalPlatform.Infrastructure.Persistence.Migrations
 
             modelBuilder.Entity("SmartRentalPlatform.Domain.Entities.Properties.RoomingHouseLegalDocument", b =>
                 {
-                    b.HasOne("SmartRentalPlatform.Domain.Entities.Media.MediaAsset", null)
-                        .WithMany()
-                        .HasForeignKey("BackMediaAssetId")
-                        .OnDelete(DeleteBehavior.SetNull);
-
-                    b.HasOne("SmartRentalPlatform.Domain.Entities.Media.MediaAsset", null)
-                        .WithMany()
-                        .HasForeignKey("ExtraMediaAssetId")
-                        .OnDelete(DeleteBehavior.SetNull);
-
-                    b.HasOne("SmartRentalPlatform.Domain.Entities.Media.MediaAsset", null)
-                        .WithMany()
-                        .HasForeignKey("FrontMediaAssetId")
-                        .OnDelete(DeleteBehavior.SetNull);
-
                     b.HasOne("SmartRentalPlatform.Domain.Entities.Properties.RoomingHouse", "RoomingHouse")
                         .WithOne("LegalDocument")
                         .HasForeignKey("SmartRentalPlatform.Domain.Entities.Properties.RoomingHouseLegalDocument", "RoomingHouseId")
@@ -38174,54 +36820,13 @@ namespace SmartRentalPlatform.Infrastructure.Persistence.Migrations
                     b.Navigation("RoomingHouse");
                 });
 
-            modelBuilder.Entity("SmartRentalPlatform.Domain.Entities.Properties.RoomingHouseReview", b =>
-                {
-                    b.HasOne("SmartRentalPlatform.Domain.Entities.RentalContracts.RentalContract", "RentalContract")
-                        .WithMany()
-                        .HasForeignKey("RentalContractId")
-                        .OnDelete(DeleteBehavior.Restrict)
-                        .IsRequired();
-
-                    b.HasOne("SmartRentalPlatform.Domain.Entities.Users.User", "ReviewedByAdmin")
-                        .WithMany()
-                        .HasForeignKey("ReviewedByAdminId")
-                        .OnDelete(DeleteBehavior.Restrict);
-
-                    b.HasOne("SmartRentalPlatform.Domain.Entities.Properties.RoomingHouse", "RoomingHouse")
-                        .WithMany()
-                        .HasForeignKey("RoomingHouseId")
-                        .OnDelete(DeleteBehavior.Restrict)
-                        .IsRequired();
-
-                    b.HasOne("SmartRentalPlatform.Domain.Entities.Users.User", "TenantUser")
-                        .WithMany()
-                        .HasForeignKey("TenantUserId")
-                        .OnDelete(DeleteBehavior.Restrict)
-                        .IsRequired();
-
-                    b.Navigation("RentalContract");
-
-                    b.Navigation("ReviewedByAdmin");
-
-                    b.Navigation("RoomingHouse");
-
-                    b.Navigation("TenantUser");
-                });
-
             modelBuilder.Entity("SmartRentalPlatform.Domain.Entities.Properties.RoomingHouseRule", b =>
                 {
-                    b.HasOne("SmartRentalPlatform.Domain.Entities.Media.MediaAsset", "MediaAsset")
-                        .WithMany()
-                        .HasForeignKey("MediaAssetId")
-                        .OnDelete(DeleteBehavior.SetNull);
-
                     b.HasOne("SmartRentalPlatform.Domain.Entities.Properties.RoomingHouse", "RoomingHouse")
                         .WithOne("HouseRule")
                         .HasForeignKey("SmartRentalPlatform.Domain.Entities.Properties.RoomingHouseRule", "RoomingHouseId")
                         .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired();
-
-                    b.Navigation("MediaAsset");
 
                     b.Navigation("RoomingHouse");
                 });
@@ -38229,7 +36834,7 @@ namespace SmartRentalPlatform.Infrastructure.Persistence.Migrations
             modelBuilder.Entity("SmartRentalPlatform.Domain.Entities.Properties.RoomingHouseServicePrice", b =>
                 {
                     b.HasOne("SmartRentalPlatform.Domain.Entities.Properties.RoomingHouse", "RoomingHouse")
-                        .WithMany("ServicePrices")
+                        .WithMany()
                         .HasForeignKey("RoomingHouseId")
                         .OnDelete(DeleteBehavior.Restrict)
                         .IsRequired();
@@ -38365,16 +36970,6 @@ namespace SmartRentalPlatform.Infrastructure.Persistence.Migrations
 
             modelBuilder.Entity("SmartRentalPlatform.Domain.Entities.RentalContracts.ContractFile", b =>
                 {
-                    b.HasOne("SmartRentalPlatform.Domain.Entities.RentalContracts.ContractSigningEnvelope", "ContractSigningEnvelope")
-                        .WithMany()
-                        .HasForeignKey("ContractSigningEnvelopeId")
-                        .OnDelete(DeleteBehavior.SetNull);
-
-                    b.HasOne("SmartRentalPlatform.Domain.Entities.Media.MediaAsset", "MediaAsset")
-                        .WithMany()
-                        .HasForeignKey("MediaAssetId")
-                        .OnDelete(DeleteBehavior.Restrict);
-
                     b.HasOne("SmartRentalPlatform.Domain.Entities.RentalContracts.ContractAppendix", "RentalContractAppendix")
                         .WithMany("Files")
                         .HasForeignKey("RentalContractAppendixId")
@@ -38385,10 +36980,6 @@ namespace SmartRentalPlatform.Infrastructure.Persistence.Migrations
                         .HasForeignKey("RentalContractId")
                         .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired();
-
-                    b.Navigation("ContractSigningEnvelope");
-
-                    b.Navigation("MediaAsset");
 
                     b.Navigation("RentalContract");
 
@@ -38422,43 +37013,17 @@ namespace SmartRentalPlatform.Infrastructure.Persistence.Migrations
 
             modelBuilder.Entity("SmartRentalPlatform.Domain.Entities.RentalContracts.ContractOccupantDocument", b =>
                 {
-                    b.HasOne("SmartRentalPlatform.Domain.Entities.Media.MediaAsset", "BackMediaAsset")
-                        .WithMany()
-                        .HasForeignKey("BackMediaAssetId")
-                        .OnDelete(DeleteBehavior.SetNull);
-
-                    b.HasOne("SmartRentalPlatform.Domain.Entities.Media.MediaAsset", "ExtraMediaAsset")
-                        .WithMany()
-                        .HasForeignKey("ExtraMediaAssetId")
-                        .OnDelete(DeleteBehavior.SetNull);
-
-                    b.HasOne("SmartRentalPlatform.Domain.Entities.Media.MediaAsset", "FrontMediaAsset")
-                        .WithMany()
-                        .HasForeignKey("FrontMediaAssetId")
-                        .OnDelete(DeleteBehavior.SetNull);
-
                     b.HasOne("SmartRentalPlatform.Domain.Entities.RentalContracts.ContractOccupant", "RentalContractOccupant")
                         .WithMany("Documents")
                         .HasForeignKey("RentalContractOccupantId")
                         .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired();
 
-                    b.Navigation("BackMediaAsset");
-
-                    b.Navigation("ExtraMediaAsset");
-
-                    b.Navigation("FrontMediaAsset");
-
                     b.Navigation("RentalContractOccupant");
                 });
 
             modelBuilder.Entity("SmartRentalPlatform.Domain.Entities.RentalContracts.ContractSignature", b =>
                 {
-                    b.HasOne("SmartRentalPlatform.Domain.Entities.RentalContracts.ContractSigningEnvelope", "ContractSigningEnvelope")
-                        .WithMany("Signatures")
-                        .HasForeignKey("ContractSigningEnvelopeId")
-                        .OnDelete(DeleteBehavior.SetNull);
-
                     b.HasOne("SmartRentalPlatform.Domain.Entities.RentalContracts.ContractAppendix", "RentalContractAppendix")
                         .WithMany("Signatures")
                         .HasForeignKey("RentalContractAppendixId")
@@ -38475,51 +37040,11 @@ namespace SmartRentalPlatform.Infrastructure.Persistence.Migrations
                         .OnDelete(DeleteBehavior.Restrict)
                         .IsRequired();
 
-                    b.Navigation("ContractSigningEnvelope");
-
                     b.Navigation("RentalContract");
 
                     b.Navigation("RentalContractAppendix");
 
                     b.Navigation("SignerUser");
-                });
-
-            modelBuilder.Entity("SmartRentalPlatform.Domain.Entities.RentalContracts.ContractSigningEnvelope", b =>
-                {
-                    b.HasOne("SmartRentalPlatform.Domain.Entities.Media.MediaAsset", "EvidenceFileMediaAsset")
-                        .WithMany()
-                        .HasForeignKey("EvidenceFileMediaAssetId")
-                        .OnDelete(DeleteBehavior.Restrict);
-
-                    b.HasOne("SmartRentalPlatform.Domain.Entities.RentalContracts.ContractAppendix", "ContractAppendix")
-                        .WithMany("SigningEnvelopes")
-                        .HasForeignKey("RentalContractAppendixId")
-                        .OnDelete(DeleteBehavior.SetNull);
-
-                    b.HasOne("SmartRentalPlatform.Domain.Entities.RentalContracts.RentalContract", "RentalContract")
-                        .WithMany("SigningEnvelopes")
-                        .HasForeignKey("RentalContractId")
-                        .OnDelete(DeleteBehavior.SetNull);
-
-                    b.HasOne("SmartRentalPlatform.Domain.Entities.Media.MediaAsset", "SignedFileMediaAsset")
-                        .WithMany()
-                        .HasForeignKey("SignedFileMediaAssetId")
-                        .OnDelete(DeleteBehavior.Restrict);
-
-                    b.HasOne("SmartRentalPlatform.Domain.Entities.Media.MediaAsset", "UnsignedFileMediaAsset")
-                        .WithMany()
-                        .HasForeignKey("UnsignedFileMediaAssetId")
-                        .OnDelete(DeleteBehavior.Restrict);
-
-                    b.Navigation("ContractAppendix");
-
-                    b.Navigation("EvidenceFileMediaAsset");
-
-                    b.Navigation("RentalContract");
-
-                    b.Navigation("SignedFileMediaAsset");
-
-                    b.Navigation("UnsignedFileMediaAsset");
                 });
 
             modelBuilder.Entity("SmartRentalPlatform.Domain.Entities.RentalContracts.RentalContract", b =>
@@ -38570,25 +37095,10 @@ namespace SmartRentalPlatform.Infrastructure.Persistence.Migrations
 
             modelBuilder.Entity("SmartRentalPlatform.Domain.Entities.Users.KycVerification", b =>
                 {
-                    b.HasOne("SmartRentalPlatform.Domain.Entities.Media.MediaAsset", "BackMediaAsset")
-                        .WithMany()
-                        .HasForeignKey("BackMediaAssetId")
-                        .OnDelete(DeleteBehavior.Restrict);
-
-                    b.HasOne("SmartRentalPlatform.Domain.Entities.Media.MediaAsset", "FrontMediaAsset")
-                        .WithMany()
-                        .HasForeignKey("FrontMediaAssetId")
-                        .OnDelete(DeleteBehavior.Restrict);
-
                     b.HasOne("SmartRentalPlatform.Domain.Entities.Users.User", "ReviewedByAdmin")
                         .WithMany()
                         .HasForeignKey("ReviewedByAdminId")
                         .OnDelete(DeleteBehavior.SetNull);
-
-                    b.HasOne("SmartRentalPlatform.Domain.Entities.Media.MediaAsset", "SelfieMediaAsset")
-                        .WithMany()
-                        .HasForeignKey("SelfieMediaAssetId")
-                        .OnDelete(DeleteBehavior.Restrict);
 
                     b.HasOne("SmartRentalPlatform.Domain.Entities.Users.User", "User")
                         .WithMany("KycVerifications")
@@ -38596,13 +37106,7 @@ namespace SmartRentalPlatform.Infrastructure.Persistence.Migrations
                         .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired();
 
-                    b.Navigation("BackMediaAsset");
-
-                    b.Navigation("FrontMediaAsset");
-
                     b.Navigation("ReviewedByAdmin");
-
-                    b.Navigation("SelfieMediaAsset");
 
                     b.Navigation("User");
                 });
@@ -38615,16 +37119,6 @@ namespace SmartRentalPlatform.Infrastructure.Persistence.Migrations
                         .OnDelete(DeleteBehavior.SetNull);
 
                     b.Navigation("User");
-                });
-
-            modelBuilder.Entity("SmartRentalPlatform.Domain.Entities.Users.User", b =>
-                {
-                    b.HasOne("SmartRentalPlatform.Domain.Entities.Media.MediaAsset", "AvatarMediaAsset")
-                        .WithMany()
-                        .HasForeignKey("AvatarMediaAssetId")
-                        .OnDelete(DeleteBehavior.SetNull);
-
-                    b.Navigation("AvatarMediaAsset");
                 });
 
             modelBuilder.Entity("SmartRentalPlatform.Domain.Entities.Users.UserProfile", b =>
@@ -38706,18 +37200,6 @@ namespace SmartRentalPlatform.Infrastructure.Persistence.Migrations
                     b.Navigation("InvoiceItems");
                 });
 
-            modelBuilder.Entity("SmartRentalPlatform.Domain.Entities.Chat.Conversation", b =>
-                {
-                    b.Navigation("Messages");
-
-                    b.Navigation("Participants");
-                });
-
-            modelBuilder.Entity("SmartRentalPlatform.Domain.Entities.Media.MediaAsset", b =>
-                {
-                    b.Navigation("AuditLogs");
-                });
-
             modelBuilder.Entity("SmartRentalPlatform.Domain.Entities.Payments.PaymentTransaction", b =>
                 {
                     b.Navigation("WebhookLogs");
@@ -38762,13 +37244,6 @@ namespace SmartRentalPlatform.Infrastructure.Persistence.Migrations
                     b.Navigation("RoomingHouseAmenities");
 
                     b.Navigation("Rooms");
-
-                    b.Navigation("ServicePrices");
-                });
-
-            modelBuilder.Entity("SmartRentalPlatform.Domain.Entities.Properties.RoomingHouseReview", b =>
-                {
-                    b.Navigation("Images");
                 });
 
             modelBuilder.Entity("SmartRentalPlatform.Domain.Entities.Rental.RentalRequest", b =>
@@ -38790,8 +37265,6 @@ namespace SmartRentalPlatform.Infrastructure.Persistence.Migrations
                     b.Navigation("Files");
 
                     b.Navigation("Signatures");
-
-                    b.Navigation("SigningEnvelopes");
                 });
 
             modelBuilder.Entity("SmartRentalPlatform.Domain.Entities.RentalContracts.ContractOccupant", b =>
@@ -38799,11 +37272,6 @@ namespace SmartRentalPlatform.Infrastructure.Persistence.Migrations
                     b.Navigation("Dependents");
 
                     b.Navigation("Documents");
-                });
-
-            modelBuilder.Entity("SmartRentalPlatform.Domain.Entities.RentalContracts.ContractSigningEnvelope", b =>
-                {
-                    b.Navigation("Signatures");
                 });
 
             modelBuilder.Entity("SmartRentalPlatform.Domain.Entities.RentalContracts.RentalContract", b =>
@@ -38815,8 +37283,6 @@ namespace SmartRentalPlatform.Infrastructure.Persistence.Migrations
                     b.Navigation("Occupants");
 
                     b.Navigation("Signatures");
-
-                    b.Navigation("SigningEnvelopes");
                 });
 
             modelBuilder.Entity("SmartRentalPlatform.Domain.Entities.Users.Role", b =>

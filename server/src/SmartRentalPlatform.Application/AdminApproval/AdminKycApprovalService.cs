@@ -7,14 +7,9 @@ using SmartRentalPlatform.Domain.Enums;
 
 namespace SmartRentalPlatform.Application.AdminApproval;
 
-public class AdminKycApprovalService : IAdminKycApprovalService
+public class AdminKycApprovalService(IAppDbContext context) : IAdminKycApprovalService
 {
-    private readonly IAppDbContext _context;
-
-    public AdminKycApprovalService(IAppDbContext context)
-    {
-        _context = context;
-    }
+    private readonly IAppDbContext _context = context;
 
     public async Task<AdminKycListResponse> GetPendingAsync(
         int pageNumber,

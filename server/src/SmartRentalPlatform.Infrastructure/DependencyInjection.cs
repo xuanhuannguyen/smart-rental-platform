@@ -18,6 +18,7 @@ using SmartRentalPlatform.Infrastructure.ExternalServices.DeepSeek;
 using SmartRentalPlatform.Infrastructure.ExternalServices.Gemini;
 using SmartRentalPlatform.Infrastructure.ExternalServices.Google;
 using SmartRentalPlatform.Infrastructure.ExternalServices.PayOS;
+using SmartRentalPlatform.Infrastructure.ExternalServices.Ai;
 using SmartRentalPlatform.Infrastructure.ExternalServices.VietMap;
 using SmartRentalPlatform.Infrastructure.ExternalServices.Ai;
 using SmartRentalPlatform.Infrastructure.Identity;

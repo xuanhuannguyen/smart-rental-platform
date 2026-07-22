@@ -184,13 +184,6 @@ export const billingApi = {
   }
 };
 
-function normalizeServicePrice(price: ServicePrice): ServicePrice {
-  return {
-    ...price,
-    unitName: price.unitName ?? price.displayUnitName
-  };
-}
-
 const AI_UPLOAD_LIMIT_BYTES = 1_400_000;
 const AI_MAX_IMAGE_DIMENSION = 2200;
 
@@ -241,4 +234,11 @@ async function prepareMeterImageForUpload(file: File): Promise<File> {
   } finally {
     bitmap.close();
   }
+}
+
+function normalizeServicePrice(price: ServicePrice): ServicePrice {
+  return {
+    ...price,
+    unitName: price.unitName ?? price.displayUnitName
+  };
 }

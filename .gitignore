@@ -92,6 +92,9 @@ server/nuget.config
 *.nupkg
 *.snupkg
 *.binlog
+__pycache__/
+*.py[cod]
+**/.venv/
 
 # Test/coverage generated output
 server/coverage-report/

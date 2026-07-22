@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useLocation, useNavigate } from 'react-router-dom';
 import { ROUTE_PATHS } from '../../../app/router/routePaths';
 import { contractApi } from '../api';
 import type { ContractHistoryItemResponse } from '../types';
@@ -77,12 +77,16 @@ function getContractStatusTone(status: string): CardStatusTone {
 
 export default function LandlordContractsPage() {
   const navigate = useNavigate();
+  const location = useLocation();
+  const query = new URLSearchParams(location.search);
   const [contracts, setContracts] = useState<ContractHistoryItemResponse[]>([]);
   const [loading, setLoading] = useState(true);
   const [message, setMessage] = useState('');
   const [selectedHouseId, setSelectedHouseId] = useState<string>('');
   const [selectedRoomId, setSelectedRoomId] = useState<string>('');
-  const [selectedStatus, setSelectedStatus] = useState<string>('all');
+  const [selectedStatus, setSelectedStatus] = useState<string>(
+    query.get('filter') === 'expiring' ? 'Expiring' : 'all'
+  );
 
   useEffect(() => {
     async function loadData() {
@@ -127,6 +131,10 @@ export default function LandlordContractsPage() {
   useEffect(() => {
     setSelectedRoomId('');
   }, [selectedHouseId]);
+
+  useEffect(() => {
+    setSelectedStatus(query.get('filter') === 'expiring' ? 'Expiring' : 'all');
+  }, [location.search]);
 
   const filteredContracts = useMemo(() => {
     return contracts.filter((contract) => {

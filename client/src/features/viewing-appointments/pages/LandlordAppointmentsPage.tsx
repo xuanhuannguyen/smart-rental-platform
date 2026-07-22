@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useLocation, useNavigate } from 'react-router-dom';
 import {
   getLandlordAppointments,
   checkConflict,
@@ -93,6 +93,9 @@ function getAppointmentStatusTone(statusKey: string): CardStatusTone {
 
 export default function LandlordAppointmentsPage() {
   const navigate = useNavigate();
+  const location = useLocation();
+  const query = new URLSearchParams(location.search);
+  const showTodayOnly = query.get('filter') === 'today';
   const [appointments, setAppointments] = useState<ViewingAppointment[]>([]);
   const [conflictMap, setConflictMap] = useState<Record<string, ConflictCheckResponse>>({});
   const [activeTab, setActiveTab] = useState<AppointmentTab>('pending');
@@ -152,6 +155,12 @@ export default function LandlordAppointmentsPage() {
   useEffect(() => {
     void loadData();
   }, []);
+
+  useEffect(() => {
+    if (showTodayOnly) {
+      setActiveTab('all');
+    }
+  }, [showTodayOnly]);
 
   // Real-time conflict check when opening confirm modal
   const handleConfirmClick = async (app: ViewingAppointment) => {
@@ -296,16 +305,24 @@ export default function LandlordAppointmentsPage() {
   // Filter
   const filteredAppointments = appointments.filter((appointment) => {
     if (activeTab === 'pending') {
-      return appointment.status === 'Pending' || hasProposal(appointment);
-    }
-    if (activeTab === 'confirmed') {
-      return appointment.status === 'Confirmed';
-    }
-    if (activeTab === 'history') {
-      return ['CancelledByTenant', 'CancelledByLandlord', 'Completed', 'Expired'].includes(
+      if (!(appointment.status === 'Pending' || hasProposal(appointment))) return false;
+    } else if (activeTab === 'confirmed') {
+      if (appointment.status !== 'Confirmed') return false;
+    } else if (activeTab === 'history') {
+      if (!(['CancelledByTenant', 'CancelledByLandlord', 'Completed', 'Expired'].includes(
         appointment.status
-      ) || (appointment.status === 'Rejected' && !appointment.proposedScheduledAt);
+      ) || (appointment.status === 'Rejected' && !appointment.proposedScheduledAt))) return false;
     }
+
+    if (showTodayOnly) {
+      const today = new Date();
+      const scheduledAt = new Date(appointment.scheduledAt);
+      return scheduledAt.getFullYear() === today.getFullYear() &&
+        scheduledAt.getMonth() === today.getMonth() &&
+        scheduledAt.getDate() === today.getDate() &&
+        (appointment.status === 'Pending' || appointment.status === 'Confirmed');
+    }
+
     return true;
   });
 

@@ -22,6 +22,7 @@ public class BillingController : ControllerBase
     {
         "image/jpeg", "image/png"
     };
+
     private readonly IBillingService billingService;
     private readonly IMeterReadingAiService meterReadingAiService;
     private readonly ICurrentUserService currentUserService;
@@ -34,6 +35,53 @@ public class BillingController : ControllerBase
         this.billingService = billingService;
         this.meterReadingAiService = meterReadingAiService;
         this.currentUserService = currentUserService;
+    }
+
+    [Authorize]
+    [HttpPost("landlord/meter-readings/ai")]
+    [Consumes("multipart/form-data")]
+    [RequestSizeLimit(MaxMeterImageSizeBytes)]
+    public async Task<ActionResult<ApiResponse<MeterAiResponse>>> ReadMeterImage(
+        [FromForm] MeterAiRequest request,
+        CancellationToken cancellationToken)
+    {
+        if (request.File is null || request.File.Length == 0)
+        {
+            return BadRequest(BuildValidationError("Vui lòng chọn ảnh đồng hồ.", "file"));
+        }
+
+        if (request.File.Length > MaxMeterImageSizeBytes)
+        {
+            return BadRequest(BuildValidationError("Dung lượng ảnh không được vượt quá 5MB.", "file"));
+        }
+
+        var extension = Path.GetExtension(request.File.FileName);
+        if (!AllowedMeterImageExtensions.Contains(extension) ||
+            !AllowedMeterImageContentTypes.Contains(request.File.ContentType))
+        {
+            return BadRequest(BuildValidationError("Chỉ hỗ trợ ảnh đồng hồ JPG hoặc PNG.", "file"));
+        }
+
+        var result = await meterReadingAiService.ReadAsync(
+            GetCurrentUserId(),
+            request.ContractId,
+            request.ServiceTypeId,
+            request.BillingPeriodStart,
+            new SmartRentalPlatform.Application.Common.Models.ImageUploadFile
+            {
+                Content = request.File.OpenReadStream(),
+                FileName = request.File.FileName,
+                ContentType = request.File.ContentType,
+                Length = request.File.Length
+            },
+            cancellationToken);
+
+        return Ok(new ApiResponse<MeterAiResponse>
+        {
+            Success = true,
+            Message = "Đã đọc chỉ số từ ảnh. Vui lòng kiểm tra và xác nhận trước khi lưu.",
+            Data = result
+        });
     }
 
     [Authorize]
@@ -128,6 +176,23 @@ public class BillingController : ControllerBase
         {
             Success = true,
             Message = "Tạo hóa đơn thành công.",
+            Data = result
+        });
+    }
+
+    [Authorize]
+    [HttpPost("landlord/invoices/generate-bulk")]
+    public async Task<ActionResult<ApiResponse<BulkInvoiceResultResponse>>> GenerateBulkInvoices(
+        GenerateBulkInvoicesRequest request,
+        CancellationToken cancellationToken)
+    {
+        var result = await billingService.GenerateBulkInvoicesAsync(
+            GetCurrentUserId(), request, cancellationToken);
+
+        return Ok(new ApiResponse<BulkInvoiceResultResponse>
+        {
+            Success = true,
+            Message = $"Đã tạo {result.CreatedCount} hóa đơn nháp; bỏ qua {result.SkippedCount}; thiếu dữ liệu {result.MissingDataCount}.",
             Data = result
         });
     }
@@ -287,70 +352,6 @@ public class BillingController : ControllerBase
     private Guid GetCurrentUserId()
     {
         return currentUserService.GetRequiredUserId("Không tìm thấy người dùng đang đăng nhập.");
-    }
-
-    [Authorize]
-    [HttpPost("landlord/meter-readings/ai")]
-    [Consumes("multipart/form-data")]
-    [RequestSizeLimit(MaxMeterImageSizeBytes)]
-    public async Task<ActionResult<ApiResponse<MeterAiResponse>>> ReadMeterImage(
-        [FromForm] MeterAiRequest request,
-        CancellationToken cancellationToken)
-    {
-        if (request.File is null || request.File.Length == 0)
-        {
-            return BadRequest(BuildValidationError("Vui lòng chọn ảnh đồng hồ.", "file"));
-        }
-
-        if (request.File.Length > MaxMeterImageSizeBytes)
-        {
-            return BadRequest(BuildValidationError("Dung lượng ảnh không được vượt quá 5MB.", "file"));
-        }
-
-        var extension = Path.GetExtension(request.File.FileName);
-        if (!AllowedMeterImageExtensions.Contains(extension) ||
-            !AllowedMeterImageContentTypes.Contains(request.File.ContentType))
-        {
-            return BadRequest(BuildValidationError("Chỉ hỗ trợ ảnh đồng hồ JPG hoặc PNG.", "file"));
-        }
-
-        var result = await meterReadingAiService.ReadAsync(
-            GetCurrentUserId(),
-            request.ContractId,
-            request.ServiceTypeId,
-            request.BillingPeriodStart,
-            new SmartRentalPlatform.Application.Common.Models.ImageUploadFile
-            {
-                Content = request.File.OpenReadStream(),
-                FileName = request.File.FileName,
-                ContentType = request.File.ContentType,
-                Length = request.File.Length
-            },
-            cancellationToken);
-
-        return Ok(new ApiResponse<MeterAiResponse>
-        {
-            Success = true,
-            Message = "Nhận diện chỉ số từ ảnh thành công.",
-            Data = result
-        });
-    }
-
-    [Authorize]
-    [HttpPost("landlord/invoices/generate-bulk")]
-    public async Task<ActionResult<ApiResponse<BulkInvoiceResultResponse>>> GenerateBulkInvoices(
-        GenerateBulkInvoicesRequest request,
-        CancellationToken cancellationToken)
-    {
-        var result = await billingService.GenerateBulkInvoicesAsync(
-            GetCurrentUserId(), request, cancellationToken);
-
-        return Ok(new ApiResponse<BulkInvoiceResultResponse>
-        {
-            Success = true,
-            Message = $"Đã tạo {result.CreatedCount} hóa đơn nháp; bỏ qua {result.SkippedCount}; thiếu dữ liệu {result.MissingDataCount}.",
-            Data = result
-        });
     }
 
     private static ApiErrorResponse BuildValidationError(string message, string field)
