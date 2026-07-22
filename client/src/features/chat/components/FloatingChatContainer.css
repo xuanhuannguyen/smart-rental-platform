@@ -1,0 +1,137 @@
+/* Styles for FloatingChatContainer */
+
+.floating-chat-container {
+  position: fixed;
+  bottom: 20px;
+  right: 20px;
+  display: flex;
+  flex-direction: row-reverse;
+  align-items: flex-end;
+  gap: 12px;
+  z-index: 1050;
+  pointer-events: none; /* Let clicks pass through empty spaces */
+}
+
+/* Minimized Avatars Stack */
+.floating-chat-avatar-stack {
+  pointer-events: auto;
+  display: flex;
+  flex-direction: row-reverse; /* Stack horizontally from right to left */
+  align-items: center;
+  position: relative;
+  height: 48px;
+  margin-bottom: 8px; /* Lift slightly off the bottom */
+}
+
+.floating-chat-avatar-btn {
+  position: relative;
+  width: 48px;
+  height: 48px;
+  border-radius: 50%;
+  border: 1.5px solid #ffffff;
+  background: #ffffff;
+  padding: 0;
+  cursor: pointer;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+  transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  overflow: visible;
+}
+
+.floating-chat-avatar-btn:hover {
+  transform: scale(1.12) !important;
+  box-shadow: 0 6px 16px rgba(0, 0, 0, 0.2);
+  z-index: 200 !important;
+}
+
+.floating-chat-avatar-img {
+  width: 100%;
+  height: 100%;
+  border-radius: 50%;
+  object-fit: cover;
+}
+
+.floating-chat-avatar-placeholder {
+  width: 100%;
+  height: 100%;
+  border-radius: 50%;
+  background: linear-gradient(135deg, #246bfe, #0045d4);
+  color: #ffffff;
+  font-weight: bold;
+  font-size: 15px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+/* Red Unread Count Badge */
+.floating-chat-avatar-badge {
+  position: absolute;
+  top: -2px;
+  right: -2px;
+  background: #ef4444;
+  color: #ffffff;
+  font-size: 10px;
+  font-weight: 700;
+  border-radius: 9px;
+  padding: 0 4px;
+  min-width: 18px;
+  height: 18px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border: 1.5px solid #ffffff;
+  box-shadow: 0 2px 6px rgba(239, 68, 68, 0.4);
+  z-index: 210;
+}
+
+/* Active Chat Windows List */
+.floating-chat-active-windows {
+  display: flex;
+  flex-direction: row-reverse;
+  align-items: flex-end;
+  gap: 12px;
+}
+
+.floating-chat-active-window {
+  pointer-events: auto;
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.12);
+  border-radius: 12px 12px 0 0;
+  overflow: hidden;
+  transition: all 0.25s cubic-bezier(0.4, 0, 0.2, 1);
+  background: #ffffff;
+}
+
+/* Mobile Responsive Layout */
+@media (max-width: 640px) {
+  .floating-chat-container {
+    right: 0;
+    left: 0;
+    bottom: 0;
+    padding: 0;
+    flex-direction: column;
+    align-items: center;
+    gap: 0;
+  }
+
+  .floating-chat-avatar-stack {
+    display: none; /* Hide stack on mobile to save screen space */
+  }
+
+  .floating-chat-active-windows {
+    width: 100dvw;
+    height: 100dvh;
+    flex-direction: column;
+    gap: 0;
+  }
+
+  .floating-chat-active-window {
+    width: 100% !important;
+    max-width: 100% !important;
+    height: 100% !important;
+    border-radius: 0 !important;
+    box-shadow: none;
+  }
+}

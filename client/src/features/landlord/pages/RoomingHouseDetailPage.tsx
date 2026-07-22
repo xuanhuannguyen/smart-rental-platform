@@ -3,6 +3,9 @@ import { useParams, useNavigate } from 'react-router-dom';
 import { useAuth } from '../../../app/providers/AuthProvider';
 import { ROUTE_PATHS } from '../../../app/router/routePaths';
 import { getApiErrorMessage } from '../../../shared/api/apiError';
+import { Toast } from '../../../shared/components/ui/Toast';
+import { Tabs } from '../../../shared/components/ui/Tabs';
+import { PageHeader } from '../../../shared/components/ui/PageHeader';
 import { toAssetUrl } from '../../../shared/api/assets';
 import { formatDateVi, formatMoneyString, parseMoneyString } from '../../../shared/utils/format';
 import { formatStatus, getStatusToneClass } from '../../../shared/utils/status';
@@ -91,7 +94,7 @@ export default function RoomingHouseDetailPage() {
   const [house, setHouse] = useState<RoomingHouseDetail | null>(null);
   const [loading, setLoading] = useState(true);
   const [actionLoading, setActionLoading] = useState(false);
-  const [message, setMessage] = useState('');
+  const [toast, setToast] = useState<{ message: string, type: 'success' | 'error' } | null>(null);
   const [activeTab, setActiveTab] = useState<MainTab>('rooms');
   const [newRoomForm, setNewRoomForm] = useState<CreateRoomRequest>(emptyRoomForm);
 
@@ -201,7 +204,7 @@ export default function RoomingHouseDetailPage() {
     if (!house) return;
 
     setActionLoading(true);
-    setMessage('');
+    setToast(null)
     try {
       for (const draft of servicePriceDrafts) {
         await billingApi.createServicePrice(house.id, {
@@ -213,9 +216,9 @@ export default function RoomingHouseDetailPage() {
       }
 
       await loadServicePrices();
-      setMessage('Đã lưu tất cả giá dịch vụ thành công.');
+      setToast({ message: 'Đã lưu tất cả giá dịch vụ thành công.', type: 'success' })
     } catch (err) {
-      setMessage(getApiErrorMessage(err, 'Không thể lưu giá dịch vụ.'));
+      setToast({ message: getApiErrorMessage(err, 'Không thể lưu giá dịch vụ.'), type: 'error' })
     } finally {
       setActionLoading(false);
     }
@@ -229,13 +232,13 @@ export default function RoomingHouseDetailPage() {
 
   async function loadHouseData() {
     setLoading(true);
-    setMessage('');
+    setToast(null)
     try {
       const data = await getRoomingHouseDetail(id!);
 
       // Chỉ cho phép khu trọ đã duyệt vào trang này
       if (data.approvalStatus !== 'Approved') {
-        setMessage('Khu trọ này chưa được quản trị viên phê duyệt. Không thể truy cập quản lý phòng.');
+        setToast({ message: 'Khu trọ này chưa được quản trị viên phê duyệt. Không thể truy cập quản lý phòng.', type: 'error' })
         setHouse(null);
         return;
       }
@@ -282,7 +285,7 @@ export default function RoomingHouseDetailPage() {
         setRooms([]);
       }
     } catch (err) {
-      setMessage(getApiErrorMessage(err, 'Không thể tải thông tin chi tiết khu trọ.'));
+      setToast({ message: getApiErrorMessage(err, 'Không thể tải thông tin chi tiết khu trọ.'), type: 'error' })
     } finally {
       setLoading(false);
     }
@@ -327,13 +330,13 @@ export default function RoomingHouseDetailPage() {
   async function handleSaveBasicInfo() {
     if (!house) return;
     setActionLoading(true);
-    setMessage('');
+    setToast(null)
     try {
       const updated = await updateRoomingHouseBasicInfo(house.id, basicForm);
       setHouse(updated);
-      setMessage('Đã cập nhật thông tin cơ bản khu trọ thành công.');
+      setToast({ message: 'Đã cập nhật thông tin cơ bản khu trọ thành công.', type: 'success' })
     } catch (err) {
-      setMessage(getApiErrorMessage(err, 'Không thể cập nhật thông tin cơ bản.'));
+      setToast({ message: getApiErrorMessage(err, 'Không thể cập nhật thông tin cơ bản.'), type: 'error' })
     } finally {
       setActionLoading(false);
     }
@@ -345,15 +348,17 @@ export default function RoomingHouseDetailPage() {
 
     const nextVisibility = house.visibilityStatus === 'Visible' ? 'Hidden' : 'Visible';
     setActionLoading(true);
-    setMessage('');
+    setToast(null)
     try {
       const updated = await updateRoomingHouseVisibility(house.id, nextVisibility);
       setHouse(updated);
-      setMessage(nextVisibility === 'Hidden'
-        ? 'Khu trọ đã được ẩn khỏi trang công khai.'
-        : 'Khu trọ đã được hiển thị công khai.');
+      setToast({
+        message: nextVisibility === 'Hidden'
+          ? 'Khu trọ đã được ẩn khỏi trang công khai.'
+          : 'Khu trọ đã được hiển thị công khai.', type: 'success'
+      });
     } catch (err) {
-      setMessage(getApiErrorMessage(err, 'Không thể cập nhật trạng thái hiển thị khu trọ.'));
+      setToast({ message: getApiErrorMessage(err, 'Không thể cập nhật trạng thái hiển thị khu trọ.'), type: 'error' })
     } finally {
       setActionLoading(false);
     }
@@ -362,14 +367,14 @@ export default function RoomingHouseDetailPage() {
   async function handleSaveImages() {
     if (!house) return;
     setActionLoading(true);
-    setMessage('');
+    setToast(null)
     try {
       const updated = await updateRoomingHouseImages(house.id, cleanImages(houseImages));
       setHouse(updated);
       setHouseImages(toImageRequests(updated.images));
-      setMessage('Đã lưu ảnh minh họa khu trọ thành công.');
+      setToast({ message: 'Đã lưu ảnh minh họa khu trọ thành công.', type: 'success' })
     } catch (err) {
-      setMessage(getApiErrorMessage(err, 'Không thể cập nhật ảnh khu trọ.'));
+      setToast({ message: getApiErrorMessage(err, 'Không thể cập nhật ảnh khu trọ.'), type: 'error' })
     } finally {
       setActionLoading(false);
     }
@@ -379,14 +384,14 @@ export default function RoomingHouseDetailPage() {
   async function handleSaveAmenities() {
     if (!house) return;
     setActionLoading(true);
-    setMessage('');
+    setToast(null)
     try {
       const updated = await updateRoomingHouseAmenities(house.id, selectedAmenityIds);
       setHouse(updated);
       setSelectedAmenityIds(updated.amenities.map(a => a.id));
-      setMessage('Đã cập nhật tiện ích khu trọ thành công.');
+      setToast({ message: 'Đã cập nhật tiện ích khu trọ thành công.', type: 'success' })
     } catch (err) {
-      setMessage(getApiErrorMessage(err, 'Không thể cập nhật tiện ích khu trọ.'));
+      setToast({ message: getApiErrorMessage(err, 'Không thể cập nhật tiện ích khu trọ.'), type: 'error' })
     } finally {
       setActionLoading(false);
     }
@@ -396,7 +401,7 @@ export default function RoomingHouseDetailPage() {
   async function handleSaveRentalPolicy() {
     if (!house) return;
     setActionLoading(true);
-    setMessage('');
+    setToast(null)
     try {
       await updateRoomingHouseRentalPolicy(house.id, rentalPolicyForm);
       const updated = await getRoomingHouseDetail(house.id);
@@ -411,9 +416,9 @@ export default function RoomingHouseDetailPage() {
           defaultPaymentDay: updated.rentalPolicy.defaultPaymentDay,
         });
       }
-      setMessage('Đã cập nhật chính sách thuê thành công.');
+      setToast({ message: 'Đã cập nhật chính sách thuê thành công.', type: 'success' })
     } catch (err) {
-      setMessage(getApiErrorMessage(err, 'Không thể cập nhật chính sách thuê.'));
+      setToast({ message: getApiErrorMessage(err, 'Không thể cập nhật chính sách thuê.'), type: 'error' })
     } finally {
       setActionLoading(false);
     }
@@ -421,27 +426,27 @@ export default function RoomingHouseDetailPage() {
 
   function handleHouseRuleSaved(savedRule: NonNullable<RoomingHouseDetail['houseRule']>) {
     setHouse((current) => current ? { ...current, houseRule: savedRule } : current);
-    setMessage('Đã cập nhật luật khu trọ thành công.');
+    setToast({ message: 'Đã cập nhật luật khu trọ thành công.', type: 'success' })
   }
 
 
 
   function handleCreateRoomClick() {
     if (!house?.rentalPolicy) {
-      setMessage('Vui lòng hoàn thành chính sách cho thuê trước khi tạo phòng.');
+      setToast({ message: 'Vui lòng hoàn thành chính sách cho thuê trước khi tạo phòng.', type: 'error' })
       setActiveTab('rental-policy');
       return;
     }
 
     if (!house.houseRule) {
-      setMessage('Vui lòng hoàn thành Luật khu trọ trước khi tạo phòng đầu tiên.');
+      setToast({ message: 'Vui lòng hoàn thành Luật khu trọ trước khi tạo phòng đầu tiên.', type: 'error' })
       setActiveTab('house-rule');
       return;
     }
 
     const hasPrices = activeServicePrices.length > 0;
     if (!hasPrices) {
-      setMessage('Vui lòng cấu hình bảng giá dịch vụ trước khi tạo phòng.');
+      setToast({ message: 'Vui lòng cấu hình bảng giá dịch vụ trước khi tạo phòng.', type: 'error' })
       setActiveTab('service-prices');
       return;
     }
@@ -452,15 +457,15 @@ export default function RoomingHouseDetailPage() {
   async function handleCreateRoomSubmit() {
     if (!house) return;
     setActionLoading(true);
-    setMessage('');
+    setToast(null)
     try {
       const createdRoom = await createRoom(house.id, newRoomForm);
-      setMessage('Tạo phòng mới thành công. Hãy tiếp tục cập nhật các thông tin khác.');
+      setToast({ message: 'Tạo phòng mới thành công. Hãy tiếp tục cập nhật các thông tin khác.', type: 'success' })
       setNewRoomForm(emptyRoomForm);
       // Chuyển hướng sang trang chi tiết phòng vừa tạo để có thể edit Ảnh, Tiện ích, Bảng giá
       navigate(ROUTE_PATHS.LANDLORD.ROOM_DETAIL(house.id, createdRoom.id), { state: { initialTab: 'images' } });
     } catch (err) {
-      setMessage(getApiErrorMessage(err, 'Không thể tạo phòng.'));
+      setToast({ message: getApiErrorMessage(err, 'Không thể tạo phòng.'), type: 'error' })
     } finally {
       setActionLoading(false);
     }
@@ -486,7 +491,7 @@ export default function RoomingHouseDetailPage() {
         <main className="dashboard-main">
           <div className="empty-panel">
             <h2>Lỗi truy cập</h2>
-            <p>{message || 'Không thể truy cập thông tin khu trọ này.'}</p>
+            <p>{toast?.message || 'Không thể truy cập thông tin khu trọ này.'}</p>
           </div>
         </main>
       </div>
@@ -497,206 +502,141 @@ export default function RoomingHouseDetailPage() {
     <div className="rooming-house-detail-page" style={{ display: 'contents' }}>
       <main className="dashboard-main">
         {/* Banner Tổng quan */}
-        <section className="overview-band">
-          <div className="overview-header-title-area">
-            <button
-              type="button"
-              className="back-icon-btn"
-              onClick={() => navigate(ROUTE_PATHS.LANDLORD.ROOMING_HOUSES)}
-              title="Quay về quản lý khu trọ"
-            >
-              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
-                <line x1="19" y1="12" x2="5" y2="12" />
-                <polyline points="12 19 5 12 12 5" />
+        <PageHeader
+          className="page-header-band--flat-bottom"
+          onBack={() => navigate(ROUTE_PATHS.LANDLORD.ROOMING_HOUSES)}
+          icon={
+            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#2563eb" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+              <path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z" />
+              <polyline points="9 22 9 12 15 12 15 22" />
+              <rect x="10" y="14" width="4" height="4" />
+            </svg>
+          }
+          eyebrow={
+            <div className="overview-address" style={{ display: 'flex', alignItems: 'center', color: '#2563eb', fontWeight: 700, fontSize: '12px', textTransform: 'uppercase', marginBottom: '4px' }}>
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#2563eb" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" style={{ marginRight: '6px' }}>
+                <path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z" />
+                <circle cx="12" cy="10" r="3" />
               </svg>
-            </button>
-            <div className="overview-house-icon">
-              <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#2563eb" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                <path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z" />
-                <polyline points="9 22 9 12 15 12 15 22" />
-                <rect x="10" y="14" width="4" height="4" />
-              </svg>
+              <span>{house.addressDisplay}</span>
             </div>
-            <div className="overview-left">
-              <div className="overview-address">
-                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#2563eb" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" style={{ marginRight: '6px' }}>
-                  <path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z" />
-                  <circle cx="12" cy="10" r="3" />
-                </svg>
-                <span>{house.addressDisplay}</span>
-              </div>
-              <h2>{house.name}</h2>
-              <p className="overview-description">
-                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#2563eb" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ marginRight: '6px' }}>
-                  <rect x="3" y="4" width="18" height="18" rx="2" ry="2" />
-                  <line x1="16" y1="2" x2="16" y2="6" />
-                  <line x1="8" y1="2" x2="8" y2="6" />
-                  <line x1="3" y1="10" x2="21" y2="10" />
-                </svg>
-                Thời gian duyệt: <span style={{ color: '#2563eb', fontWeight: 600, marginLeft: '4px' }}>{house.createdAt ? formatDate(house.createdAt) : ''}</span>
-              </p>
-            </div>
-          </div>
-
-          <div className="overview-right" style={{ display: 'flex', flexDirection: 'column', gap: '16px', alignItems: 'flex-end' }}>
-            <div className="overview-stats">
-              <div className="stat-item stat-item--total">
-                <HomeIcon />
-                <div className="stat-info">
-                  <span className="stat-label">Tổng số phòng</span>
-                  <strong className="stat-number">{roomStats.total}</strong>
-                </div>
-              </div>
-              <div className="stat-item stat-item--approved">
-                <CheckCircleIcon />
-                <div className="stat-info">
-                  <span className="stat-label">Số phòng trống</span>
-                  <strong className="stat-number">{roomStats.available}</strong>
-                </div>
-              </div>
-              <div className="stat-item stat-item--pending">
-                <UserCheckIcon />
-                <div className="stat-info">
-                  <span className="stat-label">Đang thuê</span>
-                  <strong className="stat-number">{roomStats.occupied}</strong>
-                </div>
-              </div>
-              <div className="stat-item stat-item--rejected">
-                <EyeOffIcon />
-                <div className="stat-info">
-                  <span className="stat-label">Đang ẩn</span>
-                  <strong className="stat-number">{roomStats.hidden}</strong>
-                </div>
-              </div>
-            </div>
-
-            <div className="overview-actions" style={{ display: 'flex', gap: '12px' }}>
-              <button
-                className={`nav-tab-btn ${activeTab === 'rooms' ? 'active' : ''}`}
-                onClick={() => setActiveTab('rooms')}
-              >
-                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                  <line x1="8" y1="6" x2="21" y2="6" />
-                  <line x1="8" y1="12" x2="21" y2="12" />
-                  <line x1="8" y1="18" x2="21" y2="18" />
-                  <line x1="3" y1="6" x2="3.01" y2="6" />
-                  <line x1="3" y1="12" x2="3.01" y2="12" />
-                  <line x1="3" y1="18" x2="3.01" y2="18" />
-                </svg>
-                Danh sách phòng
-              </button>
-              <button
-                className={`nav-tab-btn ${(activeTab !== 'rooms' && activeTab !== 'create-room') ? 'active' : ''}`}
-                onClick={() => {
-                  if (activeTab === 'rooms' || activeTab === 'create-room') setActiveTab('basic');
-                }}
-              >
-                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                  <path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z" />
-                  <polyline points="9 22 9 12 15 12 15 22" />
-                  <rect x="10" y="14" width="4" height="4" />
-                </svg>
-                Thông tin khu trọ
-              </button>
-              {house.approvalStatus === 'Approved' && (
-                <button
-                  className="action-btn-outline"
-                  onClick={handleToggleVisibility}
-                  disabled={actionLoading}
-                >
-                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
-                    <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z" />
-                    <circle cx="12" cy="12" r="3" />
-                  </svg>
-                  {house.visibilityStatus === 'Visible' ? 'Ẩn khu trọ' : 'Hiển thị khu trọ'}
-                </button>
-              )}
-              <button
-                className="action-btn-primary"
-                onClick={handleCreateRoomClick}
-                disabled={!canCreateRoom}
-                title={!canCreateRoom ? "Vui lòng cấu hình chính sách thuê và Luật khu trọ trước khi tạo phòng." : "Tạo phòng mới"}
-                style={!canCreateRoom ? { opacity: 0.5, cursor: 'not-allowed' } : undefined}
-              >
-                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
-                  <line x1="12" y1="5" x2="12" y2="19" />
-                  <line x1="5" y1="12" x2="19" y2="12" />
-                </svg>
-                Tạo phòng mới
-              </button>
-            </div>
-          </div>
-        </section>
-
-        {message && <p className="dashboard-message">{message}</p>}
-        {actionLoading && <p className="dashboard-message" style={{ background: '#dbeafe', color: '#1e40af' }}>Đang lưu thay đổi...</p>}
-
-        {/* Hệ thống Tab Cấp 2 */}
-        {(activeTab !== 'rooms' && activeTab !== 'create-room') && (
-          <div className="info-subtabs">
-            <button className={activeTab === 'basic' ? 'active' : ''} onClick={() => setActiveTab('basic')}>
-              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                <path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z" />
-                <polyline points="9 22 9 12 15 12 15 22" />
-              </svg>
-              Thông tin cơ bản
-            </button>
-            <button className={activeTab === 'images' ? 'active' : ''} onClick={() => setActiveTab('images')}>
-              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                <rect x="3" y="3" width="18" height="18" rx="2" ry="2" />
-                <circle cx="8.5" cy="8.5" r="1.5" />
-                <polyline points="21 15 16 10 5 21" />
-              </svg>
-              Ảnh khu trọ
-            </button>
-            <button className={activeTab === 'amenities' ? 'active' : ''} onClick={() => setActiveTab('amenities')}>
-              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                <polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2" />
-              </svg>
-              Tiện nghi
-            </button>
-            <button className={activeTab === 'legal' ? 'active' : ''} onClick={() => setActiveTab('legal')}>
-              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                <rect x="3" y="4" width="18" height="16" rx="2" ry="2" />
-                <line x1="16" y1="2" x2="16" y2="4" />
-                <line x1="8" y1="2" x2="8" y2="4" />
-                <line x1="3" y1="10" x2="21" y2="10" />
-              </svg>
-              Giấy tờ pháp lý
-            </button>
-            <button className={activeTab === 'house-rule' ? 'active' : ''} onClick={() => setActiveTab('house-rule')}>
-              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" />
-                <polyline points="14 2 14 8 20 8" />
-                <line x1="16" y1="13" x2="8" y2="13" />
-                <line x1="16" y1="17" x2="8" y2="17" />
-              </svg>
-              Luật khu trọ
-            </button>
-            <button className={activeTab === 'rental-policy' ? 'active' : ''} onClick={() => setActiveTab('rental-policy')}>
-              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+          }
+          title={house.name}
+          description={
+            <div className="overview-description" style={{ display: 'flex', alignItems: 'center', margin: 0 }}>
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#2563eb" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ marginRight: '6px' }}>
                 <rect x="3" y="4" width="18" height="18" rx="2" ry="2" />
                 <line x1="16" y1="2" x2="16" y2="6" />
                 <line x1="8" y1="2" x2="8" y2="6" />
                 <line x1="3" y1="10" x2="21" y2="10" />
               </svg>
-              Chính sách thuê
-            </button>
-            <button className={activeTab === 'service-prices' ? 'active' : ''} onClick={() => setActiveTab('service-prices')}>
-              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                <line x1="12" y1="1" x2="12" y2="23" />
-                <path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6" />
-              </svg>
-              Bảng giá dịch vụ
-            </button>
-          </div>
-        )}
+              Thời gian duyệt: <span style={{ color: '#2563eb', fontWeight: 600, marginLeft: '4px' }}>{house.createdAt ? formatDate(house.createdAt) : ''}</span>
+            </div>
+          }
+          rightContent={
+            <div className="overview-right" style={{ display: 'flex', flexDirection: 'column', gap: '16px', alignItems: 'flex-end' }}>
+              <div className="overview-stats">
+                <div className="stat-item stat-item--total">
+                  <HomeIcon />
+                  <span>Tổng số phòng</span>
+                  <strong className="stat-badge">{roomStats.total}</strong>
+                </div>
+                <div className="stat-item stat-item--approved">
+                  <CheckCircleIcon />
+                  <span>Số phòng trống</span>
+                  <strong className="stat-badge">{roomStats.available}</strong>
+                </div>
+                <div className="stat-item stat-item--pending">
+                  <UserCheckIcon />
+                  <span>Đang thuê</span>
+                  <strong className="stat-badge">{roomStats.occupied}</strong>
+                </div>
+                <div className="stat-item stat-item--rejected">
+                  <EyeOffIcon />
+                  <span>Đang ẩn</span>
+                  <strong className="stat-badge">{roomStats.hidden}</strong>
+                </div>
+              </div>
+
+              <div className="overview-actions" style={{ display: 'flex', gap: '12px' }}>
+                {house.approvalStatus === 'Approved' && (
+                  <button
+                    className="action-btn-outline"
+                    onClick={handleToggleVisibility}
+                    disabled={actionLoading}
+                  >
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                      <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z" />
+                      <circle cx="12" cy="12" r="3" />
+                    </svg>
+                    {house.visibilityStatus === 'Visible' ? 'Ẩn khu trọ' : 'Hiển thị khu trọ'}
+                  </button>
+                )}
+                <button
+                  className="action-btn-primary"
+                  onClick={handleCreateRoomClick}
+                  disabled={!canCreateRoom}
+                  title={!canCreateRoom ? "Vui lòng cấu hình chính sách thuê và Luật khu trọ trước khi tạo phòng." : "Tạo phòng mới"}
+                  style={!canCreateRoom ? { opacity: 0.5, cursor: 'not-allowed' } : undefined}
+                >
+                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                    <line x1="12" y1="5" x2="12" y2="19" />
+                    <line x1="5" y1="12" x2="19" y2="12" />
+                  </svg>
+                  Tạo phòng mới
+                </button>
+              </div>
+            </div>
+          }
+        />
+
+        {toast && <Toast message={toast.message} type={toast.type} onClose={() => setToast(null)} />}
+        {actionLoading && <p className="dashboard-message" style={{ background: '#dbeafe', color: '#1e40af' }}>Đang lưu thay đổi...</p>}
+
+
+
+        {/* Hệ thống Tab Cấp 1 (Main Tabs) */}
+        <div style={{ marginBottom: '32px' }}>
+          <Tabs
+            className="attached-top"
+            variant="segmented-primary"
+            activeId={(activeTab === 'rooms' || activeTab === 'create-room') ? 'rooms' : 'house_info'}
+            onChange={(id) => {
+              if (id === 'rooms') setActiveTab('rooms');
+              else if (id === 'house_info') setActiveTab('basic');
+            }}
+            items={[
+              { id: 'rooms', label: 'Danh sách phòng', icon: <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><line x1="8" y1="6" x2="21" y2="6" /><line x1="8" y1="12" x2="21" y2="12" /><line x1="8" y1="18" x2="21" y2="18" /><line x1="3" y1="6" x2="3.01" y2="6" /><line x1="3" y1="12" x2="3.01" y2="12" /><line x1="3" y1="18" x2="3.01" y2="18" /></svg> },
+              { id: 'house_info', label: 'Thông tin khu trọ', icon: <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z" /><polyline points="9 22 9 12 15 12 15 22" /><rect x="10" y="14" width="4" height="4" /></svg> }
+            ]}
+          />
+        </div>
 
         {/* Nội dung Tab */}
-        <div className="tab-content" style={{ marginTop: '16px' }}>
+        <div className="tab-content" style={{ marginTop: '24px' }}>
+          {/* Hệ thống Tab Cấp 2 (Sub Tabs) */}
+          {(activeTab !== 'rooms' && activeTab !== 'create-room') && (
+            <div>
+              <Tabs
+                className="attached-bottom"
+                variant="segmented-secondary"
+                activeId={activeTab}
+                onChange={(id) => setActiveTab(id as any)}
+                items={[
+                  { id: 'basic', label: 'Cơ bản', icon: <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z" /><polyline points="9 22 9 12 15 12 15 22" /></svg> },
+                  { id: 'images', label: 'Ảnh', icon: <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="3" y="3" width="18" height="18" rx="2" ry="2" /><circle cx="8.5" cy="8.5" r="1.5" /><polyline points="21 15 16 10 5 21" /></svg> },
+                  { id: 'amenities', label: 'Tiện ích', icon: <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2" /></svg> },
+                  { id: 'legal', label: 'Pháp lý', icon: <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" /><polyline points="14 2 14 8 20 8" /><line x1="16" y1="13" x2="8" y2="13" /><line x1="16" y1="17" x2="8" y2="17" /><polyline points="10 9 9 9 8 9" /></svg> },
+                  { id: 'house-rule', label: 'Luật khu trọ', icon: <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" /><polyline points="14 2 14 8 20 8" /><line x1="16" y1="13" x2="8" y2="13" /><line x1="16" y1="17" x2="8" y2="17" /></svg> },
+                  { id: 'rental-policy', label: 'Quy định thuê', icon: <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="3" y="4" width="18" height="18" rx="2" ry="2" /><line x1="16" y1="2" x2="16" y2="6" /><line x1="8" y1="2" x2="8" y2="6" /><line x1="3" y1="10" x2="21" y2="10" /></svg> },
+                  { id: 'service-prices', label: 'Bảng giá dịch vụ', icon: <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><line x1="12" y1="1" x2="12" y2="23" /><path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6" /></svg> }
+                ]}
+              />
+            </div>
+          )}
           {/* TAB 1: THÔNG TIN CƠ BẢN */}
           {activeTab === 'basic' && (
-            <div className="subtab-card">
+            <div className="subtab-card tab-attached-panel tab-attached-panel--compact">
               <div className="subtab-header">
                 <div className="subtab-header-icon">
                   <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
@@ -808,7 +748,7 @@ export default function RoomingHouseDetailPage() {
               <div className="subtab-footer">
                 <div className="shield-info">
                   <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                    <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/>
+                    <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z" />
                   </svg>
                   <span>Thông tin này giúp khách thuê tìm kiếm khu trọ trên bản đồ chính xác.</span>
                 </div>
@@ -826,7 +766,7 @@ export default function RoomingHouseDetailPage() {
 
           {/* TAB 2: ẢNH KHU TRỌ */}
           {activeTab === 'images' && (
-            <div className="subtab-card">
+            <div className="subtab-card tab-attached-panel tab-attached-panel--compact">
               <div className="subtab-header">
                 <div className="subtab-header-icon">
                   <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
@@ -851,7 +791,7 @@ export default function RoomingHouseDetailPage() {
 
           {/* TAB 3: TIỆN NGHI KHU TRỌ */}
           {activeTab === 'amenities' && (
-            <div className="subtab-card">
+            <div className="subtab-card tab-attached-panel tab-attached-panel--compact">
               <div className="subtab-header">
                 <div className="subtab-header-icon">
                   <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
@@ -875,7 +815,7 @@ export default function RoomingHouseDetailPage() {
 
           {/* TAB 4: GIẤY TỜ PHÁP LÝ (READ ONLY) */}
           {activeTab === 'legal' && (
-            <div className="subtab-card">
+            <div className="subtab-card tab-attached-panel tab-attached-panel--compact">
               <div className="subtab-header">
                 <div className="subtab-header-icon">
                   <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
@@ -955,7 +895,7 @@ export default function RoomingHouseDetailPage() {
 
           {/* TAB 4.5: LUẬT KHU TRỌ */}
           {activeTab === 'house-rule' && (
-            <div className="subtab-card">
+            <div className="subtab-card tab-attached-panel tab-attached-panel--compact">
               <div className="subtab-header">
                 <div className="subtab-header-icon">
                   <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
@@ -980,7 +920,7 @@ export default function RoomingHouseDetailPage() {
 
           {/* TAB 4.5: CHÍNH SÁCH THUÊ */}
           {activeTab === 'rental-policy' && (
-            <div className="subtab-card">
+            <div className="subtab-card tab-attached-panel tab-attached-panel--compact">
               <div className="subtab-header">
                 <div className="subtab-header-icon">
                   <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
@@ -1134,7 +1074,7 @@ export default function RoomingHouseDetailPage() {
               <div className="subtab-footer">
                 <div className="shield-info">
                   <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                    <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/>
+                    <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z" />
                   </svg>
                   <span>Chính sách thuê rõ ràng giúp giảm thiểu các tranh chấp không đáng có.</span>
                 </div>
@@ -1152,19 +1092,73 @@ export default function RoomingHouseDetailPage() {
 
           {/* TAB: TẠO PHÒNG MỚI */}
           {activeTab === 'create-room' && (
-            <div className="editor-panel" style={{ marginTop: '20px', background: '#f8fafc', border: '1px solid #cbd5e1' }}>
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px' }}>
-                <h3 style={{ margin: 0, fontSize: '18px', color: '#1e293b' }}>Tạo phòng mới</h3>
-              </div>
+            <>
+              <Tabs
+                  className="attached-bottom"
+                  variant="segmented-secondary"
+                  activeId="basic"
+                  onChange={() => undefined}
+                  items={[
+                    {
+                      id: 'basic',
+                      label: 'Thông tin cơ bản',
+                      icon: (
+                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                          <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" />
+                          <polyline points="14 2 14 8 20 8" />
+                          <line x1="16" y1="13" x2="8" y2="13" />
+                          <line x1="16" y1="17" x2="8" y2="17" />
+                        </svg>
+                      ),
+                    },
+                    {
+                      id: 'images',
+                      label: 'Ảnh phòng',
+                      disabled: true,
+                      title: 'Tạo phòng trước khi cập nhật ảnh phòng',
+                      icon: (
+                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                          <rect x="3" y="3" width="18" height="18" rx="2" ry="2" />
+                          <circle cx="8.5" cy="8.5" r="1.5" />
+                          <polyline points="21 15 16 10 5 21" />
+                        </svg>
+                      ),
+                    },
+                    {
+                      id: 'amenities',
+                      label: 'Tiện ích phòng',
+                      disabled: true,
+                      title: 'Tạo phòng trước khi cập nhật tiện ích phòng',
+                      icon: (
+                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                          <rect x="3" y="3" width="7" height="7" />
+                          <rect x="14" y="3" width="7" height="7" />
+                          <rect x="14" y="14" width="7" height="7" />
+                          <rect x="3" y="14" width="7" height="7" />
+                        </svg>
+                      ),
+                    },
+                    {
+                      id: 'price',
+                      label: 'Bảng giá',
+                      disabled: true,
+                      title: 'Tạo phòng trước khi cập nhật bảng giá',
+                      icon: (
+                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                          <path d="M20.59 13.41l-7.17 7.17a2 2 0 0 1-2.83 0L2 12V2h10l8.59 8.59a2 2 0 0 1 0 2.82z" />
+                          <line x1="7" y1="7" x2="7.01" y2="7" strokeWidth="2.5" />
+                        </svg>
+                      ),
+                    },
+                  ]}
+              />
 
-              <div className="tabs" style={{ marginBottom: '16px', display: 'flex', alignItems: 'center' }}>
-                <button className="active" style={{ fontWeight: 600 }}>Thông tin cơ bản</button>
-                <button disabled style={{ opacity: 0.5, cursor: 'not-allowed' }}>Ảnh phòng</button>
-                <button disabled style={{ opacity: 0.5, cursor: 'not-allowed' }}>Tiện ích phòng</button>
-                <button disabled style={{ opacity: 0.5, cursor: 'not-allowed' }}>Bảng giá</button>
-              </div>
+              <div className="editor-panel tab-attached-panel tab-attached-panel--compact" style={{ marginTop: 0, background: '#f8fafc', border: '1px solid #cbd5e1' }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px' }}>
+                  <h3 style={{ margin: 0, fontSize: '18px', color: '#1e293b' }}>Tạo phòng mới</h3>
+                </div>
 
-              <div className="form-grid">
+                <div className="form-grid">
                 <label className="field">
                   <span>Số phòng / Tên phòng</span>
                   <input value={newRoomForm.roomNumber} onChange={e => setNewRoomForm({ ...newRoomForm, roomNumber: e.target.value })} placeholder="VD: 101" />
@@ -1200,6 +1194,7 @@ export default function RoomingHouseDetailPage() {
                 </div>
               </div>
             </div>
+            </>
           )}
 
           {/* TAB 5: QUẢN LÝ PHÒNG */}
@@ -1391,7 +1386,7 @@ function AmenityEditor({
       <div className="subtab-footer">
         <div className="shield-info">
           <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-            <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/>
+            <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z" />
           </svg>
           <span>Tiện ích rõ ràng giúp tăng tỷ lệ tiếp cận khách thuê trọ.</span>
         </div>

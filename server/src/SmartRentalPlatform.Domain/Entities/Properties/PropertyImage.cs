@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using System.Text;
 
@@ -9,6 +9,7 @@ namespace SmartRentalPlatform.Domain.Entities.Properties
         public Guid Id { get; set; }
         public Guid? RoomingHouseId { get; set; }
         public Guid? RoomId { get; set; }
+        public Guid? RoomingHouseReviewId { get; set; }
         public string ObjectKey { get; set; } = string.Empty;
         public string ImageUrl { get; set; } = string.Empty;
         public string? Caption { get; set; }
@@ -19,5 +20,6 @@ namespace SmartRentalPlatform.Domain.Entities.Properties
         
         public RoomingHouse? RoomingHouse { get; set; }
         public Room? Room { get; set; }
+        public RoomingHouseReview? RoomingHouseReview { get; set; }
     }
 }

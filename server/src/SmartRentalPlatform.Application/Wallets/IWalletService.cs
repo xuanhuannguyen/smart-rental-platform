@@ -45,6 +45,13 @@ public interface IWalletService
         WalletTransactionMetadata? metadata = null,
         CancellationToken cancellationToken = default);
 
+    Task<WalletMutationResponse> DebitFromReservedAsync(
+        Guid walletAccountId,
+        decimal amount,
+        WalletTransactionType transactionType,
+        WalletTransactionMetadata? metadata = null,
+        CancellationToken cancellationToken = default);
+
     Task<WalletTransferResponse> TransferAsync(
         Guid sourceWalletAccountId,
         Guid targetWalletAccountId,

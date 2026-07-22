@@ -8,9 +8,14 @@
 !/client/**
 !/server/
 !/server/**
+!/docs/
+!/docs/interval-plan/
+!/docs/interval-plan/Interval2BusinessLogicReport.md
 !/qa/
 !/qa/wallet/
 !/qa/wallet/README.md
+!/qa/week05-api-testing/
+!/qa/week05-api-testing/**
 
 # Local agent/tooling output
 .agent/

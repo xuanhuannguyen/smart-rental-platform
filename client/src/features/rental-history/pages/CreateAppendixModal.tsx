@@ -210,7 +210,7 @@ interface Props {
 export const CreateAppendixModal: React.FC<Props> = ({ contract, appendix, onClose, onCreated }) => {
   const today = new Date().toISOString().slice(0, 10);
   const activeOccupants = useMemo(
-    () => contract.occupants.filter((occupant) => occupant.status === 'Active'),
+    () => contract.occupants.filter((occupant) => occupant.status === 'Active' || occupant.status === 'PendingMoveIn'),
     [contract.occupants]
   );
 
@@ -296,6 +296,14 @@ export const CreateAppendixModal: React.FC<Props> = ({ contract, appendix, onClo
       if (change.mode === 'addOccupant') {
         if (!change.newOccupantRelationship.trim() || !change.newOccupantMoveInDate) {
           throw new Error(`Thay đổi #${changeNum}: Vui lòng nhập quan hệ với người thuê chính và ngày chuyển vào.`);
+        }
+
+        const renewalChange = changes.find(c => c.mode === 'renewContract');
+        const resolvedEndDate = renewalChange?.newEndDate || contract.endDate;
+        const resolvedEndDateStr = toFormString(resolvedEndDate);
+
+        if (change.newOccupantMoveInDate < effectiveDate || change.newOccupantMoveInDate > resolvedEndDateStr) {
+          throw new Error(`Thay đổi #${changeNum}: Ngày chuyển vào của người ở mới phải nằm trong khoảng thời gian hiệu lực của phụ lục (từ ${new Date(effectiveDate).toLocaleDateString('vi-VN')} đến ${new Date(resolvedEndDateStr).toLocaleDateString('vi-VN')}).`);
         }
 
         if (change.newOccupantHasVerifiedAccount) {
@@ -414,7 +422,8 @@ export const CreateAppendixModal: React.FC<Props> = ({ contract, appendix, onClo
             <input
               type="date"
               value={effectiveDate}
-              min={today}
+              min={today > contract.startDate ? today : contract.startDate}
+              max={contract.endDate}
               onChange={(e) => setEffectiveDate(e.target.value)}
               required
             />
@@ -568,9 +577,10 @@ export const CreateAppendixModal: React.FC<Props> = ({ contract, appendix, onClo
                       <label>Ngày chuyển vào</label>
                       <input
                         type="date"
-                        
                         value={change.newOccupantMoveInDate}
                         onChange={(e) => updateChange(change.id, 'newOccupantMoveInDate', e.target.value)}
+                        min={effectiveDate}
+                        max={toFormString(changes.find(c => c.mode === 'renewContract')?.newEndDate || contract.endDate)}
                         required
                       />
                     </div>

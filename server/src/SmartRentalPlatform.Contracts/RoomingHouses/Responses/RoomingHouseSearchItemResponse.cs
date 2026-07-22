@@ -32,5 +32,9 @@ public class RoomingHouseSearchItemResponse
 
     public List<AmenityResponse> Amenities { get; set; } = new();
 
+    public double AverageRating { get; set; }
+
+    public int TotalReviews { get; set; }
+
     public DateTimeOffset CreatedAt { get; set; }
 }

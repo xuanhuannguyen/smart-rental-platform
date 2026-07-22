@@ -18,9 +18,14 @@
 }
 
 .requests-list {
-  display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
-  gap: 24px;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  width: 100%;
+}
+
+.tenant-request-price {
+  color: #0f172a;
 }
 
 .tabs-navigation {

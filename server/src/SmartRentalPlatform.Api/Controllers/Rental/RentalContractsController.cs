@@ -2,6 +2,7 @@ using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using SmartRentalPlatform.Api.Extensions;
 using SmartRentalPlatform.Application.Common.Interfaces;
+using SmartRentalPlatform.Application.Common.Models.ESign;
 using SmartRentalPlatform.Application.RentalContracts;
 using SmartRentalPlatform.Contracts.Common;
 using SmartRentalPlatform.Contracts.RentalContracts.Requests;
@@ -14,22 +15,22 @@ namespace SmartRentalPlatform.Api.Controllers;
 public class RentalContractsController : ControllerBase
 {
     private readonly IRentalContractService rentalContractService;
-    private readonly IContractSignatureOtpService contractSignatureOtpService;
     private readonly IContractFileService contractFileService;
     private readonly IContractAppendixService contractAppendixService;
+    private readonly IContractESignService contractESignService;
     private readonly ICurrentUserService currentUserService;
 
     public RentalContractsController(
         IRentalContractService rentalContractService,
-        IContractSignatureOtpService contractSignatureOtpService,
         IContractFileService contractFileService,
         IContractAppendixService contractAppendixService,
+        IContractESignService contractESignService,
         ICurrentUserService currentUserService)
     {
         this.rentalContractService = rentalContractService;
-        this.contractSignatureOtpService = contractSignatureOtpService;
         this.contractFileService = contractFileService;
         this.contractAppendixService = contractAppendixService;
+        this.contractESignService = contractESignService;
         this.currentUserService = currentUserService;
     }
 
@@ -95,7 +96,7 @@ public class RentalContractsController : ControllerBase
             });
         }
 
-        Response.Headers.ContentDisposition = $"inline; filename=\"{result.FileName}\"";
+        SetSensitivePreviewHeaders(result.FileName);
         return File(result.Content, result.ContentType);
     }
 
@@ -124,76 +125,6 @@ public class RentalContractsController : ControllerBase
     }
 
     [Authorize]
-    [HttpPost("{id:guid}/landlord-sign/otp")]
-    public async Task<ActionResult<ApiResponse<RequestContractSignatureOtpResponse>>> RequestLandlordSignOtp(
-        Guid id,
-        CancellationToken cancellationToken)
-    {
-        var userId = GetCurrentUserId();
-        var result = await contractSignatureOtpService.RequestOtpAsync(
-            userId,
-            id,
-            ContractSignerRole.Landlord,
-            cancellationToken);
-
-        return SignatureOtpResult(result, "OTP ký hợp đồng đã được gửi đến email của chủ trọ.");
-    }
-
-    [Authorize]
-    [HttpPost("{id:guid}/landlord-sign")]
-    public async Task<ActionResult<ApiResponse<ContractDetailResponse>>> LandlordSign(
-        Guid id,
-        SignContractRequest request,
-        CancellationToken cancellationToken)
-    {
-        var userId = GetCurrentUserId();
-        var result = await rentalContractService.LandlordSignAsync(
-            userId,
-            id,
-            request,
-            HttpContext.Connection.RemoteIpAddress?.ToString(),
-            Request.Headers.UserAgent.ToString(),
-            cancellationToken);
-
-        return ContractResult(result, "Chủ trọ ký hợp đồng thành công.");
-    }
-
-    [Authorize]
-    [HttpPost("{id:guid}/tenant-sign/otp")]
-    public async Task<ActionResult<ApiResponse<RequestContractSignatureOtpResponse>>> RequestTenantSignOtp(
-        Guid id,
-        CancellationToken cancellationToken)
-    {
-        var userId = GetCurrentUserId();
-        var result = await contractSignatureOtpService.RequestOtpAsync(
-            userId,
-            id,
-            ContractSignerRole.Tenant,
-            cancellationToken);
-
-        return SignatureOtpResult(result, "OTP ký hợp đồng đã được gửi đến email của người thuê.");
-    }
-
-    [Authorize]
-    [HttpPost("{id:guid}/tenant-sign")]
-    public async Task<ActionResult<ApiResponse<ContractDetailResponse>>> TenantSign(
-        Guid id,
-        SignContractRequest request,
-        CancellationToken cancellationToken)
-    {
-        var userId = GetCurrentUserId();
-        var result = await rentalContractService.TenantSignAsync(
-            userId,
-            id,
-            request,
-            HttpContext.Connection.RemoteIpAddress?.ToString(),
-            Request.Headers.UserAgent.ToString(),
-            cancellationToken);
-
-        return ContractResult(result, "Người thuê ký hợp đồng thành công.");
-    }
-
-    [Authorize]
     [HttpPost("{id:guid}/revision-request")]
     public async Task<ActionResult<ApiResponse<ContractDetailResponse>>> RequestRevision(
         Guid id,
@@ -219,12 +150,12 @@ public class RentalContractsController : ControllerBase
 
     [Authorize]
     [HttpPost("{id:guid}/files/generate")]
-    public async Task<ActionResult<ApiResponse<ContractFileResponse>>> GenerateSignedContractFile(
+    public async Task<ActionResult<ApiResponse<ContractFileResponse>>> GenerateContractReferenceFile(
         Guid id,
         CancellationToken cancellationToken)
     {
         var userId = GetCurrentUserId();
-        var result = await contractFileService.GenerateSignedContractFileAsync(userId, id, cancellationToken);
+        var result = await contractFileService.EnsureMaskedContractFileAsync(userId, id, cancellationToken);
 
         if (result is null)
         {
@@ -239,7 +170,188 @@ public class RentalContractsController : ControllerBase
         return Ok(new ApiResponse<ContractFileResponse>
         {
             Success = true,
-            Message = "Tạo file PDF hợp đồng thành công.",
+            Message = "Tạo bản tham chiếu đã che thông tin thành công.",
+            Data = result
+        });
+    }
+
+    [Authorize]
+    [HttpPost("{id:guid}/esign-envelope")]
+    public async Task<ActionResult<ApiResponse<StartESignEnvelopeResponse>>> StartESignEnvelope(
+        Guid id,
+        [FromBody] StartESignEnvelopeRequest request,
+        CancellationToken cancellationToken)
+    {
+        if (!request.AgreedToTerms)
+        {
+            return BadRequest(new ApiErrorResponse
+            {
+                Success = false,
+                ErrorCode = ErrorCodes.ValidationError,
+                Message = "Bạn phải đồng ý với nội dung hợp đồng trước khi ký."
+            });
+        }
+
+        var userId = GetCurrentUserId();
+        var result = await contractESignService.StartContractEnvelopeAsync(userId, id, request.ReturnUrl, cancellationToken);
+
+        if (result is null)
+        {
+            return NotFound(new ApiErrorResponse
+            {
+                Success = false,
+                ErrorCode = ErrorCodes.RentalContractNotFound,
+                Message = "Không tìm thấy hợp đồng."
+            });
+        }
+
+        return Ok(new ApiResponse<StartESignEnvelopeResponse>
+        {
+            Success = true,
+            Message = "Khởi tạo trình ký số thành công.",
+            Data = result
+        });
+    }
+
+    [Authorize]
+    [HttpPost("{id:guid}/esign-envelope/request-otp")]
+    public async Task<ActionResult<ApiResponse<RequestESignOtpResponse>>> RequestESignOtp(
+        Guid id,
+        [FromBody] RequestSignatureOtpRequest request,
+        CancellationToken cancellationToken)
+    {
+        var userId = GetCurrentUserId();
+        var result = await contractESignService.RequestSignatureOtpAsync(
+            userId, id, null, (ESignOtpMethod)request.Method, cancellationToken);
+
+        return Ok(new ApiResponse<RequestESignOtpResponse>
+        {
+            Success = true,
+            Message = "VNPT đã gửi mã OTP.",
+            Data = result
+        });
+    }
+
+    [HttpPost("{id:guid}/esign-envelope/submit-otp")]
+    [Authorize]
+    public async Task<ActionResult<ApiResponse<bool>>> SubmitESignOtp(
+        Guid id,
+        [FromBody] SubmitSignatureOtpRequest request,
+        CancellationToken cancellationToken)
+    {
+        var userId = GetCurrentUserId();
+        await contractESignService.SubmitSignatureOtpAsync(
+            userId, id, null, request.OtpCode, request.SignatureImageBase64, cancellationToken);
+
+        return Ok(new ApiResponse<bool>
+        {
+            Success = true,
+            Message = "Ký số thành công.",
+            Data = true
+        });
+    }
+
+    [Authorize]
+    [HttpGet("{id:guid}/esign-envelopes/{envelopeId:guid}")]
+    public async Task<ActionResult<ApiResponse<ESignEnvelopeResponse>>> GetESignEnvelope(
+        Guid id,
+        Guid envelopeId,
+        CancellationToken cancellationToken)
+    {
+        var userId = GetCurrentUserId();
+        var result = await contractESignService.GetEnvelopeAsync(userId, envelopeId, cancellationToken);
+
+        if (result is null)
+        {
+            return NotFound(new ApiErrorResponse
+            {
+                Success = false,
+                ErrorCode = ErrorCodes.RentalContractNotFound,
+                Message = "Không tìm thấy thông tin ký số."
+            });
+        }
+
+        return Ok(new ApiResponse<ESignEnvelopeResponse>
+        {
+            Success = true,
+            Message = "Lấy thông tin ký số thành công.",
+            Data = result
+        });
+    }
+
+    [Authorize]
+    [HttpPost("{id:guid}/appendices/{appendixId:guid}/esign-envelope/request-otp")]
+    public async Task<ActionResult<ApiResponse<RequestESignOtpResponse>>> RequestAppendixESignOtp(
+        Guid id,
+        Guid appendixId,
+        [FromBody] RequestSignatureOtpRequest request,
+        CancellationToken cancellationToken)
+    {
+        var userId = GetCurrentUserId();
+        var result = await contractESignService.RequestSignatureOtpAsync(
+            userId, id, appendixId, (ESignOtpMethod)request.Method, cancellationToken);
+        return Ok(new ApiResponse<RequestESignOtpResponse>
+        {
+            Success = true,
+            Message = "VNPT đã gửi mã OTP.",
+            Data = result
+        });
+    }
+
+    [Authorize]
+    [HttpPost("{id:guid}/appendices/{appendixId:guid}/esign-envelope/submit-otp")]
+    public async Task<ActionResult<ApiResponse<bool>>> SubmitAppendixESignOtp(
+        Guid id,
+        Guid appendixId,
+        [FromBody] SubmitSignatureOtpRequest request,
+        CancellationToken cancellationToken)
+    {
+        var userId = GetCurrentUserId();
+        await contractESignService.SubmitSignatureOtpAsync(
+            userId, id, appendixId, request.OtpCode, request.SignatureImageBase64, cancellationToken);
+        return Ok(new ApiResponse<bool>
+        {
+            Success = true,
+            Message = "Ký phụ lục thành công.",
+            Data = true
+        });
+    }
+
+    [Authorize]
+    [HttpPost("{id:guid}/appendices/{appendixId:guid}/esign-envelope")]
+    public async Task<ActionResult<ApiResponse<StartESignEnvelopeResponse>>> StartAppendixESignEnvelope(
+        Guid id,
+        Guid appendixId,
+        [FromBody] StartESignEnvelopeRequest request,
+        CancellationToken cancellationToken)
+    {
+        if (!request.AgreedToTerms)
+        {
+            return BadRequest(new ApiErrorResponse
+            {
+                Success = false,
+                ErrorCode = ErrorCodes.ValidationError,
+                Message = "Bạn phải đồng ý với nội dung phụ lục trước khi ký."
+            });
+        }
+
+        var userId = GetCurrentUserId();
+        var result = await contractESignService.StartAppendixEnvelopeAsync(userId, id, appendixId, request.ReturnUrl, cancellationToken);
+
+        if (result is null)
+        {
+            return NotFound(new ApiErrorResponse
+            {
+                Success = false,
+                ErrorCode = ErrorCodes.RentalContractNotFound,
+                Message = "Không tìm thấy phụ lục hợp đồng."
+            });
+        }
+
+        return Ok(new ApiResponse<StartESignEnvelopeResponse>
+        {
+            Success = true,
+            Message = "Khởi tạo trình ký số cho phụ lục thành công.",
             Data = result
         });
     }
@@ -358,42 +470,16 @@ public class RentalContractsController : ControllerBase
             });
         }
 
-        Response.Headers.ContentDisposition = $"inline; filename=\"{result.FileName}\"";
+        SetSensitivePreviewHeaders(result.FileName);
         return File(result.Content, result.ContentType);
     }
 
-    [Authorize]
-    [HttpPost("{id:guid}/appendices/{appendixId:guid}/sign/otp")]
-    public async Task<ActionResult<ApiResponse<RequestContractSignatureOtpResponse>>> RequestAppendixSignOtp(
-        Guid id,
-        Guid appendixId,
-        CancellationToken cancellationToken)
+    private void SetSensitivePreviewHeaders(string fileName)
     {
-        var userId = GetCurrentUserId();
-        var result = await contractAppendixService.RequestSignOtpAsync(userId, id, appendixId, cancellationToken);
-
-        return SignatureOtpResult(result, "OTP ký phụ lục đã được gửi đến email.");
-    }
-
-    [Authorize]
-    [HttpPost("{id:guid}/appendices/{appendixId:guid}/sign")]
-    public async Task<ActionResult<ApiResponse<ContractAppendixResponse>>> SignAppendix(
-        Guid id,
-        Guid appendixId,
-        SignContractRequest request,
-        CancellationToken cancellationToken)
-    {
-        var userId = GetCurrentUserId();
-        var result = await contractAppendixService.SignAsync(
-            userId,
-            id,
-            appendixId,
-            request,
-            HttpContext.Connection.RemoteIpAddress?.ToString(),
-            Request.Headers.UserAgent.ToString(),
-            cancellationToken);
-
-        return AppendixResult(result, "Ký phụ lục hợp đồng thành công.");
+        Response.Headers.ContentDisposition = $"inline; filename=\"{fileName}\"";
+        Response.Headers.CacheControl = "no-store, no-cache, max-age=0";
+        Response.Headers.Pragma = "no-cache";
+        Response.Headers.Expires = "0";
     }
 
     [Authorize]
@@ -474,28 +560,6 @@ public class RentalContractsController : ControllerBase
         }
 
         return Ok(new ApiResponse<ContractDetailResponse>
-        {
-            Success = true,
-            Message = message,
-            Data = result
-        });
-    }
-
-    private ActionResult<ApiResponse<RequestContractSignatureOtpResponse>> SignatureOtpResult(
-        RequestContractSignatureOtpResponse? result,
-        string message)
-    {
-        if (result is null)
-        {
-            return NotFound(new ApiErrorResponse
-            {
-                Success = false,
-                ErrorCode = ErrorCodes.RentalContractNotFound,
-                Message = "Không tìm thấy hợp đồng."
-            });
-        }
-
-        return Ok(new ApiResponse<RequestContractSignatureOtpResponse>
         {
             Success = true,
             Message = message,

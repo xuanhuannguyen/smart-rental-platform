@@ -8,7 +8,9 @@ import type {
   AdminRoomingHouseListItem,
   AdminUserListItem,
   AdminUserDetail,
-  PagedResponse
+  PagedResponse,
+  AdminReviewReportListItem,
+  AdminReviewReportDetail
 } from '../types/adminApproval.types';
 
 export const adminApprovalApi = {
@@ -94,5 +96,29 @@ export const adminApprovalApi = {
       ENDPOINTS.ADMIN.USER_DETAIL(userId),
       { auth: true }
     );
+  },
+
+  getReviewReports(pageNumber = 1, pageSize = 20, status?: string) {
+    const query = new URLSearchParams({ pageNumber: String(pageNumber), pageSize: String(pageSize) });
+    if (status) query.append('status', status);
+    return apiClient<ApiResponse<PagedResponse<AdminReviewReportListItem>>>(
+      `${ENDPOINTS.ADMIN.REVIEW_REPORTS}?${query.toString()}`,
+      { auth: true }
+    );
+  },
+
+  getReviewReportDetail(id: string) {
+    return apiClient<ApiResponse<AdminReviewReportDetail>>(
+      ENDPOINTS.ADMIN.REVIEW_REPORT_DETAIL(id),
+      { auth: true }
+    );
+  },
+
+  processReviewReport(id: string, action: 'Dismiss' | 'DeleteReview', adminNote?: string) {
+    return apiClient<ApiResponse<object>>(
+      ENDPOINTS.ADMIN.REVIEW_REPORT_PROCESS(id),
+      { method: 'POST', auth: true, body: { hideReview: action === 'DeleteReview', adminNote } }
+    );
   }
 };
+

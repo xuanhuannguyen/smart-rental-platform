@@ -772,6 +772,19 @@
 }
 
 /* Status Banner Styles for KycStatusPage */
+.kyc-status-page-container {
+  padding: 24px;
+}
+
+.kyc-status-auth-page {
+  overflow: visible;
+}
+
+.kyc-status-auth-page::before,
+.kyc-status-auth-page::after {
+  display: none;
+}
+
 .ekyc-status-banner {
   display: flex;
   align-items: center;
@@ -851,6 +864,12 @@
   bottom: -10px;
   opacity: 0.05;
   pointer-events: none;
+}
+
+@media (max-width: 768px) {
+  .kyc-status-page-container {
+    padding: 16px;
+  }
 }
 
 
@@ -995,8 +1014,7 @@
   border: 1px solid #dce4ef;
   border-radius: 16px;
   padding: 40px;
-  max-width: 760px;
-  margin: 0 auto 24px auto;
+  margin-bottom: 24px;
   box-shadow: 0 1px 4px rgba(0, 0, 0, 0.02);
   text-align: center;
 }
@@ -1171,8 +1189,7 @@
   background: #eff6ff;
   border: 1px solid #dbe3ef;
   border-radius: 12px;
-  max-width: 760px;
-  margin: 24px auto 0 auto;
+  margin-top: 24px;
   text-align: left;
 }
 
@@ -1206,8 +1223,6 @@
   border: 1px solid #dce4ef;
   border-radius: 16px;
   padding: 32px;
-  max-width: 760px;
-  margin: 0 auto;
   box-shadow: 0 1px 4px rgba(0, 0, 0, 0.02);
 }
 

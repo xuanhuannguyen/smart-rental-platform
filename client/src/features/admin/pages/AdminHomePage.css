@@ -298,9 +298,11 @@
 
 /* Action button inside tables */
 .admin-table-action-btn {
-  padding: 8px 14px;
+  padding: 6px 12px;
   font-size: 0.8rem;
   font-weight: 600;
+  min-width: 52px;
+  white-space: nowrap;
   background-color: var(--admin-primary-color);
   color: #ffffff;
   border: none;
@@ -316,6 +318,14 @@
 
 .admin-table-action-btn:active {
   transform: translateY(0);
+}
+
+/* Fix action column width so buttons never overflow */
+.admin-table th:last-child,
+.admin-table td:last-child {
+  width: 160px;
+  min-width: 160px;
+  white-space: nowrap;
 }
 
 /* Badges */
@@ -983,4 +993,97 @@
   font-size: 0.95rem;
   font-weight: 600;
   margin: 0;
+}
+/* Admin Modals */
+.admin-modal-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(15, 23, 42, 0.5);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 1000;
+}
+
+.admin-modal-container {
+  background: #ffffff;
+  border-radius: 12px;
+  width: 100%;
+  max-width: 500px;
+  box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.1);
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+}
+
+.admin-modal-header {
+  padding: 16px 24px;
+  border-bottom: 1px solid var(--admin-border-color);
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.admin-modal-title {
+  font-size: 1.1rem;
+  font-weight: 600;
+  color: var(--admin-text-primary);
+  margin: 0;
+}
+
+.admin-modal-body {
+  padding: 24px;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.admin-modal-footer {
+  padding: 16px 24px;
+  border-top: 1px solid var(--admin-border-color);
+  display: flex;
+  justify-content: flex-end;
+  gap: 12px;
+  background-color: #f8fafc;
+}
+
+.admin-form-group {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.admin-form-label {
+  font-size: 0.875rem;
+  font-weight: 500;
+  color: var(--admin-text-secondary);
+}
+
+.admin-form-input {
+  padding: 10px 12px;
+  border: 1px solid var(--admin-border-color);
+  border-radius: 6px;
+  font-size: 0.95rem;
+  outline: none;
+  transition: border-color 0.2s;
+}
+
+.admin-form-input:focus {
+  border-color: var(--admin-primary-color);
+}
+/* Inline Edit Inputs in Table */
+.admin-table-input {
+  width: 100%;
+  padding: 6px 10px;
+  border: 1px solid var(--admin-border-color);
+  border-radius: 6px;
+  font-size: 0.85rem;
+  outline: none;
+  background-color: #ffffff;
+  transition: border-color 0.2s;
+}
+
+.admin-table-input:focus {
+  border-color: var(--admin-primary-color);
+  box-shadow: 0 0 0 2px rgba(36, 107, 254, 0.1);
 }

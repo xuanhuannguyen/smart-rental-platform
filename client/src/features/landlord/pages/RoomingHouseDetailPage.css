@@ -151,6 +151,8 @@
   flex-direction: column;
   align-items: flex-end;
   gap: 12px;
+  max-width: 100%;
+  min-width: 0;
 }
 
 .rooming-house-detail-page .eyebrow {
@@ -170,90 +172,92 @@
 
 .rooming-house-detail-page .overview-stats {
   display: flex;
+  flex-wrap: wrap;
   gap: 16px;
   align-items: center;
+  justify-content: flex-end;
+  max-width: 100%;
+  min-width: 0;
 }
 
 .rooming-house-detail-page .stat-item {
   display: flex;
-  flex-direction: row;
   align-items: center;
-  padding: 10px 16px;
-  border-radius: 10px;
-  background: #ffffff;
-  border: 1px solid #cbd5e1;
-  min-width: 140px;
-  gap: 12px;
-  text-align: left;
+  gap: 6px;
+  padding: 6px 10px;
+  border-radius: 6px;
+  border: 1px solid transparent;
+  font-size: 12px;
+  font-weight: 500;
 }
 
 .rooming-house-detail-page .stat-item svg {
-  width: 20px;
-  height: 20px;
-  flex-shrink: 0;
+  width: 14px;
+  height: 14px;
 }
 
-.rooming-house-detail-page .stat-info {
-  display: flex;
-  flex-direction: column;
-  gap: 2px;
-}
-
-.rooming-house-detail-page .stat-label {
-  font-size: 12.5px;
-  font-weight: 500;
-  color: #64748b;
+.rooming-house-detail-page .stat-item span {
+  color: inherit;
+  font-size: 12px;
+  font-weight: 600;
   white-space: nowrap;
 }
 
-.rooming-house-detail-page .stat-number {
-  font-size: 18px;
+.rooming-house-detail-page .stat-badge {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 18px;
+  height: 18px;
+  padding: 0 4px;
+  border-radius: 999px;
+  font-size: 10px;
   font-weight: 700;
-  color: #0f172a;
+  margin-left: 6px;
 }
 
 /* Total Stat Item */
-.rooming-house-detail-page .stat-item--total svg {
-  color: #475569;
+.rooming-house-detail-page .stat-item--total {
+  background: #f3f4f6;
+  border-color: #e5e7eb;
+  color: #4b5563;
 }
-.rooming-house-detail-page .stat-item--total .stat-label {
-  color: #64748b;
-}
-.rooming-house-detail-page .stat-item--total .stat-number {
-  color: #0f172a;
+.rooming-house-detail-page .stat-item--total .stat-badge {
+  background: #cbd5e1;
+  color: #1f2937;
 }
 
 /* Available Rooms */
-.rooming-house-detail-page .stat-item--approved svg {
-  color: #16a34a;
+.rooming-house-detail-page .stat-item--approved {
+  background: #f0fdf4;
+  border-color: #bbf7d0;
+  color: #166534;
 }
-.rooming-house-detail-page .stat-item--approved .stat-label {
-  color: #16a34a;
-}
-.rooming-house-detail-page .stat-item--approved .stat-number {
-  color: #16a34a;
+.rooming-house-detail-page .stat-item--approved .stat-badge {
+  background: #86efac;
+  color: #14532d;
 }
 
 /* Occupied Rooms */
-.rooming-house-detail-page .stat-item--pending svg {
-  color: #2563eb;
+.rooming-house-detail-page .stat-item--pending {
+  background: #fef9c3;
+  border-color: #fef08a;
+  color: #854d0e;
 }
-.rooming-house-detail-page .stat-item--pending .stat-label {
-  color: #2563eb;
-}
-.rooming-house-detail-page .stat-item--pending .stat-number {
-  color: #2563eb;
+.rooming-house-detail-page .stat-item--pending .stat-badge {
+  background: #fde047;
+  color: #713f12;
 }
 
 /* Hidden Rooms */
-.rooming-house-detail-page .stat-item--rejected svg {
-  color: #dc2626;
+.rooming-house-detail-page .stat-item--rejected {
+  background: #fee2e2;
+  border-color: #fecaca;
+  color: #991b1b;
 }
-.rooming-house-detail-page .stat-item--rejected .stat-label {
-  color: #dc2626;
-}
-.rooming-house-detail-page .stat-item--rejected .stat-number {
-  color: #dc2626;
+.rooming-house-detail-page .stat-item--rejected .stat-badge {
+  background: #fca5a5;
+  color: #7f1d1d;
 }
 
 /* ─── Navigation and Action Buttons ─── */
@@ -345,7 +349,10 @@
 .rooming-house-detail-page .overview-actions {
   display: flex;
   justify-content: flex-end;
+  flex-wrap: wrap;
   gap: 12px;
+  max-width: 100%;
+  min-width: 0;
 }
 
 .rooming-house-detail-page .secondary-action {
@@ -1834,4 +1841,20 @@
 .room-detail-sub-tabs button:disabled {
   opacity: 0.5;
   cursor: not-allowed;
+}
+
+/* Adjust header and subtab card to stick with tabs */
+.rooming-house-detail-page .overview-band {
+  margin-bottom: 0 !important;
+  border-bottom-left-radius: 0 !important;
+  border-bottom-right-radius: 0 !important;
+}
+.subtab-card {
+  border-top-left-radius: 0 !important;
+  border-top-right-radius: 0 !important;
+}
+
+.editor-panel {
+  border-top-left-radius: 0 !important;
+  border-top-right-radius: 0 !important;
 }

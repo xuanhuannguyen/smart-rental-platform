@@ -188,6 +188,7 @@ export interface InvoiceItem {
   serviceTypeId?: string | null;
   serviceName?: string | null;
   meterReadingId?: string | null;
+  meterReadingProofImageUrl?: string | null;
   itemType: string;
   description: string;
   quantity: number;

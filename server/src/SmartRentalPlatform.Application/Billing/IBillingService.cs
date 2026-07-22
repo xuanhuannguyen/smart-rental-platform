@@ -1,11 +1,19 @@
 using SmartRentalPlatform.Contracts.Billing.Requests;
 using SmartRentalPlatform.Contracts.Billing.Responses;
+using SmartRentalPlatform.Contracts.Common;
 
 namespace SmartRentalPlatform.Application.Billing;
 
 public interface IBillingService
 {
     Task<List<BillingServiceTypeResponse>> GetBillingServiceTypesAsync(CancellationToken cancellationToken = default);
+
+    // Admin CRUD cho BillingServiceType
+    Task<PagedResult<AdminBillingServiceTypeResponse>> GetBillingServiceTypesAdminAsync(int page, int pageSize, string? keyword, CancellationToken cancellationToken = default);
+    Task<AdminBillingServiceTypeResponse> GetBillingServiceTypeAdminAsync(Guid id, CancellationToken cancellationToken = default);
+    Task<AdminBillingServiceTypeResponse> CreateBillingServiceTypeAsync(CreateBillingServiceTypeRequest request, CancellationToken cancellationToken = default);
+    Task<AdminBillingServiceTypeResponse> UpdateBillingServiceTypeAsync(Guid id, UpdateBillingServiceTypeRequest request, CancellationToken cancellationToken = default);
+    Task ToggleBillingServiceTypeActiveAsync(Guid id, CancellationToken cancellationToken = default);
 
     Task<RoomBillingContextResponse> GetRoomBillingContextAsync(Guid landlordUserId, Guid roomId, CancellationToken cancellationToken = default);
 

@@ -5,6 +5,7 @@ import { getApiErrorMessage } from '../../../shared/api/apiError';
 import { landlordApi } from '../services/landlordApi';
 import type { LandlordDashboardData } from '../types/landlord.types';
 import './LandlordDashboardPage.css';
+import { PageHeader } from '../../../shared/components/ui/PageHeader';
 
 const money = new Intl.NumberFormat('vi-VN', { style: 'currency', currency: 'VND', maximumFractionDigits: 0 });
 

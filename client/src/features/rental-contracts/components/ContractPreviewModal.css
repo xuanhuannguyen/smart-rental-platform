@@ -1,9 +1,6 @@
 .contract-preview-modal-overlay {
   position: fixed;
-  top: 0;
-  left: 0;
-  width: 100vw;
-  height: 100vh;
+  inset: 0;
   background-color: rgba(0, 0, 0, 0.6);
   display: flex;
   justify-content: center;
@@ -84,14 +81,6 @@
   display: flex;
   flex-direction: column;
   align-items: center;
-}
-
-.loading-preview {
-  display: flex;
-  justify-content: center;
-  align-items: center;
-  height: 100%;
-  color: #64748b;
 }
 
 .agreement-section {

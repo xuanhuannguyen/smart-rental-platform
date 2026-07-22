@@ -1,0 +1,31 @@
+using SmartRentalPlatform.Contracts.RentalContracts.Requests;
+using SmartRentalPlatform.Domain.Entities.RentalContracts;
+using SmartRentalPlatform.Domain.Enums.RentalContracts;
+
+namespace SmartRentalPlatform.Application.RentalContracts;
+
+internal static class RentalContractSignatureFactory
+{
+    public static ContractSignature Create(
+        Guid contractId,
+        Guid signerUserId,
+        ContractSignerRole signerRole,
+        SignContractRequest request,
+        string? ipAddress,
+        string? userAgent,
+        DateTimeOffset now)
+    {
+        return new ContractSignature
+        {
+            Id = Guid.NewGuid(),
+            RentalContractId = contractId,
+            SignerUserId = signerUserId,
+            SignerRole = signerRole,
+            SignatureMethod = ContractSignatureMethod.EmailOtp,
+            IpAddress = RentalContractTextHelper.NormalizeOptionalText(ipAddress),
+            UserAgent = RentalContractTextHelper.NormalizeOptionalText(userAgent),
+            SignedAt = now,
+            CreatedAt = now
+        };
+    }
+}

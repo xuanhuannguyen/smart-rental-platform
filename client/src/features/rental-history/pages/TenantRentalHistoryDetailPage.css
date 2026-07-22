@@ -89,6 +89,19 @@
   min-height: 200px;
 }
 
+.history-detail-secondary-section {
+  margin-top: 20px;
+}
+
+.history-detail-section-heading {
+  margin-bottom: 16px;
+}
+
+.history-detail-section-heading h2,
+.history-detail-section-heading p {
+  margin-top: 0;
+}
+
 /* Occupants Tab */
 .occupants-filter {
   display: flex;
@@ -324,23 +337,10 @@
   color: #ffffff;
 }
 
-.invoice-inline-message {
-  border-radius: 12px;
-  padding: 12px 16px;
-  font-weight: 600;
-  font-size: 13.5px;
-}
-
 .invoice-inline-message.success {
   background: #ecfdf5;
   color: #047857;
   border: 1px solid #a7f3d0;
-}
-
-.invoice-inline-message.error {
-  background: #fef2f2;
-  color: #b91c1c;
-  border: 1px solid #fecaca;
 }
 
 .contract-invoice-list {
@@ -369,6 +369,17 @@
 .contract-invoice-card.muted {
   opacity: 0.65;
   background: #f8fafc;
+}
+
+.contract-invoice-entry {
+  display: flex;
+  flex-direction: column;
+}
+
+.contract-invoice-entry.expanded .contract-invoice-card {
+  border-bottom-left-radius: 0;
+  border-bottom-right-radius: 0;
+  border-color: #bfdbfe;
 }
 
 .contract-invoice-title {
@@ -412,6 +423,148 @@
   font-size: 12.5px;
   font-weight: 700;
   border-radius: 8px;
+}
+
+.contract-invoice-toggle {
+  width: 32px;
+  min-width: 32px;
+  height: 32px;
+  padding: 0 !important;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border: 1px solid #cbd5e1;
+  border-radius: 8px;
+  background: #ffffff;
+  color: #2563eb;
+  font-size: 20px !important;
+  line-height: 1;
+  font-weight: 800 !important;
+  cursor: pointer;
+  transition: border-color 0.18s ease, background 0.18s ease, color 0.18s ease, box-shadow 0.18s ease;
+}
+
+.contract-invoice-toggle:hover {
+  border-color: #2563eb;
+  background: #eff6ff;
+  box-shadow: 0 6px 14px rgba(37, 99, 235, 0.12);
+}
+
+.contract-invoice-toggle[aria-expanded='true'] {
+  border-color: #2563eb;
+  background: #2563eb;
+  color: #ffffff;
+}
+
+.contract-invoice-detail-panel {
+  display: grid;
+  gap: 14px;
+  padding: 16px 20px 18px;
+  border: 1px solid #bfdbfe;
+  border-top: 0;
+  border-bottom-left-radius: 12px;
+  border-bottom-right-radius: 12px;
+  background: #f8fafc;
+}
+
+.contract-invoice-breakdown {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 12px;
+}
+
+.contract-invoice-breakdown > div {
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  border: 1px solid #e2e8f0;
+  border-radius: 8px;
+  padding: 12px 14px;
+  background: #ffffff;
+}
+
+.contract-invoice-breakdown span {
+  color: #64748b;
+  font-size: 12px;
+  font-weight: 800;
+  text-transform: uppercase;
+}
+
+.contract-invoice-breakdown strong {
+  color: #0f172a;
+  font-size: 15px;
+  font-weight: 850;
+  overflow-wrap: anywhere;
+}
+
+.contract-invoice-breakdown .total {
+  border-color: #bfdbfe;
+  background: #eff6ff;
+}
+
+.contract-invoice-breakdown .total strong {
+  color: #1d4ed8;
+}
+
+.contract-invoice-detail-table {
+  overflow: hidden;
+  border: 1px solid #e2e8f0;
+  border-radius: 8px;
+  background: #ffffff;
+}
+
+.contract-invoice-detail-table .detail-table-header,
+.contract-invoice-detail-table .detail-table-row {
+  display: grid;
+  grid-template-columns: minmax(96px, 0.9fr) minmax(180px, 2fr) minmax(80px, 0.7fr) minmax(110px, 0.9fr) minmax(120px, 1fr);
+  gap: 12px;
+  align-items: center;
+}
+
+.contract-invoice-detail-table .detail-table-header {
+  padding: 12px 14px;
+  background: #eff6ff;
+  color: #1e40af;
+  font-size: 12px;
+  font-weight: 850;
+  text-transform: uppercase;
+}
+
+.contract-invoice-detail-table .detail-table-row {
+  padding: 12px 14px;
+  border-top: 1px solid #e2e8f0;
+  color: #475569;
+  font-size: 13px;
+}
+
+.contract-invoice-detail-table .detail-table-row span,
+.contract-invoice-detail-table .detail-table-row strong {
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
+.contract-invoice-detail-table .detail-table-row strong {
+  color: #0f172a;
+  font-weight: 850;
+}
+
+.contract-invoice-empty-detail,
+.contract-invoice-readonly-note {
+  margin: 0;
+  border-radius: 8px;
+  padding: 12px 14px;
+  color: #64748b;
+  background: #ffffff;
+  border: 1px dashed #cbd5e1;
+  font-size: 13px;
+}
+
+.contract-invoice-readonly-note {
+  border-style: solid;
+  border-color: #bfdbfe;
+  color: #1e40af;
+  background: #eff6ff;
 }
 
 /* Appendices Tab */
@@ -492,6 +645,39 @@
     border-top: 1px dashed #f1f5f9;
     padding-top: 10px;
   }
+
+  .contract-invoice-detail-panel {
+    padding: 14px;
+  }
+
+  .contract-invoice-breakdown {
+    grid-template-columns: 1fr;
+  }
+
+  .contract-invoice-detail-table .detail-table-header {
+    display: none;
+  }
+
+  .contract-invoice-detail-table .detail-table-row {
+    grid-template-columns: 1fr;
+    gap: 8px;
+    padding: 14px;
+  }
+
+  .contract-invoice-detail-table .detail-table-row span,
+  .contract-invoice-detail-table .detail-table-row strong {
+    display: flex;
+    justify-content: space-between;
+    gap: 12px;
+  }
+
+  .contract-invoice-detail-table .detail-table-row span::before,
+  .contract-invoice-detail-table .detail-table-row strong::before {
+    content: attr(data-label);
+    flex-shrink: 0;
+    color: #64748b;
+    font-weight: 800;
+  }
   
   .appendix-item {
     flex-direction: column;
@@ -505,4 +691,11 @@
     padding-top: 10px;
     width: 100%;
   }
+}
+
+/* Adjust header to stick with attached-top tabs */
+.contract-header-wrapper .invoice-overview-band {
+  margin-bottom: 0 !important;
+  border-bottom-left-radius: 0 !important;
+  border-bottom-right-radius: 0 !important;
 }

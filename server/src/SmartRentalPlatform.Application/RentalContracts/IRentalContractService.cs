@@ -45,21 +45,7 @@ public interface IRentalContractService
         UpdateContractTermsRequest request,
         CancellationToken cancellationToken = default);
 
-    Task<ContractDetailResponse?> LandlordSignAsync(
-        Guid landlordUserId,
-        Guid contractId,
-        SignContractRequest request,
-        string? ipAddress,
-        string? userAgent,
-        CancellationToken cancellationToken = default);
 
-    Task<ContractDetailResponse?> TenantSignAsync(
-        Guid tenantUserId,
-        Guid contractId,
-        SignContractRequest request,
-        string? ipAddress,
-        string? userAgent,
-        CancellationToken cancellationToken = default);
 
     Task<ContractDetailResponse?> RequestRevisionAsync(
         Guid userId,

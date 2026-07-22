@@ -8,6 +8,7 @@ using SmartRentalPlatform.Domain.Entities.Rental;
 using SmartRentalPlatform.Domain.Entities.Users;
 using SmartRentalPlatform.Domain.Entities.Payments;
 using SmartRentalPlatform.Domain.Entities.Billing;
+using SmartRentalPlatform.Domain.Entities.Chat;
 
 
 namespace SmartRentalPlatform.Application.Common.Interfaces;
@@ -41,6 +42,12 @@ public interface IAppDbContext {
 
     DbSet<PropertyImage> PropertyImages { get; }
 
+    DbSet<FavoriteRoomingHouse> FavoriteRoomingHouses { get; }
+
+    DbSet<RoomingHouseReview> RoomingHouseReviews { get; }
+
+    DbSet<ReviewReport> ReviewReports { get; }
+
     DbSet<RoomingHouseLegalDocument> RoomingHouseLegalDocuments { get; }
 
     DbSet<RoomingHouseAmenity> RoomingHouseAmenities { get; }
@@ -72,6 +79,8 @@ public interface IAppDbContext {
     DbSet<ContractFile> ContractFiles { get; }
 
     DbSet<ContractSignature> ContractSignatures { get; }
+    DbSet<ContractSigningEnvelope> ContractSigningEnvelopes { get; }
+    DbSet<ESignWebhookLog> ESignWebhookLogs { get; }
 
     DbSet<WalletAccount> WalletAccounts { get; }
 
@@ -80,6 +89,8 @@ public interface IAppDbContext {
     DbSet<PaymentTransaction> PaymentTransactions { get; }
 
     DbSet<PaymentWebhookLog> PaymentWebhookLogs { get; }
+    DbSet<SmartRentalPlatform.Domain.Entities.Payments.WithdrawalRequest> WithdrawalRequests { get; }
+    DbSet<SmartRentalPlatform.Domain.Entities.Payments.WithdrawalWebhookLog> WithdrawalWebhookLogs { get; }
 
     DbSet<BillingServiceType> BillingServiceTypes { get; }
 
@@ -91,6 +102,14 @@ public interface IAppDbContext {
 
     DbSet<InvoiceItem> InvoiceItems { get; }
 
+    DbSet<Conversation> Conversations { get; }
+
+    DbSet<ConversationParticipant> ConversationParticipants { get; }
+
+    DbSet<ChatMessage> ChatMessages { get; }
+
+    DbSet<ConversationJoinRequest> ConversationJoinRequests { get; }
+
 
 
 
@@ -101,4 +120,6 @@ public interface IAppDbContext {
     Task<IAppDbContextTransaction> BeginTransactionAsync(CancellationToken cancellationToken = default);
 
     Task<int> SaveChangesAsync(CancellationToken cancellationToken = default);
+
+    bool HasActiveTransaction { get; }
 }

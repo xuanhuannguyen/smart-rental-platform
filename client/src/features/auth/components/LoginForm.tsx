@@ -53,7 +53,7 @@ export function LoginForm({ isSubmitting, onSubmit }: LoginFormProps) {
     }
 
     return (
-        <form className="auth-form" onSubmit={handleSubmit}>
+        <form className="auth-form" onSubmit={handleSubmit} noValidate>
             <FormField label="Email" htmlFor="login-email" error={errors.email}>
                 <Input
                     id="login-email"

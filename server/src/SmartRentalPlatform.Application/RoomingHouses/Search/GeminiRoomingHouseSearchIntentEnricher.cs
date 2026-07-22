@@ -33,7 +33,7 @@ public sealed class GeminiRoomingHouseSearchIntentEnricher : IRoomingHouseSearch
     {
         if (!options.Enabled ||
             !options.UseAiSearchFallback ||
-            string.IsNullOrWhiteSpace(options.ApiKey) ||
+            !options.HasCredential() ||
             string.IsNullOrWhiteSpace(searchContext.Request.Q))
         {
             return;

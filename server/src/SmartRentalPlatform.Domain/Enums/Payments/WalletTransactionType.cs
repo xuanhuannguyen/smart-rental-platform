@@ -10,5 +10,8 @@ public enum WalletTransactionType
     DepositRefundDebit,
     DepositRefundCredit,
     DepositForfeitRelease,
-    ManualAdjustment
+    ManualAdjustment,
+    WalletWithdrawalReserved,
+    WalletWithdrawalSucceeded,
+    WalletWithdrawalRefund
 }

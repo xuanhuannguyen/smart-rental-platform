@@ -10,4 +10,8 @@ public enum NotificationType
     NewRentalRequest,
     RentalRequestApproved,
     RentalRequestRejected,
+    NewChatMessage,
+    RoomingHouseReviewNeedsAdminReview,
+    RoomingHouseReviewRejected,
+    RoomingHouseReviewReplied,
 }

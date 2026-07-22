@@ -2,7 +2,7 @@
   bottom: 20px;
   pointer-events: none;
   position: fixed;
-  right: 20px;
+  right: 118px;
   z-index: 999; /* Ensure it stays on top of most components but doesn't break select dropdowns */
 }
 
@@ -79,7 +79,7 @@
   height: min(520px, calc(100vh - 140px)); /* Reduced height to keep it compact and out of top navigation's way */
   margin-bottom: 12px;
   overflow: hidden;
-  width: min(370px, calc(100vw - 32px)); /* Reduced width to make it compact and elegant */
+  width: min(370px, calc(100dvw - 32px)); /* Reduced width to make it compact and elegant */
   animation: panel-entrance 0.35s cubic-bezier(0.16, 1, 0.3, 1) forwards;
 }
 
@@ -429,26 +429,13 @@
   display: flex;
   gap: 6px;
   overflow-x: auto;
-  padding: 8px 12px 10px 12px; /* Adjusted padding to allocate room for the scrollbar */
-  scrollbar-width: thin; /* Thin scrollbar for Firefox */
-  scrollbar-color: rgba(36, 107, 254, 0.25) transparent;
+  padding: 8px 12px;
+  -ms-overflow-style: none;  /* IE and Edge */
+  scrollbar-width: none;  /* Firefox */
 }
 
 .rental-ai-chatbot__quick::-webkit-scrollbar {
-  height: 4px; /* Thin horizontal scrollbar height */
-}
-
-.rental-ai-chatbot__quick::-webkit-scrollbar-track {
-  background: transparent;
-}
-
-.rental-ai-chatbot__quick::-webkit-scrollbar-thumb {
-  background: rgba(36, 107, 254, 0.25);
-  border-radius: 999px;
-}
-
-.rental-ai-chatbot__quick::-webkit-scrollbar-thumb:hover {
-  background: rgba(36, 107, 254, 0.45);
+  display: none; /* Chrome, Safari and Opera */
 }
 
 .rental-ai-chatbot__quick-pill {
@@ -647,7 +634,7 @@
   .rental-ai-chatbot__panel {
     height: min(480px, calc(100vh - 96px)); /* Slightly shorter on mobile */
     border-radius: 16px;
-    width: min(350px, calc(100vw - 32px));
+    width: min(350px, calc(100dvw - 32px));
   }
 
   .rental-ai-chatbot__launcher strong {

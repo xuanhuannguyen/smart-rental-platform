@@ -10,7 +10,7 @@ public class ContractFileResponse
 
     public string StorageObjectKey { get; set; } = string.Empty;
 
-    public string FileVariant { get; set; } = string.Empty;
+    public string Purpose { get; set; } = string.Empty;
 
     public string? FileUrl { get; set; }
 

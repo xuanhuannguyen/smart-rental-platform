@@ -25,4 +25,8 @@ public class RoomingHouseResponse
     public int TotalRooms { get; set; }
 
     public int AvailableRooms { get; set; }
+
+    public double AverageRating { get; set; }
+
+    public int TotalReviews { get; set; }
 }

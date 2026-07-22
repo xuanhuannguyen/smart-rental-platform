@@ -74,27 +74,25 @@ public class EmailSender : IEmailSender
         string email,
         string displayName,
         string contractNumber,
-        string signerRole,
+        string role,
         string otp,
         CancellationToken cancellationToken = default)
     {
-        var subject = "Mã OTP ký hợp đồng Smart Rental Platform";
+        var subject = $"Mã OTP ký hợp đồng {contractNumber} - Smart Rental Platform";
         var textBody = $"""
             Xin chao {displayName},
 
-            Mã OTP ký hợp đồng {contractNumber} của bạn là: {otp}
+            Mã OTP ký hợp đồng (Vai trò: {role}) của bạn cho hợp đồng số {contractNumber} là: {otp}
 
-            Vai tro ky: {signerRole}
-
-            Nếu bạn không thực hiện yêu cầu ký hợp đồng này, vui lòng bỏ qua email.
+            Mã này chỉ có hiệu lực trong thời gian ngắn. Nếu bạn không thực hiện yêu cầu này, vui lòng bỏ qua email.
 
             Smart Rental Platform
             """;
         var htmlBody = BuildOtpHtml(
             displayName,
             otp,
-            "Ký hợp đồng",
-            $"Dùng mã OTP bên dưới để xác nhận ký hợp đồng {contractNumber} với vai trò {signerRole}.");
+            "Ký hợp đồng điện tử",
+            $"Dùng mã OTP bên dưới để xác nhận ký hợp đồng số {contractNumber} với vai trò {role}.");
 
         return SendAsync(email, displayName, subject, textBody, htmlBody, cancellationToken);
     }

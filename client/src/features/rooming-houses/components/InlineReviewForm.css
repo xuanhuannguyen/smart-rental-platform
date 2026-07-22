@@ -1,0 +1,203 @@
+.inline-review-form {
+  display: flex;
+  gap: 16px;
+  align-items: flex-start;
+  margin-bottom: 24px;
+}
+
+.inline-review-form.disabled .inline-review-form-avatar {
+  opacity: 0.6;
+}
+
+.inline-review-form-avatar {
+  flex-shrink: 0;
+  width: 40px;
+  height: 40px;
+  border-radius: 50%;
+  overflow: hidden;
+  background-color: #f1f5f9;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.inline-review-form-avatar img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.avatar-placeholder {
+  font-size: 1.2rem;
+  font-weight: bold;
+  color: #64748b;
+}
+
+.inline-review-form-body {
+  flex-grow: 1;
+  display: flex;
+  flex-direction: column;
+}
+
+.inline-star-rating {
+  display: flex;
+  gap: 4px;
+  margin-bottom: 8px;
+}
+
+.inline-star-rating button {
+  background: none;
+  border: none;
+  font-size: 1.5rem;
+  color: #cbd5e1;
+  cursor: pointer;
+  padding: 0;
+  line-height: 1;
+  transition: color 0.2s;
+}
+
+.inline-star-rating button:hover:not(:disabled),
+.inline-star-rating button.active {
+  color: #f59e0b;
+}
+
+.inline-star-rating button:disabled {
+  cursor: not-allowed;
+}
+
+.inline-textarea-container {
+  border-bottom: 1px solid #cbd5e1;
+  transition: border-color 0.2s;
+}
+
+.inline-textarea-container:focus-within {
+  border-bottom-color: #2563eb;
+  border-bottom-width: 2px;
+}
+
+.inline-review-textarea {
+  width: 100%;
+  border: none;
+  background: transparent;
+  resize: none;
+  font-size: 0.95rem;
+  line-height: 1.5;
+  padding: 8px 0;
+  outline: none;
+  color: #334155;
+}
+
+.mode-edit .inline-review-textarea {
+  min-height: 80px;
+  padding: 0.75rem;
+  border: 1px solid #cbd5e1;
+  border-radius: 6px;
+  resize: vertical;
+  background: #fff;
+}
+
+.mode-edit .inline-textarea-container {
+  border-bottom: none;
+}
+
+.mode-edit .inline-textarea-container:focus-within {
+  border-bottom-width: 0;
+}
+
+.mode-edit .inline-review-textarea:focus {
+  border-color: #2563eb;
+  outline: 1px solid #2563eb;
+}
+
+.inline-review-textarea:disabled {
+  color: #94a3b8;
+  cursor: not-allowed;
+}
+
+.inline-form-actions {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-top: 12px;
+}
+
+.inline-form-tools .tool-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 7px;
+  padding: 8px;
+  background: #f1f5f9;
+  border-radius: 999px;
+  border: none;
+  cursor: pointer;
+  transition: background 0.2s;
+  color: #2563eb;
+  font-size: 13px;
+  font-weight: 700;
+}
+
+.inline-form-tools .tool-btn svg {
+  width: 18px;
+  height: 18px;
+  flex-shrink: 0;
+}
+
+.inline-form-tools .tool-btn:hover {
+  background: #e2e8f0;
+}
+
+.inline-form-buttons {
+  display: flex;
+  gap: 8px;
+}
+
+.inline-image-preview-grid {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 12px;
+}
+
+.image-preview-item {
+  position: relative;
+  width: 80px;
+  height: 80px;
+  border-radius: 8px;
+  overflow: hidden;
+  border: 1px solid #e2e8f0;
+}
+
+.image-preview-item img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.image-remove-btn {
+  position: absolute;
+  top: 4px;
+  right: 4px;
+  width: 20px;
+  height: 20px;
+  border-radius: 50%;
+  background: rgba(0, 0, 0, 0.6);
+  color: white;
+  border: none;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  font-size: 14px;
+  line-height: 1;
+}
+
+.image-remove-btn:hover {
+  background: rgba(0, 0, 0, 0.8);
+}
+
+.inline-error-message {
+  color: #ef4444;
+  font-size: 0.875rem;
+  margin-top: 8px;
+}

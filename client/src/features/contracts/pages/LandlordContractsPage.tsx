@@ -4,9 +4,76 @@ import { ROUTE_PATHS } from '../../../app/router/routePaths';
 import { contractApi } from '../api';
 import type { ContractHistoryItemResponse } from '../types';
 import { getApiErrorMessage } from '../../../shared/api/apiError';
+import { Tabs } from '../../../shared/components/ui/Tabs';
+import { PageHeader } from '../../../shared/components/ui/PageHeader';
+import { Card, CardMetaRow, type CardStatusTone } from '../../../shared/components/ui/Card';
 import { formatDateVi, formatMoneyString } from '../../../shared/utils/format';
-import { formatStatus, getStatusToneClass } from '../../../shared/utils/status';
+import { formatStatus } from '../../../shared/utils/status';
 import '../../landlord/pages/LandlordDashboardPage.css';
+import './LandlordContractsPage.css';
+
+function getContractStatusTabIcon(status: string) {
+  const props = {
+    width: 15,
+    height: 15,
+    viewBox: '0 0 24 24',
+    fill: 'none',
+    stroke: 'currentColor',
+    strokeWidth: 2.2,
+    strokeLinecap: 'round' as const,
+    strokeLinejoin: 'round' as const,
+  };
+
+  switch (status) {
+    case 'Active':
+      return (
+        <svg {...props}>
+          <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z" />
+          <path d="m9 12 2 2 4-4" />
+        </svg>
+      );
+    case 'Expired':
+      return (
+        <svg {...props}>
+          <rect x="3" y="4" width="18" height="18" rx="2" ry="2" />
+          <line x1="16" y1="2" x2="16" y2="6" />
+          <line x1="8" y1="2" x2="8" y2="6" />
+          <line x1="3" y1="10" x2="21" y2="10" />
+        </svg>
+      );
+    case 'Cancelled':
+      return (
+        <svg {...props}>
+          <circle cx="12" cy="12" r="10" />
+          <line x1="4.93" y1="4.93" x2="19.07" y2="19.07" />
+        </svg>
+      );
+    default:
+      return (
+        <svg {...props}>
+          <line x1="8" y1="6" x2="21" y2="6" />
+          <line x1="8" y1="12" x2="21" y2="12" />
+          <line x1="8" y1="18" x2="21" y2="18" />
+          <line x1="3" y1="6" x2="3.01" y2="6" />
+          <line x1="3" y1="12" x2="3.01" y2="12" />
+          <line x1="3" y1="18" x2="3.01" y2="18" />
+        </svg>
+      );
+  }
+}
+
+function getContractStatusTone(status: string): CardStatusTone {
+  switch (status) {
+    case 'Active':
+      return 'success';
+    case 'Cancelled':
+      return 'danger';
+    case 'Expired':
+      return 'neutral';
+    default:
+      return 'neutral';
+  }
+}
 
 export default function LandlordContractsPage() {
   const navigate = useNavigate();
@@ -15,7 +82,6 @@ export default function LandlordContractsPage() {
   const [contracts, setContracts] = useState<ContractHistoryItemResponse[]>([]);
   const [loading, setLoading] = useState(true);
   const [message, setMessage] = useState('');
-
   const [selectedHouseId, setSelectedHouseId] = useState<string>('');
   const [selectedRoomId, setSelectedRoomId] = useState<string>('');
   const [selectedStatus, setSelectedStatus] = useState<string>(
@@ -43,11 +109,10 @@ export default function LandlordContractsPage() {
     void loadData();
   }, []);
 
-  // Compute filters from data
   const houses = useMemo(() => {
     const map = new Map<string, string>();
-    contracts.forEach(c => {
-      map.set(c.roomingHouseId, c.roomingHouseName);
+    contracts.forEach((contract) => {
+      map.set(contract.roomingHouseId, contract.roomingHouseName);
     });
     return Array.from(map.entries()).map(([id, name]) => ({ id, name }));
   }, [contracts]);
@@ -56,14 +121,13 @@ export default function LandlordContractsPage() {
     if (!selectedHouseId) return [];
     const map = new Map<string, string>();
     contracts
-      .filter(c => c.roomingHouseId === selectedHouseId)
-      .forEach(c => {
-        map.set(c.roomId, c.roomNumber);
+      .filter((contract) => contract.roomingHouseId === selectedHouseId)
+      .forEach((contract) => {
+        map.set(contract.roomId, contract.roomNumber);
       });
     return Array.from(map.entries()).map(([id, name]) => ({ id, name }));
   }, [contracts, selectedHouseId]);
 
-  // Reset room selection when house changes
   useEffect(() => {
     setSelectedRoomId('');
   }, [selectedHouseId]);
@@ -73,21 +137,11 @@ export default function LandlordContractsPage() {
   }, [location.search]);
 
   const filteredContracts = useMemo(() => {
-    const today = new Date();
-    today.setHours(0, 0, 0, 0);
-    const expiringDate = new Date(today);
-    expiringDate.setDate(expiringDate.getDate() + 30);
-
-    return contracts.filter(c => {
-      // Chỉ hiển thị các trạng thái từ active trở đi
-      if (!['Active', 'Expired', 'Cancelled'].includes(c.status)) return false;
-
-      if (selectedStatus === 'Expiring') {
-        const endDate = new Date(`${c.endDate}T00:00:00`);
-        if (c.status !== 'Active' || endDate < today || endDate > expiringDate) return false;
-      } else if (selectedStatus !== 'all' && c.status !== selectedStatus) return false;
-      if (selectedHouseId && c.roomingHouseId !== selectedHouseId) return false;
-      if (selectedRoomId && c.roomId !== selectedRoomId) return false;
+    return contracts.filter((contract) => {
+      if (!['Active', 'Expired', 'Cancelled'].includes(contract.status)) return false;
+      if (selectedStatus !== 'all' && contract.status !== selectedStatus) return false;
+      if (selectedHouseId && contract.roomingHouseId !== selectedHouseId) return false;
+      if (selectedRoomId && contract.roomId !== selectedRoomId) return false;
       return true;
     });
   }, [contracts, selectedStatus, selectedHouseId, selectedRoomId]);
@@ -105,142 +159,146 @@ export default function LandlordContractsPage() {
   return (
     <div className="landlord-dashboard-page" style={{ display: 'contents' }}>
       <main className="dashboard-main">
-        <section className="overview-band">
-          <div className="overview-left">
-            <p className="eyebrow">Quản lý</p>
-            <h2>Hợp đồng cho thuê</h2>
-            <p className="overview-description">Xem danh sách các hợp đồng đang có hiệu lực, đã hết hạn hoặc đã hủy.</p>
-          </div>
-
-          <div className="overview-right" style={{ flexDirection: 'column', alignItems: 'flex-end', gap: '0.5rem' }}>
-             <div className="filter-group" style={{ display: 'flex', gap: '1rem', background: '#fff', padding: '0.75rem', borderRadius: '0.5rem', boxShadow: '0 1px 3px rgba(0,0,0,0.1)' }}>
-               <div>
-                 <label style={{ display: 'block', fontSize: '0.85rem', color: '#6b7280', marginBottom: '0.25rem' }}>Khu trọ</label>
-                 <select 
-                   value={selectedHouseId} 
-                   onChange={e => setSelectedHouseId(e.target.value)}
-                   style={{ padding: '0.5rem', borderRadius: '0.25rem', border: '1px solid #d1d5db', outline: 'none' }}
-                 >
-                   <option value="">Tất cả khu trọ</option>
-                   {houses.map(h => (
-                     <option key={h.id} value={h.id}>{h.name}</option>
-                   ))}
-                 </select>
-               </div>
-               <div>
-                 <label style={{ display: 'block', fontSize: '0.85rem', color: '#6b7280', marginBottom: '0.25rem' }}>Phòng</label>
-                 <select 
-                   value={selectedRoomId} 
-                   onChange={e => setSelectedRoomId(e.target.value)}
-                   disabled={!selectedHouseId}
-                   style={{ padding: '0.5rem', borderRadius: '0.25rem', border: '1px solid #d1d5db', outline: 'none', background: !selectedHouseId ? '#f3f4f6' : '#fff' }}
-                 >
-                   <option value="">Tất cả phòng</option>
-                   {roomsForSelectedHouse.map(r => (
-                     <option key={r.id} value={r.id}>{r.name}</option>
-                   ))}
-                 </select>
-               </div>
-             </div>
-          </div>
-        </section>
+        <PageHeader
+          icon={
+            <svg viewBox="0 0 24 24" width="24" height="24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+              <path d="M12 20h9" />
+              <path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4L16.5 3.5z" />
+            </svg>
+          }
+          eyebrow="Quản lý"
+          title="Hợp đồng cho thuê"
+          description="Xem danh sách các hợp đồng đang có hiệu lực, đã hết hạn hoặc đã hủy."
+          rightContent={
+            <div className="overview-right landlord-contract-filters">
+              <div className="landlord-contract-filter-group">
+                <div>
+                  <label className="landlord-contract-filter-label">Khu trọ</label>
+                  <select
+                    value={selectedHouseId}
+                    onChange={(event) => setSelectedHouseId(event.target.value)}
+                    className="landlord-contract-filter-select"
+                  >
+                    <option value="">Tất cả khu trọ</option>
+                    {houses.map((house) => (
+                      <option key={house.id} value={house.id}>{house.name}</option>
+                    ))}
+                  </select>
+                </div>
+                <div>
+                  <label className="landlord-contract-filter-label">Phòng</label>
+                  <select
+                    value={selectedRoomId}
+                    onChange={(event) => setSelectedRoomId(event.target.value)}
+                    disabled={!selectedHouseId}
+                    className="landlord-contract-filter-select"
+                  >
+                    <option value="">Tất cả phòng</option>
+                    {roomsForSelectedHouse.map((room) => (
+                      <option key={room.id} value={room.id}>{room.name}</option>
+                    ))}
+                  </select>
+                </div>
+              </div>
+            </div>
+          }
+        />
 
         {message && <p className="dashboard-message">{message}</p>}
 
-        <div className="tabs" style={{ display: 'flex', alignItems: 'center', margin: '0 0 16px 0', borderBottom: '1px solid #e5e7eb', overflowX: 'auto', gap: '8px' }}>
-          <button 
-            onClick={() => setSelectedStatus('all')} 
-            style={{ padding: '12px 16px', background: 'none', border: 'none', borderBottom: selectedStatus === 'all' ? '2px solid #2563eb' : '2px solid transparent', color: selectedStatus === 'all' ? '#2563eb' : '#6b7280', fontWeight: selectedStatus === 'all' ? 600 : 500, cursor: 'pointer', whiteSpace: 'nowrap', transition: 'all 0.2s' }}
-          >
-            Tất cả
-          </button>
-          <button 
-            onClick={() => setSelectedStatus('Active')} 
-            style={{ padding: '12px 16px', background: 'none', border: 'none', borderBottom: selectedStatus === 'Active' ? '2px solid #2563eb' : '2px solid transparent', color: selectedStatus === 'Active' ? '#2563eb' : '#6b7280', fontWeight: selectedStatus === 'Active' ? 600 : 500, cursor: 'pointer', whiteSpace: 'nowrap', transition: 'all 0.2s' }}
-          >
-            Đang hiệu lực
-          </button>
-          <button
-            onClick={() => setSelectedStatus('Expiring')}
-            style={{ padding: '12px 16px', background: 'none', border: 'none', borderBottom: selectedStatus === 'Expiring' ? '2px solid #2563eb' : '2px solid transparent', color: selectedStatus === 'Expiring' ? '#2563eb' : '#6b7280', fontWeight: selectedStatus === 'Expiring' ? 600 : 500, cursor: 'pointer', whiteSpace: 'nowrap', transition: 'all 0.2s' }}
-          >
-            Sắp hết hạn
-          </button>
-          <button 
-            onClick={() => setSelectedStatus('Expired')} 
-            style={{ padding: '12px 16px', background: 'none', border: 'none', borderBottom: selectedStatus === 'Expired' ? '2px solid #2563eb' : '2px solid transparent', color: selectedStatus === 'Expired' ? '#2563eb' : '#6b7280', fontWeight: selectedStatus === 'Expired' ? 600 : 500, cursor: 'pointer', whiteSpace: 'nowrap', transition: 'all 0.2s' }}
-          >
-            Đã hết hạn
-          </button>
-          <button 
-            onClick={() => setSelectedStatus('Cancelled')} 
-            style={{ padding: '12px 16px', background: 'none', border: 'none', borderBottom: selectedStatus === 'Cancelled' ? '2px solid #2563eb' : '2px solid transparent', color: selectedStatus === 'Cancelled' ? '#2563eb' : '#6b7280', fontWeight: selectedStatus === 'Cancelled' ? 600 : 500, cursor: 'pointer', whiteSpace: 'nowrap', transition: 'all 0.2s' }}
-          >
-            Đã hủy
-          </button>
-        </div>
+        <Tabs
+          className="attached-bottom"
+          variant="segmented-secondary"
+          activeId={selectedStatus}
+          onChange={setSelectedStatus}
+          items={[
+            { id: 'all', label: 'Tất cả', icon: getContractStatusTabIcon('all') },
+            { id: 'Active', label: formatStatus('Active'), icon: getContractStatusTabIcon('Active') },
+            { id: 'Expired', label: formatStatus('Expired'), icon: getContractStatusTabIcon('Expired') },
+            { id: 'Cancelled', label: formatStatus('Cancelled'), icon: getContractStatusTabIcon('Cancelled') },
+          ]}
+        />
 
-        <section className="card-grid">
+        <section className="tab-attached-panel tab-attached-panel--cards">
           {filteredContracts.length === 0 ? (
             <div className="empty-panel">
               <h2>Không tìm thấy hợp đồng</h2>
               <p>Chưa có hợp đồng nào phù hợp với bộ lọc hiện tại.</p>
             </div>
           ) : (
-            filteredContracts.map((contract) => (
-              <div
-                className="dashboard-card"
-                key={contract.id}
-                onClick={() => navigate(ROUTE_PATHS.LANDLORD.CONTRACT_DETAIL(contract.id))}
-                style={{ textAlign: 'left', cursor: 'pointer' }}
-              >
-                <div className="card-body-content" style={{ padding: '1rem', width: '100%', boxSizing: 'border-box' }}>
-                  <div className="card-title-row" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                    <h3 style={{ margin: 0, fontSize: '1.125rem' }}>Phòng {contract.roomNumber}</h3>
-                    <span className={`status-pill ${getStatusToneClass(contract.status)}`}>
-                      {formatStatus(contract.status)}
-                    </span>
-                  </div>
+            <div className="landlord-contract-list">
+              {filteredContracts.map((contract) => (
+                <Card
+                  key={contract.id}
+                  title={`Phòng ${contract.roomNumber} - ${contract.roomingHouseName}`}
+                  status={formatStatus(contract.status)}
+                  statusTone={getContractStatusTone(contract.status)}
+                  bodyColumns={2}
+                  actionItems={[
+                    {
+                      label: 'Xem chi tiết',
+                      onClick: () => navigate(ROUTE_PATHS.LANDLORD.CONTRACT_DETAIL(contract.id)),
+                      icon: (
+                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
+                          <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z" />
+                          <circle cx="12" cy="12" r="3" />
+                        </svg>
+                      ),
+                    },
+                  ]}
+                >
+                  <CardMetaRow
+                    label="Mã HĐ:"
+                    value={contract.contractNumber}
+                    icon={
+                      <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                        <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" />
+                        <polyline points="14 2 14 8 20 8" />
+                      </svg>
+                    }
+                  />
+                  <CardMetaRow
+                    label="Đại diện thuê:"
+                    value={contract.mainTenantName}
+                    icon={
+                      <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                        <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2" />
+                        <circle cx="12" cy="7" r="4" />
+                      </svg>
+                    }
+                  />
+                  <CardMetaRow
+                    label="Tiền thuê/tháng:"
+                    value={`${formatMoneyString(contract.monthlyRent)} đ`}
+                    valueClassName="landlord-contract-price"
+                    icon={
+                      <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                        <line x1="12" y1="1" x2="12" y2="23" />
+                        <path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6" />
+                      </svg>
+                    }
+                  />
+                  <CardMetaRow
+                    label="Kỳ hạn:"
+                    value={`${formatDateVi(contract.startDate)} - ${formatDateVi(contract.endDate)}`}
+                    icon={
+                      <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                        <rect x="3" y="4" width="18" height="18" rx="2" ry="2" />
+                        <line x1="16" y1="2" x2="16" y2="6" />
+                        <line x1="8" y1="2" x2="8" y2="6" />
+                        <line x1="3" y1="10" x2="21" y2="10" />
+                      </svg>
+                    }
+                  />
 
                   {contract.isAwaitingFinalInvoice && (
-                    <div style={{ marginTop: '0.6rem' }}>
-                      <span className="status-pill status-warning">Chờ hóa đơn kỳ cuối</span>
+                    <div className="landlord-contract-notice">
+                      Chờ hóa đơn kỳ cuối
                     </div>
                   )}
-
-                  <div className="card-location" style={{ marginTop: '0.5rem', color: '#6b7280', fontSize: '0.875rem', display: 'flex', alignItems: 'center' }}>
-                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ marginRight: '0.25rem', flexShrink: 0 }}>
-                      <path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"></path>
-                      <polyline points="9 22 9 12 15 12 15 22"></polyline>
-                    </svg>
-                    <span>{contract.roomingHouseName}</span>
-                  </div>
-
-                  <hr className="card-divider" style={{ margin: '1rem 0', borderColor: '#e5e7eb' }} />
-
-                  <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem', fontSize: '0.875rem' }}>
-                    <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-                      <span style={{ color: '#6b7280' }}>Mã HĐ:</span>
-                      <strong>{contract.contractNumber}</strong>
-                    </div>
-                    <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-                      <span style={{ color: '#6b7280' }}>Đại diện thuê:</span>
-                      <strong>{contract.mainTenantName}</strong>
-                    </div>
-                    <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-                      <span style={{ color: '#6b7280' }}>Tiền thuê/tháng:</span>
-                      <strong style={{ color: '#10b981' }}>{formatMoneyString(contract.monthlyRent)} đ</strong>
-                    </div>
-                    <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-                      <span style={{ color: '#6b7280' }}>Kỳ hạn:</span>
-                      <span>
-                        {formatDateVi(contract.startDate)} - {formatDateVi(contract.endDate)}
-                      </span>
-                    </div>
-                  </div>
-                </div>
-              </div>
-            ))
+                </Card>
+              ))}
+            </div>
           )}
         </section>
       </main>

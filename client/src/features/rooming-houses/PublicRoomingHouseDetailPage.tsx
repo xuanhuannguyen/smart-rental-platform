@@ -1,15 +1,20 @@
 import { useEffect, useState } from 'react';
-import { Link, useLocation, useParams } from 'react-router-dom';
+import { Link, useLocation, useNavigate, useParams } from 'react-router-dom';
 import { getPublicRoomingHouseDetail } from './api';
 import TenantMapPreview from './components/TenantMapPreview';
 import HouseImageGallery from './components/HouseImageGallery';
 import RentalAiChatbot from './components/RentalAiChatbot';
+import FavoriteButton from './components/FavoriteButton';
 import type { RoomingHouseDetail } from './types';
 import { toAssetUrl } from '../../shared/api/assets';
 import { getApiErrorMessage } from '../../shared/api/apiError';
 import { HomeHeader } from '../../shared/components/layout/HomeHeader';
 import { ROUTE_PATHS } from '../../app/router/routePaths';
 import { saveRoomingHouseView } from './rentalBehaviorStorage';
+import { useAuth } from '../../app/providers/AuthProvider';
+import { Toast } from '../../shared/components/ui/Toast';
+import { contactLandlord } from '../chat/api';
+import { HouseReviewsList } from './components/HouseReviewsList';
 import './PublicRoomingHouseDetailPage.css';
 
 function formatCurrency(value: number) {
@@ -87,10 +92,65 @@ function getAmenityIcon(name: string) {
 export default function PublicRoomingHouseDetailPage() {
   const { id } = useParams();
   const location = useLocation();
+  const navigate = useNavigate();
+  const { currentUser } = useAuth();
   const [house, setHouse] = useState<RoomingHouseDetail | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
+  const [quickMessageOpen, setQuickMessageOpen] = useState(false);
+  const [quickMessage, setQuickMessage] = useState('');
+  const [quickMessageSending, setQuickMessageSending] = useState(false);
+  const [toast, setToast] = useState<{ message: string; type: 'success' | 'error' | 'info' } | null>(null);
   const fromSearch = getSearchReturnUrl(location.state, new URLSearchParams(location.search));
+
+  const defaultQuickMessage = house
+    ? `Xin chào, tôi muốn hỏi về thông tin khu trọ ${house.name}.`
+    : 'Xin chào, tôi muốn hỏi về thông tin khu trọ này.';
+
+  function handleOpenQuickMessage() {
+    if (!house) return;
+    if (!currentUser) {
+      navigate('/login', { state: { from: location.pathname } });
+      return;
+    }
+    if (currentUser.userId === house.landlordUserId) {
+      setToast({ message: 'Bạn đang xem khu trọ của chính mình.', type: 'info' });
+      return;
+    }
+
+    setQuickMessage(quickMessage.trim() || defaultQuickMessage);
+    setQuickMessageOpen(true);
+  }
+
+  function handleCancelQuickMessage() {
+    setQuickMessageOpen(false);
+    setQuickMessage(defaultQuickMessage);
+  }
+
+  async function handleSendQuickMessage() {
+    if (!house) return;
+    const content = quickMessage.trim();
+    if (!content) {
+      setToast({ message: 'Vui lòng nhập nội dung tin nhắn.', type: 'info' });
+      return;
+    }
+
+    setQuickMessageSending(true);
+    try {
+      const conversation = await contactLandlord(house.id, content);
+      window.dispatchEvent(new CustomEvent('open-chat-bubble', {
+        detail: { conversationId: conversation.id }
+      }));
+      window.dispatchEvent(new CustomEvent('refresh-chat-list'));
+      setQuickMessageOpen(false);
+      setQuickMessage(defaultQuickMessage);
+      setToast({ message: 'Đã gửi tin nhắn cho chủ trọ.', type: 'success' });
+    } catch (chatError) {
+      setToast({ message: getApiErrorMessage(chatError, 'Không thể gửi tin nhắn cho chủ trọ.'), type: 'error' });
+    } finally {
+      setQuickMessageSending(false);
+    }
+  }
 
   useEffect(() => {
     async function loadDetail() {
@@ -149,7 +209,10 @@ export default function PublicRoomingHouseDetailPage() {
 
         <section className="public-house-detail__hero">
           <HouseImageGallery images={houseImages} houseName={house.name} />
-          <div className="hero-details-card">
+          <div className="hero-details-card" style={{ position: 'relative' }}>
+            <div style={{ position: 'absolute', top: '24px', right: '24px', zIndex: 10 }}>
+              <FavoriteButton roomingHouseId={house.id} />
+            </div>
             <div className="house-status-badge">
               <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" strokeWidth="2.5">
                 <path d="m3 9 9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z" />
@@ -157,7 +220,9 @@ export default function PublicRoomingHouseDetailPage() {
               </svg>
               <span>Khu trọ đang còn phòng</span>
             </div>
-            <h1>{house.name}</h1>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: '16px' }}>
+              <h1 style={{ flex: 1, margin: 0, paddingRight: '48px' }}>{house.name}</h1>
+            </div>
             <TenantMapPreview
               address={house.addressDisplay}
               googleMapUrl={house.googleMapUrl}
@@ -166,7 +231,21 @@ export default function PublicRoomingHouseDetailPage() {
               title={house.name}
             />
             {house.description && <p className="public-house-detail__description">{house.description}</p>}
-            
+
+            <div className="public-house-detail__contact-actions">
+              <button
+                className="public-house-detail__message-button"
+                type="button"
+                onClick={handleOpenQuickMessage}
+                disabled={currentUser?.userId === house.landlordUserId}
+              >
+                <svg viewBox="0 0 24 24" width="17" height="17" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                  <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z" />
+                </svg>
+                <span>Nhắn tin chủ trọ</span>
+              </button>
+            </div>
+
             <div className="house-amenities-mini-section">
               <h3>Tiện ích</h3>
               {houseAmenities.length > 0 ? (
@@ -348,6 +427,41 @@ export default function PublicRoomingHouseDetailPage() {
           </section>
         )}
 
+        {house.servicePrices && house.servicePrices.length > 0 && (
+          <section className="public-house-detail__section service-price-section">
+            <div className="section-title-with-icon">
+              <div className="section-title-icon-wrapper circle-blue">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                  <path d="M12 1v22M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6" />
+                </svg>
+              </div>
+              <h2>Bảng giá dịch vụ</h2>
+            </div>
+            
+            <div className="service-price-grid">
+              {house.servicePrices.map((service) => (
+                <div key={service.id} className="service-price-item">
+                  <div className="service-price-info">
+                    <span className="service-name">{service.serviceTypeName}</span>
+                    {service.note && <span className="service-note">{service.note}</span>}
+                  </div>
+                  <div className="service-price-value">
+                    <strong className="price-amount">{formatCurrency(service.unitPrice)}</strong>
+                    <span className="price-unit">/{(() => {
+                      if (service.pricingUnit === 'PerMonth') return 'tháng';
+                      if (service.pricingUnit === 'PerPersonPerMonth') return 'người/tháng';
+                      if (service.pricingUnit === 'MeterReading') {
+                        return service.meterUnitName || 'đơn vị';
+                      }
+                      return service.pricingUnit;
+                    })()}</span>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </section>
+        )}
+
         <section className="public-house-detail__section rooms-section">
           <div className="public-house-detail__section-heading">
             <div className="section-title-with-icon">
@@ -415,8 +529,84 @@ export default function PublicRoomingHouseDetailPage() {
             <p className="public-house-detail__muted">Hiện chưa có phòng trống.</p>
           )}
         </section>
+
+        <section className="public-house-detail__section reviews-section">
+          <div className="section-title-with-icon">
+            <div className="section-title-icon-wrapper circle-blue">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                <path d="M21 11.5a8.38 8.38 0 0 1-.9 3.8 8.5 8.5 0 0 1-7.6 4.7 8.38 8.38 0 0 1-3.8-.9L3 21l1.9-5.7a8.38 8.38 0 0 1-.9-3.8 8.5 8.5 0 0 1 4.7-7.6 8.38 8.38 0 0 1 3.8-.9h.5a8.48 8.48 0 0 1 8 8v.5z"/>
+              </svg>
+            </div>
+            <h2>Đánh giá từ người thuê</h2>
+          </div>
+          
+          <HouseReviewsList 
+            roomingHouseId={house.id} 
+            landlordUserId={house.landlordUserId} 
+            roomingHouseName={house.name}
+            roomingHouseAvatarUrl={(() => {
+              const img = houseImages.find(i => i.isCover) || houseImages[0];
+              return img ? (img.imageUrl || img.objectKey) : undefined;
+            })()}
+          />
+        </section>
       </main>
       <RentalAiChatbot context="detail" roomingHouseId={house.id} title={house.name} />
+      {quickMessageOpen && (
+        <div className="public-house-detail__quick-message-overlay" role="presentation" onMouseDown={handleCancelQuickMessage}>
+          <section
+            className="public-house-detail__quick-message"
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="quick-landlord-message-title"
+            onMouseDown={(event) => event.stopPropagation()}
+          >
+            <header className="public-house-detail__quick-message-header">
+              <div>
+                <p>Nhắn tin chủ trọ</p>
+                <h2 id="quick-landlord-message-title">{house.name}</h2>
+              </div>
+              <button
+                type="button"
+                className="public-house-detail__quick-message-close"
+                onClick={handleCancelQuickMessage}
+                disabled={quickMessageSending}
+                aria-label="Đóng"
+              >
+                ×
+              </button>
+            </header>
+            <label htmlFor="quick-landlord-message">Tin nhắn nhanh</label>
+            <textarea
+              id="quick-landlord-message"
+              rows={4}
+              value={quickMessage}
+              onChange={(event) => setQuickMessage(event.target.value)}
+              disabled={quickMessageSending}
+              autoFocus
+            />
+            <div className="public-house-detail__quick-message-actions">
+              <button
+                type="button"
+                className="public-house-detail__quick-message-cancel"
+                onClick={handleCancelQuickMessage}
+                disabled={quickMessageSending}
+              >
+                Hủy
+              </button>
+              <button
+                type="button"
+                className="public-house-detail__quick-message-send"
+                onClick={() => void handleSendQuickMessage()}
+                disabled={quickMessageSending || !quickMessage.trim()}
+              >
+                {quickMessageSending ? 'Đang gửi...' : 'Gửi'}
+              </button>
+            </div>
+          </section>
+        </div>
+      )}
+      {toast && <Toast message={toast.message} type={toast.type} onClose={() => setToast(null)} />}
     </>
   );
 }

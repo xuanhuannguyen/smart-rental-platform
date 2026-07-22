@@ -26,7 +26,9 @@ internal static class RoomingHouseReadModelMapper
             CoverImageUrl = house.Images.OrderBy(x => x.SortOrder).FirstOrDefault(x => x.IsCover)?.ImageUrl 
                 ?? house.Images.OrderBy(x => x.SortOrder).FirstOrDefault()?.ImageUrl,
             TotalRooms = house.Rooms?.Count(x => x.DeletedAt == null) ?? 0,
-            AvailableRooms = house.Rooms?.Count(x => x.Status == RoomStatus.Available && x.DeletedAt == null) ?? 0
+            AvailableRooms = house.Rooms?.Count(x => x.Status == RoomStatus.Available && x.DeletedAt == null) ?? 0,
+            AverageRating = house.AverageRating,
+            TotalReviews = house.TotalReviews
         };
     }
 
@@ -106,6 +108,20 @@ internal static class RoomingHouseReadModelMapper
                 .OrderBy(x => x.Floor)
                 .ThenBy(x => x.RoomNumber)
                 .Select(RoomReadModelMapper.ToResponse)
+                .ToList(),
+            ServicePrices = house.ServicePrices
+                .Where(x => x.IsActive)
+                .Select(x => new SmartRentalPlatform.Contracts.RoomingHouses.Responses.RoomingHouseServicePriceResponse
+                {
+                    Id = x.Id,
+                    ServiceTypeId = x.ServiceTypeId,
+                    ServiceTypeName = x.ServiceType.Name,
+                    PricingUnit = x.PricingUnit.ToString(),
+                    UnitPrice = x.UnitPrice,
+                    Note = x.Note,
+                    MeterUnitName = x.ServiceType.MeterUnitName,
+                    IsActive = x.IsActive
+                })
                 .ToList(),
             TotalRooms = house.Rooms?.Count(x => x.DeletedAt == null) ?? 0,
             AvailableRooms = house.Rooms?.Count(x => x.Status == RoomStatus.Available && x.DeletedAt == null) ?? 0

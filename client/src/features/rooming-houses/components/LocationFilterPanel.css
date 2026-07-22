@@ -3,7 +3,7 @@
   top: calc(100% + 10px);
   right: 0;
   z-index: 1300;
-  width: min(420px, calc(100vw - 24px));
+  width: min(420px, calc(100dvw - 24px));
   display: grid;
   gap: 18px;
   padding: 18px 16px 14px;
@@ -358,12 +358,6 @@
 
 .location-panel-summary,
 .location-panel-error,
-.nearby-error-text {
-  margin: 0;
-  font-size: 12px;
-  font-weight: 600;
-  line-height: 1.45;
-}
 
 .location-panel-summary {
   color: #246bfe;
@@ -374,9 +368,6 @@
 }
 
 .location-panel-error,
-.nearby-error-text {
-  color: #b91c1c;
-}
 
 .location-panel-actions {
   display: grid;

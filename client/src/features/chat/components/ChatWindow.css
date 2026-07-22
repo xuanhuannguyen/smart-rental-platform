@@ -1,0 +1,293 @@
+/* Styles for ChatWindow Component */
+
+/* Standard Page Mode Styles (reused from ChatPage.css layout) */
+.chat-window--page {
+  min-height: 100vh;
+  display: flex;
+  flex-direction: column;
+  background: #ffffff;
+}
+
+/* Floating Chat Bubble Mode Styles */
+.chat-window--bubble {
+  width: 368px !important;
+  height: 480px !important;
+  max-height: 80vh !important;
+  max-width: 90vw !important;
+  background: #ffffff;
+  border-radius: 12px;
+  box-shadow: 0 10px 40px rgba(0, 0, 0, 0.12);
+  border: 1px solid #dce6f3;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  position: relative;
+  z-index: 1000;
+  animation: slideUpBubble 0.25s ease-out;
+}
+
+@keyframes slideUpBubble {
+  from {
+    opacity: 0;
+    transform: translateY(20px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+/* Header tweaks for bubble mode */
+.chat-window--bubble .chat-main__header.bubble-header {
+  height: 44px;
+  min-height: 44px;
+  padding: 0 10px;
+  background: #ffffff;
+  border-bottom: 1px solid #eef3fa;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  box-sizing: border-box;
+}
+
+.chat-window--bubble .bubble-title {
+  font-size: 13px;
+  font-weight: 600;
+  color: #1e293b;
+  margin: 0;
+  max-width: 118px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.chat-window--bubble .chat-avatar {
+  width: 26px;
+  height: 26px;
+}
+
+.chat-window--bubble .chat-avatar.chat-avatar--placeholder {
+  width: 26px;
+  height: 26px;
+  line-height: 26px;
+  font-size: 11px;
+}
+
+.bubble-actions {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.bubble-action-btn {
+  width: 24px;
+  height: 24px;
+  border-radius: 50%;
+  border: none;
+  background: transparent;
+  color: #64748b;
+  font-size: 12px;
+  font-weight: bold;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: all 0.15s ease;
+  padding: 0;
+  box-sizing: border-box;
+}
+
+.bubble-action-btn:hover {
+  background: #f1f5f9;
+  color: #334155;
+}
+
+.bubble-action-btn.detail {
+  font-size: 14px;
+}
+
+.bubble-action-btn.detail:hover {
+  background: #e0f2fe;
+  color: #0284c7;
+}
+
+.bubble-action-btn.minimize {
+  font-size: 12px;
+}
+
+.bubble-action-btn.minimize:hover {
+  background: #e0f2fe;
+  color: #256bfe;
+}
+
+.bubble-action-btn.close {
+  font-size: 16px;
+}
+
+.bubble-action-btn.close:hover {
+  background: #fee2e2;
+  color: #ef4444;
+}
+
+/* Chat content inside bubble mode */
+.chat-window--bubble .chat-content {
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+  min-height: 0;
+}
+
+.chat-window--bubble .chat-messages {
+  padding: 6px;
+  gap: 6px;
+  flex: 1;
+  overflow-y: auto;
+  overflow-x: hidden;
+  background: #fdfefe;
+}
+
+.chat-window--bubble .message-bubble {
+  max-width: 85%;
+  padding: 5px 8px;
+  font-size: 12px;
+  border-radius: 8px;
+}
+
+.chat-window--bubble .message-bubble img {
+  max-width: 190px;
+  max-height: 190px;
+}
+
+/* Composer inside bubble mode */
+.chat-window--bubble .chat-composer {
+  padding: 6px 10px;
+  background: #f8fafc;
+}
+
+.chat-window--bubble .chat-emoji-row {
+  gap: 4px;
+  margin-bottom: 6px;
+}
+
+.chat-window--bubble .chat-emoji-row button {
+  width: 24px;
+  height: 24px;
+  font-size: 13px;
+}
+
+.chat-window--bubble .chat-composer__bar {
+  gap: 6px;
+  display: flex;
+  align-items: center;
+}
+
+.chat-window--bubble .chat-composer__input-container {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  background: #f1f5f9;
+  border-radius: 20px;
+  padding: 2px 12px;
+  border: 1px solid #e2e8f0;
+  transition: all 0.2s ease;
+}
+
+.chat-window--bubble .chat-composer__input-container:focus-within {
+  background: #ffffff;
+  border-color: #3b82f6;
+  box-shadow: 0 0 0 2px rgba(59, 130, 246, 0.15);
+}
+
+.chat-window--bubble .chat-composer__input-container textarea {
+  flex: 1;
+  border: none !important;
+  background: transparent !important;
+  outline: none !important;
+  font-size: 13px;
+  color: #1e293b;
+  width: 100%;
+  box-shadow: none !important;
+  font: inherit;
+  resize: none;
+  padding: 6px 0 !important;
+  line-height: 18px;
+}
+
+.chat-window--bubble .chat-composer button:not(.chat-composer__send-btn) {
+  padding: 5px 9px;
+  font-size: 12.5px;
+  border-radius: 6px;
+  flex-shrink: 0;
+}
+
+.chat-window--bubble .chat-image-button,
+.chat-window--bubble .chat-file-button,
+.chat-window--bubble .chat-composer__send-btn {
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  background: #f1f5f9 !important;
+  color: #475569 !important;
+  border: none !important;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  transition: background 0.2s ease, color 0.2s ease, transform 0.2s ease;
+  flex-shrink: 0;
+  padding: 0 !important;
+  box-sizing: border-box;
+}
+
+.chat-window--bubble .chat-image-button:hover,
+.chat-window--bubble .chat-file-button:hover {
+  background: #e2e8f0 !important;
+  color: #0f172a !important;
+}
+
+.chat-window--bubble .chat-composer__send-btn {
+  background: #246bfe !important;
+  color: #ffffff !important;
+}
+
+.chat-window--bubble .chat-composer__send-btn:hover:not(:disabled) {
+  background: #0045d4 !important;
+  transform: scale(1.05);
+}
+
+.chat-window--bubble .chat-composer__send-btn:disabled {
+  background: #e2e8f0 !important;
+  color: #94a3b8 !important;
+  cursor: not-allowed;
+  transform: none;
+}
+
+.chat-window--bubble .chat-image-button input,
+.chat-window--bubble .chat-file-button input {
+  display: none;
+}
+
+/* Empty or disabled states inside bubble mode */
+.chat-window--bubble .chat-empty,
+.chat-window--bubble .chat-main__empty,
+.chat-window--bubble .chat-composer__disabled {
+  padding: 16px;
+  font-size: 13px;
+}
+
+/* Common components inside ChatWindow */
+.chat-toast {
+  position: absolute;
+  bottom: 80px;
+  left: 50%;
+  transform: translateX(-50%);
+  background: rgba(15, 23, 42, 0.9);
+  color: #ffffff;
+  padding: 8px 16px;
+  border-radius: 8px;
+  font-size: 12px;
+  border: none;
+  cursor: pointer;
+  z-index: 1001;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+}

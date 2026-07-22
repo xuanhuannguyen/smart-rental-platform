@@ -32,7 +32,7 @@ public class RentalContractMoveInActivationWorker : BackgroundService
                 var activatedCount = await rentalContractService.ActivatePendingMoveInsAsync(stoppingToken);
                 if (activatedCount > 0)
                 {
-                    logger.LogInformation("Activated {ActivatedCount} rental contracts with pending move-ins.", activatedCount);
+                    logger.SafeLogInformation("Activated {ActivatedCount} rental contracts with pending move-ins.", activatedCount);
                 }
             }
             catch (OperationCanceledException) when (stoppingToken.IsCancellationRequested)
@@ -41,7 +41,7 @@ public class RentalContractMoveInActivationWorker : BackgroundService
             }
             catch (Exception ex)
             {
-                logger.LogError(ex, "Could not activate pending move-ins for rental contracts.");
+                logger.SafeLogError(ex, "Could not activate pending move-ins for rental contracts.");
             }
 
             await Task.Delay(Interval, stoppingToken);
