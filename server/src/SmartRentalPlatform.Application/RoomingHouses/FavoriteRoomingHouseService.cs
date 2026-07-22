@@ -1,6 +1,7 @@
 using Microsoft.EntityFrameworkCore;
 using SmartRentalPlatform.Application.Common.Exceptions;
 using SmartRentalPlatform.Application.Common.Interfaces;
+using SmartRentalPlatform.Application.Common.Media;
 using SmartRentalPlatform.Contracts.Amenities;
 using SmartRentalPlatform.Contracts.Common;
 using SmartRentalPlatform.Contracts.RoomingHouses.Responses;
@@ -64,19 +65,21 @@ public class FavoriteRoomingHouseService : IFavoriteRoomingHouseService
 
         var totalItems = await query.CountAsync(cancellationToken);
         
-        var items = await query
+        var rawItems = await query
             .Skip((pageNumber - 1) * pageSize)
             .Take(pageSize)
-            .Select(x => new RoomingHouseListingResponse
+            .Select(x => new
             {
-                Id = x.Id,
-                Name = x.Name,
+                x.Id,
+                x.Name,
                 AddressDisplay = x.Ward != null && x.Province != null
                     ? x.AddressLine + ", " + x.Ward.Name + ", " + x.Province.Name
                     : x.AddressDisplay,
-                CoverImageUrl = x.Images
-                    .OrderBy(i => i.SortOrder)
-                    .Select(i => i.ImageUrl)
+                CoverImageMediaAssetId = x.Images
+                    .Where(i => i.MediaAssetId.HasValue)
+                    .OrderByDescending(i => i.IsCover)
+                    .ThenBy(i => i.SortOrder)
+                    .Select(i => i.MediaAssetId)
                     .FirstOrDefault(),
                 AvailableRooms = x.Rooms.Count(r => r.Status == RoomStatus.Available && r.DeletedAt == null),
                 MinMonthlyRent = x.Rooms
@@ -107,9 +110,28 @@ public class FavoriteRoomingHouseService : IFavoriteRoomingHouseService
                         IconCode = a.Amenity.IconCode
                     })
                     .ToList(),
-                CreatedAt = x.CreatedAt
+                x.CreatedAt
             })
             .ToListAsync(cancellationToken);
+
+        var items = rawItems
+            .Select(x => new RoomingHouseListingResponse
+            {
+                Id = x.Id,
+                Name = x.Name,
+                AddressDisplay = x.AddressDisplay,
+                CoverImageUrl = x.CoverImageMediaAssetId.HasValue
+                    ? PublicMediaPathBuilder.Build(x.CoverImageMediaAssetId.Value)
+                    : null,
+                AvailableRooms = x.AvailableRooms,
+                MinMonthlyRent = x.MinMonthlyRent,
+                MaxMonthlyRent = x.MaxMonthlyRent,
+                MinAreaM2 = x.MinAreaM2,
+                MaxAreaM2 = x.MaxAreaM2,
+                Amenities = x.Amenities,
+                CreatedAt = x.CreatedAt
+            })
+            .ToList();
 
         return new PagedResult<RoomingHouseListingResponse>
         {

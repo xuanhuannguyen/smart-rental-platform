@@ -846,36 +846,59 @@ public partial class RoomingHouseQueryService : IRoomingHouseQueryService
         Guid landlordUserId,
         CancellationToken cancellationToken = default)
     {
-        return await context.RoomingHouses
+        var rawItems = await context.RoomingHouses
             .AsNoTracking()
             .Where(x => x.LandlordUserId == landlordUserId && x.DeletedAt == null)
             .OrderByDescending(x => x.CreatedAt)
-            .Select(x => new RoomingHouseResponse
+            .Select(x => new
             {
-                Id = x.Id,
-                LandlordUserId = x.LandlordUserId,
-                Name = x.Name,
+                x.Id,
+                x.LandlordUserId,
+                x.Name,
                 AddressDisplay = x.Ward != null && x.Province != null
                     ? x.AddressLine + ", " + x.Ward.Name + ", " + x.Province.Name
                     : x.AddressDisplay,
-                ApprovalStatus = x.ApprovalStatus.ToString(),
-                VisibilityStatus = x.VisibilityStatus.ToString(),
-                RejectedReason = x.RejectedReason,
-                CreatedAt = x.CreatedAt,
-                UpdatedAt = x.UpdatedAt,
-                CoverImageUrl = x.Images
+                ApprovalStatus = x.ApprovalStatus,
+                VisibilityStatus = x.VisibilityStatus,
+                x.RejectedReason,
+                x.CreatedAt,
+                x.UpdatedAt,
+                CoverImageMediaAssetId = x.Images
+                    .Where(image => image.MediaAssetId.HasValue)
                     .OrderByDescending(image => image.IsCover)
                     .ThenBy(image => image.SortOrder)
-                    .Select(image => image.ImageUrl)
+                    .Select(image => image.MediaAssetId)
                     .FirstOrDefault(),
                 TotalRooms = x.Rooms.Count(room => room.DeletedAt == null),
                 AvailableRooms = x.Rooms.Count(room =>
                     room.Status == RoomStatus.Available &&
                     room.DeletedAt == null),
+                x.AverageRating,
+                x.TotalReviews
+            })
+            .ToListAsync(cancellationToken);
+
+        return rawItems
+            .Select(x => new RoomingHouseResponse
+            {
+                Id = x.Id,
+                LandlordUserId = x.LandlordUserId,
+                Name = x.Name,
+                AddressDisplay = x.AddressDisplay,
+                ApprovalStatus = x.ApprovalStatus.ToString(),
+                VisibilityStatus = x.VisibilityStatus.ToString(),
+                RejectedReason = x.RejectedReason,
+                CreatedAt = x.CreatedAt,
+                UpdatedAt = x.UpdatedAt,
+                CoverImageUrl = x.CoverImageMediaAssetId.HasValue
+                    ? PublicMediaPathBuilder.Build(x.CoverImageMediaAssetId.Value)
+                    : null,
+                TotalRooms = x.TotalRooms,
+                AvailableRooms = x.AvailableRooms,
                 AverageRating = x.AverageRating,
                 TotalReviews = x.TotalReviews
             })
-            .ToListAsync(cancellationToken);
+            .ToList();
     }
 
     public async Task<RoomingHouseDetailResponse?> GetByIdAsync(
