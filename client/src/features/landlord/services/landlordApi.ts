@@ -4,6 +4,7 @@ import { ENDPOINTS } from '../../../shared/api/endpoints';
 import type {
   Amenity,
   FileUploadResponse,
+  LandlordDashboardData,
   RentalPolicy,
   PropertyImageItemRequest,
   Province,
@@ -23,6 +24,12 @@ interface LegalDocumentRequest {
 }
 
 export const landlordApi = {
+  getDashboard(month: string) {
+    return apiClient<ApiResponse<LandlordDashboardData>>(`${ENDPOINTS.LANDLORD_DASHBOARD}?month=${encodeURIComponent(month)}`, {
+      auth: true
+    });
+  },
+
   getProvinces() {
     return apiClient<Province[]>(ENDPOINTS.ADMINISTRATIVE.PROVINCES);
   },

@@ -14,9 +14,7 @@ public class LocalFileStorageService : IFileStorageService
         [FileUploadScope.LegalDocument] = "legal-documents",
         [FileUploadScope.Avatar] = "avatars",
         [FileUploadScope.HouseRule] = "house-rules",
-        [FileUploadScope.ChatImage] = "chat",
-        [FileUploadScope.MeterReading] = "meter-readings",
-        [FileUploadScope.ChatFile] = "chat-files"
+        [FileUploadScope.MeterReading] = "meter-readings"
     };
 
     private readonly IWebHostEnvironment environment;

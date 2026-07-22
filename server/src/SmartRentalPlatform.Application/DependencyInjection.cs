@@ -39,10 +39,13 @@ public static class DependencyInjection
         services.AddScoped<IUserService, UserService>();
         services.AddAdminApprovalServices();
         services.AddScoped<IWalletService, WalletService>();
-        services.AddScoped<IWithdrawalService, WithdrawalService>();
-        services.AddScoped<IWithdrawalWebhookService, WithdrawalWebhookService>();
-        services.AddPaymentServices();
-        services.AddBillingServices();
+        services.AddScoped<IPayOSTopUpService, PayOSTopUpService>();
+        services.AddScoped<IPaymentWebhookService, PaymentWebhookService>();
+        services.AddScoped<IMockPaymentService, MockPaymentService>();
+        services.AddScoped<IBillingContractReadService, ContractBillingReadService>();
+        services.AddScoped<IInvoiceWalletPaymentService, InvoiceWalletPaymentService>();
+        services.AddScoped<IBillingService, BillingService>();
+        services.AddScoped<IMeterReadingAiService, MeterReadingAiService>();
         services.AddScoped<INotificationService, NotificationService>();
         services.AddScoped<IChatService, ChatService>();
         services.AddScoped<IViewingAppointmentService, ViewingAppointmentService>();

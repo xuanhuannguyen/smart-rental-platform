@@ -12,6 +12,8 @@ import PublicRoomingHouseDetailPage from '../../features/rooming-houses/PublicRo
 import SearchRoomingHousesPage from '../../features/rooming-houses/SearchRoomingHousesPage';
 import PublicRoomDetailPage from '../../features/rooms/pages/PublicRoomDetailPage';
 import LandlordDashboardPage from '../../features/landlord/pages/LandlordDashboardPage';
+
+
 import LandlordDashboardOverviewPage from '../../features/landlord/pages/LandlordDashboardOverviewPage';
 import { LandlordRentalRequestsPage } from '../../features/landlord/pages/LandlordRentalRequestsPage';
 import RoomingHouseDetailPage from '../../features/landlord/pages/RoomingHouseDetailPage';
@@ -193,11 +195,13 @@ export const router = createBrowserRouter([
                                 children: [
                                     {
                                         path: ROUTE_PATHS.LANDLORD.DASHBOARD,
-                                        element: <LandlordDashboardOverviewPage />
+                                        element: <LandlordDashboardPage />
+
+
                                     },
                                     {
                                         path: ROUTE_PATHS.LANDLORD.ROOMING_HOUSES,
-                                        element: <LandlordDashboardPage />
+                                        element: <LandlordRoomingHousesPage />
                                     },
                                     {
                                         path: '/landlord/rooming-houses/:id',

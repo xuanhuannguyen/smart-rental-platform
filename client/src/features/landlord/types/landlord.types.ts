@@ -55,3 +55,44 @@ export interface RoomingHouseDetail {
   images: PropertyImage[];
   amenities: Amenity[];
 }
+
+export interface DashboardRevenuePoint {
+  month: string;
+  revenue: number;
+}
+
+export interface DashboardInvoice {
+  id: string;
+  invoiceCode: string;
+  roomName: string;
+  status: 'Draft' | 'Issued' | 'Paid' | 'Overdue' | 'Cancelled';
+  amount: number;
+  dueDate: string;
+}
+
+export interface LandlordDashboardData {
+  period: string;
+  totalRoomingHouses: number;
+  totalRooms: number;
+  occupiedRooms: number;
+  availableRooms: number;
+  occupancyRate: number;
+  monthlyRevenue: number;
+  previousMonthRevenue: number;
+  totalRevenue: number;
+  activeContracts: number;
+  expiringContracts: number;
+  expiredContracts: number;
+  pendingRequests: number;
+  acceptedRequests: number;
+  rejectedRequests: number;
+  todayAppointments: number;
+  upcomingAppointments: number;
+  completedAppointments: number;
+  draftInvoices: number;
+  issuedInvoices: number;
+  paidInvoices: number;
+  overdueInvoices: number;
+  revenueChart: DashboardRevenuePoint[];
+  latestInvoices: DashboardInvoice[];
+}

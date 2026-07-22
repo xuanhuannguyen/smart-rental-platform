@@ -1,583 +1,195 @@
-/* LandlordDashboardPage.css - Page specific styles (sidebar styles moved to LandlordLayout.css) */
-
-.dashboard-main {
-  padding: 24px;
-  background: #f4f7fb;
-}
-
-.landlord-dashboard-page .overview-band {
-  display: flex;
-  flex-direction: row;
-  justify-content: space-between;
-  align-items: flex-start;
-  gap: 24px;
-  margin-bottom: 24px;
-  padding: 24px;
-  border: 1px solid #dbe3ef;
-  border-radius: 12px;
-  background: #ffffff;
-  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.03);
-}
-
-.landlord-dashboard-page .overview-left {
-  display: flex;
-  flex-direction: column;
-  gap: 6px;
-  flex: 1;
-}
-
-.landlord-dashboard-page .overview-left h2 {
-  margin: 4px 0 0;
-  font-size: 30px;
-  font-weight: 700;
-  color: #0f172a;
-}
-
-.landlord-dashboard-page .overview-right {
-  display: flex;
-  flex-direction: column;
-  align-items: flex-end;
-  gap: 12px;
-}
-
-.landlord-dashboard-page .eyebrow {
-  font-size: 12px;
-  font-weight: 700;
-  text-transform: uppercase;
-  letter-spacing: 0.08em;
-  color: #64748b;
-  margin: 0;
-}
-
-.landlord-dashboard-page .overview-stats {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 12px;
-  justify-content: flex-end;
-}
-
-.landlord-dashboard-page .stat-item {
-  display: flex;
-  align-items: center;
-  gap: 6px;
-  padding: 6px 10px;
-  border-radius: 6px;
-  border: 1px solid transparent;
-  font-size: 12px;
-  font-weight: 500;
-}
-
-.landlord-dashboard-page .stat-item svg {
-  width: 14px;
-  height: 14px;
-}
-
-.landlord-dashboard-page .stat-item span {
-  color: inherit;
-  font-size: 12px;
-  font-weight: 600;
-  white-space: nowrap;
-}
-
-.landlord-dashboard-page .stat-badge {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  min-width: 18px;
-  height: 18px;
-  padding: 0 4px;
-  border-radius: 999px;
-  font-size: 10px;
-  font-weight: 700;
-  margin-left: 6px;
-}
-
-/* Total Stat Item */
-.landlord-dashboard-page .stat-item--total {
-  background: #f3f4f6;
-  border-color: #e5e7eb;
-  color: #4b5563;
-}
-.landlord-dashboard-page .stat-item--total .stat-badge {
-  background: #cbd5e1;
-  color: #1f2937;
-}
-
-/* Approved Stat Item */
-.landlord-dashboard-page .stat-item--approved {
-  background: #f0fdf4;
-  border-color: #bbf7d0;
-  color: #166534;
-}
-.landlord-dashboard-page .stat-item--approved .stat-badge {
-  background: #86efac;
-  color: #14532d;
-}
-
-/* Pending Stat Item */
-.landlord-dashboard-page .stat-item--pending {
-  background: #fef9c3;
-  border-color: #fef08a;
-  color: #854d0e;
-}
-.landlord-dashboard-page .stat-item--pending .stat-badge {
-  background: #fde047;
-  color: #713f12;
-}
-
-/* Rejected Stat Item */
-.landlord-dashboard-page .stat-item--rejected {
-  background: #fee2e2;
-  border-color: #fecaca;
-  color: #991b1b;
-}
-.landlord-dashboard-page .stat-item--rejected .stat-badge {
-  background: #fca5a5;
-  color: #7f1d1d;
-}
-
-.landlord-dashboard-page .overview-actions {
-  display: flex;
-  justify-content: flex-end;
-  gap: 8px;
-}
-
-.landlord-dashboard-page .primary-action {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  gap: 6px;
-  background: #246bfe !important; /* ocean blue */
-  color: #ffffff !important;
-  font-weight: 700 !important;
-  border: none;
-  cursor: pointer;
-  min-height: 42px;
-  padding: 10px 20px;
-  border-radius: 8px;
-  font-size: 15px;
-  transition: background-color 0.2s;
-  box-shadow: 0 2px 4px rgba(36, 107, 254, 0.15);
-}
-
-.landlord-dashboard-page .primary-action:hover:not(:disabled) {
-  background: #1a5ce0 !important;
-}
-
-.landlord-dashboard-page .primary-action:disabled {
-  background: #cbd5e1 !important;
-  color: #64748b !important;
-  cursor: not-allowed;
-}
-
-.landlord-dashboard-page .overview-description {
-  margin: 0;
-  font-size: 14.5px;
-  color: #64748b;
-}
-
-.dashboard-message {
-  margin: 0 0 12px;
-  padding: 10px 12px;
-  border-radius: 6px;
-  background: #fef9c3;
-  color: #92400e;
-  font-size: 14px;
-}
-
-.card-grid {
-  display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
-  gap: 14px;
-}
-
-.landlord-dashboard-page .dashboard-card {
-  display: flex;
-  flex-direction: column;
-  width: 100%;
-  padding: 0;
-  border: 1px solid #dbe3ef;
-  border-radius: 16px;
-  background: #ffffff;
-  color: inherit;
-  text-align: left;
-  font: inherit;
-  cursor: pointer;
-  overflow: hidden;
-  transition: border-color 0.2s, box-shadow 0.2s, transform 0.2s;
-}
-
-.landlord-dashboard-page .dashboard-card:hover {
-  border-color: #246bfe;
-  box-shadow: 0 6px 20px rgba(36, 107, 254, 0.1);
-  transform: translateY(-2px);
-}
-
-.landlord-dashboard-page .card-media-wrapper {
-  position: relative;
-  width: 100%;
-  height: 180px;
-  background: #f1f5f9;
-  overflow: hidden;
-}
-
-.landlord-dashboard-page .card-cover-image {
-  width: 100%;
-  height: 100%;
-  object-fit: cover;
-  transition: transform 0.3s;
-}
-
-.landlord-dashboard-page .dashboard-card:hover .card-cover-image {
-  transform: scale(1.05);
-}
-
-.landlord-dashboard-page .card-status-overlay {
-  position: absolute;
-  top: 10px;
-  left: 10px;
-  display: flex;
-  flex-direction: column;
-  gap: 6px;
-}
-
-.landlord-dashboard-page .card-status-overlay .status-pill {
-  font-size: 10px;
-  font-weight: 700;
-  padding: 4px 10px;
-  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.06);
-  border-radius: 999px;
-  border: none;
-  min-height: auto;
-}
-
-.status-pill--icon {
-  display: inline-flex;
-  align-items: center;
-  gap: 4px;
-}
-
-.dot-indicator {
-  width: 6px;
-  height: 6px;
-  border-radius: 50%;
-  background-color: currentColor;
-  display: inline-block;
-}
-
-.landlord-dashboard-page .card-menu-trigger-overlay {
-  position: absolute;
-  top: 10px;
-  right: 10px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  width: 32px;
-  height: 32px;
-  border-radius: 50%;
-  color: #64748b;
-  background-color: #ffffff;
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
-  border: none;
-  padding: 0;
-  cursor: pointer;
-  transition: background-color 0.2s, color 0.2s, transform 0.2s;
-  z-index: 10;
-}
-
-.landlord-dashboard-page .card-menu-trigger-overlay:hover {
-  background-color: #f1f5f9;
-  color: #0f172a;
-  transform: scale(1.05);
-}
-
-.landlord-dashboard-page .card-body-content {
-  padding: 24px;
-  display: flex;
-  flex-direction: column;
-  gap: 14px;
-  flex: 1;
-}
-
-.landlord-dashboard-page .card-title-row {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-}
-
-.landlord-dashboard-page .card-title-row h3 {
-  margin: 0;
-  font-size: 22px;
-  font-weight: 700;
-  color: #0c1831;
-  line-height: 1.2;
-  display: -webkit-box;
-  -webkit-line-clamp: 1;
-  -webkit-box-orient: vertical;
-  overflow: hidden;
-  flex: 1;
-}
-
-.landlord-dashboard-page .card-location {
-  display: flex;
-  align-items: center;
-  gap: 6px;
-  color: #64748b;
-  font-size: 14px;
-  line-height: 1.4;
-  margin-top: 2px;
-}
-
-.landlord-dashboard-page .card-location span {
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-}
-
-.landlord-dashboard-page .card-location svg {
-  color: #94a3b8;
-  flex-shrink: 0;
-}
-
-.landlord-dashboard-page .card-divider {
-  border: 0;
-  border-top: 1px solid #f1f5f9;
-  margin: 6px 0;
-}
-
-/* Metrics grid */
-.card-metrics-grid {
-  display: grid;
-  grid-template-columns: 1fr 1.1fr;
-  gap: 0;
-  margin: 6px 0;
-  align-items: center;
-}
-
-.metric-item {
-  display: flex;
-  align-items: center;
-  gap: 12px;
-}
-
-.metric-item:first-child {
-  border-right: 1px solid #f1f5f9;
-  padding-right: 16px;
-}
-
-.metric-item:last-child {
-  padding-left: 16px;
-}
-
-.metric-icon {
-  width: 36px;
-  height: 36px;
-  border-radius: 50%;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  flex-shrink: 0;
-}
-
-.metric-icon--blue {
-  background-color: #eff6ff;
-  color: #246bfe;
-}
-
-.metric-icon--green {
-  background-color: #f0fdf4;
-  color: #10b981;
-}
-
-.metric-text-group {
-  display: flex;
-  flex-direction: column;
-  gap: 2px;
-}
-
-.metric-label {
-  font-size: 9px;
-  font-weight: 700;
-  color: #94a3b8;
-  letter-spacing: 0.05em;
-  text-transform: uppercase;
-}
-
-.metric-value {
-  font-size: 14px;
-  font-weight: 700;
-  color: #0f172a;
-}
-
-/* Banner Alert styles in footer */
-.card-footer-alert-banner {
-  margin-top: 8px;
-  width: 100%;
-}
-
-.alert-banner-content {
-  display: flex;
-  align-items: center;
-  padding: 10px 16px;
-  border-radius: 8px;
-  font-size: 13px;
-  font-weight: 600;
-  width: 100%;
-  box-sizing: border-box;
-  gap: 8px;
-  border: 1px solid transparent;
-  transition: transform 0.2s, box-shadow 0.2s;
-}
-
-.alert-banner-content--info {
-  background-color: #eff6ff;
-  color: #246bfe;
-  border-color: rgba(36, 107, 254, 0.06);
-}
-
-.alert-banner-content--success {
-  background-color: #f0fdf4;
-  color: #10b981;
-  border-color: rgba(16, 185, 129, 0.06);
-}
-
-.alert-banner-content--warning {
-  background-color: #fffbeb;
-  color: #d97706;
-  border-color: rgba(217, 119, 6, 0.06);
-}
-
-.banner-icon {
-  flex-shrink: 0;
-}
-
-.chevron-icon {
-  margin-left: auto;
-  flex-shrink: 0;
-  transition: transform 0.2s;
-}
-
-.dashboard-card:hover .chevron-icon {
-  transform: translateX(4px);
-}
-
-.status-row {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 8px;
-  margin-top: 8px;
-}
-
-.status-pill {
-  display: inline-flex;
-  align-items: center;
-  min-height: 26px;
-  padding: 3px 10px;
-  border-radius: 999px;
-  background: #e2e8f0;
-  color: #475569;
-  font-size: 12px;
-  font-weight: 700;
-}
-
-.status-pill--success {
-  background: #dcfce7;
-  color: #166534;
-}
-
-.status-pill--visibility-hidden {
-  background: #e6f4ea !important;
-  color: #137333 !important;
-}
-
-.status-pill--visibility-visible {
-  background: #e6f4ea !important;
-  color: #137333 !important;
-}
-
-.status-pill--info {
-  background: #dbeafe;
-  color: #1e40af;
-}
-
-.status-pill--warning {
-  background: #fef3c7;
-  color: #92400e;
-}
-
-.status-pill--danger {
-  background: #fee2e2;
-  color: #991b1b;
-}
-
-.status-pill--neutral {
-  background: #e5e7eb;
-  color: #374151;
-}
-
-.status-pill--reserved {
-  background: #ede9fe;
-  color: #5b21b6;
-}
-
-.warning-text {
-  color: #991b1b !important;
-  font-size: 13px;
-}
-
-.empty-panel {
-  padding: 24px;
-  border: 1px solid #dbe3ef;
-  border-radius: 8px;
-  background: #ffffff;
-}
-
-.empty-panel h2 {
-  margin: 0 0 8px;
-  font-size: 20px;
-}
-
-.empty-panel p {
-  margin: 0;
-  color: #64748b;
-}
-
-.back-link {
-  margin: 0 0 14px;
-  display: inline-flex;
-  align-items: center;
-}
-
-@media (max-width: 980px) {
-  .landlord-dashboard {
-    grid-template-columns: 1fr;
-  }
-
-  .landlord-dashboard-page .overview-band {
-    flex-direction: column;
-    align-items: stretch;
-    gap: 16px;
-  }
-
-  .landlord-dashboard-page .overview-right {
-    align-items: stretch;
-  }
-
-  .landlord-dashboard-page .overview-actions {
-    justify-content: flex-start;
-  }
-
-  .landlord-dashboard-page .overview-stats {
-    flex-direction: column;
-    align-items: stretch;
-    justify-content: flex-start;
-  }
-
-  .landlord-dashboard-page .stat-item {
-    justify-content: space-between;
-  }
-
-  .landlord-dashboard-page .stat-badge {
-    margin-left: auto;
-  }
-}
+.dashboard-main{min-width:0;padding:28px 30px 40px;background:#f6f8fc;color:#12213f}.landlord-dashboard-page{font-family:Inter,system-ui,-apple-system,sans-serif}.dash-header{display:flex;align-items:flex-start;justify-content:space-between;margin-bottom:22px}.dash-header h1{margin:2px 0 3px;font-size:28px;line-height:1.15;letter-spacing:-.035em}.dash-header p{margin:0;color:#7b879f;font-size:13px}.dash-header .dash-kicker{color:#246bfe;font-size:10px;font-weight:800;letter-spacing:.12em}.month-picker{display:flex;align-items:center;gap:8px;padding:9px 12px;background:#fff;border:1px solid #dfe5ef;border-radius:9px;color:#536079;font-size:12px;box-shadow:0 1px 2px #12213f08}.month-picker .dash-icon{width:15px}.month-picker span{font-weight:600}.month-picker input{border:0;outline:0;color:#12213f;font:600 12px inherit;background:transparent}.kpi-grid{display:grid;grid-template-columns:repeat(5,minmax(130px,1fr));gap:10px}.kpi-card{display:flex;align-items:center;gap:11px;min-height:78px;padding:13px;background:#fff;border:1px solid #e5eaf2;border-radius:10px;box-shadow:0 4px 15px #1e3a6a08}.kpi-card>.dash-icon,.revenue-strip>.dash-icon{width:35px;height:35px;padding:8px;border-radius:50%;flex:0 0 auto}.kpi-card div{min-width:0;display:flex;flex-direction:column}.kpi-card span,.revenue-strip span{font-size:10px;color:#75819a;white-space:nowrap}.kpi-card strong{margin-top:3px;font-size:19px;letter-spacing:-.03em;white-space:nowrap}.kpi-card small{margin-top:1px;color:#16a36a;font-size:8px;font-weight:700}.kpi-blue>.dash-icon{color:#246bfe;background:#eaf2ff}.kpi-indigo>.dash-icon{color:#4d65d6;background:#edf0ff}.kpi-green>.dash-icon{color:#16a36a;background:#e8fbf3}.kpi-orange>.dash-icon{color:#f47d20;background:#fff0e4}.kpi-violet>.dash-icon{color:#8147e8;background:#f0e9ff}.revenue-strip{display:flex;align-items:center;gap:11px;width:max-content;min-width:285px;margin:10px 0;padding:10px 14px;background:#fff;border:1px solid #e5eaf2;border-radius:10px}.revenue-strip>.dash-icon{color:#10a568;background:#e8fbf3}.revenue-strip div{display:flex;flex-direction:column}.revenue-strip strong{font-size:15px}.dashboard-upper{display:grid;grid-template-columns:minmax(420px,1.2fr) minmax(400px,1fr);gap:10px}.dashboard-panel{background:#fff;border:1px solid #e4e9f1;border-radius:10px;box-shadow:0 4px 16px #1e3a6a07;overflow:hidden}.dashboard-panel>h2{display:flex;align-items:center;gap:7px;margin:0;padding:12px 14px;border-bottom:1px solid #eef1f5;font-size:12px}.dashboard-panel>h2 .dash-icon{width:15px;color:#246bfe}.chart-wrap{position:relative;height:235px;padding:25px 20px 18px}.y-label{position:absolute;top:10px;left:14px;font-size:9px;color:#8a95aa}.bars{height:100%;display:flex;align-items:flex-end;justify-content:space-around;gap:12px;border-bottom:1px solid #ccd5e2;background:repeating-linear-gradient(to top,transparent 0,transparent calc(25% - 1px),#edf1f6 25%)}.bar-column{height:100%;flex:1;display:flex;align-items:center;flex-direction:column;justify-content:flex-end}.bar-column>span{height:17px;font-size:9px;color:#44516a}.bar-track{height:calc(100% - 34px);width:100%;display:flex;align-items:flex-end;justify-content:center}.bar{width:min(34px,60%);min-height:3px;background:linear-gradient(180deg,#2585ff,#1766e6);border-radius:4px 4px 1px 1px;box-shadow:0 4px 10px #246bfe35;transition:height .35s ease}.bar-column small{height:17px;padding-top:5px;font-size:9px;color:#748198}.summary-grid{display:grid;grid-template-columns:1fr 1fr;gap:10px}.summary-card ul{list-style:none;margin:0;padding:8px 14px}.summary-card li{display:flex;justify-content:space-between;align-items:center;min-height:25px;font-size:10px}.summary-card li span{display:flex;align-items:center;gap:7px;color:#59667e}.summary-card li strong{font-size:11px}.dot{width:5px;height:5px;border-radius:50%;background:#94a3b8}.dot.blue{background:#2b7fff}.dot.green{background:#21b474}.dot.red{background:#ee4d5a}.dot.orange{background:#f59a23}.dot.violet{background:#8758e8}.dashboard-lower{display:grid;grid-template-columns:minmax(350px,.9fr) minmax(520px,1.6fr);gap:10px;margin-top:10px}.lower-stack{display:grid;grid-template-columns:1fr 1fr;gap:10px}.action-list{padding:7px}.action-list button{width:100%;min-height:34px;display:flex;align-items:center;gap:7px;padding:5px 7px;border:0;border-bottom:1px solid #f0f2f6;background:transparent;color:#4f5c73;font:500 9px inherit;cursor:pointer;text-align:left}.action-list button:last-child{border-bottom:0}.action-list button:hover{background:#f8faff}.action-list button>span:nth-child(2){flex:1}.action-list .dash-icon{width:13px;color:#246bfe}.alert-count{display:grid;place-items:center;width:22px;height:22px;border-radius:6px;font-weight:800}.alert-count.red{color:#df3546;background:#ffe8eb}.alert-count.orange{color:#f1781b;background:#fff0e4}.alert-count.yellow{color:#ae7a00;background:#fff7d9}.alert-count.violet{color:#7742dc;background:#f0eaff}.quick-list button>.dash-icon:first-child{width:22px;height:22px;padding:5px;border-radius:6px;background:#edf4ff}.invoice-table-wrap{overflow:auto}.invoice-table-wrap table{width:100%;border-collapse:collapse;font-size:9px}.invoice-table-wrap th{padding:8px 10px;background:#f8f9fc;color:#79849a;text-align:left;font-weight:600;white-space:nowrap}.invoice-table-wrap td{padding:9px 10px;border-bottom:1px solid #eff2f6;white-space:nowrap}.invoice-table-wrap td:nth-child(4){font-weight:600}.invoice-table-wrap td button{border:0;background:transparent;cursor:pointer;color:#7c879c}.invoice-status{padding:3px 7px;border-radius:4px;font-weight:600}.status-draft{color:#667085;background:#edf0f4}.status-issued{color:#286ad8;background:#e8f1ff}.status-paid{color:#168b5d;background:#e5f8ef}.status-overdue{color:#d53c4d;background:#ffe8eb}.status-cancelled{color:#667085;background:#edf0f4}.view-all{display:flex;align-items:center;justify-content:center;gap:4px;width:100%;padding:9px;border:0;background:#fff;color:#246bfe;font:600 9px inherit;cursor:pointer}.view-all .dash-icon{width:11px}.table-empty{display:grid;place-items:center;min-height:130px;color:#8290a7;font-size:11px}.empty-dashboard{display:flex;flex-direction:column;align-items:center;max-width:620px;margin:60px auto;padding:48px;background:#fff;border:1px solid #e1e7f0;border-radius:16px;text-align:center}.empty-dashboard>div{display:grid;place-items:center;width:62px;height:62px;border-radius:50%;color:#246bfe;background:#eaf2ff}.empty-dashboard .dash-icon{width:28px}.empty-dashboard h2{margin:18px 0 8px}.empty-dashboard p{max-width:460px;margin:0 0 20px;color:#718097;line-height:1.6}.empty-dashboard button,.inline-error button{padding:10px 16px;border:0;border-radius:8px;background:#246bfe;color:#fff;font-weight:700;cursor:pointer}.error-dashboard>div{color:#e54858;background:#ffecef}.inline-error{display:flex;align-items:center;justify-content:space-between;margin-bottom:10px;padding:9px 12px;border:1px solid #ffd0d5;border-radius:8px;background:#fff0f2;color:#ba2c3a;font-size:11px}.inline-error button{padding:5px 9px;font-size:10px}.skeleton{background:linear-gradient(90deg,#e8edf4 25%,#f5f7fa 50%,#e8edf4 75%);background-size:200% 100%;animation:pulse 1.4s infinite;border-radius:10px}.skeleton-title{width:240px;height:55px;margin-bottom:22px}.skeleton-grid{display:grid;grid-template-columns:repeat(5,1fr);gap:10px}.skeleton-card{height:80px}.skeleton-chart{height:330px;margin-top:20px}@keyframes pulse{to{background-position:-200% 0}}
+@media(max-width:1180px){.kpi-grid{grid-template-columns:repeat(3,1fr)}.dashboard-upper{grid-template-columns:1fr}.dashboard-lower{grid-template-columns:1fr}}
+@media(max-width:760px){.dashboard-main{padding:18px 14px}.dash-header{gap:14px}.dash-header h1{font-size:24px}.month-picker span{display:none}.kpi-grid{grid-template-columns:1fr 1fr}.kpi-card:last-child{grid-column:1/-1}.summary-grid,.lower-stack{grid-template-columns:1fr 1fr}.dashboard-upper,.dashboard-lower{grid-template-columns:1fr}.invoice-panel{min-width:0}}
+@media(max-width:520px){.dash-header{flex-direction:column}.kpi-grid,.summary-grid,.lower-stack{grid-template-columns:1fr}.kpi-card:last-child{grid-column:auto}.revenue-strip{width:100%;min-width:0}.chart-wrap{padding-left:10px;padding-right:10px}.dashboard-main{padding-bottom:80px}}
+
+/* Viewport-aware density: use the available desktop height instead of leaving
+   a large, inactive area below the operational widgets. */
+@media(min-width:1181px){
+  .dashboard-main.landlord-dashboard-page{min-height:100dvh;display:flex;flex-direction:column;padding:24px 26px 28px}
+  .landlord-dashboard-page .dash-header{margin-bottom:18px}
+  .landlord-dashboard-page .dashboard-upper{min-height:clamp(300px,38vh,440px)}
+  .landlord-dashboard-page .chart-panel{display:flex;flex-direction:column}
+  .landlord-dashboard-page .chart-wrap{height:auto;min-height:250px;flex:1}
+  .landlord-dashboard-page .summary-grid{grid-template-rows:1fr 1fr}
+  .landlord-dashboard-page .summary-card{display:flex;flex-direction:column}
+  .landlord-dashboard-page .summary-card ul{display:flex;flex:1;flex-direction:column;justify-content:space-evenly;padding:10px 14px}
+  .landlord-dashboard-page .dashboard-lower{min-height:clamp(270px,28vh,350px);flex:1}
+  .landlord-dashboard-page .lower-stack{height:100%}
+  .landlord-dashboard-page .lower-stack>.dashboard-panel,
+  .landlord-dashboard-page .invoice-panel{height:100%}
+  .landlord-dashboard-page .lower-stack>.dashboard-panel,
+  .landlord-dashboard-page .invoice-panel{display:flex;flex-direction:column}
+  .landlord-dashboard-page .action-list{display:flex;flex:1;flex-direction:column;justify-content:space-evenly}
+  .landlord-dashboard-page .action-list button{min-height:38px;padding:7px}
+  .landlord-dashboard-page .invoice-table-wrap{flex:1}
+  .landlord-dashboard-page .invoice-table-wrap td{padding:clamp(9px,1.15vh,14px) 10px}
+}
+
+@media(min-width:1181px) and (max-height:850px){
+  .dashboard-main.landlord-dashboard-page{padding-top:18px;padding-bottom:20px}
+  .landlord-dashboard-page .dashboard-upper{min-height:285px}
+  .landlord-dashboard-page .dashboard-lower{min-height:245px}
+}
+
+/* Readability pass: larger type with the same dense dashboard structure. */
+.landlord-dashboard-page .dash-header h1{font-size:32px}
+.landlord-dashboard-page .dash-header p{font-size:15px}
+.landlord-dashboard-page .dash-header .dash-kicker{font-size:11px}
+.landlord-dashboard-page .month-picker{font-size:13px}
+.landlord-dashboard-page .month-picker input{font-size:13px}
+.landlord-dashboard-page .kpi-card span,
+.landlord-dashboard-page .revenue-strip span{font-size:12px}
+.landlord-dashboard-page .kpi-card strong{font-size:23px}
+.landlord-dashboard-page .kpi-card small{font-size:10px}
+.landlord-dashboard-page .revenue-strip strong{font-size:18px}
+.landlord-dashboard-page .dashboard-panel>h2{font-size:14px;padding-top:13px;padding-bottom:13px}
+.landlord-dashboard-page .summary-card li{font-size:12px;min-height:30px}
+.landlord-dashboard-page .summary-card li strong{font-size:13px}
+.landlord-dashboard-page .action-list button{font-size:12px}
+.landlord-dashboard-page .alert-count{font-size:12px}
+.landlord-dashboard-page .invoice-table-wrap table{font-size:11px}
+.landlord-dashboard-page .invoice-table-wrap th{font-size:11px}
+.landlord-dashboard-page .invoice-status{font-size:10px}
+.landlord-dashboard-page .view-all{font-size:11px}
+.landlord-dashboard-page .y-label,
+.landlord-dashboard-page .bar-column>span,
+.landlord-dashboard-page .bar-column small{font-size:11px}
+.landlord-dashboard-page .table-empty{font-size:13px}
+
+@media(max-width:760px){
+  .landlord-dashboard-page .dash-header h1{font-size:28px}
+  .landlord-dashboard-page .kpi-card strong{font-size:21px}
+  .landlord-dashboard-page .invoice-table-wrap table{font-size:10px}
+}
+
+/* Slightly larger operational type and an accessible revenue tooltip. */
+.landlord-dashboard-page .dash-header p{font-size:16px}
+.landlord-dashboard-page .kpi-card span,
+.landlord-dashboard-page .revenue-strip span{font-size:13px}
+.landlord-dashboard-page .kpi-card strong{font-size:25px}
+.landlord-dashboard-page .kpi-card small{font-size:11px}
+.landlord-dashboard-page .revenue-strip strong{font-size:20px}
+.landlord-dashboard-page .dashboard-panel>h2{font-size:15px}
+.landlord-dashboard-page .summary-card li{font-size:13px}
+.landlord-dashboard-page .summary-card li strong{font-size:14px}
+.landlord-dashboard-page .action-list button{font-size:13px}
+.landlord-dashboard-page .invoice-table-wrap table,
+.landlord-dashboard-page .invoice-table-wrap th{font-size:12px}
+.landlord-dashboard-page .invoice-status,
+.landlord-dashboard-page .view-all{font-size:11px}
+.landlord-dashboard-page .bar-column>span,
+.landlord-dashboard-page .bar-column small,
+.landlord-dashboard-page .y-label{font-size:12px}
+.landlord-dashboard-page .bar{position:relative;cursor:pointer;outline:none}
+.landlord-dashboard-page .bar::after{
+  content:attr(data-tooltip);
+  position:absolute;
+  z-index:10;
+  left:50%;
+  bottom:calc(100% + 9px);
+  padding:8px 11px;
+  border-radius:7px;
+  background:#12213f;
+  color:#fff;
+  box-shadow:0 8px 22px rgba(18,33,63,.2);
+  font-size:12px;
+  font-weight:700;
+  line-height:1;
+  white-space:nowrap;
+  opacity:0;
+  pointer-events:none;
+  transform:translate(-50%,5px);
+  transition:opacity .16s ease,transform .16s ease;
+}
+.landlord-dashboard-page .bar::before{
+  content:"";
+  position:absolute;
+  z-index:11;
+  left:50%;
+  bottom:calc(100% + 4px);
+  border:5px solid transparent;
+  border-top-color:#12213f;
+  opacity:0;
+  transform:translateX(-50%);
+  transition:opacity .16s ease;
+}
+.landlord-dashboard-page .bar:hover::after,
+.landlord-dashboard-page .bar:hover::before,
+.landlord-dashboard-page .bar:focus-visible::after,
+.landlord-dashboard-page .bar:focus-visible::before{opacity:1}
+.landlord-dashboard-page .bar:hover::after,
+.landlord-dashboard-page .bar:focus-visible::after{transform:translate(-50%,0)}
+.landlord-dashboard-page .bar:focus-visible{box-shadow:0 0 0 3px rgba(36,107,254,.2),0 4px 10px #246bfe35}
+
+@media(max-width:760px){
+  .landlord-dashboard-page .kpi-card strong{font-size:23px}
+  .landlord-dashboard-page .invoice-table-wrap table,
+  .landlord-dashboard-page .invoice-table-wrap th{font-size:11px}
+}
+
+/* Comfortable desktop scale: enlarge components and type together. */
+@media(min-width:1181px){
+  .dashboard-main.landlord-dashboard-page{padding:28px 32px 32px}
+  .landlord-dashboard-page .dash-header{margin-bottom:22px}
+  .landlord-dashboard-page .dash-header h1{font-size:36px}
+  .landlord-dashboard-page .dash-header p{font-size:17px}
+  .landlord-dashboard-page .dash-header .dash-kicker{font-size:12px}
+  .landlord-dashboard-page .month-picker{padding:11px 14px;font-size:14px}
+  .landlord-dashboard-page .month-picker input{font-size:14px}
+  .landlord-dashboard-page .month-picker .dash-icon{width:18px;height:18px}
+  .landlord-dashboard-page .kpi-grid{gap:12px}
+  .landlord-dashboard-page .kpi-card{min-height:96px;padding:17px;gap:14px}
+  .landlord-dashboard-page .kpi-card>.dash-icon,
+  .landlord-dashboard-page .revenue-strip>.dash-icon{width:44px;height:44px;padding:10px}
+  .landlord-dashboard-page .kpi-card span,
+  .landlord-dashboard-page .revenue-strip span{font-size:14px}
+  .landlord-dashboard-page .kpi-card strong{font-size:28px}
+  .landlord-dashboard-page .kpi-card small{font-size:12px}
+  .landlord-dashboard-page .revenue-strip{min-width:360px;padding:13px 17px;gap:14px}
+  .landlord-dashboard-page .revenue-strip strong{font-size:22px}
+  .landlord-dashboard-page .dashboard-panel>h2{padding:15px 17px;font-size:17px}
+  .landlord-dashboard-page .dashboard-panel>h2 .dash-icon{width:18px;height:18px}
+  .landlord-dashboard-page .summary-card ul{padding:13px 17px}
+  .landlord-dashboard-page .summary-card li{min-height:36px;font-size:15px}
+  .landlord-dashboard-page .summary-card li strong{font-size:16px}
+  .landlord-dashboard-page .dot{width:7px;height:7px}
+  .landlord-dashboard-page .action-list{padding:9px}
+  .landlord-dashboard-page .action-list button{min-height:48px;padding:10px;font-size:15px}
+  .landlord-dashboard-page .alert-count{width:28px;height:28px;font-size:14px}
+  .landlord-dashboard-page .action-list .dash-icon{width:17px;height:17px}
+  .landlord-dashboard-page .quick-list button>.dash-icon:first-child{width:28px;height:28px;padding:6px}
+  .landlord-dashboard-page .invoice-table-wrap table,
+  .landlord-dashboard-page .invoice-table-wrap th{font-size:14px}
+  .landlord-dashboard-page .invoice-table-wrap th{padding:11px 13px}
+  .landlord-dashboard-page .invoice-table-wrap td{padding:clamp(12px,1.3vh,17px) 13px}
+  .landlord-dashboard-page .invoice-status{padding:5px 8px;font-size:12px}
+  .landlord-dashboard-page .view-all{padding:12px;font-size:13px}
+  .landlord-dashboard-page .bar-column>span,
+  .landlord-dashboard-page .bar-column small,
+  .landlord-dashboard-page .y-label{font-size:13px}
+  .landlord-dashboard-page .bar{width:min(42px,62%)}
+}
+
+@media(min-width:1181px) and (max-height:850px){
+  .dashboard-main.landlord-dashboard-page{padding-top:20px;padding-bottom:22px}
+  .landlord-dashboard-page .kpi-card{min-height:86px;padding:14px}
+  .landlord-dashboard-page .action-list button{min-height:42px}
+}
+
+/* Keep the X axis above month labels so it never crosses the text. */
+.landlord-dashboard-page .bars{border-bottom:0}
+.landlord-dashboard-page .bar-track{border-bottom:1px solid #ccd5e2}
+.landlord-dashboard-page .bar-column small{
+  box-sizing:border-box;
+  width:100%;
+  height:25px;
+  padding-top:7px;
+  color:#63718a;
+  font-size:14px;
+  font-weight:500;
+  line-height:1;
+  text-align:center;
+  white-space:nowrap;
+}
+.landlord-dashboard-page .bar-track{height:calc(100% - 42px)}

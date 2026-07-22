@@ -1,4 +1,5 @@
 export const ENDPOINTS = {
+  LANDLORD_DASHBOARD: '/api/landlord/dashboard',
   AUTH: {
     REGISTER: '/api/auth/register',
     VERIFY_EMAIL_OTP: '/api/auth/verify-email-otp',
