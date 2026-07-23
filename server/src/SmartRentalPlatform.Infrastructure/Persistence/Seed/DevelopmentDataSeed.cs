@@ -136,6 +136,8 @@ public static class DevelopmentDataSeed
             mediaStorageService,
             mediaObjectKeyFactory,
             cancellationToken);
+        Console.WriteLine("[seed] demo service prices");
+        await SeedDemoServicePricesAsync(context, cancellationToken);
         Console.WriteLine("[seed] base rooms");
         await SeedRoomsAsync(context, cancellationToken);
         Console.WriteLine("[seed] backfill public seed media");
@@ -712,7 +714,9 @@ public static class DevelopmentDataSeed
     {
         var electricAmount = electricReading.Consumption * 4000m;
         var waterAmount = waterReading.Consumption * 18000m;
-        var serviceAmount = 150000m;
+        const decimal internetAmount = 120000m;
+        const decimal trashAmount = 30000m;
+        var serviceAmount = internetAmount + trashAmount;
         var utilityAmount = electricAmount + waterAmount;
         var totalAmount = roomSeed.MonthlyRent + utilityAmount + serviceAmount;
         var invoiceNo = $"HD-XHUNS-{roomSeed.RoomNumber}-{periodStart:yyyyMM}";
@@ -759,7 +763,8 @@ public static class DevelopmentDataSeed
                 CreateInvoiceItem(CreateSeedGuid($"xunhuns:item:rent:{invoiceNo}"), invoice.Id, null, null, InvoiceItemType.Rent, $"Tiền phòng {roomSeed.RoomNumber} tháng {periodStart:MM/yyyy}", 1, roomSeed.MonthlyRent),
                 CreateInvoiceItem(CreateSeedGuid($"xunhuns:item:electric:{invoiceNo}"), invoice.Id, ElectricServiceTypeId, electricReading.Id, InvoiceItemType.Service, $"Điện tháng {periodStart:MM/yyyy}: {electricReading.CurrentReading} - {electricReading.PreviousReading} = {electricReading.Consumption} kWh", electricReading.Consumption, 4000m),
                 CreateInvoiceItem(CreateSeedGuid($"xunhuns:item:water:{invoiceNo}"), invoice.Id, WaterServiceTypeId, waterReading.Id, InvoiceItemType.Service, $"Nước tháng {periodStart:MM/yyyy}: {waterReading.CurrentReading} - {waterReading.PreviousReading} = {waterReading.Consumption} m3", waterReading.Consumption, 18000m),
-                CreateInvoiceItem(CreateSeedGuid($"xunhuns:item:service:{invoiceNo}"), invoice.Id, InternetServiceTypeId, null, InvoiceItemType.Service, $"Internet, rác và vệ sinh chung tháng {periodStart:MM/yyyy}", 1, serviceAmount)
+                CreateInvoiceItem(CreateSeedGuid($"xunhuns:item:internet:{invoiceNo}"), invoice.Id, InternetServiceTypeId, null, InvoiceItemType.Service, $"Internet tháng {periodStart:MM/yyyy}", 1, internetAmount),
+                CreateInvoiceItem(CreateSeedGuid($"xunhuns:item:trash:{invoiceNo}"), invoice.Id, TrashServiceTypeId, null, InvoiceItemType.Service, $"Rác và vệ sinh chung tháng {periodStart:MM/yyyy}", 1, trashAmount)
             },
             cancellationToken);
 
@@ -1461,6 +1466,14 @@ public static class DevelopmentDataSeed
         int Rating,
         string Comment);
 
+    private sealed record DemoServicePriceSeed(
+        Guid RoomingHouseId,
+        Guid ServiceTypeId,
+        PricingUnit PricingUnit,
+        decimal UnitPrice,
+        DateOnly EffectiveFrom,
+        string Note);
+
     private static async Task SeedBillingServiceTypesAsync(AppDbContext context, CancellationToken cancellationToken)
     {
         var now = DateTimeOffset.UtcNow;
@@ -1551,6 +1564,60 @@ public static class DevelopmentDataSeed
         await EnsureApprovedKycAsync(context, Guid.Parse("60000000-0000-0000-0000-000000000007"), BulkInvoiceTenantUserId, "Hoàng Minh", "079********107", "demo-bulk-invoice-tenant-hoang-minh-citizen-id-hash", new DateOnly(1999, 9, 9), cancellationToken);
         await EnsureApprovedKycAsync(context, Guid.Parse("60000000-0000-0000-0000-000000000005"), GuestTenantUserId, "Pham Ngoc Mai", "079********105", "demo-guest-tenant-pham-ngoc-mai-citizen-id-hash", new DateOnly(1999, 5, 5), cancellationToken);
         await EnsureApprovedKycAsync(context, Guid.Parse("60000000-0000-0000-0000-000000000006"), NewOccupantUserId, "Vo Thao Vy", "079********106", "demo-new-occupant-vo-thao-vy-citizen-id-hash", new DateOnly(2001, 6, 15), cancellationToken);
+
+        await context.SaveChangesAsync(cancellationToken);
+    }
+
+    private static async Task SeedDemoServicePricesAsync(AppDbContext context, CancellationToken cancellationToken)
+    {
+        var effectiveFrom = new DateOnly(2026, 4, 1);
+        var prices = new[]
+        {
+            new DemoServicePriceSeed(ApprovedHouseId, ElectricServiceTypeId, PricingUnit.MeterReading, 4000m, effectiveFrom, "Đơn giá điện cho Khu trọ Xuân Huấn."),
+            new DemoServicePriceSeed(ApprovedHouseId, WaterServiceTypeId, PricingUnit.MeterReading, 18000m, effectiveFrom, "Đơn giá nước cho Khu trọ Xuân Huấn."),
+            new DemoServicePriceSeed(ApprovedHouseId, InternetServiceTypeId, PricingUnit.PerMonth, 120000m, effectiveFrom, "Internet cố định hằng tháng cho Khu trọ Xuân Huấn."),
+            new DemoServicePriceSeed(ApprovedHouseId, TrashServiceTypeId, PricingUnit.PerMonth, 40000m, effectiveFrom, "Phí rác, vệ sinh chung hằng tháng cho Khu trọ Xuân Huấn."),
+
+            new DemoServicePriceSeed(SunriseHouseId, ElectricServiceTypeId, PricingUnit.MeterReading, 4000m, effectiveFrom, "Đơn giá điện cho Khu trọ An Phú."),
+            new DemoServicePriceSeed(SunriseHouseId, WaterServiceTypeId, PricingUnit.MeterReading, 18000m, effectiveFrom, "Đơn giá nước cho Khu trọ An Phú."),
+            new DemoServicePriceSeed(SunriseHouseId, InternetServiceTypeId, PricingUnit.PerMonth, 120000m, effectiveFrom, "Internet cố định hằng tháng cho Khu trọ An Phú."),
+            new DemoServicePriceSeed(SunriseHouseId, TrashServiceTypeId, PricingUnit.PerMonth, 30000m, effectiveFrom, "Phí rác, vệ sinh chung hằng tháng cho Khu trọ An Phú."),
+
+            new DemoServicePriceSeed(GreenViewHouseId, ElectricServiceTypeId, PricingUnit.MeterReading, 4000m, effectiveFrom, "Đơn giá điện cho Nhà trọ Minh Khang."),
+            new DemoServicePriceSeed(GreenViewHouseId, WaterServiceTypeId, PricingUnit.MeterReading, 18000m, effectiveFrom, "Đơn giá nước cho Nhà trọ Minh Khang."),
+            new DemoServicePriceSeed(GreenViewHouseId, InternetServiceTypeId, PricingUnit.PerMonth, 120000m, effectiveFrom, "Internet cố định hằng tháng cho Nhà trọ Minh Khang."),
+            new DemoServicePriceSeed(GreenViewHouseId, TrashServiceTypeId, PricingUnit.PerMonth, 30000m, effectiveFrom, "Phí rác, vệ sinh chung hằng tháng cho Nhà trọ Minh Khang.")
+        };
+
+        foreach (var seed in prices)
+        {
+            var price = await context.RoomingHouseServicePrices
+                .FirstOrDefaultAsync(x =>
+                    x.RoomingHouseId == seed.RoomingHouseId &&
+                    x.ServiceTypeId == seed.ServiceTypeId &&
+                    x.EffectiveFrom == seed.EffectiveFrom,
+                    cancellationToken);
+
+            if (price is null)
+            {
+                price = new RoomingHouseServicePrice
+                {
+                    Id = CreateSeedGuid($"service-price:{seed.RoomingHouseId}:{seed.ServiceTypeId}:{seed.EffectiveFrom:yyyyMMdd}"),
+                    RoomingHouseId = seed.RoomingHouseId,
+                    ServiceTypeId = seed.ServiceTypeId,
+                    EffectiveFrom = seed.EffectiveFrom,
+                    CreatedAt = SeededAt
+                };
+                context.RoomingHouseServicePrices.Add(price);
+            }
+
+            price.PricingUnit = seed.PricingUnit;
+            price.UnitPrice = seed.UnitPrice;
+            price.EffectiveTo = null;
+            price.IsActive = true;
+            price.Note = seed.Note;
+            price.UpdatedAt = DateTimeOffset.UtcNow;
+        }
 
         await context.SaveChangesAsync(cancellationToken);
     }
@@ -2916,9 +2983,9 @@ public static class DevelopmentDataSeed
                 contractNumber,
                 cancellationToken);
 
-            for (var month = 4; month <= 6; month++)
+            for (var month = 4; month <= 7; month++)
             {
-                var status = InvoiceStatus.Paid;
+                var status = month == 7 ? InvoiceStatus.Draft : InvoiceStatus.Paid;
                 var invoiceId = CreateSeedGuid($"xunhuns:invoice:{roomSeed.RoomNumber}:2026-{month:D2}");
                 var electricReadingId = CreateSeedGuid($"xunhuns:meter:electric:{roomSeed.RoomNumber}:2026-{month:D2}");
                 var waterReadingId = CreateSeedGuid($"xunhuns:meter:water:{roomSeed.RoomNumber}:2026-{month:D2}");
@@ -3018,7 +3085,6 @@ public static class DevelopmentDataSeed
             }
         }
 
-        await RemoveSecondaryLandlordJulyDraftInvoicesAsync(context, cancellationToken);
         await EnsureSecondaryLandlordWithdrawalAsync(context, landlordBalance, cancellationToken);
         await EnsureSecondaryLandlordChatAsync(context, roomSeeds, tenantSeeds, cancellationToken);
         await EnsureSecondaryLandlordReviewsAsync(
@@ -3028,57 +3094,6 @@ public static class DevelopmentDataSeed
             cancellationToken);
 
         await context.SaveChangesAsync(cancellationToken);
-    }
-
-    private static async Task RemoveSecondaryLandlordJulyDraftInvoicesAsync(
-        AppDbContext context,
-        CancellationToken cancellationToken)
-    {
-        await context.Database.ExecuteSqlRawAsync("""
-            DELETE FROM wallet_transactions
-            WHERE related_entity_type = 'Invoice'
-              AND related_entity_id IN (
-                  SELECT i.id
-                  FROM invoices i
-                  JOIN contracts c ON c.id = i.contract_id
-                  JOIN rooms r ON r.id = c.room_id
-                  JOIN rooming_houses h ON h.id = r.rooming_house_id
-                  WHERE h.landlord_user_id = '10000000-0000-0000-0000-000000000004'
-                    AND i.billing_period_start = DATE '2026-07-01'
-              );
-
-            DELETE FROM invoice_items
-            WHERE invoice_id IN (
-                SELECT i.id
-                FROM invoices i
-                JOIN contracts c ON c.id = i.contract_id
-                JOIN rooms r ON r.id = c.room_id
-                JOIN rooming_houses h ON h.id = r.rooming_house_id
-                WHERE h.landlord_user_id = '10000000-0000-0000-0000-000000000004'
-                  AND i.billing_period_start = DATE '2026-07-01'
-            );
-
-            DELETE FROM invoices
-            WHERE id IN (
-                SELECT i.id
-                FROM invoices i
-                JOIN contracts c ON c.id = i.contract_id
-                JOIN rooms r ON r.id = c.room_id
-                JOIN rooming_houses h ON h.id = r.rooming_house_id
-                WHERE h.landlord_user_id = '10000000-0000-0000-0000-000000000004'
-                  AND i.billing_period_start = DATE '2026-07-01'
-            );
-
-            DELETE FROM meter_readings
-            WHERE contract_id IN (
-                SELECT c.id
-                FROM contracts c
-                JOIN rooms r ON r.id = c.room_id
-                JOIN rooming_houses h ON h.id = r.rooming_house_id
-                WHERE h.landlord_user_id = '10000000-0000-0000-0000-000000000004'
-            )
-              AND billing_period_start = DATE '2026-07-01';
-            """, cancellationToken);
     }
 
     private static async Task EnsureShowcaseUsersAndHouseAsync(
