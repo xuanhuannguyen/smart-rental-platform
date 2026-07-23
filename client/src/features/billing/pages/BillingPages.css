@@ -1415,7 +1415,6 @@
 .meter-reading-main {
   min-width: 0;
   display: grid;
-  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr) minmax(220px, 1fr);
   gap: 14px;
   align-items: stretch;
 }
@@ -1619,6 +1618,106 @@
   display: grid;
   grid-template-columns: 360px minmax(0, 1fr);
   gap: 18px;
+}
+
+/* Meter AI invoice reader polish */
+.invoice-create-meter-card {
+  grid-template-columns: minmax(560px, 1fr) minmax(240px, 300px);
+  align-items: stretch;
+}
+
+.invoice-create-meter-card .meter-reading-main {
+  grid-template-columns: none;
+  align-content: start;
+}
+
+.invoice-create-meter-card .meter-reading-fields {
+  grid-template-columns: repeat(3, minmax(170px, 1fr));
+  align-items: stretch;
+}
+
+.invoice-create-meter-card .invoice-create-field {
+  min-width: 0;
+  min-height: 118px;
+  justify-content: start;
+  gap: 8px;
+  padding: 14px;
+}
+
+.invoice-create-meter-card .invoice-create-field .label {
+  line-height: 1.25;
+  white-space: normal;
+  word-break: normal;
+  overflow-wrap: normal;
+}
+
+.invoice-create-meter-card .invoice-create-field strong,
+.invoice-create-meter-card .meter-calculation strong {
+  white-space: normal;
+  word-break: normal;
+  overflow-wrap: normal;
+}
+
+.invoice-create-meter-card .meter-calculation {
+  grid-template-columns: minmax(145px, 1fr) 18px minmax(145px, 1fr) 18px minmax(145px, 1fr);
+  overflow-x: auto;
+  padding-bottom: 2px;
+}
+
+.invoice-create-meter-card .meter-calculation span {
+  min-width: 145px;
+}
+
+.invoice-create-meter-card .meter-image-panel {
+  background: #f8fbff;
+}
+
+.invoice-create-meter-card .meter-image-panel img,
+.invoice-create-meter-card .meter-image-empty {
+  aspect-ratio: 16 / 10;
+  min-height: 150px;
+}
+
+@media (max-width: 1180px) {
+  .invoice-create-meter-card {
+    grid-template-columns: 1fr;
+  }
+
+  .invoice-create-meter-card .meter-reading-main {
+    padding-right: 0;
+    padding-bottom: 14px;
+    border-right: 0;
+    border-bottom: 1px solid #e2e8f0;
+  }
+
+  .invoice-create-meter-card .meter-image-panel {
+    grid-template-columns: minmax(180px, 260px) minmax(0, 1fr);
+    align-items: center;
+  }
+
+  .invoice-create-meter-card .meter-image-panel > .label,
+  .invoice-create-meter-card .meter-image-panel > small {
+    grid-column: 1 / -1;
+  }
+}
+
+@media (max-width: 760px) {
+  .invoice-create-meter-card .meter-reading-fields,
+  .invoice-create-meter-card .meter-image-panel {
+    grid-template-columns: 1fr;
+  }
+
+  .invoice-create-meter-card .meter-calculation {
+    grid-template-columns: 1fr;
+  }
+
+  .invoice-create-meter-card .meter-calculation b {
+    display: none;
+  }
+
+  .invoice-create-meter-card .meter-calculation span {
+    min-width: 0;
+  }
 }
 
 .invoice-list-item {

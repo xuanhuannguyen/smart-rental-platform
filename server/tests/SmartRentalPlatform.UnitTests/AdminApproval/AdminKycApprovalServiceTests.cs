@@ -1,4 +1,6 @@
 using SmartRentalPlatform.Application.AdminApproval;
+using SmartRentalPlatform.Application.Common.Interfaces;
+using SmartRentalPlatform.Contracts.Admin.Requests;
 using SmartRentalPlatform.Domain.Entities.Users;
 using SmartRentalPlatform.Domain.Enums.Kyc;
 using SmartRentalPlatform.Domain.Enums.Properties;
@@ -21,7 +23,7 @@ public class AdminKycApprovalServiceTests : IDisposable
         _fixture.Context.KycVerifications.AddRange(older, newer, approved);
         await _fixture.Context.SaveChangesAsync();
 
-        var service = new AdminKycApprovalService(_fixture.Context);
+        var service = CreateService();
 
         var result = await service.GetPendingAsync(pageNumber: 1, pageSize: 10);
 
@@ -34,7 +36,7 @@ public class AdminKycApprovalServiceTests : IDisposable
     [Fact]
     public async Task GetDetailAsync_WhenKycMissing_ReturnsNull()
     {
-        var service = new AdminKycApprovalService(_fixture.Context);
+        var service = CreateService();
 
         var result = await service.GetDetailAsync(Guid.NewGuid());
 
@@ -50,7 +52,7 @@ public class AdminKycApprovalServiceTests : IDisposable
         _fixture.Context.KycVerifications.Add(kyc);
         await _fixture.Context.SaveChangesAsync();
 
-        var service = new AdminKycApprovalService(_fixture.Context);
+        var service = CreateService();
 
         var result = await service.GetDetailAsync(kyc.Id);
 
@@ -75,9 +77,9 @@ public class AdminKycApprovalServiceTests : IDisposable
         _fixture.Context.KycVerifications.Add(kyc);
         await _fixture.Context.SaveChangesAsync();
 
-        var service = new AdminKycApprovalService(_fixture.Context);
+        var service = CreateService();
 
-        var result = await service.ApproveAsync(kyc.Id, adminId);
+        var result = await service.ApproveAsync(kyc.Id, adminId, new AdminApproveKycRequest());
 
         Assert.True(result);
         Assert.Equal(KycVerificationStatus.Approved, kyc.Status);
@@ -98,9 +100,9 @@ public class AdminKycApprovalServiceTests : IDisposable
         _fixture.Context.KycVerifications.Add(kyc);
         await _fixture.Context.SaveChangesAsync();
 
-        var service = new AdminKycApprovalService(_fixture.Context);
+        var service = CreateService();
 
-        var result = await service.ApproveAsync(kyc.Id, Guid.NewGuid());
+        var result = await service.ApproveAsync(kyc.Id, Guid.NewGuid(), new AdminApproveKycRequest());
 
         Assert.False(result);
     }
@@ -108,7 +110,7 @@ public class AdminKycApprovalServiceTests : IDisposable
     [Fact]
     public async Task RejectAsync_WhenReasonBlank_ReturnsFalse()
     {
-        var service = new AdminKycApprovalService(_fixture.Context);
+        var service = CreateService();
 
         var result = await service.RejectAsync(Guid.NewGuid(), Guid.NewGuid(), "   ");
 
@@ -126,7 +128,7 @@ public class AdminKycApprovalServiceTests : IDisposable
         _fixture.Context.KycVerifications.Add(kyc);
         await _fixture.Context.SaveChangesAsync();
 
-        var service = new AdminKycApprovalService(_fixture.Context);
+        var service = CreateService();
 
         var result = await service.RejectAsync(kyc.Id, adminId, "  blurry images  ");
 
@@ -148,7 +150,7 @@ public class AdminKycApprovalServiceTests : IDisposable
         _fixture.Context.KycVerifications.AddRange(older, newer, otherUser);
         await _fixture.Context.SaveChangesAsync();
 
-        var service = new AdminKycApprovalService(_fixture.Context);
+        var service = CreateService();
 
         var result = await service.GetHistoryAsync(user.Id);
 
@@ -196,6 +198,28 @@ public class AdminKycApprovalServiceTests : IDisposable
             CreatedAt = now,
             UpdatedAt = now
         };
+    }
+
+    private AdminKycApprovalService CreateService()
+    {
+        return new AdminKycApprovalService(
+            _fixture.Context,
+            new FakeHashService(),
+            new FakeSensitiveDataProtector());
+    }
+
+    private sealed class FakeHashService : IHashService
+    {
+        public string HashSha256Hex(string value) => $"hash:{value}";
+    }
+
+    private sealed class FakeSensitiveDataProtector : ISensitiveDataProtector
+    {
+        public string Encrypt(string plainText) => $"encrypted:{plainText}";
+
+        public string Decrypt(string encryptedText) => encryptedText.StartsWith("encrypted:", StringComparison.Ordinal)
+            ? encryptedText["encrypted:".Length..]
+            : encryptedText;
     }
 
     public void Dispose()

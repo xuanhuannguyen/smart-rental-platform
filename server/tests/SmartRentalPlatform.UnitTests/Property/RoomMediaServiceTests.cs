@@ -1,4 +1,4 @@
-using Microsoft.EntityFrameworkCore;
+﻿using Microsoft.EntityFrameworkCore;
 using SmartRentalPlatform.Application.Common.Exceptions;
 using SmartRentalPlatform.Application.Common.Media;
 using SmartRentalPlatform.Application.Rooms;
@@ -78,7 +78,7 @@ public class RoomMediaServiceTests : IDisposable
         Assert.Equal(
             [coverAssetId, secondAssetId, thirdAssetId],
             result.Images.OrderBy(x => x.SortOrder).Select(x => x.MediaAssetId).Cast<Guid>().ToArray());
-        Assert.Equal($"/api/media/public/{coverAssetId:D}", result.Images[0].ImageUrl);
+        Assert.Equal(PublicMediaPathBuilder.Build(coverAssetId), result.Images[0].ImageUrl);
 
         var imagesInDb = await _fixture.Context.PropertyImages
             .Where(x => x.RoomId == room.Id)
@@ -190,9 +190,9 @@ public class RoomMediaServiceTests : IDisposable
         Assert.NotNull(result);
         Assert.Equal(
             [
-                $"/api/media/public/{coverAssetId:D}",
-                $"/api/media/public/{secondAssetId:D}",
-                $"/api/media/public/{thirdAssetId:D}"
+                PublicMediaPathBuilder.Build(coverAssetId),
+                PublicMediaPathBuilder.Build(secondAssetId),
+                PublicMediaPathBuilder.Build(thirdAssetId)
             ],
             result!.Images.OrderBy(x => x.SortOrder).Select(x => x.ImageUrl).ToArray());
 

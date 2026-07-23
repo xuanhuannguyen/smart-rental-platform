@@ -34,6 +34,8 @@ import { cleanImages, toImageRequests } from '../utils/imageRequests';
 import './RoomingHouseEditor.css';
 
 type RoomingHouseTab = 'basic' | 'images' | 'amenities' | 'legal' | 'rental-policy';
+type LegalImageFieldName = 'front' | 'back' | 'extra';
+type LegalImagePreviews = Record<LegalImageFieldName, string>;
 type RoomingHouseEditorProps = {
   title: string;
   subtitle: string;
@@ -95,6 +97,14 @@ function buildLegalForm(detail: RoomingHouseDetail | null): UpdateLegalDocumentR
     backMediaAssetId: detail.legalDocument?.backMediaAssetId ?? null,
     extraMediaAssetId: detail.legalDocument?.extraMediaAssetId ?? null,
     documentNumber: detail.legalDocument?.documentNumberMasked ?? '',
+  };
+}
+
+function buildLegalImagePreviews(detail: RoomingHouseDetail | null): LegalImagePreviews {
+  return {
+    front: detail?.legalDocument?.frontImageUrl ?? '',
+    back: detail?.legalDocument?.backImageUrl ?? '',
+    extra: detail?.legalDocument?.extraImageUrl ?? '',
   };
 }
 
@@ -177,6 +187,10 @@ export default function RoomingHouseEditor({
   const [legalForm, setLegalForm] = useState<UpdateLegalDocumentRequest>(() =>
     buildLegalForm(initialRoomingHouse ?? null)
   );
+  const [legalImagePreviews, setLegalImagePreviews] = useState<LegalImagePreviews>(() =>
+    buildLegalImagePreviews(initialRoomingHouse ?? null)
+  );
+  const legalPreviewObjectUrlsRef = useRef<Partial<LegalImagePreviews>>({});
   const [rentalPolicyForm, setRentalPolicyForm] = useState<UpdateRentalPolicyRequest>(() =>
     buildRentalPolicyForm(initialRoomingHouse ?? null)
   );
@@ -206,8 +220,14 @@ export default function RoomingHouseEditor({
         : []
     );
     setLegalForm(buildLegalForm(initialRoomingHouse ?? null));
+    revokeAllLegalPreviewObjectUrls();
+    setLegalImagePreviews(buildLegalImagePreviews(initialRoomingHouse ?? null));
     setRentalPolicyForm(buildRentalPolicyForm(initialRoomingHouse ?? null));
   }, [initialRoomingHouse]);
+
+  useEffect(() => {
+    return () => revokeAllLegalPreviewObjectUrls();
+  }, []);
 
 
   useEffect(() => {
@@ -350,6 +370,8 @@ export default function RoomingHouseEditor({
     setImages(toImageRequests(detail.images));
     setAmenityIds(detail.amenities.map((amenity) => amenity.id));
     setLegalForm(buildLegalForm(detail));
+    revokeAllLegalPreviewObjectUrls();
+    setLegalImagePreviews(buildLegalImagePreviews(detail));
     setRentalPolicyForm(buildRentalPolicyForm(detail));
   }
 
@@ -357,9 +379,39 @@ export default function RoomingHouseEditor({
     setBasicForm({ ...basicForm, provinceCode, wardCode: '' });
   }
 
-  async function uploadLegalImage(fieldName: 'front' | 'back' | 'extra', file: File | null) {
+  function revokeLegalPreviewObjectUrl(fieldName: LegalImageFieldName) {
+    const objectUrl = legalPreviewObjectUrlsRef.current[fieldName];
+    if (objectUrl) {
+      URL.revokeObjectURL(objectUrl);
+      delete legalPreviewObjectUrlsRef.current[fieldName];
+    }
+  }
+
+  function revokeAllLegalPreviewObjectUrls() {
+    (Object.keys(legalPreviewObjectUrlsRef.current) as LegalImageFieldName[]).forEach(
+      revokeLegalPreviewObjectUrl
+    );
+  }
+
+  function setLegalImagePreview(
+    fieldName: LegalImageFieldName,
+    imageUrl: string,
+    objectUrl?: string
+  ) {
+    revokeLegalPreviewObjectUrl(fieldName);
+    if (objectUrl) {
+      legalPreviewObjectUrlsRef.current[fieldName] = objectUrl;
+    }
+    setLegalImagePreviews((current) => ({
+      ...current,
+      [fieldName]: imageUrl,
+    }));
+  }
+
+  async function uploadLegalImage(fieldName: LegalImageFieldName, file: File | null) {
     if (!file || !canEditLegalDocument) return;
 
+    const localPreviewUrl = file.type.startsWith('image/') ? URL.createObjectURL(file) : '';
     setSaving(true);
     setToast(null);
 
@@ -369,7 +421,21 @@ export default function RoomingHouseEditor({
         ...current,
         [`${fieldName}MediaAssetId`]: uploaded.mediaAssetId || null,
       }));
+      const uploadedPreviewUrl = uploaded.url || localPreviewUrl;
+      if (uploadedPreviewUrl) {
+        setLegalImagePreview(
+          fieldName,
+          uploadedPreviewUrl,
+          uploaded.url ? undefined : localPreviewUrl
+        );
+      }
+      if (uploaded.url && localPreviewUrl) {
+        URL.revokeObjectURL(localPreviewUrl);
+      }
     } catch (error) {
+      if (localPreviewUrl) {
+        URL.revokeObjectURL(localPreviewUrl);
+      }
       setToast({
         message: getApiErrorMessage(error, 'Không thể tải ảnh giấy tờ lên.'),
         type: 'error',
@@ -379,12 +445,13 @@ export default function RoomingHouseEditor({
     }
   }
 
-  function removeLegalImage(fieldName: 'front' | 'back' | 'extra') {
+  function removeLegalImage(fieldName: LegalImageFieldName) {
     if (!canEditLegalDocument) return;
     setLegalForm((current) => ({
       ...current,
       [`${fieldName}MediaAssetId`]: null,
     }));
+    setLegalImagePreview(fieldName, '');
   }
 
   return (
@@ -660,21 +727,21 @@ export default function RoomingHouseEditor({
               <div className="legal-images-grid">
                 <LegalImageField
                   label="Ảnh mặt trước"
-                  imageUrl={roomingHouse?.legalDocument?.frontImageUrl ?? ''}
+                  imageUrl={legalImagePreviews.front}
                   readOnly={!canEditLegalDocument}
                   onUpload={(file) => void uploadLegalImage('front', file)}
                   onRemove={() => removeLegalImage('front')}
                 />
                 <LegalImageField
                   label="Ảnh mặt sau"
-                  imageUrl={roomingHouse?.legalDocument?.backImageUrl ?? ''}
+                  imageUrl={legalImagePreviews.back}
                   readOnly={!canEditLegalDocument}
                   onUpload={(file) => void uploadLegalImage('back', file)}
                   onRemove={() => removeLegalImage('back')}
                 />
                 <LegalImageField
                   label="Ảnh bổ sung"
-                  imageUrl={roomingHouse?.legalDocument?.extraImageUrl ?? ''}
+                  imageUrl={legalImagePreviews.extra}
                   readOnly={!canEditLegalDocument}
                   optional
                   onUpload={(file) => void uploadLegalImage('extra', file)}

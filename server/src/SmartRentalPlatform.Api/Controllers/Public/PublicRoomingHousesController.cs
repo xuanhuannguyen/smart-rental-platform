@@ -39,9 +39,11 @@ public class PublicRoomingHousesController : ControllerBase
 
     [HttpGet("listing")]
     public async Task<ActionResult<ApiResponse<List<RoomingHouseListingResponse>>>> GetListing(
-        CancellationToken cancellationToken)
+        [FromQuery] int page = 1,
+        [FromQuery] int pageSize = 24,
+        CancellationToken cancellationToken = default)
     {
-        var result = await roomingHouseQueryService.GetPublicListingAsync(cancellationToken);
+        var result = await roomingHouseQueryService.GetPublicListingAsync(page, pageSize, cancellationToken);
 
         return Ok(new ApiResponse<List<RoomingHouseListingResponse>>
         {

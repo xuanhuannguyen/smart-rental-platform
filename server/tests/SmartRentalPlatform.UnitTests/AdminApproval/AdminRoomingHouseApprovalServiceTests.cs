@@ -1,3 +1,4 @@
+﻿using SmartRentalPlatform.Application.Common.Media;
 using SmartRentalPlatform.Application.AdminApproval;
 using SmartRentalPlatform.Application.Users;
 using SmartRentalPlatform.Contracts.Users;
@@ -44,8 +45,8 @@ public class AdminRoomingHouseApprovalServiceTests : IDisposable
         var house = TestDataBuilder.BuildRoomingHouse(landlord.Id, name: "Detail House", status: RoomingHouseApprovalStatus.Pending);
         var firstImageAssetId = Guid.NewGuid();
         var secondImageAssetId = Guid.NewGuid();
-        var firstImageUrl = $"/api/media/public/{firstImageAssetId:D}";
-        var secondImageUrl = $"/api/media/public/{secondImageAssetId:D}";
+        var firstImageUrl = PublicMediaPathBuilder.Build(firstImageAssetId);
+        var secondImageUrl = PublicMediaPathBuilder.Build(secondImageAssetId);
         var roomA = TestDataBuilder.BuildRoom(house.Id, roomNumber: "102");
         roomA.Floor = 2;
         var roomB = TestDataBuilder.BuildRoom(house.Id, roomNumber: "101");
@@ -169,7 +170,7 @@ public class AdminRoomingHouseApprovalServiceTests : IDisposable
         Assert.NotNull(result);
         var image = Assert.Single(result!.Images);
         Assert.Equal(migratedAssetId, image.MediaAssetId);
-        Assert.Equal($"/api/media/public/{migratedAssetId:D}", image.ImageUrl);
+        Assert.Equal(PublicMediaPathBuilder.Build(migratedAssetId), image.ImageUrl);
     }
 
     [Fact]

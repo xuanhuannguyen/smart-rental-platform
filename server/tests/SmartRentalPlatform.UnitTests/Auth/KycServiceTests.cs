@@ -194,6 +194,7 @@ public class KycServiceTests : IClassFixture<TestDatabaseFixture>
         Assert.Equal(KycVerificationStatus.PendingAdminReview.ToString(), result.Status);
         Assert.Equal(EkycResult.Passed.ToString(), result.EkycResult);
         Assert.Equal(KycRiskLevel.Low.ToString(), result.RiskLevel);
+        Assert.False(result.SubmittedWithManualFallback);
         Assert.Equal("Submission received. Your profile is pending admin review.", result.Message);
         Assert.Equal("1234xxxx9012", result.OcrCitizenIdMasked);
 
@@ -243,7 +244,12 @@ public class KycServiceTests : IClassFixture<TestDatabaseFixture>
             SelfieCaptureMethod = SelfieCaptureMethod.Upload.ToString(),
             FrontMediaAssetId = frontAsset.Id,
             BackMediaAssetId = backAsset.Id,
-            SelfieMediaAssetId = selfieAsset.Id
+            SelfieMediaAssetId = selfieAsset.Id,
+            ManualCitizenId = "012345678901",
+            ManualFullName = "Nguyen Van Provider",
+            ManualDateOfBirth = new DateTime(1999, 1, 2),
+            ManualGender = "Nam",
+            ManualAddress = "Da Nang"
         };
 
         var result = await kycService.SubmitAsync(user.Id, request, CancellationToken.None);
@@ -251,7 +257,8 @@ public class KycServiceTests : IClassFixture<TestDatabaseFixture>
         Assert.Equal(KycVerificationStatus.PendingAdminReview.ToString(), result.Status);
         Assert.Equal(EkycResult.ProviderError.ToString(), result.EkycResult);
         Assert.Equal(KycRiskLevel.High.ToString(), result.RiskLevel);
-        Assert.Equal("Submission received. Your profile is pending admin review.", result.Message);
+        Assert.True(result.SubmittedWithManualFallback);
+        Assert.Equal("VNPT không đọc được hồ sơ tự động. Thông tin bạn điền thủ công đã được gửi cho admin duyệt.", result.Message);
 
         context.ChangeTracker.Clear();
 
@@ -265,6 +272,8 @@ public class KycServiceTests : IClassFixture<TestDatabaseFixture>
         Assert.Equal(KycVerificationStatus.PendingAdminReview, savedKyc.Status);
         Assert.Equal(EkycResult.ProviderError, savedKyc.EkycResult);
         Assert.Equal("VNPT_OCR_HTTP", savedKyc.EkycErrorCode);
+        Assert.Equal("Nguyen Van Provider", savedKyc.OcrFullName);
+        Assert.Equal("0123xxxx8901", savedKyc.OcrCitizenIdMasked);
         Assert.Equal(3, linkedAssets.Count);
     }
 

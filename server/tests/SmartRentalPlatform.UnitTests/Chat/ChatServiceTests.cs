@@ -1,3 +1,4 @@
+﻿using SmartRentalPlatform.Application.Common.Media;
 using Microsoft.EntityFrameworkCore;
 using SmartRentalPlatform.Application.Chat;
 using SmartRentalPlatform.Application.Common.Exceptions;
@@ -86,7 +87,7 @@ public sealed class ChatServiceTests : IDisposable
             new CreateDirectConversationRequest { OtherUserId = tenant.Id });
 
         var participant = Assert.Single(conversation.Participants, x => x.UserId == tenant.Id);
-        Assert.Equal($"/api/media/public/{avatar.Id:D}", participant.AvatarUrl);
+        Assert.Equal(PublicMediaPathBuilder.Build(avatar.Id), participant.AvatarUrl);
     }
 
     [Fact]
@@ -135,7 +136,7 @@ public sealed class ChatServiceTests : IDisposable
         Assert.Equal(secondAvatar.Id, savedConversation.AvatarMediaAssetId);
         Assert.Null(savedConversation.AvatarUrl);
         Assert.Equal(secondAvatar.Id, updated.AvatarMediaAssetId);
-        Assert.Equal($"/api/media/public/{secondAvatar.Id:D}", updated.AvatarUrl);
+        Assert.Equal(PublicMediaPathBuilder.Build(secondAvatar.Id), updated.AvatarUrl);
         Assert.Equal(MediaStatus.Deleted, savedFirstAvatar.Status);
         Assert.Equal(MediaStatus.Linked, savedSecondAvatar.Status);
         Assert.Equal(nameof(Conversation), savedSecondAvatar.LinkedEntityType);
@@ -199,7 +200,7 @@ public sealed class ChatServiceTests : IDisposable
             new UpdateConversationRequest { Title = "Updated title" });
 
         Assert.Equal(avatar.Id, updated.AvatarMediaAssetId);
-        Assert.Equal($"/api/media/public/{avatar.Id:D}", updated.AvatarUrl);
+        Assert.Equal(PublicMediaPathBuilder.Build(avatar.Id), updated.AvatarUrl);
         Assert.Equal(MediaStatus.Linked, avatar.Status);
         Assert.Null(avatar.DeletedAt);
     }

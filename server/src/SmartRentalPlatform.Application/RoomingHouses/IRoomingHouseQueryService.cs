@@ -15,6 +15,8 @@ public interface IRoomingHouseQueryService
         CancellationToken cancellationToken = default);
 
     Task<List<RoomingHouseListingResponse>> GetPublicListingAsync(
+        int page = 1,
+        int pageSize = 24,
         CancellationToken cancellationToken = default);
 
     Task<PagedResult<RoomingHouseSearchItemResponse>> SearchPublicAsync(

@@ -24,20 +24,46 @@
 }
 
 .public-house-detail__back {
+  appearance: none;
   width: fit-content;
-  display: flex;
+  min-height: 40px;
+  display: inline-flex;
   align-items: center;
-  gap: 6px;
+  justify-content: center;
+  gap: 8px;
+  border: 1px solid #dbe7ff;
+  border-radius: 999px;
+  padding: 0 14px 0 12px;
+  background: #ffffff;
   color: #246bfe;
+  box-shadow: 0 6px 18px rgba(36, 107, 254, 0.08);
+  cursor: pointer;
+  font-family: inherit;
   font-weight: 700;
   font-size: 14px;
+  line-height: 1;
   text-decoration: none;
-  transition: opacity 0.2s ease, transform 0.2s ease;
+  transition:
+    border-color 0.18s ease,
+    background-color 0.18s ease,
+    box-shadow 0.18s ease,
+    transform 0.18s ease;
 }
 
 .public-house-detail__back:hover {
-  opacity: 0.8;
+  border-color: #a9c4ff;
+  background: #f5f9ff;
+  box-shadow: 0 10px 24px rgba(36, 107, 254, 0.12);
   transform: translateX(-2px);
+}
+
+.public-house-detail__back:focus-visible {
+  outline: 3px solid rgba(36, 107, 254, 0.22);
+  outline-offset: 3px;
+}
+
+.public-house-detail__back svg {
+  flex: 0 0 auto;
 }
 
 /* ── Hero & Header Card ────────────────────────────── */

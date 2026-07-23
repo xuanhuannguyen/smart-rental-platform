@@ -130,6 +130,14 @@ namespace SmartRentalPlatform.Infrastructure.Persistence.Seed
             { "79", (10.7200m, 10.9000m, 106.6100m, 106.8300m) }
         };
 
+        private static readonly Dictionary<string, decimal> CityAreaSpreadRadius = new()
+        {
+            { "46", 0.0180m },
+            { "48", 0.0240m },
+            { "01", 0.0260m },
+            { "79", 0.0300m }
+        };
+
         private static readonly string[] Rating5Comments = new[]
         {
             "Phòng trọ cực kỳ an ninh, cổng vân tay rất an tâm. Ban đêm yên tĩnh không ồn ào.",
@@ -913,6 +921,51 @@ namespace SmartRentalPlatform.Infrastructure.Persistence.Seed
             return report;
         }
 
+        public async Task RunRedistributeCoordinatesAsync(string version, CancellationToken cancellationToken = default)
+        {
+            var manifestPath = ResolveManifestPath(version);
+            if (!File.Exists(manifestPath))
+            {
+                throw new FileNotFoundException($"Seed manifest file not found: {manifestPath}");
+            }
+
+            var json = await File.ReadAllTextAsync(manifestPath, cancellationToken);
+            var manifest = JsonSerializer.Deserialize<DisplaySeedManifest>(json)
+                           ?? throw new InvalidOperationException("Failed to deserialize manifest.");
+
+            Console.WriteLine($"Redistributing display catalog coordinates (Version: {version})");
+            RedistributeManifestCoordinates(manifest);
+            await SaveManifestAsync(manifest, manifestPath, cancellationToken);
+
+            var houseIds = manifest.Houses.Select(h => Guid.Parse(h.Id)).ToHashSet();
+            var dbHouses = await _context.RoomingHouses
+                .Where(h => houseIds.Contains(h.Id))
+                .ToListAsync(cancellationToken);
+
+            var manifestById = manifest.Houses.ToDictionary(h => Guid.Parse(h.Id));
+            foreach (var house in dbHouses)
+            {
+                var seedHouse = manifestById[house.Id];
+                house.Latitude = (decimal)seedHouse.Latitude;
+                house.Longitude = (decimal)seedHouse.Longitude;
+                house.UpdatedAt = DateTimeOffset.UtcNow;
+            }
+
+            await _context.SaveChangesAsync(cancellationToken);
+
+            foreach (var provinceGroup in manifest.Houses.GroupBy(h => h.ProvinceCode).OrderBy(g => g.Key))
+            {
+                var minLat = provinceGroup.Min(h => h.Latitude);
+                var maxLat = provinceGroup.Max(h => h.Latitude);
+                var minLng = provinceGroup.Min(h => h.Longitude);
+                var maxLng = provinceGroup.Max(h => h.Longitude);
+                Console.WriteLine(
+                    $"Province {provinceGroup.Key}: {provinceGroup.Count()} houses, lat {minLat:F6}-{maxLat:F6}, lng {minLng:F6}-{maxLng:F6}");
+            }
+
+            Console.WriteLine($"Updated coordinates for {dbHouses.Count}/{manifest.Houses.Count} display catalog houses.");
+        }
+
         
 
         
@@ -1080,11 +1133,6 @@ namespace SmartRentalPlatform.Infrastructure.Persistence.Seed
                 .ToListAsync(cancellationToken);
 
             var targetProvinceCodes = new[] { "46", "48", "01", "79" };
-            if (targetHouseCount % targetProvinceCodes.Length != 0)
-            {
-                throw new InvalidOperationException($"Target house count must be divisible by {targetProvinceCodes.Length} to split evenly across Hue, Da Nang, Ha Noi and Ho Chi Minh City.");
-            }
-
             var targetProvinces = provinces
                 .Where(p => targetProvinceCodes.Contains(p.Code))
                 .OrderBy(p => Array.IndexOf(targetProvinceCodes, p.Code))
@@ -1152,10 +1200,27 @@ namespace SmartRentalPlatform.Infrastructure.Persistence.Seed
 
             var random = new Random(1337);
             var houseNames = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+            var baseHouseCountPerProvince = targetHouseCount / targetProvinceCodes.Length;
+            var remainingHouses = targetHouseCount % targetProvinceCodes.Length;
+            var provinceHouseCounts = targetProvinceCodes
+                .Select((_, index) => baseHouseCountPerProvince + (index < remainingHouses ? 1 : 0))
+                .ToArray();
+            var provinceHouseOffsets = new int[targetProvinceCodes.Length];
+            for (int provinceOffsetIndex = 1; provinceOffsetIndex < provinceHouseOffsets.Length; provinceOffsetIndex++)
+            {
+                provinceHouseOffsets[provinceOffsetIndex] = provinceHouseOffsets[provinceOffsetIndex - 1] + provinceHouseCounts[provinceOffsetIndex - 1];
+            }
 
             for (int i = 0; i < targetHouseCount; i++)
             {
-                var province = targetProvinces[i / (targetHouseCount / targetProvinceCodes.Length)];
+                var provinceIndex = 0;
+                while (provinceIndex < provinceHouseCounts.Length - 1 &&
+                       i >= provinceHouseOffsets[provinceIndex] + provinceHouseCounts[provinceIndex])
+                {
+                    provinceIndex++;
+                }
+
+                var province = targetProvinces[provinceIndex];
                 var cityWards = wards.Where(x => x.ProvinceCode == province.Code).ToList();
                 if (cityWards.Count == 0)
                 {
@@ -1189,31 +1254,9 @@ namespace SmartRentalPlatform.Infrastructure.Persistence.Seed
 
                 houseNames.Add(houseName);
 
-                decimal baseLat = 15.9754m;
-                decimal baseLng = 108.2638m;
-                if (TargetProvinceCoordinates.TryGetValue(province.Code, out var coords))
-                {
-                    baseLat = coords.Lat;
-                    baseLng = coords.Lng;
-                }
-
-                var latitude = baseLat;
-                var longitude = baseLng;
-                if (area is not null)
-                {
-                    latitude = area.Lat + ((decimal)(random.NextDouble() - 0.5) * 0.006m);
-                    longitude = area.Lng + ((decimal)(random.NextDouble() - 0.5) * 0.006m);
-                }
-                else if (CityBounds.TryGetValue(province.Code, out var bounds))
-                {
-                    latitude = bounds.MinLat + ((bounds.MaxLat - bounds.MinLat) * (decimal)random.NextDouble());
-                    longitude = bounds.MinLng + ((bounds.MaxLng - bounds.MinLng) * (decimal)random.NextDouble());
-                }
-                else
-                {
-                    latitude = baseLat + ((decimal)(random.NextDouble() - 0.5) * 0.01m);
-                    longitude = baseLng + ((decimal)(random.NextDouble() - 0.5) * 0.01m);
-                }
+                var cityHouseCount = Math.Max(1, provinceHouseCounts[provinceIndex]);
+                var cityHouseIndex = i - provinceHouseOffsets[provinceIndex];
+                var (latitude, longitude) = GenerateSpreadCoordinate(province.Code, cityHouseIndex, cityHouseCount);
 
                 var streetNumber = 8 + ((i * 17) % 190);
                 var addressLine = $"Số {streetNumber} Đường {street}";
@@ -1417,6 +1460,90 @@ namespace SmartRentalPlatform.Infrastructure.Persistence.Seed
             return CityAreas.TryGetValue(provinceCode, out var areas) && areas.Length > 0
                 ? areas[seedIndex % areas.Length]
                 : null;
+        }
+
+        private static void RedistributeManifestCoordinates(DisplaySeedManifest manifest)
+        {
+            foreach (var cityGroup in manifest.Houses
+                         .GroupBy(h => h.ProvinceCode)
+                         .OrderBy(g => g.Key))
+            {
+                var cityHouses = cityGroup.ToList();
+                for (int i = 0; i < cityHouses.Count; i++)
+                {
+                    var (latitude, longitude) = GenerateSpreadCoordinate(cityGroup.Key, i, cityHouses.Count);
+                    cityHouses[i].Latitude = (double)latitude;
+                    cityHouses[i].Longitude = (double)longitude;
+                }
+            }
+        }
+
+        private static (decimal Latitude, decimal Longitude) GenerateSpreadCoordinate(
+            string provinceCode,
+            int cityHouseIndex,
+            int cityHouseCount)
+        {
+            if (CityAreas.TryGetValue(provinceCode, out var areas) && areas.Length > 0)
+            {
+                var area = areas[cityHouseIndex % areas.Length];
+                var indexInArea = cityHouseIndex / areas.Length;
+                var maxInArea = Math.Max(1, (int)Math.Ceiling(cityHouseCount / (double)areas.Length));
+                var ringCapacity = 8;
+                var ring = (indexInArea / ringCapacity) + 1;
+                var slot = indexInArea % ringCapacity;
+                var maxRing = Math.Max(1, (int)Math.Ceiling(maxInArea / (double)ringCapacity));
+                var maxRadius = CityAreaSpreadRadius.TryGetValue(provinceCode, out var radius)
+                    ? radius
+                    : 0.0180m;
+                var radiusStep = maxRadius / (maxRing + 1);
+                var pointRadius = radiusStep * ring;
+                var angleDegrees = ((slot * 137.50776405003785d) + (ring * 29.0d)) % 360d;
+                var angleRadians = angleDegrees * Math.PI / 180d;
+
+                var latitude = area.Lat + (pointRadius * (decimal)Math.Cos(angleRadians));
+                var longitude = area.Lng + (pointRadius * (decimal)Math.Sin(angleRadians));
+
+                return ClampToCityBounds(provinceCode, latitude, longitude);
+            }
+
+            if (CityBounds.TryGetValue(provinceCode, out var bounds))
+            {
+                var columns = Math.Max(1, (int)Math.Ceiling(Math.Sqrt(cityHouseCount)));
+                var rows = Math.Max(1, (int)Math.Ceiling(cityHouseCount / (double)columns));
+                var row = cityHouseIndex / columns;
+                var column = cityHouseIndex % columns;
+                var latStep = (bounds.MaxLat - bounds.MinLat) / (rows + 1);
+                var lngStep = (bounds.MaxLng - bounds.MinLng) / (columns + 1);
+                var latitude = bounds.MinLat + (latStep * (row + 1));
+                var longitude = bounds.MinLng + (lngStep * (column + 1));
+
+                return (RoundCoordinate(latitude), RoundCoordinate(longitude));
+            }
+
+            var fallback = TargetProvinceCoordinates.TryGetValue(provinceCode, out var coords)
+                ? coords
+                : (Lat: 15.9754m, Lng: 108.2638m);
+
+            return (RoundCoordinate(fallback.Lat), RoundCoordinate(fallback.Lng));
+        }
+
+        private static (decimal Latitude, decimal Longitude) ClampToCityBounds(
+            string provinceCode,
+            decimal latitude,
+            decimal longitude)
+        {
+            if (CityBounds.TryGetValue(provinceCode, out var bounds))
+            {
+                latitude = Math.Min(bounds.MaxLat, Math.Max(bounds.MinLat, latitude));
+                longitude = Math.Min(bounds.MaxLng, Math.Max(bounds.MinLng, longitude));
+            }
+
+            return (RoundCoordinate(latitude), RoundCoordinate(longitude));
+        }
+
+        private static decimal RoundCoordinate(decimal coordinate)
+        {
+            return Math.Round(coordinate, 7, MidpointRounding.AwayFromZero);
         }
 
         private static List<string> ResolveSourceImages(string? mediaSourceDirectory)

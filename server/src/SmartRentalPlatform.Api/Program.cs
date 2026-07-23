@@ -140,7 +140,7 @@ if (args.Length > 0 && args[0] == "verify-showcase-seed")
     return;
 }
 
-if (args.Length > 0 && (args[0] == "seed-display-data" || args[0] == "validate-display-seed"))
+if (args.Length > 0 && (args[0] == "seed-display-data" || args[0] == "validate-display-seed" || args[0] == "redistribute-display-coordinates"))
 {
     await using var scope = app.Services.CreateAsyncScope();
     var dbContext = scope.ServiceProvider.GetRequiredService<SmartRentalPlatform.Infrastructure.Persistence.AppDbContext>();
@@ -216,6 +216,28 @@ if (args.Length > 0 && (args[0] == "seed-display-data" || args[0] == "validate-d
         catch (Exception ex)
         {
             Console.Error.WriteLine($"Validation failed: {ex}");
+            Environment.Exit(1);
+        }
+    }
+    else if (args[0] == "redistribute-display-coordinates")
+    {
+        string version = "display-catalog-v1";
+        for (int i = 1; i < args.Length; i++)
+        {
+            if (args[i] == "--version" && i + 1 < args.Length)
+            {
+                version = args[i + 1];
+            }
+        }
+
+        try
+        {
+            await runner.RunRedistributeCoordinatesAsync(version);
+            Environment.Exit(0);
+        }
+        catch (Exception ex)
+        {
+            Console.Error.WriteLine($"Coordinate redistribution failed: {ex}");
             Environment.Exit(1);
         }
     }

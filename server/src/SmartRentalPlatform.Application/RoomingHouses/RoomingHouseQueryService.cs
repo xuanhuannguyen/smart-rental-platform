@@ -1,5 +1,7 @@
+using System.Globalization;
 using System.Text.RegularExpressions;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Caching.Memory;
 using Microsoft.Extensions.Logging;
 using SmartRentalPlatform.Application.Common.Exceptions;
 using SmartRentalPlatform.Application.Common.Interfaces;
@@ -7,11 +9,15 @@ using SmartRentalPlatform.Application.Common.Media;
 using SmartRentalPlatform.Application.RoomingHouses.Search;
 using SmartRentalPlatform.Contracts.Amenities;
 using SmartRentalPlatform.Contracts.Common;
+using SmartRentalPlatform.Contracts.PropertyImages.Responses;
+using SmartRentalPlatform.Contracts.RentalPolicies.Responses;
+using SmartRentalPlatform.Contracts.RoomingHouseRules.Responses;
 using SmartRentalPlatform.Contracts.RoomingHouses;
 using SmartRentalPlatform.Contracts.RoomingHouses.Requests;
 using SmartRentalPlatform.Contracts.RoomingHouses.Responses;
 using SmartRentalPlatform.Domain.Entities.Properties;
 using SmartRentalPlatform.Domain.Enums;
+using SmartRentalPlatform.Domain.Enums.Properties;
 
 namespace SmartRentalPlatform.Application.RoomingHouses;
 
@@ -34,6 +40,7 @@ public partial class RoomingHouseQueryService : IRoomingHouseQueryService
     private readonly IRoomingHouseRecommendationScorer recommendationScorer;
     private readonly IRoomingHouseRecommendationReranker recommendationReranker;
     private readonly IVietMapService vietMapService;
+    private readonly IMemoryCache memoryCache;
     private readonly ILogger<RoomingHouseQueryService> logger;
 
     public RoomingHouseQueryService(
@@ -43,6 +50,7 @@ public partial class RoomingHouseQueryService : IRoomingHouseQueryService
         IRoomingHouseRecommendationScorer recommendationScorer,
         IRoomingHouseRecommendationReranker recommendationReranker,
         IVietMapService vietMapService,
+        IMemoryCache memoryCache,
         ILogger<RoomingHouseQueryService> logger)
     {
         this.context = context;
@@ -51,6 +59,7 @@ public partial class RoomingHouseQueryService : IRoomingHouseQueryService
         this.recommendationScorer = recommendationScorer;
         this.recommendationReranker = recommendationReranker;
         this.vietMapService = vietMapService;
+        this.memoryCache = memoryCache;
         this.logger = logger;
     }
 
@@ -130,8 +139,19 @@ public partial class RoomingHouseQueryService : IRoomingHouseQueryService
     }
 
     public async Task<List<RoomingHouseListingResponse>> GetPublicListingAsync(
+        int page = 1,
+        int pageSize = 24,
         CancellationToken cancellationToken = default)
     {
+        page = Math.Max(1, page);
+        pageSize = Math.Clamp(pageSize, 1, 48);
+
+        var cacheKey = $"public-rooming-house-listing:{page}:{pageSize}";
+        if (memoryCache.TryGetValue(cacheKey, out List<RoomingHouseListingResponse>? cached) && cached is not null)
+        {
+            return cached;
+        }
+
         var rawItems = await context.RoomingHouses
             .AsNoTracking()
             .Where(x => x.DeletedAt == null &&
@@ -139,6 +159,8 @@ public partial class RoomingHouseQueryService : IRoomingHouseQueryService
                         x.VisibilityStatus == RoomingHouseVisibilityStatus.Visible &&
                         x.Rooms.Any(r => r.Status == RoomStatus.Available && r.DeletedAt == null))
             .OrderByDescending(x => x.CreatedAt)
+            .Skip((page - 1) * pageSize)
+            .Take(pageSize)
             .Select(x => new
             {
                 x.Id,
@@ -174,20 +196,34 @@ public partial class RoomingHouseQueryService : IRoomingHouseQueryService
                     .Where(r => r.Status == RoomStatus.Available && r.DeletedAt == null && r.AreaM2 != null)
                     .Select(r => (decimal?)r.AreaM2)
                     .Max(),
-                Amenities = x.RoomingHouseAmenities
-                    .Select(a => new AmenityResponse
-                    {
-                        Id = a.Amenity.Id,
-                        Name = a.Amenity.Name,
-                        Scope = a.Amenity.Scope.ToString(),
-                        IconCode = a.Amenity.IconCode
-                    })
-                    .ToList(),
                 x.CreatedAt
             })
             .ToListAsync(cancellationToken);
 
-        return rawItems
+        var pageIds = rawItems.Select(x => x.Id).ToList();
+        var amenityLookup = pageIds.Count == 0
+            ? new Dictionary<Guid, List<AmenityResponse>>()
+            : (await context.RoomingHouseAmenities
+                .AsNoTracking()
+                .Where(x => pageIds.Contains(x.RoomingHouseId))
+                .Select(x => new
+                {
+                    x.RoomingHouseId,
+                    Amenity = new AmenityResponse
+                    {
+                        Id = x.Amenity.Id,
+                        Name = x.Amenity.Name,
+                        Scope = x.Amenity.Scope.ToString(),
+                        IconCode = x.Amenity.IconCode
+                    }
+                })
+                .ToListAsync(cancellationToken))
+            .GroupBy(x => x.RoomingHouseId)
+            .ToDictionary(
+                x => x.Key,
+                x => x.Select(a => a.Amenity).ToList());
+
+        var result = rawItems
             .Select(x => new RoomingHouseListingResponse
             {
                 Id = x.Id,
@@ -201,12 +237,23 @@ public partial class RoomingHouseQueryService : IRoomingHouseQueryService
                 MaxMonthlyRent = x.MaxMonthlyRent,
                 MinAreaM2 = x.MinAreaM2,
                 MaxAreaM2 = x.MaxAreaM2,
-                Amenities = x.Amenities,
+                Amenities = amenityLookup.GetValueOrDefault(x.Id) ?? new List<AmenityResponse>(),
                 AverageRating = x.AverageRating,
                 TotalReviews = x.TotalReviews,
                 CreatedAt = x.CreatedAt
             })
             .ToList();
+
+        memoryCache.Set(
+            cacheKey,
+            result,
+            new MemoryCacheEntryOptions
+            {
+                AbsoluteExpirationRelativeToNow = TimeSpan.FromMinutes(2),
+                SlidingExpiration = TimeSpan.FromSeconds(45)
+            });
+
+        return result;
     }
 
     public async Task<PagedResult<RoomingHouseSearchItemResponse>> SearchPublicAsync(
@@ -215,12 +262,21 @@ public partial class RoomingHouseQueryService : IRoomingHouseQueryService
     {
         var criteria = searchParser.Parse(request);
         await PrepareSearchCriteriaAsync(criteria, cancellationToken);
+        var cacheKey = BuildPublicSearchCacheKey(criteria);
+        if (memoryCache.TryGetValue(cacheKey, out PagedResult<RoomingHouseSearchItemResponse>? cachedResult) &&
+            cachedResult is not null)
+        {
+            SetSearchMetadata(cachedResult, request, criteria);
+            return cachedResult;
+        }
+
         var result = await ExecutePublicSearchAsync(criteria, cancellationToken);
         SetSearchMetadata(result, request, criteria);
         LogSearchParse(request, criteria, result.TotalItems);
 
         if (result.TotalItems > 0 || string.IsNullOrWhiteSpace(request.Q))
         {
+            CachePublicSearchResult(cacheKey, result);
             return result;
         }
 
@@ -244,11 +300,14 @@ public partial class RoomingHouseQueryService : IRoomingHouseQueryService
             SetSearchMetadata(aiResult, request, aiCriteria);
             LogSearchParse(request, aiCriteria, aiResult.TotalItems);
 
-            return aiResult.TotalItems == 0 ? result : aiResult;
+            var finalResult = aiResult.TotalItems == 0 ? result : aiResult;
+            CachePublicSearchResult(cacheKey, finalResult);
+            return finalResult;
         }
         catch (Exception ex)
         {
             logger.LogWarning(ex, "AI search fallback failed.");
+            CachePublicSearchResult(cacheKey, result);
             return result;
         }
     }
@@ -270,10 +329,58 @@ public partial class RoomingHouseQueryService : IRoomingHouseQueryService
         }
     }
 
+    private static string BuildPublicSearchCacheKey(ParsedRoomingHouseSearchCriteria criteria)
+    {
+        static string JoinInts(IEnumerable<int> values) => string.Join(',', values.OrderBy(x => x));
+        static string JoinGuids(IEnumerable<Guid> values) => string.Join(',', values.OrderBy(x => x));
+        static string DecimalKey(decimal? value) => value?.ToString("0.####", CultureInfo.InvariantCulture) ?? string.Empty;
+
+        return string.Join('|',
+            "public-rooming-house-search",
+            RoomingHouseSearchParser.Normalize(criteria.Keyword ?? string.Empty),
+            criteria.ProvinceCode ?? string.Empty,
+            criteria.WardCode ?? string.Empty,
+            DecimalKey(criteria.MinPrice),
+            DecimalKey(criteria.MaxPrice),
+            DecimalKey(criteria.MinArea),
+            DecimalKey(criteria.MaxArea),
+            criteria.MinOccupants?.ToString(CultureInfo.InvariantCulture) ?? string.Empty,
+            JoinInts(criteria.AmenityIds),
+            JoinInts(criteria.RoomAmenityIds),
+            JoinInts(criteria.PreferredAmenityIds),
+            JoinInts(criteria.PreferredRoomAmenityIds),
+            JoinGuids(criteria.RecentRoomingHouseIds),
+            DecimalKey(criteria.CenterLat),
+            DecimalKey(criteria.CenterLng),
+            DecimalKey(criteria.RadiusKm),
+            criteria.Sort,
+            criteria.Page.ToString(CultureInfo.InvariantCulture),
+            criteria.PageSize.ToString(CultureInfo.InvariantCulture));
+    }
+
+    private void CachePublicSearchResult(
+        string cacheKey,
+        PagedResult<RoomingHouseSearchItemResponse> result)
+    {
+        memoryCache.Set(
+            cacheKey,
+            result,
+            new MemoryCacheEntryOptions
+            {
+                AbsoluteExpirationRelativeToNow = TimeSpan.FromMinutes(2),
+                SlidingExpiration = TimeSpan.FromSeconds(45)
+            });
+    }
+
     private async Task<PagedResult<RoomingHouseSearchItemResponse>> ExecutePublicSearchAsync(
         ParsedRoomingHouseSearchCriteria criteria,
         CancellationToken cancellationToken)
     {
+        if (CanUseFastPublicSearch(criteria))
+        {
+            return await ExecuteFastPublicSearchAsync(criteria, cancellationToken);
+        }
+
         // Phase 1: Build the query with WHERE filters (no .Include(), no entity loading)
         var baseQuery = BuildSearchBaseQuery(criteria);
 
@@ -485,6 +592,802 @@ public partial class RoomingHouseQueryService : IRoomingHouseQueryService
                 InterpretedQuery = criteria.InterpretedQuery,
                 RelaxedFields = criteria.RelaxedFields
             }
+        };
+    }
+
+    private async Task<PagedResult<RoomingHouseSearchItemResponse>> ExecuteFastPublicSearchAsync(
+        ParsedRoomingHouseSearchCriteria criteria,
+        CancellationToken cancellationToken)
+    {
+        var snapshotRows = await GetPublicSearchSnapshotAsync(cancellationToken);
+        var filteredRows = ApplySnapshotFilters(snapshotRows, criteria).ToList();
+        var normalizedKeyword = RoomingHouseSearchParser.Normalize(criteria.Keyword ?? string.Empty);
+        if (!string.IsNullOrWhiteSpace(normalizedKeyword))
+        {
+            return ExecuteSnapshotKeywordSearch(filteredRows, criteria, normalizedKeyword);
+        }
+
+        var totalItems = filteredRows.Count;
+
+        if (totalItems == 0)
+        {
+            return new PagedResult<RoomingHouseSearchItemResponse>
+            {
+                Items = new List<RoomingHouseSearchItemResponse>(),
+                Page = criteria.Page,
+                PageSize = criteria.PageSize,
+                TotalItems = 0,
+                TotalPages = 0,
+                Metadata = new RoomingHouseSearchMetadataResponse
+                {
+                    AiAssisted = criteria.AiAssisted,
+                    InterpretedQuery = criteria.InterpretedQuery,
+                    RelaxedFields = criteria.RelaxedFields
+                }
+            };
+        }
+
+        var pageRows = ApplySnapshotSort(filteredRows, criteria)
+            .Skip((criteria.Page - 1) * criteria.PageSize)
+            .Take(criteria.PageSize)
+            .ToList();
+
+        var items = MaterializeSnapshotSearchItems(pageRows, criteria);
+
+        return new PagedResult<RoomingHouseSearchItemResponse>
+        {
+            Items = items,
+            Page = criteria.Page,
+            PageSize = criteria.PageSize,
+            TotalItems = totalItems,
+            TotalPages = (int)Math.Ceiling(totalItems / (double)criteria.PageSize),
+            Metadata = new RoomingHouseSearchMetadataResponse
+            {
+                AiAssisted = criteria.AiAssisted,
+                InterpretedQuery = criteria.InterpretedQuery,
+                RelaxedFields = criteria.RelaxedFields
+            }
+        };
+    }
+
+    private async Task<PagedResult<RoomingHouseSearchItemResponse>> ExecuteSimpleFastPublicSearchAsync(
+        IQueryable<RoomingHouse> baseQuery,
+        ParsedRoomingHouseSearchCriteria criteria,
+        int totalItems,
+        CancellationToken cancellationToken)
+    {
+        var sortedQuery = ApplySimpleSearchSort(baseQuery, criteria);
+        var pageRows = await BuildFastSearchProjection(sortedQuery
+                .Skip((criteria.Page - 1) * criteria.PageSize)
+                .Take(criteria.PageSize))
+            .ToListAsync(cancellationToken);
+        var items = await MaterializeFastSearchItemsAsync(pageRows, criteria, cancellationToken);
+
+        return new PagedResult<RoomingHouseSearchItemResponse>
+        {
+            Items = items,
+            Page = criteria.Page,
+            PageSize = criteria.PageSize,
+            TotalItems = totalItems,
+            TotalPages = (int)Math.Ceiling(totalItems / (double)criteria.PageSize),
+            Metadata = new RoomingHouseSearchMetadataResponse
+            {
+                AiAssisted = criteria.AiAssisted,
+                InterpretedQuery = criteria.InterpretedQuery,
+                RelaxedFields = criteria.RelaxedFields
+            }
+        };
+    }
+
+    private async Task<List<FastSearchRow>> GetPublicSearchSnapshotAsync(CancellationToken cancellationToken)
+    {
+        const string cacheKey = "public-rooming-house-search-snapshot";
+        if (memoryCache.TryGetValue(cacheKey, out List<FastSearchRow>? cachedRows) &&
+            cachedRows is not null)
+        {
+            return cachedRows;
+        }
+
+        var rows = await BuildFastSearchProjection(context.RoomingHouses
+                .AsNoTracking()
+                .Where(x => x.DeletedAt == null &&
+                            x.ApprovalStatus == RoomingHouseApprovalStatus.Approved &&
+                            x.VisibilityStatus == RoomingHouseVisibilityStatus.Visible &&
+                            x.Rooms.Any(r => r.Status == RoomStatus.Available && r.DeletedAt == null)))
+            .ToListAsync(cancellationToken);
+
+        var rowIds = rows.Select(x => x.Id).ToList();
+        if (rowIds.Count > 0)
+        {
+            var houseAmenities = await context.RoomingHouseAmenities
+                .AsNoTracking()
+                .Where(x => rowIds.Contains(x.RoomingHouseId))
+                .Select(x => new
+                {
+                    x.RoomingHouseId,
+                    x.AmenityId,
+                    Amenity = new AmenityResponse
+                    {
+                        Id = x.Amenity.Id,
+                        Name = x.Amenity.Name,
+                        Scope = x.Amenity.Scope.ToString(),
+                        IconCode = x.Amenity.IconCode
+                    }
+                })
+                .ToListAsync(cancellationToken);
+
+            var roomAmenities = await context.RoomAmenities
+                .AsNoTracking()
+                .Where(x => rowIds.Contains(x.Room.RoomingHouseId) &&
+                            x.Room.Status == RoomStatus.Available &&
+                            x.Room.DeletedAt == null)
+                .Select(x => new
+                {
+                    x.Room.RoomingHouseId,
+                    x.AmenityId
+                })
+                .Distinct()
+                .ToListAsync(cancellationToken);
+
+            var houseAmenityLookup = houseAmenities
+                .GroupBy(x => x.RoomingHouseId)
+                .ToDictionary(
+                    x => x.Key,
+                    x => x.ToList());
+            var roomAmenityLookup = roomAmenities
+                .GroupBy(x => x.RoomingHouseId)
+                .ToDictionary(
+                    x => x.Key,
+                    x => x.Select(a => a.AmenityId).Distinct().ToHashSet());
+
+            foreach (var row in rows)
+            {
+                if (houseAmenityLookup.TryGetValue(row.Id, out var amenities))
+                {
+                    row.AmenityIds = amenities.Select(x => x.AmenityId).Distinct().ToHashSet();
+                    row.Amenities = amenities.Select(x => x.Amenity).ToList();
+                }
+
+                if (roomAmenityLookup.TryGetValue(row.Id, out var roomAmenityIds))
+                {
+                    row.RoomAmenityIds = roomAmenityIds;
+                }
+            }
+        }
+
+        memoryCache.Set(
+            cacheKey,
+            rows,
+            new MemoryCacheEntryOptions
+            {
+                AbsoluteExpirationRelativeToNow = TimeSpan.FromMinutes(2),
+                SlidingExpiration = TimeSpan.FromSeconds(45)
+            });
+
+        return rows;
+    }
+
+    private static IEnumerable<FastSearchRow> ApplySnapshotFilters(
+        IEnumerable<FastSearchRow> rows,
+        ParsedRoomingHouseSearchCriteria criteria)
+    {
+        var filtered = rows;
+
+        if (!string.IsNullOrWhiteSpace(criteria.ProvinceCode))
+        {
+            filtered = filtered.Where(x => x.ProvinceCode == criteria.ProvinceCode);
+        }
+
+        if (!string.IsNullOrWhiteSpace(criteria.WardCode))
+        {
+            filtered = filtered.Where(x => x.WardCode == criteria.WardCode);
+        }
+
+        if (criteria.MinPrice is not null)
+        {
+            filtered = filtered.Where(x => x.MaxMonthlyRent >= criteria.MinPrice);
+        }
+
+        if (criteria.MaxPrice is not null)
+        {
+            filtered = filtered.Where(x => x.MinMonthlyRent <= criteria.MaxPrice);
+        }
+
+        if (criteria.MinArea is not null)
+        {
+            filtered = filtered.Where(x => x.MaxAreaM2 >= criteria.MinArea);
+        }
+
+        if (criteria.MaxArea is not null)
+        {
+            filtered = filtered.Where(x => x.MinAreaM2 <= criteria.MaxArea);
+        }
+
+        if (criteria.MinOccupants is not null)
+        {
+            filtered = filtered.Where(x => x.MaxOccupants >= criteria.MinOccupants);
+        }
+
+        foreach (var amenityId in criteria.AmenityIds)
+        {
+            filtered = filtered.Where(x => x.AmenityIds.Contains(amenityId));
+        }
+
+        foreach (var amenityId in criteria.RoomAmenityIds)
+        {
+            filtered = filtered.Where(x => x.RoomAmenityIds.Contains(amenityId));
+        }
+
+        if (criteria.CenterLat is not null && criteria.CenterLng is not null && criteria.RadiusKm is not null)
+        {
+            var box = GeoSearchHelper.BuildBoundingBox(criteria.CenterLat.Value, criteria.CenterLng.Value, criteria.RadiusKm.Value);
+            filtered = filtered.Where(x =>
+                x.Latitude is not null &&
+                x.Longitude is not null &&
+                x.Latitude >= box.MinLat &&
+                x.Latitude <= box.MaxLat &&
+                x.Longitude >= box.MinLng &&
+                x.Longitude <= box.MaxLng);
+        }
+
+        return filtered;
+    }
+
+    private PagedResult<RoomingHouseSearchItemResponse> ExecuteSnapshotKeywordSearch(
+        List<FastSearchRow> rows,
+        ParsedRoomingHouseSearchCriteria criteria,
+        string normalizedKeyword)
+    {
+        var scoredRows = rows
+            .Select(x => new FastSearchScoredRow
+            {
+                Row = x,
+                KeywordScore = CalculateFastKeywordScore(x, normalizedKeyword),
+                DistanceKm = CalculateFastDistanceKm(x, criteria)
+            })
+            .Where(x => x.KeywordScore > 0)
+            .ToList();
+
+        if (criteria.CenterLat is not null && criteria.CenterLng is not null && criteria.RadiusKm is not null)
+        {
+            scoredRows = scoredRows
+                .Where(x => x.DistanceKm is not null && x.DistanceKm <= criteria.RadiusKm.Value)
+                .ToList();
+        }
+
+        var totalItems = scoredRows.Count;
+        var pageRows = ApplySnapshotKeywordSort(scoredRows, criteria)
+            .Skip((criteria.Page - 1) * criteria.PageSize)
+            .Take(criteria.PageSize)
+            .Select(x => x.Row)
+            .ToList();
+
+        return new PagedResult<RoomingHouseSearchItemResponse>
+        {
+            Items = MaterializeSnapshotSearchItems(pageRows, criteria),
+            Page = criteria.Page,
+            PageSize = criteria.PageSize,
+            TotalItems = totalItems,
+            TotalPages = totalItems == 0 ? 0 : (int)Math.Ceiling(totalItems / (double)criteria.PageSize),
+            Metadata = new RoomingHouseSearchMetadataResponse
+            {
+                AiAssisted = criteria.AiAssisted,
+                InterpretedQuery = criteria.InterpretedQuery,
+                RelaxedFields = criteria.RelaxedFields
+            }
+        };
+    }
+
+    private static IEnumerable<FastSearchRow> ApplySnapshotSort(
+        IEnumerable<FastSearchRow> rows,
+        ParsedRoomingHouseSearchCriteria criteria)
+    {
+        var sort = criteria.Sort.Trim();
+        if (sort == "relevance" &&
+            criteria.CenterLat is not null &&
+            criteria.CenterLng is not null &&
+            criteria.RadiusKm is not null)
+        {
+            sort = "distanceAsc";
+        }
+
+        return sort switch
+        {
+            "newest" => rows.OrderByDescending(x => x.CreatedAt),
+            "priceAsc" => rows.OrderBy(x => x.MinMonthlyRent ?? decimal.MaxValue).ThenByDescending(x => x.CreatedAt),
+            "priceDesc" => rows.OrderByDescending(x => x.MaxMonthlyRent ?? decimal.MinValue).ThenByDescending(x => x.CreatedAt),
+            "areaAsc" => rows.OrderBy(x => x.MinAreaM2 ?? decimal.MaxValue).ThenByDescending(x => x.CreatedAt),
+            "areaDesc" => rows.OrderByDescending(x => x.MaxAreaM2 ?? decimal.MinValue).ThenByDescending(x => x.CreatedAt),
+            "distanceAsc" when criteria.CenterLat is not null && criteria.CenterLng is not null => rows
+                .OrderBy(x => CalculateFastDistanceKm(x, criteria) ?? decimal.MaxValue)
+                .ThenByDescending(x => x.CreatedAt),
+            _ => rows
+                .OrderByDescending(x => x.AverageRating)
+                .ThenByDescending(x => x.TotalReviews)
+                .ThenByDescending(x => x.CreatedAt)
+        };
+    }
+
+    private static IEnumerable<FastSearchScoredRow> ApplySnapshotKeywordSort(
+        IEnumerable<FastSearchScoredRow> rows,
+        ParsedRoomingHouseSearchCriteria criteria)
+    {
+        var sort = criteria.Sort.Trim();
+        if (sort == "relevance")
+        {
+            return rows
+                .OrderByDescending(x => x.KeywordScore)
+                .ThenByDescending(x => x.Row.AverageRating)
+                .ThenByDescending(x => x.Row.TotalReviews)
+                .ThenByDescending(x => x.Row.CreatedAt);
+        }
+
+        return sort switch
+        {
+            "newest" => rows.OrderByDescending(x => x.Row.CreatedAt),
+            "priceAsc" => rows.OrderBy(x => x.Row.MinMonthlyRent ?? decimal.MaxValue).ThenByDescending(x => x.KeywordScore),
+            "priceDesc" => rows.OrderByDescending(x => x.Row.MaxMonthlyRent ?? decimal.MinValue).ThenByDescending(x => x.KeywordScore),
+            "areaAsc" => rows.OrderBy(x => x.Row.MinAreaM2 ?? decimal.MaxValue).ThenByDescending(x => x.KeywordScore),
+            "areaDesc" => rows.OrderByDescending(x => x.Row.MaxAreaM2 ?? decimal.MinValue).ThenByDescending(x => x.KeywordScore),
+            "distanceAsc" when criteria.CenterLat is not null && criteria.CenterLng is not null => rows
+                .OrderBy(x => x.DistanceKm ?? decimal.MaxValue)
+                .ThenByDescending(x => x.KeywordScore),
+            _ => rows
+                .OrderByDescending(x => x.KeywordScore)
+                .ThenByDescending(x => x.Row.AverageRating)
+                .ThenByDescending(x => x.Row.TotalReviews)
+                .ThenByDescending(x => x.Row.CreatedAt)
+        };
+    }
+
+    private static List<RoomingHouseSearchItemResponse> MaterializeSnapshotSearchItems(
+        IEnumerable<FastSearchRow> rows,
+        ParsedRoomingHouseSearchCriteria criteria)
+        => rows
+            .Select(x => new RoomingHouseSearchItemResponse
+            {
+                Id = x.Id,
+                Name = x.Name,
+                AddressDisplay = x.AddressDisplay,
+                Latitude = x.Latitude,
+                Longitude = x.Longitude,
+                CoverImageUrl = x.CoverImageMediaAssetId.HasValue
+                    ? PublicMediaPathBuilder.Build(x.CoverImageMediaAssetId.Value)
+                    : null,
+                AvailableRooms = x.AvailableRooms,
+                TotalRooms = x.TotalRooms,
+                MinMonthlyRent = x.MinMonthlyRent,
+                MaxMonthlyRent = x.MaxMonthlyRent,
+                MinAreaM2 = x.MinAreaM2,
+                MaxAreaM2 = x.MaxAreaM2,
+                Amenities = x.Amenities,
+                AverageRating = x.AverageRating,
+                TotalReviews = x.TotalReviews,
+                DistanceKm = CalculateFastDistanceKm(x, criteria),
+                CreatedAt = x.CreatedAt
+            })
+            .ToList();
+
+    private async Task<PagedResult<RoomingHouseSearchItemResponse>> ExecuteFastKeywordPublicSearchAsync(
+        IQueryable<RoomingHouse> baseQuery,
+        ParsedRoomingHouseSearchCriteria criteria,
+        string normalizedKeyword,
+        CancellationToken cancellationToken)
+    {
+        var scoredRows = (await BuildFastKeywordProjection(baseQuery)
+                .ToListAsync(cancellationToken))
+            .Select(x => new FastKeywordScoredRow
+            {
+                Row = x,
+                KeywordScore = CalculateFastKeywordScore(x, normalizedKeyword),
+                DistanceKm = CalculateFastDistanceKm(x, criteria)
+            })
+            .Where(x => x.KeywordScore > 0)
+            .ToList();
+
+        if (criteria.CenterLat is not null && criteria.CenterLng is not null && criteria.RadiusKm is not null)
+        {
+            scoredRows = scoredRows
+                .Where(x => x.DistanceKm is not null && x.DistanceKm <= criteria.RadiusKm.Value)
+                .ToList();
+        }
+
+        var totalItems = scoredRows.Count;
+        var pageIds = ApplyFastKeywordSort(scoredRows, criteria)
+            .Skip((criteria.Page - 1) * criteria.PageSize)
+            .Take(criteria.PageSize)
+            .Select(x => x.Row.Id)
+            .ToList();
+        var pageRows = await LoadFastSearchRowsByIdsAsync(pageIds, cancellationToken);
+
+        var items = await MaterializeFastSearchItemsAsync(pageRows, criteria, cancellationToken);
+
+        return new PagedResult<RoomingHouseSearchItemResponse>
+        {
+            Items = items,
+            Page = criteria.Page,
+            PageSize = criteria.PageSize,
+            TotalItems = totalItems,
+            TotalPages = totalItems == 0 ? 0 : (int)Math.Ceiling(totalItems / (double)criteria.PageSize),
+            Metadata = new RoomingHouseSearchMetadataResponse
+            {
+                AiAssisted = criteria.AiAssisted,
+                InterpretedQuery = criteria.InterpretedQuery,
+                RelaxedFields = criteria.RelaxedFields
+            }
+        };
+    }
+
+    private static IQueryable<FastKeywordRow> BuildFastKeywordProjection(IQueryable<RoomingHouse> query)
+        => query.Select(x => new FastKeywordRow
+        {
+            Id = x.Id,
+            Name = x.Name,
+            Description = x.Description,
+            AddressDisplay = x.Ward != null && x.Province != null
+                ? x.AddressLine + ", " + x.Ward.Name + ", " + x.Province.Name
+                : x.AddressDisplay,
+            Latitude = x.Latitude,
+            Longitude = x.Longitude,
+            AverageRating = x.AverageRating,
+            TotalReviews = x.TotalReviews,
+            MinMonthlyRent = x.Rooms
+                .Where(r => r.Status == RoomStatus.Available && r.DeletedAt == null)
+                .SelectMany(r => r.PriceTiers)
+                .Where(p => p.IsActive)
+                .Select(p => (decimal?)p.MonthlyRent)
+                .Min(),
+            MaxMonthlyRent = x.Rooms
+                .Where(r => r.Status == RoomStatus.Available && r.DeletedAt == null)
+                .SelectMany(r => r.PriceTiers)
+                .Where(p => p.IsActive)
+                .Select(p => (decimal?)p.MonthlyRent)
+                .Max(),
+            MinAreaM2 = x.Rooms
+                .Where(r => r.Status == RoomStatus.Available && r.DeletedAt == null && r.AreaM2 != null)
+                .Select(r => (decimal?)r.AreaM2)
+                .Min(),
+            MaxAreaM2 = x.Rooms
+                .Where(r => r.Status == RoomStatus.Available && r.DeletedAt == null && r.AreaM2 != null)
+                .Select(r => (decimal?)r.AreaM2)
+                .Max(),
+            CreatedAt = x.CreatedAt
+        });
+
+    private static IQueryable<FastSearchRow> BuildFastSearchProjection(IQueryable<RoomingHouse> query)
+        => query.Select(x => new FastSearchRow
+        {
+            Id = x.Id,
+            Name = x.Name,
+            Description = x.Description,
+            ProvinceCode = x.ProvinceCode,
+            WardCode = x.WardCode,
+            AddressDisplay = x.Ward != null && x.Province != null
+                ? x.AddressLine + ", " + x.Ward.Name + ", " + x.Province.Name
+                : x.AddressDisplay,
+            Latitude = x.Latitude,
+            Longitude = x.Longitude,
+            CoverImageMediaAssetId = x.Images
+                .Where(i => i.MediaAssetId.HasValue)
+                .OrderBy(i => i.SortOrder)
+                .Select(i => i.MediaAssetId)
+                .FirstOrDefault(),
+            AvailableRooms = x.Rooms.Count(r => r.Status == RoomStatus.Available && r.DeletedAt == null),
+            TotalRooms = x.Rooms.Count(r => r.DeletedAt == null),
+            AverageRating = x.AverageRating,
+            TotalReviews = x.TotalReviews,
+            MinMonthlyRent = x.Rooms
+                .Where(r => r.Status == RoomStatus.Available && r.DeletedAt == null)
+                .SelectMany(r => r.PriceTiers)
+                .Where(p => p.IsActive)
+                .Select(p => (decimal?)p.MonthlyRent)
+                .Min(),
+            MaxMonthlyRent = x.Rooms
+                .Where(r => r.Status == RoomStatus.Available && r.DeletedAt == null)
+                .SelectMany(r => r.PriceTiers)
+                .Where(p => p.IsActive)
+                .Select(p => (decimal?)p.MonthlyRent)
+                .Max(),
+            MinAreaM2 = x.Rooms
+                .Where(r => r.Status == RoomStatus.Available && r.DeletedAt == null && r.AreaM2 != null)
+                .Select(r => (decimal?)r.AreaM2)
+                .Min(),
+            MaxAreaM2 = x.Rooms
+                .Where(r => r.Status == RoomStatus.Available && r.DeletedAt == null && r.AreaM2 != null)
+                .Select(r => (decimal?)r.AreaM2)
+                .Max(),
+            MaxOccupants = x.Rooms
+                .Where(r => r.Status == RoomStatus.Available && r.DeletedAt == null)
+                .Select(r => (int?)r.MaxOccupants)
+                .Max(),
+            CreatedAt = x.CreatedAt
+        });
+
+    private async Task<List<FastSearchRow>> LoadFastSearchRowsByIdsAsync(
+        List<Guid> pageIds,
+        CancellationToken cancellationToken)
+    {
+        if (pageIds.Count == 0)
+        {
+            return new List<FastSearchRow>();
+        }
+
+        var rows = await BuildFastSearchProjection(context.RoomingHouses
+                .AsNoTracking()
+                .Where(x => pageIds.Contains(x.Id)))
+            .ToListAsync(cancellationToken);
+        var order = pageIds
+            .Select((id, index) => (id, index))
+            .ToDictionary(x => x.id, x => x.index);
+
+        return rows
+            .OrderBy(x => order.GetValueOrDefault(x.Id, int.MaxValue))
+            .ToList();
+    }
+
+    private async Task<List<RoomingHouseSearchItemResponse>> MaterializeFastSearchItemsAsync(
+        List<FastSearchRow> pageRows,
+        ParsedRoomingHouseSearchCriteria criteria,
+        CancellationToken cancellationToken)
+    {
+        var pageIds = pageRows.Select(x => x.Id).ToList();
+        var amenityLookup = pageIds.Count == 0
+            ? new Dictionary<Guid, List<AmenityResponse>>()
+            : (await context.RoomingHouseAmenities
+                .AsNoTracking()
+                .Where(x => pageIds.Contains(x.RoomingHouseId))
+                .Select(x => new
+                {
+                    x.RoomingHouseId,
+                    Amenity = new AmenityResponse
+                    {
+                        Id = x.Amenity.Id,
+                        Name = x.Amenity.Name,
+                        Scope = x.Amenity.Scope.ToString(),
+                        IconCode = x.Amenity.IconCode
+                    }
+                })
+                .ToListAsync(cancellationToken))
+            .GroupBy(x => x.RoomingHouseId)
+            .ToDictionary(
+                x => x.Key,
+                x => x.Select(a => a.Amenity).ToList());
+
+        return pageRows
+            .Select(x => new RoomingHouseSearchItemResponse
+            {
+                Id = x.Id,
+                Name = x.Name,
+                AddressDisplay = x.AddressDisplay,
+                Latitude = x.Latitude,
+                Longitude = x.Longitude,
+                CoverImageUrl = x.CoverImageMediaAssetId.HasValue
+                    ? PublicMediaPathBuilder.Build(x.CoverImageMediaAssetId.Value)
+                    : null,
+                AvailableRooms = x.AvailableRooms,
+                TotalRooms = x.TotalRooms,
+                MinMonthlyRent = x.MinMonthlyRent,
+                MaxMonthlyRent = x.MaxMonthlyRent,
+                MinAreaM2 = x.MinAreaM2,
+                MaxAreaM2 = x.MaxAreaM2,
+                Amenities = amenityLookup.GetValueOrDefault(x.Id) ?? new List<AmenityResponse>(),
+                AverageRating = x.AverageRating,
+                TotalReviews = x.TotalReviews,
+                DistanceKm = CalculateFastDistanceKm(x, criteria),
+                CreatedAt = x.CreatedAt
+            })
+            .ToList();
+    }
+
+    private static IEnumerable<FastKeywordScoredRow> ApplyFastKeywordSort(
+        IEnumerable<FastKeywordScoredRow> rows,
+        ParsedRoomingHouseSearchCriteria criteria)
+    {
+        var sort = criteria.Sort.Trim();
+        if (sort == "relevance")
+        {
+            return rows
+                .OrderByDescending(x => x.KeywordScore)
+                .ThenByDescending(x => x.Row.AverageRating)
+                .ThenByDescending(x => x.Row.TotalReviews)
+                .ThenByDescending(x => x.Row.CreatedAt);
+        }
+
+        return sort switch
+        {
+            "newest" => rows.OrderByDescending(x => x.Row.CreatedAt),
+            "priceAsc" => rows.OrderBy(x => x.Row.MinMonthlyRent ?? decimal.MaxValue).ThenByDescending(x => x.KeywordScore),
+            "priceDesc" => rows.OrderByDescending(x => x.Row.MaxMonthlyRent ?? decimal.MinValue).ThenByDescending(x => x.KeywordScore),
+            "areaAsc" => rows.OrderBy(x => x.Row.MinAreaM2 ?? decimal.MaxValue).ThenByDescending(x => x.KeywordScore),
+            "areaDesc" => rows.OrderByDescending(x => x.Row.MaxAreaM2 ?? decimal.MinValue).ThenByDescending(x => x.KeywordScore),
+            "distanceAsc" when criteria.CenterLat is not null && criteria.CenterLng is not null => rows
+                .OrderBy(x => x.DistanceKm ?? decimal.MaxValue)
+                .ThenByDescending(x => x.KeywordScore),
+            _ => rows
+                .OrderByDescending(x => x.KeywordScore)
+                .ThenByDescending(x => x.Row.AverageRating)
+                .ThenByDescending(x => x.Row.TotalReviews)
+                .ThenByDescending(x => x.Row.CreatedAt)
+        };
+    }
+
+    private static int CalculateFastKeywordScore(FastKeywordRow row, string normalizedKeyword)
+        => CalculateFastKeywordScore(
+            row.Name,
+            row.AddressDisplay,
+            row.Description,
+            normalizedKeyword);
+
+    private static int CalculateFastKeywordScore(FastSearchRow row, string normalizedKeyword)
+        => CalculateFastKeywordScore(
+            row.Name,
+            row.AddressDisplay,
+            row.Description,
+            normalizedKeyword);
+
+    private static int CalculateFastKeywordScore(
+        string name,
+        string addressDisplay,
+        string? description,
+        string normalizedKeyword)
+    {
+        var score = 0;
+        var searchableHouseName = RoomingHouseSearchParser.Normalize(name);
+        var searchableAddress = RoomingHouseSearchParser.Normalize(addressDisplay);
+        var searchableDescription = RoomingHouseSearchParser.Normalize(description ?? string.Empty);
+
+        if (ContainsSearchPhrase(searchableHouseName, normalizedKeyword))
+        {
+            score += 35;
+        }
+
+        if (ContainsSearchPhrase(searchableAddress, normalizedKeyword))
+        {
+            score += 25;
+        }
+
+        if (ContainsSearchPhrase(searchableDescription, normalizedKeyword))
+        {
+            score += 12;
+        }
+
+        var tokens = normalizedKeyword
+            .Split(' ', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)
+            .Where(x => x.Length >= 3)
+            .Distinct()
+            .ToList();
+
+        foreach (var token in tokens)
+        {
+            if (ContainsSearchPhrase(searchableHouseName, token))
+            {
+                score += 8;
+            }
+
+            if (ContainsSearchPhrase(searchableAddress, token))
+            {
+                score += 6;
+            }
+
+            if (ContainsSearchPhrase(searchableDescription, token))
+            {
+                score += 3;
+            }
+        }
+
+        return score;
+    }
+
+    private static decimal? CalculateFastDistanceKm(FastKeywordRow row, ParsedRoomingHouseSearchCriteria criteria)
+    {
+        if (criteria.CenterLat is null ||
+            criteria.CenterLng is null ||
+            row.Latitude is null ||
+            row.Longitude is null)
+        {
+            return null;
+        }
+
+        return GeoSearchHelper.CalculateDistanceKm(
+            criteria.CenterLat.Value,
+            criteria.CenterLng.Value,
+            row.Latitude.Value,
+            row.Longitude.Value);
+    }
+
+    private static decimal? CalculateFastDistanceKm(FastSearchRow row, ParsedRoomingHouseSearchCriteria criteria)
+    {
+        if (criteria.CenterLat is null ||
+            criteria.CenterLng is null ||
+            row.Latitude is null ||
+            row.Longitude is null)
+        {
+            return null;
+        }
+
+        return GeoSearchHelper.CalculateDistanceKm(
+            criteria.CenterLat.Value,
+            criteria.CenterLng.Value,
+            row.Latitude.Value,
+            row.Longitude.Value);
+    }
+
+    private static bool CanUseFastPublicSearch(ParsedRoomingHouseSearchCriteria criteria)
+    {
+        return criteria.PreferredAmenityIds.Count == 0 &&
+               criteria.PreferredRoomAmenityIds.Count == 0 &&
+               criteria.RecentRoomingHouseIds.Count == 0;
+    }
+
+    private static bool CanUseSimplePageIdSearch(ParsedRoomingHouseSearchCriteria criteria)
+    {
+        var sort = criteria.Sort.Trim();
+        return sort is "" or "relevance" or "newest" or "distanceAsc";
+    }
+
+    private static IQueryable<RoomingHouse> ApplySimpleSearchSort(
+        IQueryable<RoomingHouse> query,
+        ParsedRoomingHouseSearchCriteria criteria)
+    {
+        var sort = criteria.Sort.Trim();
+        if (sort == "relevance" &&
+            criteria.CenterLat is not null &&
+            criteria.CenterLng is not null &&
+            criteria.RadiusKm is not null)
+        {
+            sort = "distanceAsc";
+        }
+
+        return sort switch
+        {
+            "newest" => query.OrderByDescending(x => x.CreatedAt),
+            "distanceAsc" when criteria.CenterLat is not null && criteria.CenterLng is not null => query
+                .OrderBy(x => Math.Abs((x.Latitude ?? 999m) - criteria.CenterLat.Value) +
+                              Math.Abs((x.Longitude ?? 999m) - criteria.CenterLng.Value))
+                .ThenByDescending(x => x.CreatedAt),
+            _ => query
+                .OrderByDescending(x => x.AverageRating)
+                .ThenByDescending(x => x.TotalReviews)
+                .ThenByDescending(x => x.CreatedAt)
+        };
+    }
+
+    private static IQueryable<FastSearchRow> ApplyFastSearchSort(
+        IQueryable<FastSearchRow> query,
+        ParsedRoomingHouseSearchCriteria criteria)
+    {
+        var sort = criteria.Sort.Trim();
+        if (sort == "relevance" &&
+            criteria.CenterLat is not null &&
+            criteria.CenterLng is not null &&
+            criteria.RadiusKm is not null)
+        {
+            sort = "distanceAsc";
+        }
+
+        return sort switch
+        {
+            "newest" => query.OrderByDescending(x => x.CreatedAt),
+            "priceAsc" => query
+                .OrderBy(x => x.MinMonthlyRent ?? decimal.MaxValue)
+                .ThenByDescending(x => x.CreatedAt),
+            "priceDesc" => query
+                .OrderByDescending(x => x.MaxMonthlyRent ?? decimal.MinValue)
+                .ThenByDescending(x => x.CreatedAt),
+            "areaAsc" => query
+                .OrderBy(x => x.MinAreaM2 ?? decimal.MaxValue)
+                .ThenByDescending(x => x.CreatedAt),
+            "areaDesc" => query
+                .OrderByDescending(x => x.MaxAreaM2 ?? decimal.MinValue)
+                .ThenByDescending(x => x.CreatedAt),
+            "distanceAsc" when criteria.CenterLat is not null && criteria.CenterLng is not null => query
+                .OrderBy(x => Math.Abs((x.Latitude ?? 999m) - criteria.CenterLat.Value) +
+                              Math.Abs((x.Longitude ?? 999m) - criteria.CenterLng.Value))
+                .ThenByDescending(x => x.CreatedAt),
+            _ => query
+                .OrderByDescending(x => x.AverageRating)
+                .ThenByDescending(x => x.TotalReviews)
+                .ThenByDescending(x => x.CreatedAt)
         };
     }
 
@@ -811,35 +1714,151 @@ public partial class RoomingHouseQueryService : IRoomingHouseQueryService
         Guid roomingHouseId,
         CancellationToken cancellationToken = default)
     {
-        var house = await BuildPublicRoomingHouseDetailQuery()
-            .FirstOrDefaultAsync(
-                x => x.Id == roomingHouseId &&
-                     x.DeletedAt == null &&
-                     x.ApprovalStatus == RoomingHouseApprovalStatus.Approved &&
-                     x.VisibilityStatus == RoomingHouseVisibilityStatus.Visible,
-                cancellationToken);
+        var cacheKey = $"public-rooming-house-detail:{roomingHouseId:N}";
+        if (memoryCache.TryGetValue(cacheKey, out RoomingHouseDetailResponse? cachedResponse) &&
+            cachedResponse is not null)
+        {
+            return cachedResponse;
+        }
+
+        var house = await context.RoomingHouses
+            .AsNoTracking()
+            .Where(x => x.Id == roomingHouseId &&
+                        x.DeletedAt == null &&
+                        x.ApprovalStatus == RoomingHouseApprovalStatus.Approved &&
+                        x.VisibilityStatus == RoomingHouseVisibilityStatus.Visible)
+            .Select(x => new RoomingHouseDetailResponse
+            {
+                Id = x.Id,
+                LandlordUserId = x.LandlordUserId,
+                Name = x.Name,
+                Description = x.Description,
+                AddressLine = x.AddressLine,
+                ProvinceCode = x.ProvinceCode,
+                WardCode = x.WardCode,
+                AddressDisplay = x.Ward != null && x.Province != null
+                    ? x.AddressLine + ", " + x.Ward.Name + ", " + x.Province.Name
+                    : x.AddressDisplay,
+                Latitude = x.Latitude,
+                Longitude = x.Longitude,
+                GoogleMapUrl = x.GoogleMapUrl,
+                ApprovalStatus = x.ApprovalStatus.ToString(),
+                VisibilityStatus = x.VisibilityStatus.ToString(),
+                RejectedReason = x.RejectedReason,
+                ReviewedByAdminId = x.ReviewedByAdminId,
+                ReviewedAt = x.ReviewedAt,
+                CreatedAt = x.CreatedAt,
+                UpdatedAt = x.UpdatedAt,
+                LegalDocument = null,
+                Images = x.Images
+                    .Where(image => image.MediaAssetId.HasValue)
+                    .OrderByDescending(image => image.IsCover)
+                    .ThenBy(image => image.SortOrder)
+                    .ThenBy(image => image.Id)
+                    .Select(image => new PropertyImageResponse
+                    {
+                        Id = image.Id,
+                        MediaAssetId = image.MediaAssetId,
+                        Caption = image.Caption,
+                        IsCover = image.IsCover,
+                        SortOrder = image.SortOrder,
+                        CreatedAt = image.CreatedAt
+                    })
+                    .ToList(),
+                Amenities = x.RoomingHouseAmenities
+                    .OrderBy(amenity => amenity.Amenity.Name)
+                    .Select(amenity => new AmenityResponse
+                    {
+                        Id = amenity.Amenity.Id,
+                        Name = amenity.Amenity.Name,
+                        Scope = amenity.Amenity.Scope.ToString(),
+                        IconCode = amenity.Amenity.IconCode
+                    })
+                    .ToList(),
+                RentalPolicy = x.RentalPolicy == null
+                    ? null
+                    : new RentalPolicyResponse
+                    {
+                        Id = x.RentalPolicy.Id,
+                        RoomingHouseId = x.RentalPolicy.RoomingHouseId,
+                        MinRentalMonths = x.RentalPolicy.MinRentalMonths,
+                        MaxRentalMonths = x.RentalPolicy.MaxRentalMonths,
+                        AllowShortTermRenewal = x.RentalPolicy.AllowShortTermRenewal,
+                        RenewalNoticeDays = x.RentalPolicy.RenewalNoticeDays,
+                        DepositMonths = x.RentalPolicy.DepositMonths,
+                        DefaultPaymentDay = x.RentalPolicy.DefaultPaymentDay,
+                        IsActive = x.RentalPolicy.IsActive,
+                        CreatedAt = x.RentalPolicy.CreatedAt,
+                        UpdatedAt = x.RentalPolicy.UpdatedAt
+                    },
+                HouseRule = x.HouseRule == null
+                    ? null
+                    : new RoomingHouseRuleResponse
+                    {
+                        Id = x.HouseRule.Id,
+                        RoomingHouseId = x.HouseRule.RoomingHouseId,
+                        SourceType = x.HouseRule.SourceType.ToString(),
+                        MediaAssetId = x.HouseRule.MediaAssetId,
+                        GeneralRules = x.HouseRule.GeneralRules,
+                        QuietHours = x.HouseRule.QuietHours,
+                        SecurityPolicy = x.HouseRule.SecurityPolicy,
+                        CleaningPolicy = x.HouseRule.CleaningPolicy,
+                        GuestPolicy = x.HouseRule.GuestPolicy,
+                        ParkingPolicy = x.HouseRule.ParkingPolicy,
+                        UtilityPolicy = x.HouseRule.UtilityPolicy,
+                        DamageCompensationPolicy = x.HouseRule.DamageCompensationPolicy,
+                        AdditionalNotes = x.HouseRule.AdditionalNotes,
+                        CreatedAt = x.HouseRule.CreatedAt,
+                        UpdatedAt = x.HouseRule.UpdatedAt
+                    },
+                Rooms = new List<RoomResponse>(),
+                ServicePrices = x.ServicePrices
+                    .Where(price => price.IsActive)
+                    .OrderBy(price => price.ServiceType.Name)
+                    .Select(price => new RoomingHouseServicePriceResponse
+                    {
+                        Id = price.Id,
+                        ServiceTypeId = price.ServiceTypeId,
+                        ServiceTypeName = price.ServiceType.Name,
+                        PricingUnit = price.PricingUnit.ToString(),
+                        UnitPrice = price.UnitPrice,
+                        Note = price.Note,
+                        MeterUnitName = price.ServiceType.MeterUnitName,
+                        IsActive = price.IsActive
+                    })
+                    .ToList(),
+                TotalRooms = x.Rooms.Count(room => room.DeletedAt == null),
+                AvailableRooms = x.Rooms.Count(room => room.Status == RoomStatus.Available && room.DeletedAt == null)
+            })
+            .FirstOrDefaultAsync(cancellationToken);
 
         if (house is null)
         {
             return null;
         }
 
-        var response = RoomingHouseReadModelMapper.ToDetailResponse(house);
-        var roomStats = await context.Rooms
-            .AsNoTracking()
-            .Where(x => x.RoomingHouseId == roomingHouseId && x.DeletedAt == null)
-            .GroupBy(_ => 1)
-            .Select(g => new
+        foreach (var image in house.Images)
+        {
+            image.ImageUrl = image.MediaAssetId.HasValue
+                ? PublicMediaPathBuilder.Build(image.MediaAssetId.Value)
+                : string.Empty;
+        }
+
+        if (house.HouseRule?.MediaAssetId is Guid ruleMediaAssetId)
+        {
+            house.HouseRule.PdfUrl = PublicMediaPathBuilder.Build(ruleMediaAssetId);
+        }
+
+        memoryCache.Set(
+            cacheKey,
+            house,
+            new MemoryCacheEntryOptions
             {
-                TotalRooms = g.Count(),
-                AvailableRooms = g.Count(x => x.Status == RoomStatus.Available),
-            })
-            .FirstOrDefaultAsync(cancellationToken);
+                AbsoluteExpirationRelativeToNow = TimeSpan.FromMinutes(3),
+                SlidingExpiration = TimeSpan.FromMinutes(1)
+            });
 
-        response.TotalRooms = roomStats?.TotalRooms ?? 0;
-        response.AvailableRooms = roomStats?.AvailableRooms ?? 0;
-
-        return response;
+        return house;
     }
 
     public async Task<List<RoomingHouseResponse>> GetByLandlordAsync(
@@ -988,6 +2007,101 @@ public partial class RoomingHouseQueryService : IRoomingHouseQueryService
         DateTimeOffset UpdatedAt);
 
     private sealed record SearchLocationMatch(string Code, string? ProvinceCode, string Alias);
+
+    private sealed class FastSearchRow
+    {
+        public Guid Id { get; set; }
+
+        public string Name { get; set; } = string.Empty;
+
+        public string? Description { get; set; }
+
+        public string ProvinceCode { get; set; } = string.Empty;
+
+        public string WardCode { get; set; } = string.Empty;
+
+        public string AddressDisplay { get; set; } = string.Empty;
+
+        public decimal? Latitude { get; set; }
+
+        public decimal? Longitude { get; set; }
+
+        public Guid? CoverImageMediaAssetId { get; set; }
+
+        public int AvailableRooms { get; set; }
+
+        public int TotalRooms { get; set; }
+
+        public double AverageRating { get; set; }
+
+        public int TotalReviews { get; set; }
+
+        public decimal? MinMonthlyRent { get; set; }
+
+        public decimal? MaxMonthlyRent { get; set; }
+
+        public decimal? MinAreaM2 { get; set; }
+
+        public decimal? MaxAreaM2 { get; set; }
+
+        public int? MaxOccupants { get; set; }
+
+        public HashSet<int> AmenityIds { get; set; } = new();
+
+        public HashSet<int> RoomAmenityIds { get; set; } = new();
+
+        public List<AmenityResponse> Amenities { get; set; } = new();
+
+        public DateTimeOffset CreatedAt { get; set; }
+    }
+
+    private sealed class FastKeywordRow
+    {
+        public Guid Id { get; set; }
+
+        public string Name { get; set; } = string.Empty;
+
+        public string? Description { get; set; }
+
+        public string AddressDisplay { get; set; } = string.Empty;
+
+        public decimal? Latitude { get; set; }
+
+        public decimal? Longitude { get; set; }
+
+        public double AverageRating { get; set; }
+
+        public int TotalReviews { get; set; }
+
+        public decimal? MinMonthlyRent { get; set; }
+
+        public decimal? MaxMonthlyRent { get; set; }
+
+        public decimal? MinAreaM2 { get; set; }
+
+        public decimal? MaxAreaM2 { get; set; }
+
+        public DateTimeOffset CreatedAt { get; set; }
+    }
+
+
+    private sealed class FastKeywordScoredRow
+    {
+        public FastKeywordRow Row { get; set; } = new();
+
+        public int KeywordScore { get; set; }
+
+        public decimal? DistanceKm { get; set; }
+    }
+
+    private sealed class FastSearchScoredRow
+    {
+        public FastSearchRow Row { get; set; } = new();
+
+        public int KeywordScore { get; set; }
+
+        public decimal? DistanceKm { get; set; }
+    }
 
     /// <summary>
     /// Lightweight scored candidate used for filtering, sorting, and pagination.

@@ -1,3 +1,4 @@
+﻿using SmartRentalPlatform.Application.Common.Media;
 using Microsoft.AspNetCore.Http;
 using SmartRentalPlatform.Application.Common.Exceptions;
 using SmartRentalPlatform.Application.Common.Interfaces;
@@ -53,7 +54,7 @@ public class UserServiceTests : IDisposable
         Assert.Equal(mediaAsset.Id, updatedUser.AvatarMediaAssetId);
         Assert.Null(updatedUser.AvatarUrl);
         Assert.Equal(mediaAsset.Id, result.AvatarMediaAssetId);
-        Assert.Equal($"/api/media/public/{mediaAsset.Id:D}", result.AvatarUrl);
+        Assert.Equal(PublicMediaPathBuilder.Build(mediaAsset.Id), result.AvatarUrl);
         Assert.Equal(nameof(SmartRentalPlatform.Domain.Entities.Users.User), updatedAsset.LinkedEntityType);
         Assert.Equal(user.Id, updatedAsset.LinkedEntityId);
         Assert.Equal(MediaStatus.Linked, updatedAsset.Status);
@@ -118,7 +119,7 @@ public class UserServiceTests : IDisposable
         var refreshedNextAvatar = _fixture.Context.MediaAssets.Single(x => x.Id == nextAvatar.Id);
 
         Assert.Equal(nextAvatar.Id, result.AvatarMediaAssetId);
-        Assert.Equal($"/api/media/public/{nextAvatar.Id:D}", result.AvatarUrl);
+        Assert.Equal(PublicMediaPathBuilder.Build(nextAvatar.Id), result.AvatarUrl);
 
         Assert.Equal(MediaStatus.Deleted, refreshedPreviousAvatar.Status);
         Assert.NotNull(refreshedPreviousAvatar.DeletedAt);
@@ -236,7 +237,7 @@ public class UserServiceTests : IDisposable
         var result = await service.GetCurrentUserAsync();
 
         Assert.Equal(avatarAsset.Id, result.AvatarMediaAssetId);
-        Assert.Equal($"/api/media/public/{avatarAsset.Id:D}", result.AvatarUrl);
+        Assert.Equal(PublicMediaPathBuilder.Build(avatarAsset.Id), result.AvatarUrl);
     }
 
     private UserService CreateService(Guid userId)

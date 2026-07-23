@@ -1,4 +1,6 @@
+﻿using SmartRentalPlatform.Application.Common.Media;
 using Microsoft.Extensions.Logging.Abstractions;
+using Microsoft.Extensions.Caching.Memory;
 using SmartRentalPlatform.Application.Common.Interfaces;
 using SmartRentalPlatform.Application.RoomingHouses;
 using SmartRentalPlatform.Application.RoomingHouses.Search;
@@ -35,7 +37,7 @@ public class RoomingHouseQueryServiceMediaTests : IClassFixture<TestDatabaseFixt
         var result = await service.GetPublicListingAsync();
 
         var item = Assert.Single(result);
-        Assert.Equal($"/api/media/public/{mediaAssetId:D}", item.CoverImageUrl);
+        Assert.Equal(PublicMediaPathBuilder.Build(mediaAssetId), item.CoverImageUrl);
     }
 
     [Fact]
@@ -51,7 +53,7 @@ public class RoomingHouseQueryServiceMediaTests : IClassFixture<TestDatabaseFixt
         });
 
         var item = Assert.Single(result.Items);
-        Assert.Equal($"/api/media/public/{mediaAssetId:D}", item.CoverImageUrl);
+        Assert.Equal(PublicMediaPathBuilder.Build(mediaAssetId), item.CoverImageUrl);
     }
 
     private async Task<Guid> SeedPublicHouseWithLegacyAndMediaImagesAsync()
@@ -139,7 +141,7 @@ public class RoomingHouseQueryServiceMediaTests : IClassFixture<TestDatabaseFixt
             Id = mediaAsset.LinkedEntityId!.Value,
             RoomingHouseId = house.Id,
             MediaAssetId = mediaAsset.Id,
-            ImageUrl = $"/api/media/public/{mediaAsset.Id:D}",
+            ImageUrl = PublicMediaPathBuilder.Build(mediaAsset.Id),
             Caption = "Media cover",
             IsCover = true,
             SortOrder = 1,
@@ -173,6 +175,7 @@ public class RoomingHouseQueryServiceMediaTests : IClassFixture<TestDatabaseFixt
             new ZeroBehaviorScoreScorer(),
             new NoopReranker(),
             new NoopVietMapService(),
+            new MemoryCache(new MemoryCacheOptions()),
             NullLogger<RoomingHouseQueryService>.Instance);
     }
 

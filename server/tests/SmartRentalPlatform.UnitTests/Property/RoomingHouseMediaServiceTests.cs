@@ -1,4 +1,4 @@
-using Microsoft.EntityFrameworkCore;
+﻿using Microsoft.EntityFrameworkCore;
 using SmartRentalPlatform.Application.Common.Exceptions;
 using SmartRentalPlatform.Application.Common.Media;
 using SmartRentalPlatform.Application.RoomingHouses;
@@ -75,7 +75,7 @@ public class RoomingHouseMediaServiceTests : IDisposable
         Assert.Equal(
             [coverAssetId, secondAssetId, thirdAssetId],
             result.Images.OrderBy(x => x.SortOrder).Select(x => x.MediaAssetId).Cast<Guid>().ToArray());
-        Assert.Equal($"/api/media/public/{coverAssetId:D}", result.Images[0].ImageUrl);
+        Assert.Equal(PublicMediaPathBuilder.Build(coverAssetId), result.Images[0].ImageUrl);
 
         var imagesInDb = await _fixture.Context.PropertyImages
             .Where(x => x.RoomingHouseId == house.Id)
@@ -180,9 +180,9 @@ public class RoomingHouseMediaServiceTests : IDisposable
         Assert.NotNull(result);
         Assert.Equal(
             [
-                $"/api/media/public/{coverAssetId:D}",
-                $"/api/media/public/{secondAssetId:D}",
-                $"/api/media/public/{thirdAssetId:D}"
+                PublicMediaPathBuilder.Build(coverAssetId),
+                PublicMediaPathBuilder.Build(secondAssetId),
+                PublicMediaPathBuilder.Build(thirdAssetId)
             ],
             result!.Images.OrderBy(x => x.SortOrder).Select(x => x.ImageUrl).ToArray());
 
@@ -448,7 +448,7 @@ public class RoomingHouseMediaServiceTests : IDisposable
 
         public Task<RoomingHouseOnboardingResponse> GetOnboardingAsync(Guid landlordUserId, CancellationToken cancellationToken = default) => throw new NotImplementedException();
         public Task<List<RoomingHouseDetailResponse>> GetPublicAvailableAsync(CancellationToken cancellationToken = default) => throw new NotImplementedException();
-        public Task<List<RoomingHouseListingResponse>> GetPublicListingAsync(CancellationToken cancellationToken = default) => throw new NotImplementedException();
+        public Task<List<RoomingHouseListingResponse>> GetPublicListingAsync(int page = 1, int pageSize = 24, CancellationToken cancellationToken = default) => throw new NotImplementedException();
         public Task<PagedResult<RoomingHouseSearchItemResponse>> SearchPublicAsync(RoomingHouseSearchRequest request, CancellationToken cancellationToken = default) => throw new NotImplementedException();
         public Task<RoomingHouseRecommendationResponse> GetGuestRecommendationsAsync(GuestRoomingHouseRecommendationRequest request, CancellationToken cancellationToken = default) => throw new NotImplementedException();
         public Task<RoomingHouseDetailResponse?> GetPublicByIdAsync(Guid roomingHouseId, CancellationToken cancellationToken = default) => throw new NotImplementedException();

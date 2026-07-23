@@ -3,6 +3,7 @@ using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Caching.Memory;
 using SmartRentalPlatform.Application.Common.Exceptions;
 using SmartRentalPlatform.Application.Common.Interfaces;
 using SmartRentalPlatform.Application.Common.Media;
@@ -33,19 +34,22 @@ public class RoomingHouseReviewService : IRoomingHouseReviewService
     private readonly ICurrentUserService _currentUserService;
     private readonly IReviewAiModerationService _moderationService;
     private readonly INotificationService _notificationService;
+    private readonly IMemoryCache _memoryCache;
 
     public RoomingHouseReviewService(
         IAppDbContext context,
         IFileStorageService fileStorageService,
         ICurrentUserService currentUserService,
         IReviewAiModerationService moderationService,
-        INotificationService notificationService)
+        INotificationService notificationService,
+        IMemoryCache memoryCache)
     {
         _context = context;
         _fileStorageService = fileStorageService;
         _currentUserService = currentUserService;
         _moderationService = moderationService;
         _notificationService = notificationService;
+        _memoryCache = memoryCache;
     }
 
     public async Task<ReviewEligibilityResponse> CheckEligibilityAsync(
@@ -308,6 +312,7 @@ public class RoomingHouseReviewService : IRoomingHouseReviewService
 
             await _context.SaveChangesAsync(cancellationToken);
             await transaction.CommitAsync(cancellationToken);
+            InvalidatePublicReviewCache(review.RoomingHouseId);
 
             return await GetReviewResponseAsync(review.Id, cancellationToken);
         }
@@ -324,50 +329,99 @@ public class RoomingHouseReviewService : IRoomingHouseReviewService
         int pageSize,
         CancellationToken cancellationToken = default)
     {
-        var query = _context.RoomingHouseReviews
-            .Include(x => x.TenantUser)
-            .Include(x => x.Images)
-            .Include(x => x.RentalContract)
-                .ThenInclude(x => x.Room)
-            .Where(x => x.RoomingHouseId == roomingHouseId && !x.IsHidden && x.ModerationStatus == RoomingHouseReviewModerationStatus.Approved);
+        var cacheVersion = GetPublicReviewCacheVersion(roomingHouseId);
+        var cacheKey = $"public-rooming-house-reviews:{roomingHouseId:N}:{cacheVersion}:{page}:{pageSize}";
+        if (_memoryCache.TryGetValue(cacheKey, out RoomingHouseReviewListResponse? cachedResponse) &&
+            cachedResponse is not null)
+        {
+            return cachedResponse;
+        }
 
-        var totalCount = await query.CountAsync(cancellationToken);
+        var baseQuery = _context.RoomingHouseReviews
+            .AsNoTracking()
+            .Where(x => x.RoomingHouseId == roomingHouseId &&
+                        !x.IsHidden &&
+                        x.ModerationStatus == RoomingHouseReviewModerationStatus.Approved);
 
-        var reviews = await query
+        var reviews = await baseQuery
             .OrderByDescending(x => x.CreatedAt)
             .Skip((page - 1) * pageSize)
             .Take(pageSize)
+            .Select(x => new RoomingHouseReviewResponse
+            {
+                Id = x.Id,
+                RentalContractId = x.RentalContractId,
+                RoomNumber = x.RentalContract.Room.RoomNumber,
+                ContractStartDate = x.RentalContract.StartDate,
+                ContractEndDate = x.RentalContract.EndDate,
+                TenantUserId = x.TenantUserId,
+                TenantDisplayName = x.TenantUser.DisplayName,
+                TenantAvatarUrl = x.TenantUser.AvatarUrl,
+                Rating = x.Rating,
+                Comment = x.Comment,
+                LandlordReply = x.LandlordReply,
+                LandlordReplyCreatedAt = x.LandlordReplyCreatedAt,
+                CreatedAt = x.CreatedAt,
+                UpdatedAt = x.UpdatedAt,
+                IsReported = _context.ReviewReports.Any(report => report.RoomingHouseReviewId == x.Id),
+                ModerationStatus = x.ModerationStatus.ToString(),
+                ModerationReason = x.ModerationReason,
+                AiModerationProvider = x.AiModerationProvider,
+                AiModerationRiskLevel = x.AiModerationRiskLevel,
+                AdminNote = x.AdminNote,
+                Images = x.Images
+                    .Where(image => image.MediaAssetId.HasValue)
+                    .OrderBy(image => image.SortOrder)
+                    .Select(image => new PropertyImageResponse
+                    {
+                        Id = image.Id,
+                        MediaAssetId = image.MediaAssetId,
+                        Caption = image.Caption,
+                        IsCover = image.IsCover,
+                        SortOrder = image.SortOrder,
+                        CreatedAt = image.CreatedAt
+                    })
+                    .ToList()
+            })
             .ToListAsync(cancellationToken);
 
-        var distribution = await _context.RoomingHouseReviews
-            .Where(x => x.RoomingHouseId == roomingHouseId && !x.IsHidden && x.ModerationStatus == RoomingHouseReviewModerationStatus.Approved)
+        foreach (var review in reviews)
+        {
+            foreach (var image in review.Images)
+            {
+                image.ImageUrl = image.MediaAssetId.HasValue
+                    ? BuildReviewImageUrl(image.MediaAssetId.Value)
+                    : string.Empty;
+            }
+        }
+
+        var distribution = await baseQuery
             .GroupBy(x => x.Rating)
             .Select(g => new { Rating = g.Key, Count = g.Count() })
             .ToDictionaryAsync(x => x.Rating, x => x.Count, cancellationToken);
 
         var house = await _context.RoomingHouses
             .AsNoTracking()
-            .FirstOrDefaultAsync(x => x.Id == roomingHouseId, cancellationToken);
-
-        var reviewIds = reviews.Select(x => x.Id).ToList();
-        var reportedReviewIds = await _context.ReviewReports
-            .Where(x => reviewIds.Contains(x.RoomingHouseReviewId))
-            .Select(x => x.RoomingHouseReviewId)
-            .Distinct()
-            .ToListAsync(cancellationToken);
+            .Where(x => x.Id == roomingHouseId)
+            .Select(x => new { x.AverageRating, x.TotalReviews })
+            .FirstOrDefaultAsync(cancellationToken);
 
         var response = new RoomingHouseReviewListResponse
         {
             AverageRating = house?.AverageRating ?? 0,
             TotalReviews = house?.TotalReviews ?? 0,
             RatingDistribution = distribution,
-            Reviews = reviews.Select(r =>
-            {
-                var mapped = MapToResponse(r);
-                mapped.IsReported = reportedReviewIds.Contains(r.Id);
-                return mapped;
-            }).ToList()
+            Reviews = reviews
         };
+
+        _memoryCache.Set(
+            cacheKey,
+            response,
+            new MemoryCacheEntryOptions
+            {
+                AbsoluteExpirationRelativeToNow = TimeSpan.FromMinutes(2),
+                SlidingExpiration = TimeSpan.FromMinutes(1)
+            });
 
         return response;
     }
@@ -464,6 +518,7 @@ public class RoomingHouseReviewService : IRoomingHouseReviewService
 
             await _context.SaveChangesAsync(cancellationToken);
             await transaction.CommitAsync(cancellationToken);
+            InvalidatePublicReviewCache(review.RoomingHouseId);
 
             return await GetReviewResponseAsync(review.Id, cancellationToken);
         }
@@ -501,6 +556,7 @@ public class RoomingHouseReviewService : IRoomingHouseReviewService
             await RoomingHouseRatingHelper.UpdateRatingAsync(_context, review.RoomingHouseId, cancellationToken);
             await _context.SaveChangesAsync(cancellationToken);
             await transaction.CommitAsync(cancellationToken);
+            InvalidatePublicReviewCache(review.RoomingHouseId);
         }
         catch (Exception)
         {
@@ -529,6 +585,7 @@ public class RoomingHouseReviewService : IRoomingHouseReviewService
         review.LandlordReplyCreatedAt = DateTimeOffset.UtcNow;
 
         await _context.SaveChangesAsync(cancellationToken);
+        InvalidatePublicReviewCache(review.RoomingHouseId);
 
         await _notificationService.CreateAsync(
             review.TenantUserId,
@@ -559,6 +616,26 @@ public class RoomingHouseReviewService : IRoomingHouseReviewService
         review.LandlordReplyCreatedAt = null;
 
         await _context.SaveChangesAsync(cancellationToken);
+        InvalidatePublicReviewCache(review.RoomingHouseId);
+    }
+
+    private long GetPublicReviewCacheVersion(Guid roomingHouseId)
+    {
+        return _memoryCache.GetOrCreate(
+            $"public-rooming-house-reviews-version:{roomingHouseId:N}",
+            entry =>
+            {
+                entry.Priority = CacheItemPriority.NeverRemove;
+                return DateTimeOffset.UtcNow.ToUnixTimeMilliseconds();
+            });
+    }
+
+    private void InvalidatePublicReviewCache(Guid roomingHouseId)
+    {
+        _memoryCache.Set(
+            $"public-rooming-house-reviews-version:{roomingHouseId:N}",
+            DateTimeOffset.UtcNow.ToUnixTimeMilliseconds(),
+            new MemoryCacheEntryOptions { Priority = CacheItemPriority.NeverRemove });
     }
 
 

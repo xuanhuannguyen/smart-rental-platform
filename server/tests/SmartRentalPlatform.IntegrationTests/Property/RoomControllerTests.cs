@@ -5,6 +5,7 @@ using System.Net.Http;
 using System.Net.Http.Json;
 using System.Threading.Tasks;
 using Microsoft.Extensions.DependencyInjection;
+using SmartRentalPlatform.Application.Common.Media;
 using SmartRentalPlatform.Contracts.Common;
 using SmartRentalPlatform.Contracts.Rooms;
 using SmartRentalPlatform.Domain.Entities.Properties;
@@ -270,6 +271,6 @@ public class RoomControllerTests : IClassFixture<CustomWebApplicationFactory>
 
         var image = Assert.Single(body.Data!.Images);
         Assert.Equal(migratedAssetId, image.MediaAssetId);
-        Assert.Equal($"/api/media/public/{migratedAssetId:D}", image.ImageUrl);
+        Assert.Equal(PublicMediaPathBuilder.Build(migratedAssetId), image.ImageUrl);
     }
 }

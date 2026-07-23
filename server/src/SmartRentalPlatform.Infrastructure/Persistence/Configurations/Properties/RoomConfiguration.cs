@@ -32,6 +32,8 @@ public class RoomConfiguration : IEntityTypeConfiguration<Room>
 
         builder.HasIndex(x => new { x.RoomingHouseId, x.Status, x.DeletedAt })
             .HasDatabaseName("ix_rooms_house_status_active");
+        builder.HasIndex(x => new { x.RoomingHouseId, x.DeletedAt, x.Status, x.Floor, x.RoomNumber })
+            .HasDatabaseName("ix_rooms_public_detail_order");
         builder.HasIndex(x => new { x.Status, x.DeletedAt, x.AreaM2, x.MaxOccupants })
             .HasDatabaseName("ix_rooms_public_filters");
     }

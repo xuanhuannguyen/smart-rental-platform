@@ -1,3 +1,4 @@
+﻿using SmartRentalPlatform.Application.Common.Media;
 using System.Text;
 using SmartRentalPlatform.Application.Common.Interfaces;
 using SmartRentalPlatform.Application.Common.Interfaces.Media;
@@ -44,7 +45,7 @@ public class MediaBackedFileStorageServiceTests : IClassFixture<TestDatabaseFixt
             FileUploadScope.Room);
 
         Assert.NotNull(response.MediaAssetId);
-        Assert.Equal($"/api/media/public/{response.MediaAssetId:D}", response.Url);
+        Assert.Equal(PublicMediaPathBuilder.Build(response.MediaAssetId.Value), response.Url);
         Assert.NotNull(storage.LastRequest);
         Assert.Equal(MediaVisibility.Public, storage.LastRequest!.Visibility);
 
@@ -70,7 +71,7 @@ public class MediaBackedFileStorageServiceTests : IClassFixture<TestDatabaseFixt
         var response = await service.UploadPdfAsync(stream, "house-rule.pdf", FileUploadScope.HouseRule);
 
         Assert.NotNull(response.MediaAssetId);
-        Assert.Equal($"/api/media/public/{response.MediaAssetId:D}", response.Url);
+        Assert.Equal(PublicMediaPathBuilder.Build(response.MediaAssetId.Value), response.Url);
         Assert.NotNull(storage.LastRequest);
         Assert.Equal(MediaVisibility.Public, storage.LastRequest!.Visibility);
 

@@ -24,6 +24,8 @@ namespace SmartRentalPlatform.Infrastructure.Persistence.Configurations.Properti
 
             builder.HasIndex(x => new { x.RoomId, x.IsActive, x.MonthlyRent })
                 .HasDatabaseName("ix_room_price_tiers_room_active_rent");
+            builder.HasIndex(x => new { x.RoomId, x.OccupantCount })
+                .HasDatabaseName("ix_room_price_tiers_room_occupant_order");
             builder.HasIndex(x => new { x.IsActive, x.MonthlyRent, x.RoomId })
                 .HasDatabaseName("ix_room_price_tiers_public_rent");
         }

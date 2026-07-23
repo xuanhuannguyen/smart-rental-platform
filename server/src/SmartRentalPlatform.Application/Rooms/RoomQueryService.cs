@@ -1,4 +1,5 @@
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Caching.Memory;
 using SmartRentalPlatform.Application.Common.Media;
 using SmartRentalPlatform.Application.Common.Interfaces;
 using SmartRentalPlatform.Contracts.Amenities;
@@ -13,11 +14,16 @@ public class RoomQueryService : IRoomQueryService
 {
     private readonly IAppDbContext context;
     private readonly RoomAccessService roomAccessService;
+    private readonly IMemoryCache memoryCache;
 
-    public RoomQueryService(IAppDbContext context, RoomAccessService roomAccessService)
+    public RoomQueryService(
+        IAppDbContext context,
+        RoomAccessService roomAccessService,
+        IMemoryCache memoryCache)
     {
         this.context = context;
         this.roomAccessService = roomAccessService;
+        this.memoryCache = memoryCache;
     }
 
     public async Task<List<RoomResponse>> GetByRoomingHouseAsync(
@@ -58,6 +64,13 @@ public class RoomQueryService : IRoomQueryService
         Guid roomingHouseId,
         CancellationToken cancellationToken = default)
     {
+        var cacheKey = $"public-rooming-house-rooms:{roomingHouseId:N}";
+        if (memoryCache.TryGetValue(cacheKey, out List<RoomResponse>? cachedRooms) &&
+            cachedRooms is not null)
+        {
+            return cachedRooms;
+        }
+
         var rooms = await ProjectPublicRoomResponse(
                 context.Rooms
                     .Where(x => x.RoomingHouseId == roomingHouseId &&
@@ -70,6 +83,14 @@ public class RoomQueryService : IRoomQueryService
             .ToListAsync(cancellationToken);
 
         HydratePublicImageUrls(rooms);
+        memoryCache.Set(
+            cacheKey,
+            rooms,
+            new MemoryCacheEntryOptions
+            {
+                AbsoluteExpirationRelativeToNow = TimeSpan.FromMinutes(2),
+                SlidingExpiration = TimeSpan.FromMinutes(1)
+            });
         return rooms;
     }
 

@@ -1,5 +1,5 @@
 import { Alert } from '../../shared/components/ui/Alert';
-import { useEffect, useMemo, useState, useRef, type CSSProperties, type FormEvent } from 'react';
+import { useEffect, useLayoutEffect, useMemo, useState, useRef, type CSSProperties, type FormEvent } from 'react';
 import { useLocation, useNavigate, useSearchParams } from 'react-router-dom';
 import L from 'leaflet';
 import 'leaflet/dist/leaflet.css';
@@ -33,7 +33,17 @@ type SidebarFilterPanel = 'price' | 'area' | 'occupants' | 'houseAmenities' | 'r
 const searchResultCache = new Map<string, PagedResult<RoomingHouseSearchItem>>();
 const wardsCache = new Map<string, Ward[]>();
 const scrollPositionCache = new Map<string, number>();
+const SEARCH_SCROLL_CACHE_KEY = 'srp_search_scroll_restore_v1';
+const SEARCH_SCROLL_CACHE_TTL = 5 * 60 * 1000;
 let metadataCache: { provinces: Province[]; amenities: Amenity[] } | null = null;
+
+type SearchScrollSnapshot = {
+  path: string;
+  y: number;
+  cardKey?: string;
+  viewportOffsetTop?: number;
+  timestamp: number;
+};
 
 export default function SearchRoomingHousesPage() {
   const navigate = useNavigate();
@@ -299,22 +309,50 @@ export default function SearchRoomingHousesPage() {
 
   useEffect(() => {
     return () => {
-      scrollPositionCache.set(currentSearchPath, window.scrollY);
+      saveSearchScrollPosition(currentSearchPath);
     };
   }, [currentSearchPath]);
 
-  useEffect(() => {
+  useLayoutEffect(() => {
     if (loading || restoredSearchPathRef.current === currentSearchPath) return;
 
-    restoredSearchPathRef.current = currentSearchPath;
-    const scrollY = scrollPositionCache.get(currentSearchPath);
-    if (scrollY == null) return;
+    const snapshot = readSearchScrollPosition(location.state, currentSearchPath);
+    if (!snapshot) return;
 
-    const frameId = window.requestAnimationFrame(() => {
-      window.scrollTo({ top: scrollY });
-    });
-    return () => window.cancelAnimationFrame(frameId);
-  }, [currentSearchPath, loading, result]);
+    restoredSearchPathRef.current = currentSearchPath;
+    let attempts = 0;
+    let frameId = 0;
+    let timeoutId = 0;
+
+    const restore = () => {
+      attempts += 1;
+      const targetCard = snapshot.cardKey ? findSearchResultCard(snapshot.cardKey) : null;
+      if (targetCard && typeof snapshot.viewportOffsetTop === 'number') {
+        const nextY = window.scrollY + targetCard.getBoundingClientRect().top - snapshot.viewportOffsetTop;
+        window.scrollTo({ top: Math.max(0, nextY), behavior: 'auto' });
+      } else {
+        window.scrollTo({ top: snapshot.y, behavior: 'auto' });
+      }
+
+      const reachedTarget = targetCard && typeof snapshot.viewportOffsetTop === 'number'
+        ? Math.abs(targetCard.getBoundingClientRect().top - snapshot.viewportOffsetTop) <= 4
+        : Math.abs(window.scrollY - snapshot.y) <= 4;
+
+      if (reachedTarget || attempts >= 8) {
+        return;
+      }
+
+      timeoutId = window.setTimeout(() => {
+        frameId = window.requestAnimationFrame(restore);
+      }, 80);
+    };
+
+    restore();
+    return () => {
+      window.cancelAnimationFrame(frameId);
+      window.clearTimeout(timeoutId);
+    };
+  }, [currentSearchPath, loading, location.state, result]);
 
   // Leaflet Map Initialization
   useEffect(() => {
@@ -358,7 +396,15 @@ export default function SearchRoomingHousesPage() {
       if (!link) return;
 
       event.preventDefault();
-      navigate(`${link.pathname}${link.search}`, { state: { fromSearch: currentSearchPath } });
+      const searchScroll = saveSearchScrollPosition(currentSearchPath);
+      navigate(`${link.pathname}${link.search}`, {
+        preventScrollReset: true,
+        state: {
+          fromSearch: currentSearchPath,
+          fromListing: currentSearchPath,
+          searchScroll,
+        },
+      });
     };
     map.getContainer().addEventListener('click', handleMapPopupLinkClick);
 
@@ -1325,13 +1371,20 @@ export default function SearchRoomingHousesPage() {
                 {result.items.map((item) => (
                   <button
                     key={item.id}
+                    data-search-card-key={item.id}
                     className="search-result-card"
                     type="button"
-                    onClick={() =>
+                    onClick={(event) => {
+                      const searchScroll = saveSearchScrollPosition(currentSearchPath, item.id, event.currentTarget);
                       navigate(`/rooming-houses/${item.id}`, {
-                        state: { fromSearch: currentSearchPath },
-                      })
-                    }
+                        preventScrollReset: true,
+                        state: {
+                          fromSearch: currentSearchPath,
+                          fromListing: currentSearchPath,
+                          searchScroll,
+                        },
+                      });
+                    }}
                   >
                     <div className="search-result-card__image-container">
                       {item.coverImageUrl ? (
@@ -1478,6 +1531,88 @@ function buildSearchParams(params: URLSearchParams): RoomingHouseSearchParams {
     page: Math.max(1, Math.floor(getNumberParam(params, 'page') ?? 1)),
     pageSize: clampPageSize(getNumberParam(params, 'pageSize') ?? DEFAULT_PAGE_SIZE),
   };
+}
+
+function saveSearchScrollPosition(path: string, cardKey?: string, element?: HTMLElement | null): SearchScrollSnapshot {
+  const snapshot: SearchScrollSnapshot = {
+    path,
+    y: window.scrollY,
+    cardKey,
+    viewportOffsetTop: element ? element.getBoundingClientRect().top : undefined,
+    timestamp: Date.now(),
+  };
+
+  scrollPositionCache.set(path, snapshot.y);
+  try {
+    sessionStorage.setItem(SEARCH_SCROLL_CACHE_KEY, JSON.stringify(snapshot));
+  } catch {
+    // sessionStorage can be unavailable/full; in-memory cache still handles this tab.
+  }
+
+  return snapshot;
+}
+
+function readSearchScrollPosition(routeState: unknown, currentPath: string): SearchScrollSnapshot | null {
+  const routeSnapshot = readSearchScrollPositionFromRouteState(routeState);
+  if (routeSnapshot?.path === currentPath) {
+    return routeSnapshot;
+  }
+
+  try {
+    const cached = sessionStorage.getItem(SEARCH_SCROLL_CACHE_KEY);
+    if (cached) {
+      const snapshot = JSON.parse(cached) as Partial<SearchScrollSnapshot>;
+      if (
+        snapshot.path === currentPath &&
+        typeof snapshot.y === 'number' &&
+        typeof snapshot.timestamp === 'number' &&
+        Date.now() - snapshot.timestamp < SEARCH_SCROLL_CACHE_TTL
+      ) {
+        return {
+          path: snapshot.path,
+          y: Math.max(0, snapshot.y),
+          cardKey: typeof snapshot.cardKey === 'string' ? snapshot.cardKey : undefined,
+          viewportOffsetTop: typeof snapshot.viewportOffsetTop === 'number' ? snapshot.viewportOffsetTop : undefined,
+          timestamp: snapshot.timestamp,
+        };
+      }
+    }
+  } catch {
+    sessionStorage.removeItem(SEARCH_SCROLL_CACHE_KEY);
+  }
+
+  const cachedY = scrollPositionCache.get(currentPath);
+  return typeof cachedY === 'number'
+    ? { path: currentPath, y: cachedY, timestamp: Date.now() }
+    : null;
+}
+
+function readSearchScrollPositionFromRouteState(routeState: unknown): SearchScrollSnapshot | null {
+  const searchScroll =
+    routeState && typeof routeState === 'object' && 'restoreSearchScroll' in routeState
+      ? (routeState as { restoreSearchScroll?: unknown }).restoreSearchScroll
+      : undefined;
+
+  if (!searchScroll || typeof searchScroll !== 'object') {
+    return null;
+  }
+
+  const snapshot = searchScroll as Partial<SearchScrollSnapshot>;
+  if (typeof snapshot.path !== 'string' || typeof snapshot.y !== 'number') {
+    return null;
+  }
+
+  return {
+    path: snapshot.path,
+    y: Math.max(0, snapshot.y),
+    cardKey: typeof snapshot.cardKey === 'string' ? snapshot.cardKey : undefined,
+    viewportOffsetTop: typeof snapshot.viewportOffsetTop === 'number' ? snapshot.viewportOffsetTop : undefined,
+    timestamp: typeof snapshot.timestamp === 'number' ? snapshot.timestamp : Date.now(),
+  };
+}
+
+function findSearchResultCard(cardKey: string) {
+  return document.querySelector<HTMLElement>(`[data-search-card-key="${CSS.escape(cardKey)}"]`);
 }
 
 function paramsToUrl(params: RoomingHouseSearchParams): URLSearchParams {

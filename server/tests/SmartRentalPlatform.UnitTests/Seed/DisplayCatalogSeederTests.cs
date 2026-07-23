@@ -28,11 +28,13 @@ namespace SmartRentalPlatform.UnitTests.Seed
     {
         private readonly SqliteConnection _connection;
         private readonly AppDbContext _context;
+        private readonly string _mediaSourceDirectory;
 
         public DisplayCatalogSeederTests()
         {
             _connection = new SqliteConnection("Data Source=:memory:");
             _connection.Open();
+            _mediaSourceDirectory = CreateMediaSourceDirectory();
 
             var options = new DbContextOptionsBuilder<AppDbContext>()
                 .UseSqlite(_connection)
@@ -63,7 +65,8 @@ namespace SmartRentalPlatform.UnitTests.Seed
                 targetHouseCount: 3,
                 targetAssetCount: 15,
                 uploadMedia: true,
-                version: version);
+                version: version,
+                mediaSourceDirectory: _mediaSourceDirectory);
 
             int initialHouses = await _context.RoomingHouses.CountAsync();
             int initialRooms = await _context.Rooms.CountAsync();
@@ -81,7 +84,8 @@ namespace SmartRentalPlatform.UnitTests.Seed
                 targetHouseCount: 3,
                 targetAssetCount: 15,
                 uploadMedia: true,
-                version: version);
+                version: version,
+                mediaSourceDirectory: _mediaSourceDirectory);
 
             int secondHouses = await _context.RoomingHouses.CountAsync();
             int secondRooms = await _context.Rooms.CountAsync();
@@ -116,7 +120,8 @@ namespace SmartRentalPlatform.UnitTests.Seed
                 targetHouseCount: 3,
                 targetAssetCount: 20,
                 uploadMedia: true,
-                version: version);
+                version: version,
+                mediaSourceDirectory: _mediaSourceDirectory);
 
             // Validate that no house or room gallery has duplicate images
             var houses = await _context.RoomingHouses
@@ -188,7 +193,8 @@ namespace SmartRentalPlatform.UnitTests.Seed
                 targetHouseCount: 2,
                 targetAssetCount: 15,
                 uploadMedia: true,
-                version: version);
+                version: version,
+                mediaSourceDirectory: _mediaSourceDirectory);
 
             var reviews = await _context.RoomingHouseReviews.ToListAsync();
             Assert.Equal(10, reviews.Count); // 2 houses * 5 reviews
@@ -238,7 +244,8 @@ namespace SmartRentalPlatform.UnitTests.Seed
                 targetHouseCount: 2,
                 targetAssetCount: 15,
                 uploadMedia: true,
-                version: version);
+                version: version,
+                mediaSourceDirectory: _mediaSourceDirectory);
 
             var contracts = await _context.RentalContracts
                 .Include(c => c.Occupants)
@@ -249,9 +256,9 @@ namespace SmartRentalPlatform.UnitTests.Seed
             int expiredCount = contracts.Count(c => c.Status == RentalContractStatus.Expired);
             int activeCount = contracts.Count(c => c.Status == RentalContractStatus.Active);
 
-            // 80% (8) should be Expired, 20% (2) should be Active
-            Assert.Equal(8, expiredCount);
-            Assert.Equal(2, activeCount);
+            // Review-only catalog contracts must be completed/expired before reviews are created.
+            Assert.Equal(10, expiredCount);
+            Assert.Equal(0, activeCount);
 
             foreach (var contract in contracts)
             {
@@ -283,12 +290,22 @@ namespace SmartRentalPlatform.UnitTests.Seed
             var now = DateTimeOffset.UtcNow;
             
             // Seed target provinces and wards if they don't exist
-            if (!await _context.AdministrativeProvinces.AnyAsync(p => p.Code == "01"))
+            if (!await _context.AdministrativeProvinces.AnyAsync())
             {
-                var province = new AdministrativeProvince { Code = "01", Name = "Thành phố Hà Nội", IsActive = true };
-                var ward = new AdministrativeWard { Code = "00001", ProvinceCode = "01", Name = "Phường Dịch Vọng Hậu", IsActive = true, Province = province };
-                _context.AdministrativeProvinces.Add(province);
-                _context.AdministrativeWards.Add(ward);
+                var provinces = new[]
+                {
+                    new AdministrativeProvince { Code = "46", Name = "Thành phố Huế", IsActive = true },
+                    new AdministrativeProvince { Code = "48", Name = "Thành phố Đà Nẵng", IsActive = true },
+                    new AdministrativeProvince { Code = "01", Name = "Thành phố Hà Nội", IsActive = true },
+                    new AdministrativeProvince { Code = "79", Name = "Thành phố Hồ Chí Minh", IsActive = true }
+                };
+
+                _context.AdministrativeProvinces.AddRange(provinces);
+                _context.AdministrativeWards.AddRange(
+                    new AdministrativeWard { Code = "46001", ProvinceCode = "46", Name = "Phường Phú Hội", IsActive = true, Province = provinces[0] },
+                    new AdministrativeWard { Code = "48001", ProvinceCode = "48", Name = "Phường Hòa Cường Bắc", IsActive = true, Province = provinces[1] },
+                    new AdministrativeWard { Code = "01001", ProvinceCode = "01", Name = "Phường Dịch Vọng Hậu", IsActive = true, Province = provinces[2] },
+                    new AdministrativeWard { Code = "79001", ProvinceCode = "79", Name = "Phường Bến Nghé", IsActive = true, Province = provinces[3] });
             }
 
             // Seed Roles if they don't exist
@@ -328,6 +345,26 @@ namespace SmartRentalPlatform.UnitTests.Seed
             _context.Database.EnsureDeleted();
             _context.Dispose();
             _connection.Dispose();
+            if (Directory.Exists(_mediaSourceDirectory))
+            {
+                Directory.Delete(_mediaSourceDirectory, recursive: true);
+            }
+        }
+
+        private static string CreateMediaSourceDirectory()
+        {
+            var directory = Path.Combine(Path.GetTempPath(), $"display-catalog-seed-test-{Guid.NewGuid():N}");
+            Directory.CreateDirectory(directory);
+
+            for (var i = 0; i < 12; i++)
+            {
+                var extension = i % 3 == 0 ? ".jpg" : i % 3 == 1 ? ".png" : ".webp";
+                File.WriteAllBytes(
+                    Path.Combine(directory, $"room-photo-{i + 1}{extension}"),
+                    new byte[] { 0x42, 0x4d, (byte)i, 0x01, 0x02, 0x03 });
+            }
+
+            return directory;
         }
 
         private sealed class StubPasswordService : IPasswordService

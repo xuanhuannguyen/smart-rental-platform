@@ -1,5 +1,7 @@
+﻿using SmartRentalPlatform.Application.Common.Media;
 using Microsoft.AspNetCore.Http;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Caching.Memory;
 using SmartRentalPlatform.Application.Common.Exceptions;
 using SmartRentalPlatform.Application.Common.Interfaces;
 using SmartRentalPlatform.Application.Kyc;
@@ -223,7 +225,7 @@ public class MediaMigrationRegressionTests : IDisposable
         var result = await service.GetCurrentUserAsync();
 
         Assert.Equal(avatarAsset.Id, result.AvatarMediaAssetId);
-        Assert.Equal($"/api/media/public/{avatarAsset.Id:D}", result.AvatarUrl);
+        Assert.Equal(PublicMediaPathBuilder.Build(avatarAsset.Id), result.AvatarUrl);
     }
 
     [Fact]
@@ -274,14 +276,17 @@ public class MediaMigrationRegressionTests : IDisposable
             });
         await _fixture.Context.SaveChangesAsync();
 
-        var service = new RoomQueryService(_fixture.Context, new RoomAccessService(_fixture.Context));
+        var service = new RoomQueryService(
+            _fixture.Context,
+            new RoomAccessService(_fixture.Context),
+            new MemoryCache(new MemoryCacheOptions()));
 
         var result = await service.GetPublicRoomByIdAsync(room.Id);
 
         Assert.NotNull(result);
         var image = Assert.Single(result!.Images);
         Assert.Equal(mediaAssetId, image.MediaAssetId);
-        Assert.Equal($"/api/media/public/{mediaAssetId:D}", image.ImageUrl);
+        Assert.Equal(PublicMediaPathBuilder.Build(mediaAssetId), image.ImageUrl);
     }
 
     private UserService CreateUserService(Guid userId)

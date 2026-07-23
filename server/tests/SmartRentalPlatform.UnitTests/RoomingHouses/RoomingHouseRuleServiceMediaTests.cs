@@ -1,3 +1,4 @@
+﻿using SmartRentalPlatform.Application.Common.Media;
 using Microsoft.EntityFrameworkCore;
 using SmartRentalPlatform.Application.Common.Interfaces;
 using SmartRentalPlatform.Application.Common.Models;
@@ -67,7 +68,7 @@ public sealed class RoomingHouseRuleServiceMediaTests : IDisposable
         var savedNewAsset = await fixture.Context.MediaAssets.SingleAsync(x => x.Id == newAsset.Id);
 
         Assert.Equal(newAsset.Id, response.MediaAssetId);
-        Assert.Equal($"/api/media/public/{newAsset.Id:D}", response.PdfUrl);
+        Assert.Equal(PublicMediaPathBuilder.Build(newAsset.Id), response.PdfUrl);
         Assert.Equal(newAsset.Id, savedRule.MediaAssetId);
         Assert.Equal(MediaStatus.Linked, savedNewAsset.Status);
         Assert.Equal(MediaVisibility.Public, savedNewAsset.Visibility);
@@ -117,7 +118,7 @@ public sealed class RoomingHouseRuleServiceMediaTests : IDisposable
             return Task.FromResult(new FileUploadResponse
             {
                 MediaAssetId = mediaAssetId,
-                Url = $"/api/media/public/{mediaAssetId:D}"
+                Url = PublicMediaPathBuilder.Build(mediaAssetId)
             });
         }
 

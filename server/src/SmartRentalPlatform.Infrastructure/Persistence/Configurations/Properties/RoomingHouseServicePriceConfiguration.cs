@@ -31,6 +31,8 @@ public class RoomingHouseServicePriceConfiguration : IEntityTypeConfiguration<Ro
 
         builder.HasIndex(x => new { x.RoomingHouseId, x.ServiceTypeId, x.EffectiveFrom }).IsUnique();
         builder.HasIndex(x => new { x.RoomingHouseId, x.ServiceTypeId, x.IsActive });
+        builder.HasIndex(x => new { x.RoomingHouseId, x.IsActive, x.ServiceTypeId })
+            .HasDatabaseName("ix_rooming_house_service_prices_public_detail");
 
         builder.HasOne(x => x.RoomingHouse)
             .WithMany(x => x.ServicePrices)

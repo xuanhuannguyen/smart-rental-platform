@@ -311,7 +311,16 @@ function getListingReturnState(state: unknown) {
       ? (state as { homeScroll?: unknown }).homeScroll
       : undefined;
 
-  return homeScroll ? { restoreHomeScroll: homeScroll } : undefined;
+  if (homeScroll) {
+    return { restoreHomeScroll: homeScroll };
+  }
+
+  const searchScroll =
+    state && typeof state === 'object' && 'searchScroll' in state
+      ? (state as { searchScroll?: unknown }).searchScroll
+      : undefined;
+
+  return searchScroll ? { restoreSearchScroll: searchScroll } : undefined;
 }
 
 function readDetailCache(id: string): RoomingHouseDetail | null {
