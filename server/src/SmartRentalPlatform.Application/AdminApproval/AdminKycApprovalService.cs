@@ -1,15 +1,22 @@
 using Microsoft.EntityFrameworkCore;
+using SmartRentalPlatform.Application.Common.Exceptions;
 using SmartRentalPlatform.Application.Common.Media;
 using SmartRentalPlatform.Contracts.Admin;
 using SmartRentalPlatform.Application.Common.Interfaces;
+using SmartRentalPlatform.Contracts.Common;
 using SmartRentalPlatform.Domain.Entities.Users;
 using SmartRentalPlatform.Domain.Enums;
 
 namespace SmartRentalPlatform.Application.AdminApproval;
 
-public class AdminKycApprovalService(IAppDbContext context) : IAdminKycApprovalService
+public class AdminKycApprovalService(
+    IAppDbContext context,
+    IHashService hashService,
+    ISensitiveDataProtector sensitiveDataProtector) : IAdminKycApprovalService
 {
     private readonly IAppDbContext _context = context;
+    private readonly IHashService _hashService = hashService;
+    private readonly ISensitiveDataProtector _sensitiveDataProtector = sensitiveDataProtector;
 
     public async Task<AdminKycListResponse> GetPendingAsync(
         int pageNumber,
@@ -103,6 +110,7 @@ public class AdminKycApprovalService(IAppDbContext context) : IAdminKycApprovalS
     public async Task<bool> ApproveAsync(
         Guid kycId,
         Guid adminId,
+        AdminApproveKycRequest request,
         CancellationToken cancellationToken = default)
     {
         await using var transaction = await _context.BeginTransactionAsync(cancellationToken);
@@ -128,6 +136,8 @@ public class AdminKycApprovalService(IAppDbContext context) : IAdminKycApprovalS
             }
 
             var now = DateTimeOffset.UtcNow;
+            await ApplyAdminEditsAsync(kyc, request, cancellationToken);
+
             kyc.Status = KycVerificationStatus.Approved;
             kyc.RejectedReason = null;
             kyc.ReviewedByAdminId = adminId;
@@ -229,6 +239,85 @@ public class AdminKycApprovalService(IAppDbContext context) : IAdminKycApprovalS
         profile.AddressLine = kyc.OcrAddress;
         profile.VerifiedCitizenIdMasked = kyc.OcrCitizenIdMasked;
         profile.UpdatedAt = now;
+    }
+
+    private async Task ApplyAdminEditsAsync(
+        KycVerification kyc,
+        AdminApproveKycRequest? request,
+        CancellationToken cancellationToken)
+    {
+        request ??= new AdminApproveKycRequest();
+
+        var citizenId = NormalizeOptionalText(request.CitizenId);
+        if (!string.IsNullOrWhiteSpace(citizenId))
+        {
+            var citizenIdHash = _hashService.HashSha256Hex(citizenId);
+            var duplicateExists = await _context.KycVerifications
+                .AsNoTracking()
+                .AnyAsync(x =>
+                    x.Id != kyc.Id &&
+                    x.UserId != kyc.UserId &&
+                    x.CitizenIdHash == citizenIdHash &&
+                    x.Status == KycVerificationStatus.Approved,
+                    cancellationToken);
+
+            if (duplicateExists)
+            {
+                throw new BadRequestException(
+                    ErrorCodes.EkycDocumentFailed,
+                    "Số CCCD đã được gắn với một tài khoản KYC đã duyệt khác.");
+            }
+
+            kyc.OcrCitizenIdMasked = MaskCitizenId(citizenId);
+            kyc.CitizenIdHash = citizenIdHash;
+            kyc.DocumentNumberEncrypted = _sensitiveDataProtector.Encrypt(citizenId);
+        }
+
+        var fullName = NormalizeOptionalText(request.FullName);
+        if (fullName is not null)
+        {
+            kyc.OcrFullName = fullName;
+        }
+
+        if (request.DateOfBirth.HasValue)
+        {
+            kyc.OcrDateOfBirth = DateOnly.FromDateTime(request.DateOfBirth.Value);
+        }
+
+        var gender = NormalizeOptionalText(request.Gender);
+        if (gender is not null)
+        {
+            kyc.OcrGender = gender;
+        }
+
+        var address = NormalizeOptionalText(request.Address);
+        if (address is not null)
+        {
+            kyc.OcrAddress = address;
+        }
+    }
+
+    private static string? NormalizeOptionalText(string? value)
+    {
+        return string.IsNullOrWhiteSpace(value) ? null : value.Trim();
+    }
+
+    private static string MaskCitizenId(string citizenId)
+    {
+        var trimmed = citizenId.Trim();
+        if (trimmed.Length < 8)
+        {
+            return new string('x', trimmed.Length);
+        }
+
+        var first = trimmed[..4];
+        var last = trimmed[^4..];
+        var middleLength = trimmed.Length - 8;
+        var middle = middleLength >= 4
+            ? new string('x', middleLength)
+            : "xxxx";
+
+        return first + middle + last;
     }
 
     private static string BuildPrivateMediaUrl(Guid? mediaAssetId)

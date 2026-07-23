@@ -74,10 +74,11 @@ public class AdminKycController : ControllerBase
     [HttpPost("{kycId:guid}/approve")]
     public async Task<ActionResult<ApiResponse<object>>> Approve(
         Guid kycId,
+        AdminApproveKycRequest request,
         CancellationToken cancellationToken = default)
     {
         var adminId = GetCurrentUserId();
-        var success = await _kycApprovalService.ApproveAsync(kycId, adminId, cancellationToken);
+        var success = await _kycApprovalService.ApproveAsync(kycId, adminId, request, cancellationToken);
         if (!success)
         {
             return BadRequest(ValidationError("Chỉ hồ sơ KYC đang chờ admin duyệt mới có thể được duyệt."));

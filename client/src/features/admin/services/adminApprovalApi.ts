@@ -8,6 +8,7 @@ import type {
   AdminRoomingHouseListItem,
   AdminUserListItem,
   AdminUserDetail,
+  AdminApproveKycRequest,
   PagedResponse,
   AdminReviewReportListItem,
   AdminReviewReportDetail
@@ -27,10 +28,11 @@ export const adminApprovalApi = {
     });
   },
 
-  approveKyc(id: string) {
+  approveKyc(id: string, payload: AdminApproveKycRequest) {
     return apiClient<ApiResponse<object>>(ENDPOINTS.ADMIN.KYC_APPROVE(id), {
       method: 'POST',
-      auth: true
+      auth: true,
+      body: payload
     });
   },
 

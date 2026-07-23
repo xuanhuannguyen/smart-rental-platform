@@ -18,6 +18,7 @@ import { LocationFilterPanel } from './components/LocationFilterPanel';
 import RentalAiChatbot from './components/RentalAiChatbot';
 import TenantMapPreview from './components/TenantMapPreview';
 import FavoriteButton from './components/FavoriteButton';
+import { useAuth } from '../../app/providers/AuthProvider';
 import { saveRecentSearch } from './searchRecentStorage';
 import { saveSearchBehavior } from './rentalBehaviorStorage';
 import './SearchRoomingHousesPage.css';
@@ -37,12 +38,14 @@ let metadataCache: { provinces: Province[]; amenities: Amenity[] } | null = null
 export default function SearchRoomingHousesPage() {
   const navigate = useNavigate();
   const location = useLocation();
+  const { currentUser } = useAuth();
   const [searchParams, setSearchParams] = useSearchParams();
   const currentSearchPath = `${location.pathname}${location.search}`;
   const query = useMemo(() => buildSearchParams(searchParams), [searchParams]);
   const searchCacheKey = useMemo(() => paramsToUrl(query).toString(), [query]);
   const behaviorCaptureKey = useMemo(() => buildBehaviorCaptureKey(query, searchParams), [query, searchParams]);
   const nearbyLabelParam = searchParams.get('nearbyLabel')?.trim() ?? '';
+  const isAdmin = currentUser?.roles.includes('Admin') ?? false;
   
   const [result, setResult] = useState<PagedResult<RoomingHouseSearchItem> | null>(
     () => searchResultCache.get(searchCacheKey) ?? null
@@ -1337,9 +1340,11 @@ export default function SearchRoomingHousesPage() {
                         <div className="search-result-card__placeholder">Chưa có ảnh</div>
                       )}
                       
-                      <div className="search-result-card__favorite-wrapper" style={{ position: 'absolute', top: '12px', right: '12px' }}>
-                        <FavoriteButton roomingHouseId={item.id} />
-                      </div>
+                      {!isAdmin && (
+                        <div className="search-result-card__favorite-wrapper" style={{ position: 'absolute', top: '12px', right: '12px' }}>
+                          <FavoriteButton roomingHouseId={item.id} />
+                        </div>
+                      )}
                       {item.distanceKm != null && (
                         <span className="distance-badge">
                           Cách {(item.distanceKm).toFixed(1)} km

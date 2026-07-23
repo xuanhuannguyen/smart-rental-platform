@@ -29,6 +29,11 @@ export const kycApi = {
       frontMediaAssetId: frontUpload.mediaAssetId,
       backMediaAssetId: backUpload.mediaAssetId,
       selfieMediaAssetId: selfieUpload.mediaAssetId,
+      manualCitizenId: payload.manualCitizenId?.trim() || null,
+      manualFullName: payload.manualFullName?.trim() || null,
+      manualDateOfBirth: payload.manualDateOfBirth || null,
+      manualGender: payload.manualGender?.trim() || null,
+      manualAddress: payload.manualAddress?.trim() || null,
     };
 
     return apiClient<ApiResponse<KycSubmissionResponse>>(ENDPOINTS.KYC.SUBMISSIONS, {

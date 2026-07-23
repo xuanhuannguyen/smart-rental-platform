@@ -16,6 +16,7 @@ public interface IAdminKycApprovalService
     Task<bool> ApproveAsync(
         Guid kycId,
         Guid adminId,
+        AdminApproveKycRequest request,
         CancellationToken cancellationToken = default);
 
     Task<bool> RejectAsync(

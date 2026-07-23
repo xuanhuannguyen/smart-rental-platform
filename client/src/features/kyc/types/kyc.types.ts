@@ -8,6 +8,11 @@ export interface SubmitKycRequest {
   frontImage: File;
   backImage: File;
   selfieImage: File;
+  manualCitizenId?: string;
+  manualFullName?: string;
+  manualDateOfBirth?: string;
+  manualGender?: string;
+  manualAddress?: string;
 }
 
 export interface KycSubmissionResponse {
@@ -28,6 +33,8 @@ export interface KycSubmissionResponse {
   livenessResult?: string | null;
   ekycErrorCode?: string | null;
   ekycErrorMessage?: string | null;
+  requiresManualInput?: boolean;
+  submittedWithManualFallback?: boolean;
   submittedAt: string;
   message: string;
 }

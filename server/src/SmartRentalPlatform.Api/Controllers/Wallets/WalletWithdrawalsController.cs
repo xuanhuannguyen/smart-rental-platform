@@ -12,7 +12,7 @@ namespace SmartRentalPlatform.Api.Controllers.Wallets;
 
 [ApiController]
 [Route("api/me/wallet/withdrawals")]
-[Authorize]
+[Authorize(Roles = "Tenant,Landlord")]
 public class WalletWithdrawalsController : ControllerBase
 {
     private readonly IWithdrawalService withdrawalService;

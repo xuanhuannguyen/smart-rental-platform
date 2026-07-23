@@ -27,6 +27,11 @@ export function KycSubmitPage() {
   const [frontImage, setFrontImage] = useState<File | null>(null);
   const [backImage, setBackImage] = useState<File | null>(null);
   const [selfieImage, setSelfieImage] = useState<File | null>(null);
+  const [manualCitizenId, setManualCitizenId] = useState('');
+  const [manualFullName, setManualFullName] = useState('');
+  const [manualDateOfBirth, setManualDateOfBirth] = useState('');
+  const [manualGender, setManualGender] = useState('');
+  const [manualAddress, setManualAddress] = useState('');
   const [result, setResult] = useState<KycSubmissionResponse | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -50,7 +55,12 @@ export function KycSubmitPage() {
           selfieCaptureMethod: selfieMethod,
           frontImage,
           backImage,
-          selfieImage
+          selfieImage,
+          manualCitizenId,
+          manualFullName,
+          manualDateOfBirth,
+          manualGender,
+          manualAddress
         });
         setResult(response.data);
       } catch (submitError) {
@@ -59,7 +69,7 @@ export function KycSubmitPage() {
         setIsSubmitting(false);
       }
     },
-    [backImage, documentType, frontImage, selfieImage, selfieMethod]
+    [backImage, documentType, frontImage, manualAddress, manualCitizenId, manualDateOfBirth, manualFullName, manualGender, selfieImage, selfieMethod]
   );
 
   return (
@@ -157,24 +167,86 @@ export function KycSubmitPage() {
           ) : null}
 
           {step === 3 ? (
-            <dl className="user-summary">
-              <div>
-                <dt>Giấy tờ</dt>
-                <dd>{documentType}</dd>
+            <>
+              <dl className="user-summary">
+                <div>
+                  <dt>Giấy tờ</dt>
+                  <dd>{documentType}</dd>
+                </div>
+                <div>
+                  <dt>Mặt trước</dt>
+                  <dd>{fileLabel(frontImage)}</dd>
+                </div>
+                <div>
+                  <dt>Mặt sau</dt>
+                  <dd>{fileLabel(backImage)}</dd>
+                </div>
+                <div>
+                  <dt>Selfie</dt>
+                  <dd>{fileLabel(selfieImage)}</dd>
+                </div>
+              </dl>
+
+              <div className="kyc-manual-section">
+                <h2>Thông tin dự phòng khi VNPT không đọc được</h2>
+                <p className="subtle" style={{ marginTop: 0 }}>
+                  Nếu VNPT lỗi hoặc không nhận dạng được giấy tờ, hệ thống sẽ dùng các trường này để gửi hồ sơ cho admin duyệt thủ công.
+                </p>
+                <FormField label="Số CCCD" htmlFor="kyc-manual-citizen-id">
+                  <input
+                    id="kyc-manual-citizen-id"
+                    className="ui-input"
+                    value={manualCitizenId}
+                    disabled={isSubmitting}
+                    onChange={(event) => setManualCitizenId(event.target.value)}
+                    placeholder="Ví dụ: 012345678901"
+                  />
+                </FormField>
+                <FormField label="Họ và tên" htmlFor="kyc-manual-full-name">
+                  <input
+                    id="kyc-manual-full-name"
+                    className="ui-input"
+                    value={manualFullName}
+                    disabled={isSubmitting}
+                    onChange={(event) => setManualFullName(event.target.value)}
+                    placeholder="Ví dụ: Nguyễn Văn A"
+                  />
+                </FormField>
+                <div className="kyc-grid">
+                  <FormField label="Ngày sinh" htmlFor="kyc-manual-dob">
+                    <input
+                      id="kyc-manual-dob"
+                      className="ui-input"
+                      type="date"
+                      value={manualDateOfBirth}
+                      disabled={isSubmitting}
+                      onChange={(event) => setManualDateOfBirth(event.target.value)}
+                    />
+                  </FormField>
+                  <FormField label="Giới tính" htmlFor="kyc-manual-gender">
+                    <input
+                      id="kyc-manual-gender"
+                      className="ui-input"
+                      value={manualGender}
+                      disabled={isSubmitting}
+                      onChange={(event) => setManualGender(event.target.value)}
+                      placeholder="Nam/Nữ"
+                    />
+                  </FormField>
+                </div>
+                <FormField label="Quê quán / địa chỉ thường trú" htmlFor="kyc-manual-address">
+                  <textarea
+                    id="kyc-manual-address"
+                    className="ui-input"
+                    value={manualAddress}
+                    disabled={isSubmitting}
+                    onChange={(event) => setManualAddress(event.target.value)}
+                    placeholder="Nhập theo thông tin trên giấy tờ"
+                    rows={3}
+                  />
+                </FormField>
               </div>
-              <div>
-                <dt>Mặt trước</dt>
-                <dd>{fileLabel(frontImage)}</dd>
-              </div>
-              <div>
-                <dt>Mặt sau</dt>
-                <dd>{fileLabel(backImage)}</dd>
-              </div>
-              <div>
-                <dt>Selfie</dt>
-                <dd>{fileLabel(selfieImage)}</dd>
-              </div>
-            </dl>
+            </>
           ) : null}
 
           {result ? (
@@ -191,6 +263,12 @@ export function KycSubmitPage() {
                 <dt>Rủi ro</dt>
                 <dd>{result.riskLevel}</dd>
               </div>
+              {result.submittedWithManualFallback ? (
+                <div>
+                  <dt>Nguồn thông tin</dt>
+                  <dd>Người dùng nhập thủ công do VNPT không đọc được</dd>
+                </div>
+              ) : null}
               {result.ocrFullName ? (
                 <div>
                   <dt>Họ tên OCR</dt>

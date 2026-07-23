@@ -108,15 +108,28 @@ public class KycService : IKycService
             var faceMatch = ParseNullableEnum<FaceMatchResult>(ekyc.FaceMatchResult);
             var liveness = ParseNullableEnum<LivenessResult>(ekyc.LivenessResult);
             var riskLevel = CalculateRiskLevel(ekycResult, documentCheck, faceMatch, liveness, ekyc);
+            var submittedWithManualFallback = ShouldUseManualFallback(ekyc, request);
+
+            if (ekyc.IsProviderFailure && !HasRequiredManualIdentity(request))
+            {
+                throw new KycBusinessException(
+                    ErrorCodes.ValidationError,
+                    "VNPT không nhận dạng được giấy tờ. Vui lòng điền thủ công số CCCD, họ tên, ngày sinh và quê quán/địa chỉ rồi gửi lại để admin duyệt.",
+                    400);
+            }
 
             string? ocrCitizenIdMasked = null;
             string? citizenIdHash = null;
             string? documentNumberEncrypted = null;
-            if (!string.IsNullOrWhiteSpace(ekyc.OcrCitizenId))
+            var effectiveCitizenId = submittedWithManualFallback
+                ? NormalizeOptionalText(request.ManualCitizenId)
+                : NormalizeOptionalText(ekyc.OcrCitizenId);
+
+            if (!string.IsNullOrWhiteSpace(effectiveCitizenId))
             {
-                ocrCitizenIdMasked = MaskCitizenId(ekyc.OcrCitizenId);
-                citizenIdHash = _hashService.HashSha256Hex(ekyc.OcrCitizenId);
-                documentNumberEncrypted = _sensitiveDataProtector.Encrypt(ekyc.OcrCitizenId);
+                ocrCitizenIdMasked = MaskCitizenId(effectiveCitizenId);
+                citizenIdHash = _hashService.HashSha256Hex(effectiveCitizenId);
+                documentNumberEncrypted = _sensitiveDataProtector.Encrypt(effectiveCitizenId);
 
                 var duplicate = await _context.KycVerifications
                     .AsNoTracking()
@@ -146,15 +159,25 @@ public class KycService : IKycService
                 EkycProvider = EkycProvider.VNPT,
                 EkycSessionId = ekyc.SessionId,
                 SelfieCaptureMethod = selfieMethod,
-                OcrFullName = ekyc.OcrFullName,
+                OcrFullName = submittedWithManualFallback
+                    ? NormalizeOptionalText(request.ManualFullName)
+                    : NormalizeOptionalText(ekyc.OcrFullName),
                 OcrCitizenIdMasked = ocrCitizenIdMasked,
                 CitizenIdHash = citizenIdHash ?? string.Empty,
                 DocumentNumberEncrypted = documentNumberEncrypted,
-                OcrDateOfBirth = ekyc.OcrDateOfBirth.HasValue
-                    ? DateOnly.FromDateTime(ekyc.OcrDateOfBirth.Value)
-                    : null,
-                OcrGender = ekyc.OcrGender,
-                OcrAddress = ekyc.OcrAddress,
+                OcrDateOfBirth = submittedWithManualFallback
+                    ? request.ManualDateOfBirth.HasValue
+                        ? DateOnly.FromDateTime(request.ManualDateOfBirth.Value)
+                        : null
+                    : ekyc.OcrDateOfBirth.HasValue
+                        ? DateOnly.FromDateTime(ekyc.OcrDateOfBirth.Value)
+                        : null,
+                OcrGender = submittedWithManualFallback
+                    ? NormalizeOptionalText(request.ManualGender)
+                    : NormalizeOptionalText(ekyc.OcrGender),
+                OcrAddress = submittedWithManualFallback
+                    ? NormalizeOptionalText(request.ManualAddress)
+                    : NormalizeOptionalText(ekyc.OcrAddress),
                 OcrConfidence = ekyc.OcrConfidence,
                 DocumentCheckResult = documentCheck,
                 FaceMatchScore = ekyc.FaceMatchScore,
@@ -208,6 +231,8 @@ public class KycService : IKycService
                 LivenessResult = liveness?.ToString(),
                 EkycErrorCode = kyc.EkycErrorCode,
                 EkycErrorMessage = kyc.EkycErrorMessage,
+                RequiresManualInput = false,
+                SubmittedWithManualFallback = submittedWithManualFallback,
                 SubmittedAt = now,
                 Message = BuildSubmissionMessage(finalStatus, ekyc)
             };
@@ -364,12 +389,42 @@ public class KycService : IKycService
         return first + middle + last;
     }
 
+    private static bool ShouldUseManualFallback(VnptEkycClientResult ekyc, SubmitKycRequest request)
+    {
+        if (!ekyc.IsProviderFailure)
+        {
+            return false;
+        }
+
+        return HasRequiredManualIdentity(request);
+    }
+
+    private static bool HasRequiredManualIdentity(SubmitKycRequest request)
+    {
+        return !string.IsNullOrWhiteSpace(request.ManualCitizenId) &&
+               !string.IsNullOrWhiteSpace(request.ManualFullName) &&
+               request.ManualDateOfBirth.HasValue &&
+               !string.IsNullOrWhiteSpace(request.ManualAddress);
+    }
+
+    private static string? NormalizeOptionalText(string? value)
+    {
+        return string.IsNullOrWhiteSpace(value) ? null : value.Trim();
+    }
+
     private static string BuildSubmissionMessage(
         KycVerificationStatus finalStatus,
         VnptEkycClientResult ekyc)
     {
         if (finalStatus == KycVerificationStatus.PendingAdminReview)
+        {
+            if (ekyc.IsProviderFailure)
+            {
+                return "VNPT không đọc được hồ sơ tự động. Thông tin bạn điền thủ công đã được gửi cho admin duyệt.";
+            }
+
             return "Submission received. Your profile is pending admin review.";
+        }
 
         if (ekyc.ErrorCode == ErrorCodes.EkycDocumentFailed)
             return "Document image quality is not acceptable. Please retake clear, uncropped images and try again.";

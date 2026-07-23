@@ -143,33 +143,39 @@ export function HomeHeader({ centerContent }: HomeHeaderProps) {
                   <strong>{currentUser.displayName}</strong>
                   <span>{currentUser.email}</span>
                 </div>
-                <button className="dropdown-item" onClick={() => { setShowDropdown(false); navigate(ROUTE_PATHS.ACCOUNT.WALLET); }}>
-                  Ví của tôi
-                </button>
+                {!isAdmin && (
+                  <button className="dropdown-item" onClick={() => { setShowDropdown(false); navigate(ROUTE_PATHS.ACCOUNT.WALLET); }}>
+                    Ví của tôi
+                  </button>
+                )}
                 <button className="dropdown-item" onClick={() => { setShowDropdown(false); navigate(ROUTE_PATHS.ACCOUNT.PROFILE); }}>
                   Chỉnh sửa thông tin
                 </button>
                 <button className="dropdown-item" onClick={() => { setShowDropdown(false); navigate(ROUTE_PATHS.ACCOUNT.SECURITY); }}>
                   Quản lý bảo mật
                 </button>
-                <button className="dropdown-item" onClick={() => { setShowDropdown(false); navigate(ROUTE_PATHS.ACCOUNT.VIEWING_APPOINTMENTS); }}>
-                  Lịch xem phòng
-                </button>
-                <button className="dropdown-item" onClick={() => { setShowDropdown(false); navigate(ROUTE_PATHS.ACCOUNT.FAVORITES); }}>
-                  Khu trọ yêu thích
-                </button>
-                <button className="dropdown-item" onClick={() => { setShowDropdown(false); navigate(ROUTE_PATHS.ACCOUNT.RENTAL_REQUESTS); }}>
-                  Yêu cầu thuê phòng
-                </button>
-                <button className="dropdown-item" onClick={() => { setShowDropdown(false); navigate(ROUTE_PATHS.ACCOUNT.RENTAL_HISTORY); }}>
-                  Lịch sử thuê phòng
-                </button>
-                <button className="dropdown-item" onClick={() => { setShowDropdown(false); navigate(ROUTE_PATHS.ACCOUNT.INVOICES); }}>
-                  Hóa đơn của tôi
-                </button>
-                <button className="dropdown-item" onClick={() => { setShowDropdown(false); navigate(ROUTE_PATHS.ACCOUNT.TRANSACTIONS); }}>
-                  Lịch sử giao dịch
-                </button>
+                {!isAdmin && (
+                  <>
+                    <button className="dropdown-item" onClick={() => { setShowDropdown(false); navigate(ROUTE_PATHS.ACCOUNT.VIEWING_APPOINTMENTS); }}>
+                      Lịch xem phòng
+                    </button>
+                    <button className="dropdown-item" onClick={() => { setShowDropdown(false); navigate(ROUTE_PATHS.ACCOUNT.FAVORITES); }}>
+                      Khu trọ yêu thích
+                    </button>
+                    <button className="dropdown-item" onClick={() => { setShowDropdown(false); navigate(ROUTE_PATHS.ACCOUNT.RENTAL_REQUESTS); }}>
+                      Yêu cầu thuê phòng
+                    </button>
+                    <button className="dropdown-item" onClick={() => { setShowDropdown(false); navigate(ROUTE_PATHS.ACCOUNT.RENTAL_HISTORY); }}>
+                      Lịch sử thuê phòng
+                    </button>
+                    <button className="dropdown-item" onClick={() => { setShowDropdown(false); navigate(ROUTE_PATHS.ACCOUNT.INVOICES); }}>
+                      Hóa đơn của tôi
+                    </button>
+                    <button className="dropdown-item" onClick={() => { setShowDropdown(false); navigate(ROUTE_PATHS.ACCOUNT.TRANSACTIONS); }}>
+                      Lịch sử giao dịch
+                    </button>
+                  </>
+                )}
                 {isAdmin && (
                   <button className="dropdown-item" onClick={() => { setShowDropdown(false); navigate(ROUTE_PATHS.ADMIN.APPROVALS); }}>
                     Duyệt hồ sơ

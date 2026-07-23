@@ -155,6 +155,7 @@ export default function PublicRoomDetailPage() {
   const roomImages = room.images ?? [];
   const roomAmenities = room.amenities ?? [];
   const activePriceTiers = (room.priceTiers ?? []).filter((tier) => tier.isActive);
+  const isAdmin = currentUser?.roles.includes('Admin') ?? false;
 
   return (
     <>
@@ -194,34 +195,36 @@ export default function PublicRoomDetailPage() {
                 <span>{house.addressDisplay}</span>
               </p>
               
-              <div className="public-room-detail__actions" aria-label="Thao tác với phòng">
-                <button
-                  className="public-room-detail__action public-room-detail__action--primary"
-                  type="button"
-                  onClick={() => {
-                    if (!currentUser) {
-                      navigate('/login', { state: { from: location.pathname } });
-                      return;
-                    }
-                    setIsRentalModalOpen(true);
-                  }}
-                >
-                  <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
-                    <line x1="22" y1="2" x2="11" y2="13" />
-                    <polygon points="22 2 15 22 11 13 2 9 22 2" />
-                  </svg>
-                  <span>Gửi yêu cầu thuê</span>
-                </button>
-                <button className="public-room-detail__action public-room-detail__action--secondary" type="button" onClick={handleBookingClick}>
-                  <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
-                    <rect x="3" y="4" width="18" height="18" rx="2" ry="2" />
-                    <line x1="16" y1="2" x2="16" y2="6" />
-                    <line x1="8" y1="2" x2="8" y2="6" />
-                    <line x1="3" y1="10" x2="21" y2="10" />
-                  </svg>
-                  <span>Đặt lịch xem phòng</span>
-                </button>
-              </div>
+              {!isAdmin && (
+                <div className="public-room-detail__actions" aria-label="Thao tác với phòng">
+                  <button
+                    className="public-room-detail__action public-room-detail__action--primary"
+                    type="button"
+                    onClick={() => {
+                      if (!currentUser) {
+                        navigate('/login', { state: { from: location.pathname } });
+                        return;
+                      }
+                      setIsRentalModalOpen(true);
+                    }}
+                  >
+                    <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                      <line x1="22" y1="2" x2="11" y2="13" />
+                      <polygon points="22 2 15 22 11 13 2 9 22 2" />
+                    </svg>
+                    <span>Gửi yêu cầu thuê</span>
+                  </button>
+                  <button className="public-room-detail__action public-room-detail__action--secondary" type="button" onClick={handleBookingClick}>
+                    <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                      <rect x="3" y="4" width="18" height="18" rx="2" ry="2" />
+                      <line x1="16" y1="2" x2="16" y2="6" />
+                      <line x1="8" y1="2" x2="8" y2="6" />
+                      <line x1="3" y1="10" x2="21" y2="10" />
+                    </svg>
+                    <span>Đặt lịch xem phòng</span>
+                  </button>
+                </div>
+              )}
             </header>
 
             <div className="public-room-detail__specs">

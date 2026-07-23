@@ -20,7 +20,8 @@ import type {
   AdminRoomingHouseDetail,
   AdminRoomingHouseListItem,
   AdminUserListItem,
-  AdminUserDetail
+  AdminUserDetail,
+  AdminApproveKycRequest
 } from '../types/adminApproval.types';
 import './AdminHomePage.css';
 
@@ -177,6 +178,13 @@ export function AdminHomePage() {
   const [kycPendingItems, setKycPendingItems] = useState<AdminKycListItem[]>([]);
   const [kycPendingTotal, setKycPendingTotal] = useState(0);
   const [selectedKyc, setSelectedKyc] = useState<AdminKycDetail | null>(null);
+  const [kycEditForm, setKycEditForm] = useState<AdminApproveKycRequest>({
+    citizenId: '',
+    fullName: '',
+    dateOfBirth: '',
+    gender: '',
+    address: '',
+  });
   const [kycHistory, setKycHistory] = useState<AdminKycDetail[]>([]);
   const [isLoadingKycHistory, setIsLoadingKycHistory] = useState(false);
 
@@ -212,6 +220,13 @@ export function AdminHomePage() {
     setKycHistory([]);
     const response = await adminApprovalApi.getKycDetail(id);
     setSelectedKyc(response.data);
+    setKycEditForm({
+      citizenId: '',
+      fullName: response.data.ocrFullName ?? response.data.userDisplayName ?? '',
+      dateOfBirth: toDateInputValue(response.data.ocrDateOfBirth),
+      gender: response.data.ocrGender ?? '',
+      address: response.data.ocrAddress ?? '',
+    });
     setSelectedHouse(null);
 
     // Load history
@@ -248,6 +263,7 @@ export function AdminHomePage() {
       } else {
         setSelectedUser(null);
         setSelectedKyc(null);
+        setKycEditForm({ citizenId: '', fullName: '', dateOfBirth: '', gender: '', address: '' });
         setSelectedHouse(null);
         setKycHistory([]);
 
@@ -310,6 +326,10 @@ export function AdminHomePage() {
     setSearchParams({ menu: activeMenu, tab: activeTab, page: pageParam.toString(), id });
   }
 
+  function patchKycEditForm(patch: Partial<AdminApproveKycRequest>) {
+    setKycEditForm((current) => ({ ...current, ...patch }));
+  }
+
   function openHouse(id: string) {
     setError('');
     setToast(null);
@@ -323,7 +343,13 @@ export function AdminHomePage() {
     setToast(null);
     try {
       if (activeMenu === 'users' && activeTab === 'kyc' && selectedKyc) {
-        const response = await adminApprovalApi.approveKyc(selectedKyc.id);
+        const response = await adminApprovalApi.approveKyc(selectedKyc.id, {
+          citizenId: kycEditForm.citizenId?.trim() || null,
+          fullName: kycEditForm.fullName?.trim() || null,
+          dateOfBirth: kycEditForm.dateOfBirth || null,
+          gender: kycEditForm.gender?.trim() || null,
+          address: kycEditForm.address?.trim() || null,
+        });
         setToast({ message: response.message ?? 'Đã duyệt KYC thành công.', type: 'success' });
         setSearchParams({ menu: activeMenu, tab: activeTab, page: pageParam.toString() });
       } else if (activeMenu === 'houses' && activeTab === 'pending' && selectedHouse) {
@@ -366,6 +392,19 @@ export function AdminHomePage() {
 
   function assetUrl(url: string) {
     return toAssetUrl(url);
+  }
+
+  function toDateInputValue(value?: string | null) {
+    if (!value) {
+      return '';
+    }
+
+    const parsed = new Date(value);
+    if (Number.isNaN(parsed.getTime())) {
+      return '';
+    }
+
+    return parsed.toISOString().slice(0, 10);
   }
 
   if (!isAdmin) {
@@ -777,11 +816,21 @@ export function AdminHomePage() {
                     {/* Cột trái: Thông tin định danh + Lịch sử + Actions */}
                     <div className="admin-detail-column-left">
                       <div className="admin-detail-section">
-                        <h3 className="section-subtitle">Thông tin định danh (OCR)</h3>
+                        <h3 className="section-subtitle">Thông tin định danh có thể chỉnh sửa</h3>
+                        {selectedKyc.ekycErrorCode || selectedKyc.ekycErrorMessage ? (
+                          <Alert type="info">
+                            VNPT trả về: {selectedKyc.ekycErrorCode || 'Không có mã lỗi'} - {selectedKyc.ekycErrorMessage || 'Cần admin đối chiếu thủ công.'}
+                          </Alert>
+                        ) : null}
                         <div className="admin-grid-details">
                           <div className="admin-detail-item">
                             <label><UserIcon /> Tên chủ thẻ</label>
-                            <span>{selectedKyc.ocrFullName || selectedKyc.userDisplayName}</span>
+                            <input
+                              className="ui-input"
+                              value={kycEditForm.fullName ?? ''}
+                              onChange={(event) => patchKycEditForm({ fullName: event.target.value })}
+                              placeholder="Nhập họ tên theo giấy tờ"
+                            />
                           </div>
                           <div className="admin-detail-item">
                             <label><MailIcon /> Email đăng ký</label>
@@ -789,21 +838,40 @@ export function AdminHomePage() {
                           </div>
                           <div className="admin-detail-item">
                             <label><ShieldIcon /> Số CCCD / CMND</label>
-                            <span>{selectedKyc.ocrCitizenIdMasked || 'Chưa nhận dạng được'}</span>
+                            <input
+                              className="ui-input"
+                              value={kycEditForm.citizenId ?? ''}
+                              onChange={(event) => patchKycEditForm({ citizenId: event.target.value })}
+                              placeholder={selectedKyc.ocrCitizenIdMasked ? `Đang lưu: ${selectedKyc.ocrCitizenIdMasked}` : 'Nhập số CCCD nếu OCR chưa nhận dạng'}
+                            />
                           </div>
                           <div className="admin-detail-item">
                             <label><CalendarIcon /> Ngày sinh</label>
-                            <span>
-                              {selectedKyc.ocrDateOfBirth
-                                ? new Date(selectedKyc.ocrDateOfBirth).toLocaleDateString('vi-VN')
-                                : 'Chưa nhận dạng được'}
-                            </span>
+                            <input
+                              className="ui-input"
+                              type="date"
+                              value={kycEditForm.dateOfBirth ?? ''}
+                              onChange={(event) => patchKycEditForm({ dateOfBirth: event.target.value })}
+                            />
+                          </div>
+                          <div className="admin-detail-item">
+                            <label><ShieldIcon /> Giới tính</label>
+                            <input
+                              className="ui-input"
+                              value={kycEditForm.gender ?? ''}
+                              onChange={(event) => patchKycEditForm({ gender: event.target.value })}
+                              placeholder="Nam/Nữ"
+                            />
                           </div>
                           <div className="admin-detail-item" style={{ gridColumn: 'span 2' }}>
-                            <label><MapPinIcon /> Giới tính & Địa chỉ</label>
-                            <span>
-                              {selectedKyc.ocrGender || '—'} · {selectedKyc.ocrAddress || 'Chưa nhận dạng được'}
-                            </span>
+                            <label><MapPinIcon /> Quê quán / địa chỉ thường trú</label>
+                            <textarea
+                              className="ui-input"
+                              value={kycEditForm.address ?? ''}
+                              onChange={(event) => patchKycEditForm({ address: event.target.value })}
+                              placeholder="Nhập địa chỉ theo giấy tờ"
+                              rows={3}
+                            />
                           </div>
                         </div>
                       </div>

@@ -10,7 +10,7 @@ using SmartRentalPlatform.Contracts.Wallets.Responses;
 namespace SmartRentalPlatform.Api.Controllers;
 
 [ApiController]
-[Authorize]
+[Authorize(Roles = "Tenant,Landlord")]
 [Route("api/me/wallet/topups")]
 public class WalletTopUpsController : ControllerBase
 {

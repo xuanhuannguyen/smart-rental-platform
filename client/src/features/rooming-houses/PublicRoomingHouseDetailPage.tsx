@@ -164,6 +164,7 @@ export default function PublicRoomingHouseDetailPage() {
   const houseImages = house.images ?? [];
   const houseAmenities = house.amenities ?? [];
   const availableRooms = house.rooms ?? [];
+  const isAdmin = currentUser?.roles.includes('Admin') ?? false;
 
   return (
     <>
@@ -179,9 +180,11 @@ export default function PublicRoomingHouseDetailPage() {
         <section className="public-house-detail__hero">
           <HouseImageGallery images={houseImages} houseName={house.name} />
           <div className="hero-details-card" style={{ position: 'relative' }}>
-            <div style={{ position: 'absolute', top: '24px', right: '24px', zIndex: 10 }}>
-              <FavoriteButton roomingHouseId={house.id} />
-            </div>
+            {!isAdmin && (
+              <div style={{ position: 'absolute', top: '24px', right: '24px', zIndex: 10 }}>
+                <FavoriteButton roomingHouseId={house.id} />
+              </div>
+            )}
             <div className="house-status-badge">
               <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" strokeWidth="2.5">
                 <path d="m3 9 9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z" />
@@ -201,19 +204,21 @@ export default function PublicRoomingHouseDetailPage() {
             />
             {house.description && <p className="public-house-detail__description">{house.description}</p>}
 
-            <div className="public-house-detail__contact-actions">
-              <button
-                className="public-house-detail__message-button"
-                type="button"
-                onClick={handleOpenQuickMessage}
-                disabled={currentUser?.userId === house.landlordUserId}
-              >
-                <svg viewBox="0 0 24 24" width="17" height="17" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
-                  <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z" />
-                </svg>
-                <span>Nhắn tin chủ trọ</span>
-              </button>
-            </div>
+            {!isAdmin && (
+              <div className="public-house-detail__contact-actions">
+                <button
+                  className="public-house-detail__message-button"
+                  type="button"
+                  onClick={handleOpenQuickMessage}
+                  disabled={currentUser?.userId === house.landlordUserId}
+                >
+                  <svg viewBox="0 0 24 24" width="17" height="17" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                    <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z" />
+                  </svg>
+                  <span>Nhắn tin chủ trọ</span>
+                </button>
+              </div>
+            )}
 
             <div className="house-amenities-mini-section">
               <h3>Tiện ích</h3>

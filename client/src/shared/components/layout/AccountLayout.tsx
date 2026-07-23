@@ -13,6 +13,8 @@ export function AccountLayout() {
     return null;
   }
 
+  const isAdmin = currentUser.roles.includes('Admin');
+
   return (
     <div className="account-container">
       <aside className="account-sidebar">
@@ -49,19 +51,21 @@ export function AccountLayout() {
           </div>
         </div>
         
-        <NavLink
-          to={ROUTE_PATHS.ACCOUNT.WALLET}
-          className={({ isActive }) => `account-sidebar-item ${isActive ? 'active' : ''}`}
-        >
-          <svg className="sidebar-item-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-            <path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z" />
-            <polyline points="9 22 9 12 15 12 15 22" />
-          </svg>
-          <span className="sidebar-item-text">Ví của tôi</span>
-          <svg className="sidebar-item-chevron" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
-            <polyline points="9 18 15 12 9 6" />
-          </svg>
-        </NavLink>
+        {!isAdmin && (
+          <NavLink
+            to={ROUTE_PATHS.ACCOUNT.WALLET}
+            className={({ isActive }) => `account-sidebar-item ${isActive ? 'active' : ''}`}
+          >
+            <svg className="sidebar-item-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+              <path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z" />
+              <polyline points="9 22 9 12 15 12 15 22" />
+            </svg>
+            <span className="sidebar-item-text">Ví của tôi</span>
+            <svg className="sidebar-item-chevron" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
+              <polyline points="9 18 15 12 9 6" />
+            </svg>
+          </NavLink>
+        )}
 
         <NavLink
           to={ROUTE_PATHS.ACCOUNT.PROFILE}
@@ -93,6 +97,7 @@ export function AccountLayout() {
 
         <div className="sidebar-divider" />
         
+        {!isAdmin && (
         <NavLink
           to={ROUTE_PATHS.ACCOUNT.FAVORITES}
           className={({ isActive }) => `account-sidebar-item ${isActive ? 'active' : ''}`}
@@ -105,7 +110,9 @@ export function AccountLayout() {
             <polyline points="9 18 15 12 9 6" />
           </svg>
         </NavLink>
+        )}
         
+        {!isAdmin && (
         <NavLink
           to={ROUTE_PATHS.ACCOUNT.VIEWING_APPOINTMENTS}
           className={({ isActive }) => `account-sidebar-item ${isActive ? 'active' : ''}`}
@@ -121,7 +128,9 @@ export function AccountLayout() {
             <polyline points="9 18 15 12 9 6" />
           </svg>
         </NavLink>
+        )}
         
+        {!isAdmin && (
         <NavLink 
           to={ROUTE_PATHS.ACCOUNT.RENTAL_REQUESTS}
           className={({ isActive }) => `account-sidebar-item ${isActive ? 'active' : ''}`}
@@ -137,7 +146,9 @@ export function AccountLayout() {
             <polyline points="9 18 15 12 9 6" />
           </svg>
         </NavLink>
+        )}
 
+        {!isAdmin && (
         <NavLink 
           to={ROUTE_PATHS.ACCOUNT.RENTAL_HISTORY}
           className={({ isActive }) => `account-sidebar-item ${isActive ? 'active' : ''}`}
@@ -151,7 +162,9 @@ export function AccountLayout() {
             <polyline points="9 18 15 12 9 6" />
           </svg>
         </NavLink>
+        )}
 
+        {!isAdmin && (
         <NavLink
           to={ROUTE_PATHS.ACCOUNT.INVOICES}
           className={({ isActive }) => `account-sidebar-item ${isActive ? 'active' : ''}`}
@@ -167,7 +180,9 @@ export function AccountLayout() {
             <polyline points="9 18 15 12 9 6" />
           </svg>
         </NavLink>
+        )}
 
+        {!isAdmin && (
         <NavLink
           to={ROUTE_PATHS.ACCOUNT.TRANSACTIONS}
           className={({ isActive }) => `account-sidebar-item ${isActive ? 'active' : ''}`}
@@ -180,6 +195,7 @@ export function AccountLayout() {
             <polyline points="9 18 15 12 9 6" />
           </svg>
         </NavLink>
+        )}
 
         <div className="sidebar-divider" />
 

@@ -8,6 +8,7 @@ using SmartRentalPlatform.Domain.Entities.Properties;
 using SmartRentalPlatform.Domain.Enums;
 using SmartRentalPlatform.Domain.Enums.Notifications;
 using SmartRentalPlatform.Domain.Enums.Properties;
+using SmartRentalPlatform.Domain.Enums.Users;
 using System;
 using System.Collections.Generic;
 using System.Linq;
@@ -32,6 +33,8 @@ namespace SmartRentalPlatform.Application.ViewingAppointments
             CreateViewingAppointmentRequest request,
             CancellationToken cancellationToken = default)
         {
+            await EnsureRequesterIsNotAdminAsync(tenantUserId, cancellationToken);
+
             // Minimum advance time: phải đặt trước ít nhất 2 giờ
             if (request.ScheduledAt < DateTimeOffset.UtcNow.AddHours(2))
             {
@@ -149,6 +152,22 @@ namespace SmartRentalPlatform.Application.ViewingAppointments
                 cancellationToken: cancellationToken);
 
             return ViewingAppointmentMapper.ToResponse(savedAppointment);
+        }
+
+        private async Task EnsureRequesterIsNotAdminAsync(
+            Guid userId,
+            CancellationToken cancellationToken)
+        {
+            var isAdmin = await _context.UserRoles
+                .AsNoTracking()
+                .AnyAsync(x => x.UserId == userId && x.Role.Name == RoleName.Admin, cancellationToken);
+
+            if (isAdmin)
+            {
+                throw new ForbiddenException(
+                    ErrorCodes.Forbidden,
+                    "Tài khoản admin chỉ được xem thông tin khu trọ, không thể đặt lịch xem phòng.");
+            }
         }
 
         public async Task<List<ViewingAppointmentResponse>> GetMyAppointmentsAsync(

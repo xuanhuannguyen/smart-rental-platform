@@ -9,7 +9,7 @@ using SmartRentalPlatform.Contracts.Wallets.Responses;
 namespace SmartRentalPlatform.Api.Controllers;
 
 [ApiController]
-[Authorize]
+[Authorize(Roles = "Tenant,Landlord")]
 [Route("api/me/wallet")]
 public class WalletController : ControllerBase
 {

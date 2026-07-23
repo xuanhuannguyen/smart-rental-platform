@@ -11,6 +11,7 @@ using SmartRentalPlatform.Domain.Enums.Properties;
 using SmartRentalPlatform.Domain.Enums.Rental;
 using SmartRentalPlatform.Domain.Enums.RentalContracts;
 using SmartRentalPlatform.Domain.Enums.Notifications;
+using SmartRentalPlatform.Domain.Enums.Users;
 using System.Text.Json;
 
 namespace SmartRentalPlatform.Application.RentalRequests;
@@ -51,6 +52,7 @@ public class RentalRequestService : IRentalRequestService
         CancellationToken cancellationToken = default)
     {
         ValidateCreateRequest(request);
+        await EnsureRequesterIsNotAdminAsync(tenantUserId, cancellationToken);
         await EnsureTenantBillingEligibilityAsync(tenantUserId, cancellationToken);
 
         var room = await context.Rooms
@@ -558,6 +560,22 @@ public class RentalRequestService : IRentalRequestService
             throw new ConflictException(
                 ErrorCodes.TenantFinalInvoicePending,
                 "Hợp đồng vừa chấm dứt vẫn đang chờ chủ trọ tạo hóa đơn kỳ cuối.");
+        }
+    }
+
+    private async Task EnsureRequesterIsNotAdminAsync(
+        Guid userId,
+        CancellationToken cancellationToken)
+    {
+        var isAdmin = await context.UserRoles
+            .AsNoTracking()
+            .AnyAsync(x => x.UserId == userId && x.Role.Name == RoleName.Admin, cancellationToken);
+
+        if (isAdmin)
+        {
+            throw new ForbiddenException(
+                ErrorCodes.Forbidden,
+                "Tài khoản admin chỉ được xem thông tin khu trọ, không thể gửi yêu cầu thuê phòng.");
         }
     }
 

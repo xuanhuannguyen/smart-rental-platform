@@ -62,6 +62,14 @@ export interface AdminKycDetail extends AdminKycListItem {
   reviewedAt?: string | null;
 }
 
+export interface AdminApproveKycRequest {
+  citizenId?: string | null;
+  fullName?: string | null;
+  dateOfBirth?: string | null;
+  gender?: string | null;
+  address?: string | null;
+}
+
 export interface AdminRoomingHouseListItem {
   id: string;
   landlordUserId: string;

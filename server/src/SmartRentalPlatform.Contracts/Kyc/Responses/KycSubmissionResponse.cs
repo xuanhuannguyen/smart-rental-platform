@@ -19,6 +19,8 @@ public class KycSubmissionResponse
     public string? LivenessResult { get; set; }
     public string? EkycErrorCode { get; set; }
     public string? EkycErrorMessage { get; set; }
+    public bool RequiresManualInput { get; set; }
+    public bool SubmittedWithManualFallback { get; set; }
     public DateTimeOffset SubmittedAt { get; set; }
     public string Message { get; set; } = default!;
 }
