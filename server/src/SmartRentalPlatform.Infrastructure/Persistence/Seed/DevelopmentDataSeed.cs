@@ -1879,6 +1879,8 @@ public static class DevelopmentDataSeed
             AmenitySeed.BalconyId,
             AmenitySeed.ParkingId);
 
+        await EnsureOperationalHouseRulesAsync(context, cancellationToken);
+
         await SeedRoomingHouseAsync(
             context,
             location,
@@ -2093,20 +2095,117 @@ public static class DevelopmentDataSeed
             cancellationToken);
     }
 
+    private static async Task EnsureOperationalHouseRulesAsync(
+        AppDbContext context,
+        CancellationToken cancellationToken)
+    {
+        var seeds = new[]
+        {
+            new
+            {
+                Id = CreateSeedGuid("rooming-house-rule:an-phu"),
+                HouseId = SunriseHouseId,
+                Request = BuildOperationalHouseRuleRequest(
+                    "Khu trọ An Phú",
+                    "Cổng chính mở từ 5:30 đến 23:00. Người thuê giữ trật tự chung, không tự ý sửa chữa kết cấu phòng, không cho thuê lại hoặc chuyển nhượng phòng khi chưa có xác nhận của chủ trọ.",
+                    "Từ 22:30 đến 6:00 cần giảm âm lượng, không hát karaoke, không tụ tập đông người tại hành lang hoặc sân để xe.",
+                    "Khu trọ có camera khu vực chung. Người thuê tự bảo quản tài sản cá nhân, khóa cửa khi ra ngoài và báo ngay cho chủ trọ khi phát hiện người lạ hoặc sự cố an ninh.",
+                    "Rác sinh hoạt bỏ vào thùng chung trước 21:00 mỗi ngày. Hành lang, cầu thang và khu giặt phơi cần được giữ thông thoáng, không để đồ cá nhân chắn lối đi.",
+                    "Khách thăm cần gửi xe đúng vị trí và rời khu trọ trước 22:00. Nếu ở lại qua đêm phải báo trước với chủ trọ và cung cấp thông tin liên hệ khi cần.",
+                    "Xe máy để theo ô được phân công, không nổ máy lâu trong sân, không chặn lối thoát hiểm. Mỗi phòng tối đa hai xe máy nếu chưa đăng ký thêm.",
+                    "Điện nước chốt vào cuối tháng theo chỉ số đồng hồ. Người thuê kiểm tra chỉ số trước khi xác nhận hóa đơn và báo trong vòng 24 giờ nếu có sai lệch.",
+                    "Hư hỏng do sử dụng sai quy định hoặc tự ý lắp đặt thiết bị công suất lớn sẽ bồi thường theo chi phí sửa chữa thực tế.",
+                    "Ưu tiên trao đổi qua nhóm cư dân để chủ trọ phản hồi nhanh các vấn đề về hóa đơn, lịch sửa chữa và an ninh.")
+            },
+            new
+            {
+                Id = CreateSeedGuid("rooming-house-rule:minh-khang"),
+                HouseId = GreenViewHouseId,
+                Request = BuildOperationalHouseRuleRequest(
+                    "Nhà trọ Minh Khang",
+                    "Người thuê sử dụng phòng đúng mục đích lưu trú, không kinh doanh trong phòng, không lưu trữ vật dễ cháy nổ và không tự ý thay khóa.",
+                    "Sau 22:00 hạn chế tiếng ồn, đóng cửa nhẹ tay và không sử dụng loa công suất lớn trong phòng.",
+                    "Cửa cổng và khu để xe được kiểm soát bằng camera. Khi có khách giao hàng hoặc người thân đến thăm, người thuê chủ động nhận tại khu vực cổng.",
+                    "Mỗi phòng tự vệ sinh khu vực trước cửa phòng. Khu vực rác chung được thu gom vào buổi tối, không đặt rác qua đêm ở hành lang.",
+                    "Khách ở lại qua đêm tối đa hai đêm liên tiếp và cần thông báo trước. Người thuê chịu trách nhiệm về hành vi của khách trong thời gian lưu trú.",
+                    "Khu để xe ưu tiên xe đã đăng ký với chủ trọ. Không sạc pin xe điện trong phòng nếu chưa có ổ cắm chuyên dụng được kiểm tra an toàn.",
+                    "Đơn giá điện, nước, internet và rác được công khai theo bảng giá của khu trọ. Hóa đơn phát hành sau khi chủ trọ chốt chỉ số và người thuê có thể xem ảnh đồng hồ.",
+                    "Tài sản chung như camera, máy bơm, đèn hành lang nếu bị làm hỏng do lỗi cá nhân sẽ bồi thường theo báo giá sửa chữa.",
+                    "Khi cần sửa chữa phòng, người thuê đặt lịch trước để chủ trọ sắp xếp thợ và thông báo thời gian vào phòng.")
+            }
+        };
+
+        foreach (var seed in seeds)
+        {
+            var rule = await context.RoomingHouseRules
+                .FirstOrDefaultAsync(x => x.RoomingHouseId == seed.HouseId, cancellationToken);
+
+            if (rule is null)
+            {
+                rule = new RoomingHouseRule
+                {
+                    Id = seed.Id,
+                    RoomingHouseId = seed.HouseId,
+                    CreatedAt = SeededAt
+                };
+                context.RoomingHouseRules.Add(rule);
+            }
+
+            rule.SourceType = RoomingHouseRuleSourceType.FormGenerated;
+            rule.GeneralRules = seed.Request.GeneralRules;
+            rule.QuietHours = seed.Request.QuietHours;
+            rule.SecurityPolicy = seed.Request.SecurityPolicy;
+            rule.CleaningPolicy = seed.Request.CleaningPolicy;
+            rule.GuestPolicy = seed.Request.GuestPolicy;
+            rule.ParkingPolicy = seed.Request.ParkingPolicy;
+            rule.UtilityPolicy = seed.Request.UtilityPolicy;
+            rule.DamageCompensationPolicy = seed.Request.DamageCompensationPolicy;
+            rule.AdditionalNotes = seed.Request.AdditionalNotes;
+            rule.UpdatedAt = DateTimeOffset.UtcNow;
+        }
+    }
+
+    private static UpsertRoomingHouseRuleRequest BuildOperationalHouseRuleRequest(
+        string houseName,
+        string generalRules,
+        string quietHours,
+        string securityPolicy,
+        string cleaningPolicy,
+        string guestPolicy,
+        string parkingPolicy,
+        string utilityPolicy,
+        string damageCompensationPolicy,
+        string additionalNotes)
+    {
+        return new UpsertRoomingHouseRuleRequest
+        {
+            SourceType = RoomingHouseRuleSourceType.FormGenerated.ToString(),
+            GeneralRules = generalRules,
+            QuietHours = quietHours,
+            SecurityPolicy = securityPolicy,
+            CleaningPolicy = cleaningPolicy,
+            GuestPolicy = guestPolicy,
+            ParkingPolicy = parkingPolicy,
+            UtilityPolicy = utilityPolicy,
+            DamageCompensationPolicy = damageCompensationPolicy,
+            AdditionalNotes = $"{additionalNotes} Áp dụng riêng cho {houseName}."
+        };
+    }
+
     private static UpsertRoomingHouseRuleRequest BuildApprovedHouseRuleRequest()
     {
         return new UpsertRoomingHouseRuleRequest
         {
             SourceType = RoomingHouseRuleSourceType.FormGenerated.ToString(),
-            GeneralRules = "Giu gin trat tu chung, khong gay on ao, khong tu y cai tao phong.",
-            QuietHours = "Sau 22:30 vui long giam tieng on va khong tu tap dong nguoi.",
-            SecurityPolicy = "Khoa cua, tat dien khi ra khoi phong va bao ngay cho chu tro neu co su co.",
-            CleaningPolicy = "Do rac dung gio, giu ve sinh hanh lang, khu bep va nha tam chung.",
-            GuestPolicy = "Khach o lai qua dem can thong bao truoc cho chu tro.",
-            ParkingPolicy = "De xe dung vi tri quy dinh, khong chan loi di chung.",
-            UtilityPolicy = "Su dung dien, nuoc tiet kiem va khong dau noi thiet bi cong suat lon trai phep.",
-            DamageCompensationPolicy = "Nguoi gay hu hong tai san co trach nhiem boi thuong theo muc do thiet hai.",
-            AdditionalNotes = "Lien he chu tro qua so hotline noi bo neu can ho tro khan cap."
+            GeneralRules = "Người thuê giữ gìn trật tự chung, không gây ồn ào, không tự ý cải tạo phòng, không cho thuê lại phòng hoặc chuyển người ở khi chưa được chủ trọ xác nhận.",
+            QuietHours = "Từ 22:30 đến 6:00 cần hạn chế tiếng ồn, không tụ tập đông người tại hành lang, sân để xe hoặc khu vực sinh hoạt chung.",
+            SecurityPolicy = "Luôn khóa cửa phòng khi ra ngoài, tắt thiết bị điện không sử dụng và báo ngay cho chủ trọ khi phát hiện sự cố an ninh, cháy nổ hoặc người lạ ra vào bất thường.",
+            CleaningPolicy = "Đổ rác đúng giờ, giữ vệ sinh hành lang, cầu thang, khu phơi đồ và khu vực sử dụng chung. Không để vật dụng cá nhân chắn lối thoát hiểm.",
+            GuestPolicy = "Khách thăm cần rời khu trọ trước 22:00. Trường hợp ở lại qua đêm phải báo trước với chủ trọ và người thuê chịu trách nhiệm về khách của mình.",
+            ParkingPolicy = "Để xe đúng vị trí đã đăng ký, không chắn lối đi chung, không sửa xe hoặc nổ máy lâu trong khu vực sân để xe.",
+            UtilityPolicy = "Điện nước được chốt theo chỉ số đồng hồ. Người thuê kiểm tra chỉ số và phản hồi trong vòng 24 giờ kể từ khi hóa đơn được gửi.",
+            DamageCompensationPolicy = "Tài sản chung hoặc thiết bị trong phòng bị hư hỏng do lỗi sử dụng sẽ được bồi thường theo chi phí sửa chữa hoặc thay thế thực tế.",
+            AdditionalNotes = "Liên hệ chủ trọ qua hotline hoặc nhóm cư dân khi cần hỗ trợ khẩn cấp, sửa chữa phòng, xác nhận hóa đơn hoặc đăng ký khách ở lại."
         };
     }
 
@@ -2983,7 +3082,7 @@ public static class DevelopmentDataSeed
                 contractNumber,
                 cancellationToken);
 
-            for (var month = 4; month <= 6; month++)
+            for (var month = 4; month <= 5; month++)
             {
                 var status = InvoiceStatus.Paid;
                 var invoiceId = CreateSeedGuid($"xunhuns:invoice:{roomSeed.RoomNumber}:2026-{month:D2}");
@@ -3085,7 +3184,7 @@ public static class DevelopmentDataSeed
             }
         }
 
-        await RemoveSecondaryLandlordJulyInvoicesAsync(context, cancellationToken);
+        await RemoveSecondaryLandlordOpenPeriodInvoicesAsync(context, cancellationToken);
         await EnsureSecondaryLandlordWithdrawalAsync(context, landlordBalance, cancellationToken);
         await EnsureSecondaryLandlordChatAsync(context, roomSeeds, tenantSeeds, cancellationToken);
         await EnsureSecondaryLandlordReviewsAsync(
@@ -3097,7 +3196,7 @@ public static class DevelopmentDataSeed
         await context.SaveChangesAsync(cancellationToken);
     }
 
-    private static async Task RemoveSecondaryLandlordJulyInvoicesAsync(
+    private static async Task RemoveSecondaryLandlordOpenPeriodInvoicesAsync(
         AppDbContext context,
         CancellationToken cancellationToken)
     {
@@ -3111,7 +3210,7 @@ public static class DevelopmentDataSeed
                   JOIN rooms r ON r.id = c.room_id
                   JOIN rooming_houses h ON h.id = r.rooming_house_id
                   WHERE h.landlord_user_id = '10000000-0000-0000-0000-000000000004'
-                    AND i.billing_period_start = DATE '2026-07-01'
+                    AND i.billing_period_start >= DATE '2026-06-01'
               );
 
             DELETE FROM invoice_items
@@ -3122,7 +3221,7 @@ public static class DevelopmentDataSeed
                 JOIN rooms r ON r.id = c.room_id
                 JOIN rooming_houses h ON h.id = r.rooming_house_id
                 WHERE h.landlord_user_id = '10000000-0000-0000-0000-000000000004'
-                  AND i.billing_period_start = DATE '2026-07-01'
+                  AND i.billing_period_start >= DATE '2026-06-01'
             );
 
             DELETE FROM invoices
@@ -3133,7 +3232,7 @@ public static class DevelopmentDataSeed
                 JOIN rooms r ON r.id = c.room_id
                 JOIN rooming_houses h ON h.id = r.rooming_house_id
                 WHERE h.landlord_user_id = '10000000-0000-0000-0000-000000000004'
-                  AND i.billing_period_start = DATE '2026-07-01'
+                  AND i.billing_period_start >= DATE '2026-06-01'
             );
 
             DELETE FROM meter_readings
@@ -3144,7 +3243,7 @@ public static class DevelopmentDataSeed
                 JOIN rooming_houses h ON h.id = r.rooming_house_id
                 WHERE h.landlord_user_id = '10000000-0000-0000-0000-000000000004'
             )
-              AND billing_period_start = DATE '2026-07-01';
+              AND billing_period_start >= DATE '2026-06-01';
             """, cancellationToken);
     }
 
