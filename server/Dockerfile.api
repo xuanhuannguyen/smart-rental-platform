@@ -22,6 +22,10 @@ ENV ASPNETCORE_HOSTBUILDER__RELOADCONFIGONCHANGE=false
 ENV DOTNET_USE_POLLING_FILE_WATCHER=true
 EXPOSE 8080
 
+RUN apt-get update \
+    && apt-get install -y --no-install-recommends fontconfig fonts-liberation2 \
+    && rm -rf /var/lib/apt/lists/*
+
 COPY --from=build /out/api ./
 COPY --from=build /out/efbundle ./efbundle
 COPY --from=build /src/data ./data

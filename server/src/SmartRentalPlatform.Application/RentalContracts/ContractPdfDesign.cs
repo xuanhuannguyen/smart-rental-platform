@@ -5,7 +5,10 @@ namespace SmartRentalPlatform.Application.RentalContracts;
 
 internal static class ContractPdfDesign
 {
-    public const string FontFamily = "Times New Roman";
+    private const string PreferredFontFamily = "Times New Roman";
+    private const string FallbackFontFamily = "Liberation Serif";
+
+    public static string FontFamily { get; private set; } = PreferredFontFamily;
     public const float PageMarginHorizontal = 56.7f;
     // Header/footer are laid out inside the page margin area by QuestPDF.
     // Combined with their fixed heights, these values produce the 21 mm / 19 mm visual margins of the approved sample.
@@ -37,11 +40,15 @@ internal static class ContractPdfDesign
                 return;
             }
 
-            var candidates = GetFontCandidates().Distinct(StringComparer.OrdinalIgnoreCase).ToList();
+            var candidates = GetFontCandidates()
+                .Where(candidate => File.Exists(candidate.Path))
+                .GroupBy(candidate => candidate.Path, StringComparer.OrdinalIgnoreCase)
+                .Select(group => group.First())
+                .ToList();
             var registeredCount = 0;
-            foreach (var path in candidates.Where(File.Exists))
+            foreach (var candidate in candidates)
             {
-                using var stream = File.OpenRead(path);
+                using var stream = File.OpenRead(candidate.Path);
                 FontManager.RegisterFont(stream);
                 registeredCount++;
             }
@@ -49,28 +56,32 @@ internal static class ContractPdfDesign
             if (registeredCount == 0)
             {
                 throw new InvalidOperationException(
-                    "Times New Roman font files were not found. Install a licensed Times New Roman font set on the server before rendering contracts.");
+                    "No supported contract PDF font files were found. Install Times New Roman or Liberation Serif fonts before rendering contracts.");
             }
+
+            FontFamily = candidates.Any(candidate => candidate.Family == PreferredFontFamily)
+                ? PreferredFontFamily
+                : FallbackFontFamily;
 
             fontsRegistered = true;
         }
     }
 
-    private static IEnumerable<string> GetFontCandidates()
+    private static IEnumerable<(string Path, string Family)> GetFontCandidates()
     {
         var windowsFonts = Environment.GetFolderPath(Environment.SpecialFolder.Fonts);
         if (!string.IsNullOrWhiteSpace(windowsFonts))
         {
-            yield return Path.Combine(windowsFonts, "times.ttf");
-            yield return Path.Combine(windowsFonts, "timesbd.ttf");
-            yield return Path.Combine(windowsFonts, "timesi.ttf");
-            yield return Path.Combine(windowsFonts, "timesbi.ttf");
+            yield return (Path.Combine(windowsFonts, "times.ttf"), PreferredFontFamily);
+            yield return (Path.Combine(windowsFonts, "timesbd.ttf"), PreferredFontFamily);
+            yield return (Path.Combine(windowsFonts, "timesi.ttf"), PreferredFontFamily);
+            yield return (Path.Combine(windowsFonts, "timesbi.ttf"), PreferredFontFamily);
         }
 
         var linuxRoots = new[]
         {
             "/usr/share/fonts/truetype/msttcorefonts",
-            "/usr/share/fonts/truetype/msttcorefonts",
+            "/usr/share/fonts/truetype/microsoft",
             "/usr/local/share/fonts"
         };
 
@@ -90,7 +101,30 @@ internal static class ContractPdfDesign
         {
             foreach (var name in linuxNames)
             {
-                yield return Path.Combine(root, name);
+                yield return (Path.Combine(root, name), PreferredFontFamily);
+            }
+        }
+
+        var liberationRoots = new[]
+        {
+            "/usr/share/fonts/truetype/liberation2",
+            "/usr/share/fonts/truetype/liberation",
+            "/usr/local/share/fonts"
+        };
+
+        var liberationNames = new[]
+        {
+            "LiberationSerif-Regular.ttf",
+            "LiberationSerif-Bold.ttf",
+            "LiberationSerif-Italic.ttf",
+            "LiberationSerif-BoldItalic.ttf"
+        };
+
+        foreach (var root in liberationRoots)
+        {
+            foreach (var name in liberationNames)
+            {
+                yield return (Path.Combine(root, name), FallbackFontFamily);
             }
         }
     }
