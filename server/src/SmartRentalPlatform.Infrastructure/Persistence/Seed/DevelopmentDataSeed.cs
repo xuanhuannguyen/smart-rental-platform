@@ -2983,9 +2983,9 @@ public static class DevelopmentDataSeed
                 contractNumber,
                 cancellationToken);
 
-            for (var month = 4; month <= 7; month++)
+            for (var month = 4; month <= 6; month++)
             {
-                var status = month == 7 ? InvoiceStatus.Draft : InvoiceStatus.Paid;
+                var status = InvoiceStatus.Paid;
                 var invoiceId = CreateSeedGuid($"xunhuns:invoice:{roomSeed.RoomNumber}:2026-{month:D2}");
                 var electricReadingId = CreateSeedGuid($"xunhuns:meter:electric:{roomSeed.RoomNumber}:2026-{month:D2}");
                 var waterReadingId = CreateSeedGuid($"xunhuns:meter:water:{roomSeed.RoomNumber}:2026-{month:D2}");
@@ -3085,6 +3085,7 @@ public static class DevelopmentDataSeed
             }
         }
 
+        await RemoveSecondaryLandlordJulyInvoicesAsync(context, cancellationToken);
         await EnsureSecondaryLandlordWithdrawalAsync(context, landlordBalance, cancellationToken);
         await EnsureSecondaryLandlordChatAsync(context, roomSeeds, tenantSeeds, cancellationToken);
         await EnsureSecondaryLandlordReviewsAsync(
@@ -3094,6 +3095,57 @@ public static class DevelopmentDataSeed
             cancellationToken);
 
         await context.SaveChangesAsync(cancellationToken);
+    }
+
+    private static async Task RemoveSecondaryLandlordJulyInvoicesAsync(
+        AppDbContext context,
+        CancellationToken cancellationToken)
+    {
+        await context.Database.ExecuteSqlRawAsync("""
+            DELETE FROM wallet_transactions
+            WHERE related_entity_type = 'Invoice'
+              AND related_entity_id IN (
+                  SELECT i.id
+                  FROM invoices i
+                  JOIN contracts c ON c.id = i.contract_id
+                  JOIN rooms r ON r.id = c.room_id
+                  JOIN rooming_houses h ON h.id = r.rooming_house_id
+                  WHERE h.landlord_user_id = '10000000-0000-0000-0000-000000000004'
+                    AND i.billing_period_start = DATE '2026-07-01'
+              );
+
+            DELETE FROM invoice_items
+            WHERE invoice_id IN (
+                SELECT i.id
+                FROM invoices i
+                JOIN contracts c ON c.id = i.contract_id
+                JOIN rooms r ON r.id = c.room_id
+                JOIN rooming_houses h ON h.id = r.rooming_house_id
+                WHERE h.landlord_user_id = '10000000-0000-0000-0000-000000000004'
+                  AND i.billing_period_start = DATE '2026-07-01'
+            );
+
+            DELETE FROM invoices
+            WHERE id IN (
+                SELECT i.id
+                FROM invoices i
+                JOIN contracts c ON c.id = i.contract_id
+                JOIN rooms r ON r.id = c.room_id
+                JOIN rooming_houses h ON h.id = r.rooming_house_id
+                WHERE h.landlord_user_id = '10000000-0000-0000-0000-000000000004'
+                  AND i.billing_period_start = DATE '2026-07-01'
+            );
+
+            DELETE FROM meter_readings
+            WHERE contract_id IN (
+                SELECT c.id
+                FROM contracts c
+                JOIN rooms r ON r.id = c.room_id
+                JOIN rooming_houses h ON h.id = r.rooming_house_id
+                WHERE h.landlord_user_id = '10000000-0000-0000-0000-000000000004'
+            )
+              AND billing_period_start = DATE '2026-07-01';
+            """, cancellationToken);
     }
 
     private static async Task EnsureShowcaseUsersAndHouseAsync(
