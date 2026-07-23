@@ -87,6 +87,11 @@ namespace SmartRentalPlatform.Infrastructure.Persistence.Migrations
 
         protected override void Up(MigrationBuilder migrationBuilder)
         {
+            // Legacy demo seed is replaced by DevelopmentDataSeed. Keeping this
+            // migration as a schema-history marker avoids inserting conflicting
+            // demo users before the current deterministic seed runs.
+            return;
+
             ResetDemoData(migrationBuilder);
             SeedUsers(migrationBuilder);
             SeedKyc(migrationBuilder);

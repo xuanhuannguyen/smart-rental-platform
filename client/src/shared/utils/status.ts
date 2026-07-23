@@ -11,7 +11,7 @@ const STATUS_LABELS: Record<string, string> = {
   Maintenance: 'Bảo trì',
   Reserved: 'Đã đặt chỗ',
   Active: 'Đang hiệu lực',
-  Expired: 'Đã hết hạn',
+  Expired: 'Kết thúc',
   Cancelled: 'Đã hủy',
 };
 

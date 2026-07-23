@@ -13,7 +13,7 @@ type HistoryStatusFilter = 'All' | 'Active' | 'Expired' | 'Cancelled';
 const statusFilters: Array<{ value: HistoryStatusFilter; label: string }> = [
   { value: 'All', label: 'Tất cả' },
   { value: 'Active', label: 'Đang hiệu lực' },
-  { value: 'Expired', label: 'Đã hết hạn' },
+  { value: 'Expired', label: 'Kết thúc' },
   { value: 'Cancelled', label: 'Đã chấm dứt' }
 ];
 
@@ -238,7 +238,7 @@ function formatContractStatus(status: string) {
     case 'Active':
       return 'Đang hiệu lực';
     case 'Expired':
-      return 'Đã hết hạn';
+      return 'Kết thúc';
     case 'Cancelled':
       return 'Đã chấm dứt';
     default:

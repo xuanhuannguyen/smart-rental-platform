@@ -411,6 +411,7 @@ public class ContractFileService : IContractFileService
                 .ThenInclude(x => x.Changes)
             .Include(x => x.Appendices)
                 .ThenInclude(x => x.Signatures)
+            .Include(x => x.Signatures)
             .Include(x => x.Files)
             .FirstOrDefaultAsync(x => x.Id == contractId && x.DeletedAt == null, cancellationToken);
 

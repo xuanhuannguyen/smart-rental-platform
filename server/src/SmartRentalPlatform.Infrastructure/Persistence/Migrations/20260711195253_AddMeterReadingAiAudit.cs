@@ -10,42 +10,14 @@ namespace SmartRentalPlatform.Infrastructure.Persistence.Migrations
         /// <inheritdoc />
         protected override void Up(MigrationBuilder migrationBuilder)
         {
-            migrationBuilder.AddColumn<string>(
-                name: "ai_raw_text",
-                table: "meter_readings",
-                type: "text",
-                nullable: true);
-
-            migrationBuilder.AddColumn<decimal>(
-                name: "ai_reading",
-                table: "meter_readings",
-                type: "numeric(12,2)",
-                precision: 12,
-                scale: 2,
-                nullable: true);
-
-            migrationBuilder.AddColumn<bool>(
-                name: "was_manually_corrected",
-                table: "meter_readings",
-                type: "boolean",
-                nullable: false,
-                defaultValue: false);
+            // No-op: these columns are created by AddMeterReadingOcrAudit and
+            // renamed by RenameMeterReadingOcrAuditToAi in earlier migrations.
         }
 
         /// <inheritdoc />
         protected override void Down(MigrationBuilder migrationBuilder)
         {
-            migrationBuilder.DropColumn(
-                name: "ai_raw_text",
-                table: "meter_readings");
-
-            migrationBuilder.DropColumn(
-                name: "ai_reading",
-                table: "meter_readings");
-
-            migrationBuilder.DropColumn(
-                name: "was_manually_corrected",
-                table: "meter_readings");
+            // No-op for the paired Up migration.
         }
     }
 }

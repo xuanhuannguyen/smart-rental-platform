@@ -25,8 +25,7 @@ namespace SmartRentalPlatform.Infrastructure.Persistence.Seed
         private static readonly Guid LegacySearchMockLandlordId =
             Guid.Parse("90000000-0000-0000-0000-000000000002");
 
-        private static readonly byte[] PlaceholderImageBytes = Convert.FromBase64String(
-            "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO5Wv7sAAAAASUVORK5CYII=");
+        private const string DemoImageDirectory = @"C:\Users\Admin\Downloads\Demo";
         private static readonly string[] UnsplashPhotoIds = new[]
         {
             "photo-1522708323590-d24dbb6b0267", "photo-1502672260266-1c1ef2d93688", "photo-1493809842364-78817add7ffb", 
@@ -461,11 +460,11 @@ namespace SmartRentalPlatform.Infrastructure.Persistence.Seed
                 // 2. Random tên khu trọ tiếng Việt tự nhiên
                 var prefix = Prefixes[random.Next(Prefixes.Length)];
                 var name = Names[random.Next(Names.Length)];
-                var codeNo = random.Next(10, 999);
-                var houseName = $"{prefix} {name} #{codeNo}";
+                var localArea = Streets[random.Next(Streets.Length)];
+                var houseName = $"{prefix} {name} {localArea}";
 
                 // 3. Random địa chỉ
-                var street = Streets[random.Next(Streets.Length)];
+                var street = localArea;
                 var streetNo = random.Next(1, 450);
                 var addressLine = $"{streetNo} {street}";
                 var addressDisplay = $"{addressLine}, {ward.Name}, {province.Name}";
@@ -633,11 +632,17 @@ namespace SmartRentalPlatform.Infrastructure.Persistence.Seed
             CancellationToken cancellationToken)
         {
             var propertyImageId = Guid.NewGuid();
-            var objectKey = mediaObjectKeyFactory.Create(scope, MediaVisibility.Public, fileName);
-            var storedObject = await UploadPlaceholderImageAsync(
+            var imagePath = PickRealSeedImage($"{roomingHouseId}:{roomId}:{fileName}");
+            var bytes = await File.ReadAllBytesAsync(imagePath, cancellationToken);
+            var actualFileName = Path.GetFileName(imagePath);
+            var contentType = ResolveImageContentType(imagePath);
+            var objectKey = mediaObjectKeyFactory.Create(scope, MediaVisibility.Public, actualFileName);
+            var storedObject = await UploadSeedImageAsync(
                 mediaStorageService,
                 objectKey.ObjectKey,
-                fileName,
+                actualFileName,
+                contentType,
+                bytes,
                 cancellationToken);
             var mediaAssetId = Guid.NewGuid();
 
@@ -647,10 +652,10 @@ namespace SmartRentalPlatform.Infrastructure.Persistence.Seed
                 OwnerUserId = ownerUserId,
                 BucketName = storedObject.BucketName,
                 ObjectKey = storedObject.ObjectKey,
-                OriginalFileName = fileName,
+                OriginalFileName = actualFileName,
                 StoredFileName = storedObject.StoredFileName,
-                ContentType = "image/png",
-                FileSize = PlaceholderImageBytes.Length,
+                ContentType = contentType,
+                FileSize = bytes.Length,
                 Scope = scope,
                 Visibility = MediaVisibility.Public,
                 Status = MediaStatus.Linked,
@@ -674,24 +679,68 @@ namespace SmartRentalPlatform.Infrastructure.Persistence.Seed
             });
         }
 
-        private static async Task<MediaStoredObjectResult> UploadPlaceholderImageAsync(
+        private static async Task<MediaStoredObjectResult> UploadSeedImageAsync(
             IMediaStorageService mediaStorageService,
             string objectKey,
             string fileName,
+            string contentType,
+            byte[] bytes,
             CancellationToken cancellationToken)
         {
-            await using var content = new MemoryStream(PlaceholderImageBytes, writable: false);
+            await using var content = new MemoryStream(bytes, writable: false);
             return await mediaStorageService.UploadAsync(
                 new MediaUploadRequest
                 {
                     Content = content,
                     OriginalFileName = fileName,
-                    ContentType = "image/png",
-                    FileSize = PlaceholderImageBytes.Length,
+                    ContentType = contentType,
+                    FileSize = bytes.Length,
                     ObjectKey = objectKey,
                     Visibility = MediaVisibility.Public
                 },
                 cancellationToken);
+        }
+
+        private static string PickRealSeedImage(string selector)
+        {
+            if (!Directory.Exists(DemoImageDirectory))
+            {
+                throw new DirectoryNotFoundException($"Missing real image directory for seed media: {DemoImageDirectory}");
+            }
+
+            var files = Directory
+                .EnumerateFiles(DemoImageDirectory, "*.*", SearchOption.AllDirectories)
+                .Where(path =>
+                {
+                    var extension = Path.GetExtension(path).ToLowerInvariant();
+                    var fileName = Path.GetFileName(path);
+                    return extension is ".jpg" or ".jpeg" or ".png" or ".webp" &&
+                           !fileName.Equals("1341.png", StringComparison.OrdinalIgnoreCase) &&
+                           !fileName.Equals("96.png", StringComparison.OrdinalIgnoreCase) &&
+                           new FileInfo(path).Length >= 20_000;
+                })
+                .OrderBy(path => path, StringComparer.OrdinalIgnoreCase)
+                .ToArray();
+
+            if (files.Length == 0)
+            {
+                throw new InvalidOperationException($"No real seed images found in {DemoImageDirectory}.");
+            }
+
+            var hash = System.Security.Cryptography.MD5.HashData(System.Text.Encoding.UTF8.GetBytes(selector));
+            var index = BitConverter.ToUInt32(hash, 0) % files.Length;
+            return files[index];
+        }
+
+        private static string ResolveImageContentType(string imagePath)
+        {
+            return Path.GetExtension(imagePath).ToLowerInvariant() switch
+            {
+                ".jpg" or ".jpeg" => "image/jpeg",
+                ".png" => "image/png",
+                ".webp" => "image/webp",
+                _ => "application/octet-stream"
+            };
         }
     }
 }

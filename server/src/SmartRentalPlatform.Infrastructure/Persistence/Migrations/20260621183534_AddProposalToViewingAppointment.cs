@@ -11,29 +11,29 @@ namespace SmartRentalPlatform.Infrastructure.Persistence.Migrations
         /// <inheritdoc />
         protected override void Up(MigrationBuilder migrationBuilder)
         {
-            migrationBuilder.AddColumn<int>(
-                name: "proposed_duration_minutes",
-                table: "viewing_appointments",
-                type: "integer",
-                nullable: true);
+            migrationBuilder.Sql("""
+                ALTER TABLE viewing_appointments
+                ADD COLUMN IF NOT EXISTS proposed_duration_minutes integer;
+                """);
 
-            migrationBuilder.AddColumn<DateTimeOffset>(
-                name: "proposed_scheduled_at",
-                table: "viewing_appointments",
-                type: "timestamp with time zone",
-                nullable: true);
+            migrationBuilder.Sql("""
+                ALTER TABLE viewing_appointments
+                ADD COLUMN IF NOT EXISTS proposed_scheduled_at timestamp with time zone;
+                """);
         }
 
         /// <inheritdoc />
         protected override void Down(MigrationBuilder migrationBuilder)
         {
-            migrationBuilder.DropColumn(
-                name: "proposed_duration_minutes",
-                table: "viewing_appointments");
+            migrationBuilder.Sql("""
+                ALTER TABLE viewing_appointments
+                DROP COLUMN IF EXISTS proposed_duration_minutes;
+                """);
 
-            migrationBuilder.DropColumn(
-                name: "proposed_scheduled_at",
-                table: "viewing_appointments");
+            migrationBuilder.Sql("""
+                ALTER TABLE viewing_appointments
+                DROP COLUMN IF EXISTS proposed_scheduled_at;
+                """);
         }
     }
 }

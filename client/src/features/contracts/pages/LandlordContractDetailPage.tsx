@@ -787,7 +787,7 @@ function formatStatus(status: string) {
     case 'Active':
       return 'Đang hiệu lực';
     case 'Expired':
-      return 'Đã hết hạn';
+      return 'Kết thúc';
     case 'Cancelled':
       return 'Đã chấm dứt';
     default:

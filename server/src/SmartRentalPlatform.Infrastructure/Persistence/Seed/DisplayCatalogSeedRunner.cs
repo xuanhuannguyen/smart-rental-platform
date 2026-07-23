@@ -56,9 +56,78 @@ namespace SmartRentalPlatform.Infrastructure.Persistence.Seed
             "An Nhiên", "Trúc Xanh", "Bình Minh", "Hoa Sữa", "Thanh Xuân", "Hương Sen", "Cát Tường", "Thịnh Vượng", "Hòa Bình", "Nam Long", "Khánh An", "Phương Nam", "Đại Việt", "Trường Sơn", "Bạch Đằng", "Hồng Hà", "Cửu Long", "Mai Hoa", "Tâm An", "Gia Đình", "Đất Việt", "Hướng Dương", "Khánh Hội", "Song Hành", "Phú Mỹ", "Hưng Thịnh", "Vinh Quang", "Vạn Xuân", "Kim Liên", "Bình An", "Hạnh Phúc", "An Khang", "Gia Hòa", "Vĩnh Tiến", "Thành Công", "Đại Nam", "Âu Cơ", "Lạc Long Quân", "Phú Gia", "Thiên Phú"
         };
 
+        private static readonly string[] OwnerNames = new[]
+        {
+            "Anh Hào", "Cô Lan", "Chú Bình", "Chị Hạnh", "Anh Phúc", "Cô Mai", "Chú Sơn", "Chị Ngọc",
+            "Anh Tùng", "Cô Thu", "Chú Dũng", "Chị Hương", "Anh Khoa", "Cô Vân", "Chú Thành", "Chị Linh"
+        };
+
         private static readonly string[] Streets = new[]
         {
             "Nguyễn Trãi", "Lê Lợi", "Trần Hưng Đạo", "Nguyễn Huệ", "Hai Bà Trưng", "Phan Chu Trinh", "Bùi Thị Xuân", "Nguyễn Thị Minh Khai", "Lê Hồng Phong", "Điện Biên Phủ", "Trần Phú", "Kim Mã", "Cầu Giấy", "Nguyễn Văn Cừ", "Phạm Văn Đồng", "Cách Mạng Tháng Tám", "Nam Kỳ Khởi Nghĩa", "Nguyễn Thị Thập", "Tôn Thất Thuyết", "Trần Não", "Lê Văn Việt", "Nguyễn Hữu Thọ", "Kha Vạn Cân", "Võ Văn Ngân", "Hoàng Hoa Thám", "Xuân Thủy", "Trần Duy Hưng", "Chùa Láng", "Giải Phóng", "Đê La Thành"
+        };
+
+        private static readonly Dictionary<string, string[]> CityStreets = new()
+        {
+            { "46", new[] { "Lê Lợi", "Hùng Vương", "Nguyễn Huệ", "Bà Triệu", "Phan Chu Trinh", "Điện Biên Phủ", "Nguyễn Sinh Cung", "Tố Hữu", "An Dương Vương", "Đống Đa" } },
+            { "48", new[] { "Ngũ Hành Sơn", "Lê Duẩn", "Nguyễn Văn Linh", "Trần Phú", "Điện Biên Phủ", "Tôn Đức Thắng", "Hoàng Diệu", "Núi Thành", "Phạm Văn Đồng", "Nguyễn Hữu Thọ" } },
+            { "01", new[] { "Cầu Giấy", "Xuân Thủy", "Trần Duy Hưng", "Chùa Láng", "Giải Phóng", "Kim Mã", "Nguyễn Trãi", "Láng Hạ", "Phạm Văn Đồng", "Nguyễn Văn Cừ" } },
+            { "79", new[] { "Điện Biên Phủ", "Nguyễn Thị Minh Khai", "Cách Mạng Tháng Tám", "Nam Kỳ Khởi Nghĩa", "Nguyễn Hữu Thọ", "Lê Văn Việt", "Kha Vạn Cân", "Võ Văn Ngân", "Nguyễn Thị Thập", "Trần Não" } }
+        };
+
+        private static readonly Dictionary<string, CityArea[]> CityAreas = new()
+        {
+            {
+                "46",
+                new[]
+                {
+                    new CityArea("Phường An Cựu", 16.4528m, 107.6007m, new[] { "An Dương Vương", "Hùng Vương", "Tố Hữu" }),
+                    new CityArea("Phường Vỹ Dạ", 16.4681m, 107.6047m, new[] { "Nguyễn Sinh Cung", "Hàn Mặc Tử", "Lâm Hoằng" }),
+                    new CityArea("Phường Phú Xuân", 16.4676m, 107.5797m, new[] { "Lê Lợi", "Nguyễn Huệ", "Đống Đa" }),
+                    new CityArea("Phường Thuận Hoá", 16.4639m, 107.5845m, new[] { "Trần Hưng Đạo", "Mai Thúc Loan", "Đinh Tiên Hoàng" })
+                }
+            },
+            {
+                "48",
+                new[]
+                {
+                    new CityArea("Phường Ngũ Hành Sơn", 16.0106m, 108.2522m, new[] { "Ngũ Hành Sơn", "Lê Văn Hiến", "Hồ Xuân Hương" }),
+                    new CityArea("Phường Hải Châu", 16.0605m, 108.2208m, new[] { "Lê Duẩn", "Trần Phú", "Nguyễn Văn Linh" }),
+                    new CityArea("Phường Thanh Khê", 16.0714m, 108.1919m, new[] { "Điện Biên Phủ", "Hà Huy Tập", "Lê Độ" }),
+                    new CityArea("Phường Cẩm Lệ", 16.0158m, 108.2035m, new[] { "Ông Ích Đường", "Cách Mạng Tháng Tám", "Nguyễn Hữu Thọ" }),
+                    new CityArea("Phường Liên Chiểu", 16.0737m, 108.1499m, new[] { "Tôn Đức Thắng", "Nguyễn Lương Bằng", "Âu Cơ" })
+                }
+            },
+            {
+                "01",
+                new[]
+                {
+                    new CityArea("Phường Cầu Giấy", 21.0362m, 105.7906m, new[] { "Cầu Giấy", "Xuân Thủy", "Duy Tân" }),
+                    new CityArea("Phường Láng", 21.0214m, 105.8068m, new[] { "Chùa Láng", "Nguyễn Chí Thanh", "Láng Hạ" }),
+                    new CityArea("Phường Thanh Xuân", 20.9935m, 105.8098m, new[] { "Nguyễn Trãi", "Khuất Duy Tiến", "Vũ Trọng Phụng" }),
+                    new CityArea("Phường Hai Bà Trưng", 21.0038m, 105.8496m, new[] { "Giải Phóng", "Bạch Mai", "Trần Đại Nghĩa" }),
+                    new CityArea("Phường Đống Đa", 21.0182m, 105.8325m, new[] { "Tây Sơn", "Tôn Đức Thắng", "Xã Đàn" })
+                }
+            },
+            {
+                "79",
+                new[]
+                {
+                    new CityArea("Phường Thủ Đức", 10.8498m, 106.7717m, new[] { "Võ Văn Ngân", "Kha Vạn Cân", "Hoàng Diệu 2" }),
+                    new CityArea("Phường Bình Thạnh", 10.8067m, 106.7132m, new[] { "Điện Biên Phủ", "Xô Viết Nghệ Tĩnh", "Ung Văn Khiêm" }),
+                    new CityArea("Phường Tân Bình", 10.8011m, 106.6526m, new[] { "Cách Mạng Tháng Tám", "Hoàng Văn Thụ", "Trường Chinh" }),
+                    new CityArea("Phường Gò Vấp", 10.8387m, 106.6653m, new[] { "Phan Văn Trị", "Quang Trung", "Nguyễn Oanh" }),
+                    new CityArea("Phường An Khánh", 10.7835m, 106.7351m, new[] { "Trần Não", "Lương Định Của", "Mai Chí Thọ" })
+                }
+            }
+        };
+
+        private static readonly Dictionary<string, (decimal MinLat, decimal MaxLat, decimal MinLng, decimal MaxLng)> CityBounds = new()
+        {
+            { "46", (16.4300m, 16.5150m, 107.5350m, 107.6450m) },
+            { "48", (15.9700m, 16.0900m, 108.1450m, 108.2850m) },
+            { "01", (20.9600m, 21.0900m, 105.7300m, 105.9000m) },
+            { "79", (10.7200m, 10.9000m, 106.6100m, 106.8300m) }
         };
 
         private static readonly string[] Rating5Comments = new[]
@@ -128,21 +197,7 @@ namespace SmartRentalPlatform.Infrastructure.Persistence.Seed
             { "01", (21.0362m, 105.7825m) }, // Hà Nội (Cầu Giấy)
             { "79", (10.8752m, 106.8007m) }, // TP.HCM (Thủ Đức)
             { "48", (15.9754m, 108.2638m) }, // Đà Nẵng (Ngũ Hành Sơn)
-            { "92", (10.0299m, 105.7684m) }, // Cần Thơ
-            { "46", (16.4627m, 107.5905m) }, // Huế
-            { "31", (20.8384m, 106.6908m) }, // Hải Phòng
-            { "19", (21.5852m, 105.8065m) }, // Thái Nguyên
-            { "40", (18.6631m, 105.6946m) }, // Nghệ An
-            { "38", (19.7891m, 105.7952m) }, // Thanh Hóa
-            { "24", (21.1712m, 106.0594m) }, // Bắc Ninh
-            { "51", (15.1147m, 108.8045m) }, // Quảng Ngãi
-            { "52", (13.9774m, 108.0121m) }, // Gia Lai
-            { "56", (12.2682m, 109.2023m) }, // Khánh Hòa
-            { "68", (11.9542m, 108.4447m) }, // Lâm Đồng
-            { "66", (12.6639m, 108.0772m) }, // Đắk Lắk
-            { "75", (10.9622m, 106.8123m) }, // Đồng Nai
-            { "86", (10.2458m, 105.9612m) }, // Vĩnh Long
-            { "91", (10.3712m, 105.4325m) }  // An Giang
+            { "46", (16.4627m, 107.5905m) } // Huế
         };
 
         public DisplayCatalogSeedRunner(
@@ -305,10 +360,14 @@ namespace SmartRentalPlatform.Infrastructure.Persistence.Seed
                     LandlordUserId = LandlordUserId,
                     Name = seedHouse.Name,
                     Description = $"Cơ sở lưu trú chất lượng cao, an ninh đảm bảo tại khu vực {seedHouse.Name}. Phòng rộng thoáng mát, giá rẻ sinh viên.",
-                    AddressLine = $"Số {random.Next(1, 200)} Đường {Streets[i % Streets.Length]}",
+                    AddressLine = string.IsNullOrWhiteSpace(seedHouse.AddressLine)
+                        ? $"Số {random.Next(1, 200)} Đường {Streets[i % Streets.Length]}"
+                        : seedHouse.AddressLine,
                     WardCode = seedHouse.WardCode,
                     ProvinceCode = seedHouse.ProvinceCode,
-                    AddressDisplay = $"{seedHouse.Name}, Việt Nam",
+                    AddressDisplay = string.IsNullOrWhiteSpace(seedHouse.AddressDisplay)
+                        ? seedHouse.AddressLine
+                        : seedHouse.AddressDisplay,
                     Latitude = (decimal)seedHouse.Latitude,
                     Longitude = (decimal)seedHouse.Longitude,
                     ApprovalStatus = RoomingHouseApprovalStatus.Approved,
@@ -553,7 +612,7 @@ namespace SmartRentalPlatform.Infrastructure.Persistence.Seed
                         RoomDepositId = depositGuid,
                         RoomId = firstRoomInHouse,
                         MainTenantUserId = tenantGuid,
-                        ContractNumber = $"DISPLAY-CTR-{contractGuid.ToString("N")[^8..].ToUpper()}",
+                        ContractNumber = $"HD-{seedHouse.ProvinceCode}-{contractGuid.ToString("N")[^8..].ToUpperInvariant()}",
                         StartDate = startDate,
                         EndDate = endDate,
                         MonthlyRent = seedHouse.Rooms[0].Price,
@@ -751,7 +810,7 @@ namespace SmartRentalPlatform.Infrastructure.Persistence.Seed
                 var replyCount = reviews.Count(rev =>
                     !string.IsNullOrWhiteSpace(rev.LandlordReply) &&
                     rev.LandlordReplyCreatedAt.HasValue);
-                if (replyCount < 3 || replyCount > 5)
+                if (replyCount != 5)
                 {
                     report.HousesWithInvalidReplyCount.Add((house.Id, house.Name, replyCount));
                 }
@@ -896,16 +955,15 @@ namespace SmartRentalPlatform.Infrastructure.Persistence.Seed
 
             var passwordHash = _passwordService.HashPassword("DisplayPassword@123");
 
-            var landlordExists = await _context.Users.AnyAsync(u => u.Id == LandlordUserId, cancellationToken);
-            if (!landlordExists)
+            var landlord = await _context.Users.FirstOrDefaultAsync(u => u.Id == LandlordUserId, cancellationToken);
+            if (landlord is null)
             {
-                var user = new User
+                landlord = new User
                 {
                     Id = LandlordUserId,
-                    Email = "display-landlord@displayseed.com",
-                    NormalizedEmail = "DISPLAY-LANDLORD@DISPLAYSEED.COM",
+                    Email = "tran.van.phuc@example.com",
+                    NormalizedEmail = "TRAN.VAN.PHUC@EXAMPLE.COM",
                     PasswordHash = passwordHash,
-                    DisplayName = "Chủ trọ Display",
                     Status = UserStatus.Active,
                     OnboardingStatus = OnboardingStatus.Completed,
                     EmailConfirmed = true,
@@ -913,11 +971,11 @@ namespace SmartRentalPlatform.Infrastructure.Persistence.Seed
                     CreatedAt = DateTimeOffset.UtcNow,
                     UpdatedAt = DateTimeOffset.UtcNow
                 };
-                _context.Users.Add(user);
+                _context.Users.Add(landlord);
                 _context.UserProfiles.Add(new UserProfile
                 {
                     UserId = LandlordUserId,
-                    FullName = "Chủ trọ Display",
+                    FullName = "Trần Văn Phúc",
                     CreatedAt = DateTimeOffset.UtcNow,
                     UpdatedAt = DateTimeOffset.UtcNow
                 });
@@ -926,30 +984,50 @@ namespace SmartRentalPlatform.Infrastructure.Persistence.Seed
                     _context.UserRoles.Add(new UserRole { UserId = LandlordUserId, RoleId = landlordRole.Id, CreatedAt = DateTimeOffset.UtcNow });
                 }
             }
+            landlord.DisplayName = "Trần Văn Phúc";
+            landlord.Email = "tran.van.phuc@example.com";
+            landlord.NormalizedEmail = "TRAN.VAN.PHUC@EXAMPLE.COM";
+            landlord.Status = UserStatus.Active;
+            landlord.OnboardingStatus = OnboardingStatus.Completed;
+            landlord.EmailConfirmed = true;
+            landlord.UpdatedAt = DateTimeOffset.UtcNow;
+
+            var landlordProfile = await _context.UserProfiles.FirstOrDefaultAsync(x => x.UserId == LandlordUserId, cancellationToken);
+            if (landlordProfile is not null)
+            {
+                landlordProfile.FullName = "Trần Văn Phúc";
+                landlordProfile.UpdatedAt = DateTimeOffset.UtcNow;
+            }
 
             for (int i = 0; i < TenantUserIds.Length; i++)
             {
                 var tenantId = TenantUserIds[i];
-                var tenantExists = await _context.Users.AnyAsync(u => u.Id == tenantId, cancellationToken);
-                if (!tenantExists)
+                string email = i switch
                 {
-                    string email = $"display-tenant-{i + 1}@displayseed.com";
-                    string name = i switch
-                    {
-                        0 => "Nguyễn Văn An",
-                        1 => "Trần Thị Bình",
-                        2 => "Lê Văn Cường",
-                        3 => "Phạm Thị Dung",
-                        _ => "Hoàng Văn Em"
-                    };
+                    0 => "nguyen.minh.anh@example.com",
+                    1 => "tran.thu.ha@example.com",
+                    2 => "le.quoc.bao@example.com",
+                    3 => "pham.gia.huy@example.com",
+                    _ => "hoang.ngoc.linh@example.com"
+                };
+                string name = i switch
+                {
+                    0 => "Nguyễn Minh Anh",
+                    1 => "Trần Thu Hà",
+                    2 => "Lê Quốc Bảo",
+                    3 => "Phạm Gia Huy",
+                    _ => "Hoàng Ngọc Linh"
+                };
 
-                    var user = new User
+                var tenant = await _context.Users.FirstOrDefaultAsync(u => u.Id == tenantId, cancellationToken);
+                if (tenant is null)
+                {
+                    tenant = new User
                     {
                         Id = tenantId,
                         Email = email,
                         NormalizedEmail = email.ToUpperInvariant(),
                         PasswordHash = passwordHash,
-                        DisplayName = name,
                         Status = UserStatus.Active,
                         OnboardingStatus = OnboardingStatus.Completed,
                         EmailConfirmed = true,
@@ -957,7 +1035,7 @@ namespace SmartRentalPlatform.Infrastructure.Persistence.Seed
                         CreatedAt = DateTimeOffset.UtcNow,
                         UpdatedAt = DateTimeOffset.UtcNow
                     };
-                    _context.Users.Add(user);
+                    _context.Users.Add(tenant);
                     _context.UserProfiles.Add(new UserProfile
                     {
                         UserId = tenantId,
@@ -969,6 +1047,20 @@ namespace SmartRentalPlatform.Infrastructure.Persistence.Seed
                     {
                         _context.UserRoles.Add(new UserRole { UserId = tenantId, RoleId = tenantRole.Id, CreatedAt = DateTimeOffset.UtcNow });
                     }
+                }
+                tenant.Email = email;
+                tenant.NormalizedEmail = email.ToUpperInvariant();
+                tenant.DisplayName = name;
+                tenant.Status = UserStatus.Active;
+                tenant.OnboardingStatus = OnboardingStatus.Completed;
+                tenant.EmailConfirmed = true;
+                tenant.UpdatedAt = DateTimeOffset.UtcNow;
+
+                var profile = await _context.UserProfiles.FirstOrDefaultAsync(x => x.UserId == tenantId, cancellationToken);
+                if (profile is not null)
+                {
+                    profile.FullName = name;
+                    profile.UpdatedAt = DateTimeOffset.UtcNow;
                 }
             }
 
@@ -987,19 +1079,25 @@ namespace SmartRentalPlatform.Infrastructure.Persistence.Seed
                 .Where(x => x.IsActive)
                 .ToListAsync(cancellationToken);
 
-            var targetProvinceNames = new[] { "Hà Nội", "Hồ Chí Minh", "Đà Nẵng", "Cần Thơ", "Thừa Thiên Huế", "Hải Phòng", "Thái Nguyên", "Nghệ An", "Thanh Hóa", "Bắc Ninh", "Quảng Ngãi", "Gia Lai", "Khánh Hòa", "Lâm Đồng", "Đắk Lắk", "Đồng Nai", "Vĩnh Long", "An Giang" };
-            var targetProvinces = provinces
-                .Where(p => targetProvinceNames.Any(name => p.Name.Contains(name, StringComparison.OrdinalIgnoreCase)))
-                .ToList();
-
-            if (targetProvinces.Count == 0)
+            var targetProvinceCodes = new[] { "46", "48", "01", "79" };
+            if (targetHouseCount % targetProvinceCodes.Length != 0)
             {
-                targetProvinces = provinces;
+                throw new InvalidOperationException($"Target house count must be divisible by {targetProvinceCodes.Length} to split evenly across Hue, Da Nang, Ha Noi and Ho Chi Minh City.");
             }
 
-            var targetProvinceCodes = targetProvinces.Select(p => p.Code).ToList();
+            var targetProvinces = provinces
+                .Where(p => targetProvinceCodes.Contains(p.Code))
+                .OrderBy(p => Array.IndexOf(targetProvinceCodes, p.Code))
+                .ToList();
+
+            if (targetProvinces.Count != targetProvinceCodes.Length)
+            {
+                throw new InvalidOperationException("Missing one or more target provinces: 46 Hue, 48 Da Nang, 01 Ha Noi, 79 Ho Chi Minh City.");
+            }
+
+            var targetProvinceCodeList = targetProvinces.Select(p => p.Code).ToList();
             var wards = await _context.AdministrativeWards
-                .Where(x => x.IsActive && targetProvinceCodes.Contains(x.ProvinceCode))
+                .Where(x => x.IsActive && targetProvinceCodeList.Contains(x.ProvinceCode))
                 .ToListAsync(cancellationToken);
 
             if (wards.Count == 0)
@@ -1011,10 +1109,14 @@ namespace SmartRentalPlatform.Infrastructure.Persistence.Seed
                 .Take(targetAssetCount)
                 .ToList();
 
+            if (sourceImages.Count == 0)
+            {
+                throw new InvalidOperationException("No valid real image files found for display catalog seed. SVG fallback is disabled for production demo data.");
+            }
+
             if (sourceImages.Count > 0)
             {
-                targetAssetCount = sourceImages.Count;
-                Console.WriteLine($"Using {sourceImages.Count} real image files from {mediaSourceDirectory}.");
+                Console.WriteLine($"Using {sourceImages.Count} real image files from {mediaSourceDirectory}; assets will reuse photos up to {targetAssetCount} records.");
             }
 
             int extCount = sourceImages.Count > 0 ? Math.Max(10, (int)(targetAssetCount * 0.24)) : 120;
@@ -1037,68 +1139,11 @@ namespace SmartRentalPlatform.Infrastructure.Persistence.Seed
 
             var today = DateTimeOffset.UtcNow;
 
-            if (sourceImages.Count > 0)
-            {
-                var imageIndex = 0;
-                exteriorAssets.AddRange(CreateRealImageAssets(sourceImages, ref imageIndex, extCount, "Exterior", today));
-                commonAssets.AddRange(CreateRealImageAssets(sourceImages, ref imageIndex, comCount, "Common", today));
-                roomAssets.AddRange(CreateRealImageAssets(sourceImages, ref imageIndex, romCount, "Room", today));
-                reviewAssets.AddRange(CreateRealImageAssets(sourceImages, ref imageIndex, revCount, "Review", today));
-            }
-            else
-            {
-                for (int i = 0; i < extCount; i++)
-            {
-                var id = Guid.NewGuid();
-                exteriorAssets.Add(new DisplaySeedAsset
-                {
-                    Id = id.ToString(),
-                    Pool = "Exterior",
-                    FileName = $"exterior-{i + 1}.svg",
-                    ObjectKey = $"public/rooming-house-images/{today:yyyy/MM/dd}/{id:N}.svg",
-                    Uploaded = false
-                });
-            }
-
-                for (int i = 0; i < comCount; i++)
-            {
-                var id = Guid.NewGuid();
-                commonAssets.Add(new DisplaySeedAsset
-                {
-                    Id = id.ToString(),
-                    Pool = "Common",
-                    FileName = $"common-{i + 1}.svg",
-                    ObjectKey = $"public/rooming-house-images/{today:yyyy/MM/dd}/{id:N}.svg",
-                    Uploaded = false
-                });
-            }
-
-                for (int i = 0; i < romCount; i++)
-            {
-                var id = Guid.NewGuid();
-                roomAssets.Add(new DisplaySeedAsset
-                {
-                    Id = id.ToString(),
-                    Pool = "Room",
-                    FileName = $"room-{i + 1}.svg",
-                    ObjectKey = $"public/room-images/{today:yyyy/MM/dd}/{id:N}.svg",
-                    Uploaded = false
-                });
-            }
-
-                for (int i = 0; i < revCount; i++)
-            {
-                var id = Guid.NewGuid();
-                reviewAssets.Add(new DisplaySeedAsset
-                {
-                    Id = id.ToString(),
-                    Pool = "Review",
-                    FileName = $"review-{i + 1}.svg",
-                    ObjectKey = $"public/rooming-house-images/{today:yyyy/MM/dd}/{id:N}.svg",
-                    Uploaded = false
-                });
-            }
-            }
+            var imageIndex = 0;
+            exteriorAssets.AddRange(CreateRealImageAssets(sourceImages, ref imageIndex, extCount, "Exterior", today));
+            commonAssets.AddRange(CreateRealImageAssets(sourceImages, ref imageIndex, comCount, "Common", today));
+            roomAssets.AddRange(CreateRealImageAssets(sourceImages, ref imageIndex, romCount, "Room", today));
+            reviewAssets.AddRange(CreateRealImageAssets(sourceImages, ref imageIndex, revCount, "Review", today));
 
             manifest.Assets.AddRange(exteriorAssets);
             manifest.Assets.AddRange(commonAssets);
@@ -1110,19 +1155,33 @@ namespace SmartRentalPlatform.Infrastructure.Persistence.Seed
 
             for (int i = 0; i < targetHouseCount; i++)
             {
-                var ward = wards[random.Next(wards.Count)];
-                var province = targetProvinces.First(p => p.Code == ward.ProvinceCode);
+                var province = targetProvinces[i / (targetHouseCount / targetProvinceCodes.Length)];
+                var cityWards = wards.Where(x => x.ProvinceCode == province.Code).ToList();
+                if (cityWards.Count == 0)
+                {
+                    throw new InvalidOperationException($"No active wards found for province {province.Code} - {province.Name}.");
+                }
+
+                var area = SelectCityArea(province.Code, i);
+                var ward = area is not null
+                    ? cityWards.FirstOrDefault(x => x.Name.Equals(area.WardName, StringComparison.OrdinalIgnoreCase)) ?? cityWards[(i + random.Next(cityWards.Count)) % cityWards.Count]
+                    : cityWards[(i + random.Next(cityWards.Count)) % cityWards.Count];
+                var cityStreets = area?.Streets
+                    ?? (CityStreets.TryGetValue(province.Code, out var streetsForCity) ? streetsForCity : Streets);
+                var street = cityStreets[(i + random.Next(cityStreets.Length)) % cityStreets.Length];
 
                 string houseName;
                 int nameRetry = 0;
                 do
                 {
-                    var prefix = Prefixes[random.Next(Prefixes.Length)];
-                    var core = CoreNames[random.Next(CoreNames.Length)];
+                    var prefix = Prefixes[(i + nameRetry) % Prefixes.Length];
+                    var core = CoreNames[(i * 3 + nameRetry) % CoreNames.Length];
+                    var owner = OwnerNames[(i * 5 + nameRetry) % OwnerNames.Length];
                     string suffix;
-                    if (nameRetry % 3 == 0) suffix = $" {ward.Name}";
-                    else if (nameRetry % 3 == 1) suffix = $" Đường {Streets[random.Next(Streets.Length)]}";
-                    else suffix = $" {province.Name}";
+                    if (nameRetry % 4 == 0) suffix = $" {ward.Name}";
+                    else if (nameRetry % 4 == 1) suffix = $" Đường {street}";
+                    else if (nameRetry % 4 == 2) suffix = $" {owner}";
+                    else suffix = $" Gần {street}";
 
                     houseName = $"{prefix} {core}{suffix}";
                     nameRetry++;
@@ -1138,8 +1197,26 @@ namespace SmartRentalPlatform.Infrastructure.Persistence.Seed
                     baseLng = coords.Lng;
                 }
 
-                var latOffset = (decimal)(random.NextDouble() - 0.5) * 0.01m;
-                var lngOffset = (decimal)(random.NextDouble() - 0.5) * 0.01m;
+                var latitude = baseLat;
+                var longitude = baseLng;
+                if (area is not null)
+                {
+                    latitude = area.Lat + ((decimal)(random.NextDouble() - 0.5) * 0.006m);
+                    longitude = area.Lng + ((decimal)(random.NextDouble() - 0.5) * 0.006m);
+                }
+                else if (CityBounds.TryGetValue(province.Code, out var bounds))
+                {
+                    latitude = bounds.MinLat + ((bounds.MaxLat - bounds.MinLat) * (decimal)random.NextDouble());
+                    longitude = bounds.MinLng + ((bounds.MaxLng - bounds.MinLng) * (decimal)random.NextDouble());
+                }
+                else
+                {
+                    latitude = baseLat + ((decimal)(random.NextDouble() - 0.5) * 0.01m);
+                    longitude = baseLng + ((decimal)(random.NextDouble() - 0.5) * 0.01m);
+                }
+
+                var streetNumber = 8 + ((i * 17) % 190);
+                var addressLine = $"Số {streetNumber} Đường {street}";
 
                 var seedHouse = new DisplaySeedHouse
                 {
@@ -1147,8 +1224,10 @@ namespace SmartRentalPlatform.Infrastructure.Persistence.Seed
                     Name = houseName,
                     ProvinceCode = province.Code,
                     WardCode = ward.Code,
-                    Latitude = (double)(baseLat + latOffset),
-                    Longitude = (double)(baseLng + lngOffset)
+                    AddressLine = addressLine,
+                    AddressDisplay = $"{addressLine}, {ward.Name}, {province.Name}",
+                    Latitude = (double)latitude,
+                    Longitude = (double)longitude
                 };
 
                 int houseImgCount = 3 + (i % 3);
@@ -1212,7 +1291,6 @@ namespace SmartRentalPlatform.Infrastructure.Persistence.Seed
                     _ => new[] { 5, 5, 5, 4, 3 }
                 };
 
-                var repliesToSeed = 3 + (i % 3);
                 for (int rIdx = 0; rIdx < 5; rIdx++)
                 {
                     int rating = ratings[rIdx];
@@ -1222,9 +1300,7 @@ namespace SmartRentalPlatform.Infrastructure.Persistence.Seed
                         4 => Rating4Comments[(i * 4 + rIdx) % Rating4Comments.Length],
                         _ => Rating3Comments[(i * 3 + rIdx) % Rating3Comments.Length]
                     };
-                    string reply = rIdx < repliesToSeed
-                        ? LandlordReplies[(i * 7 + rIdx) % LandlordReplies.Length]
-                        : string.Empty;
+                    string reply = LandlordReplies[(i * 7 + rIdx) % LandlordReplies.Length];
 
                     var reviewAssetIds = new List<string>();
                     int reviewImgCount = 1 + ((i + rIdx) % 3);
@@ -1241,40 +1317,44 @@ namespace SmartRentalPlatform.Infrastructure.Persistence.Seed
 
                     string mainTenantName = rIdx switch
                     {
-                        0 => "Nguyễn Văn An",
-                        1 => "Trần Thị Bình",
-                        2 => "Lê Văn Cường",
-                        3 => "Phạm Thị Dung",
-                        _ => "Hoàng Văn Em"
+                        0 => "Nguyễn Minh Anh",
+                        1 => "Trần Thu Hà",
+                        2 => "Lê Quốc Bảo",
+                        3 => "Phạm Gia Huy",
+                        _ => "Hoàng Ngọc Linh"
                     };
 
                     string contractStart, contractEnd;
                     int createdAtOffset;
-                    if (rIdx < 4) 
+                    if (rIdx == 0)
                     {
-                        int startMonth = 1 + (rIdx * 2);
-                        contractStart = $"2025-{startMonth:D2}-10";
-                        int endMonth = startMonth + 6;
-                        int endYear = 2025;
-                        if (endMonth > 12)
-                        {
-                            endMonth -= 12;
-                            endYear = 2026;
-                        }
-                        contractEnd = $"{endYear}-{endMonth:D2}-10";
-                        createdAtOffset = rIdx switch
-                        {
-                            0 => -345,
-                            1 => -263,
-                            2 => -171,
-                            _ => -81  
-                        };
+                        contractStart = "2025-01-10";
+                        contractEnd = "2025-07-10";
+                        createdAtOffset = -335;
                     }
-                    else 
+                    else if (rIdx == 1)
                     {
-                        contractStart = "2026-01-15";
-                        contractEnd = "2026-07-15";
-                        createdAtOffset = -30; 
+                        contractStart = "2025-03-10";
+                        contractEnd = "2025-09-10";
+                        createdAtOffset = -263;
+                    }
+                    else if (rIdx == 2)
+                    {
+                        contractStart = "2025-05-10";
+                        contractEnd = "2025-11-10";
+                        createdAtOffset = -171;
+                    }
+                    else if (rIdx == 3)
+                    {
+                        contractStart = "2025-07-10";
+                        contractEnd = "2026-01-10";
+                        createdAtOffset = -81;
+                    }
+                    else
+                    {
+                        contractStart = "2025-09-15";
+                        contractEnd = "2026-03-15";
+                        createdAtOffset = -30;
                     }
 
                     var occupants = new List<DisplaySeedOccupant>();
@@ -1286,8 +1366,8 @@ namespace SmartRentalPlatform.Infrastructure.Persistence.Seed
                         DateOfBirth = $"1998-05-1{rIdx}",
                         RelationshipToMainTenant = "Self",
                         MoveInDate = contractStart,
-                        MoveOutDate = rIdx < 4 ? contractEnd : null,
-                        Status = rIdx < 4 ? "MoveOut" : "Active"
+                        MoveOutDate = contractEnd,
+                        Status = "MoveOut"
                     });
 
                     if ((i + rIdx) % 5 < 2)
@@ -1302,8 +1382,8 @@ namespace SmartRentalPlatform.Infrastructure.Persistence.Seed
                             DateOfBirth = $"1999-08-1{rIdx}",
                             RelationshipToMainTenant = relationship,
                             MoveInDate = contractStart,
-                            MoveOutDate = rIdx < 4 ? contractEnd : null,
-                            Status = rIdx < 4 ? "MoveOut" : "Active"
+                            MoveOutDate = contractEnd,
+                            Status = "MoveOut"
                         });
                     }
 
@@ -1330,6 +1410,13 @@ namespace SmartRentalPlatform.Infrastructure.Persistence.Seed
             }
 
             return manifest;
+        }
+
+        private static CityArea? SelectCityArea(string provinceCode, int seedIndex)
+        {
+            return CityAreas.TryGetValue(provinceCode, out var areas) && areas.Length > 0
+                ? areas[seedIndex % areas.Length]
+                : null;
         }
 
         private static List<string> ResolveSourceImages(string? mediaSourceDirectory)
@@ -1361,8 +1448,21 @@ namespace SmartRentalPlatform.Infrastructure.Persistence.Seed
             return Directory
                 .EnumerateFiles(directory, "*.*", SearchOption.TopDirectoryOnly)
                 .Where(path => allowedExtensions.Contains(Path.GetExtension(path)))
+                .Where(path => !IsMeterProofImage(path))
                 .OrderBy(path => Path.GetFileName(path), StringComparer.OrdinalIgnoreCase)
                 .ToList();
+        }
+
+        private static bool IsMeterProofImage(string path)
+        {
+            var fileName = Path.GetFileName(path);
+            return fileName.Equals("1341.png", StringComparison.OrdinalIgnoreCase)
+                   || fileName.Equals("96.png", StringComparison.OrdinalIgnoreCase)
+                   || fileName.Contains("meter", StringComparison.OrdinalIgnoreCase)
+                   || fileName.Contains("electric", StringComparison.OrdinalIgnoreCase)
+                   || fileName.Contains("water", StringComparison.OrdinalIgnoreCase)
+                   || fileName.Contains("dien", StringComparison.OrdinalIgnoreCase)
+                   || fileName.Contains("nuoc", StringComparison.OrdinalIgnoreCase);
         }
 
         private static IEnumerable<DisplaySeedAsset> CreateRealImageAssets(
@@ -1373,9 +1473,9 @@ namespace SmartRentalPlatform.Infrastructure.Persistence.Seed
             DateTimeOffset today)
         {
             var assets = new List<DisplaySeedAsset>();
-            for (int i = 0; i < count && imageIndex < sourceImages.Count; i++, imageIndex++)
+            for (int i = 0; i < count; i++, imageIndex++)
             {
-                var sourcePath = sourceImages[imageIndex];
+                var sourcePath = sourceImages[imageIndex % sourceImages.Count];
                 var id = Guid.NewGuid();
                 var extension = Path.GetExtension(sourcePath).ToLowerInvariant();
                 var objectPrefix = pool == "Room"
@@ -1550,12 +1650,16 @@ namespace SmartRentalPlatform.Infrastructure.Persistence.Seed
 
     internal sealed record DisplaySeedAssetContent(byte[] Bytes, string ContentType, long FileSize);
 
+    internal sealed record CityArea(string WardName, decimal Lat, decimal Lng, string[] Streets);
+
     public class DisplaySeedHouse
     {
         public string Id { get; set; } = string.Empty;
         public string Name { get; set; } = string.Empty;
         public string ProvinceCode { get; set; } = string.Empty;
         public string WardCode { get; set; } = string.Empty;
+        public string AddressLine { get; set; } = string.Empty;
+        public string AddressDisplay { get; set; } = string.Empty;
         public double Latitude { get; set; }
         public double Longitude { get; set; }
         public List<DisplaySeedRoom> Rooms { get; set; } = new();
