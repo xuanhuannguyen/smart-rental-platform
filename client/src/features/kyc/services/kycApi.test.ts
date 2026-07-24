@@ -57,6 +57,11 @@ describe('kycApi.submit', () => {
           frontMediaAssetId: 'front-id',
           backMediaAssetId: 'back-id',
           selfieMediaAssetId: 'selfie-id',
+          manualCitizenId: null,
+          manualFullName: null,
+          manualDateOfBirth: null,
+          manualGender: null,
+          manualAddress: null,
         }
       })
     );

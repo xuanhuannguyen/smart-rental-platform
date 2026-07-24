@@ -42,7 +42,7 @@ public sealed class ReviewAiModerationService : IReviewAiModerationService
         CancellationToken cancellationToken = default)
     {
         var reviewIds = await context.RoomingHouseReviews
-            .Where(x => x.ModerationStatus == RoomingHouseReviewModerationStatus.PendingAiReview)
+            .Where(x => !x.IsHidden && x.ModerationStatus == RoomingHouseReviewModerationStatus.PendingAiReview)
             .OrderBy(x => x.UpdatedAt ?? x.CreatedAt)
             .Select(x => x.Id)
             .Take(batchSize)
@@ -66,7 +66,7 @@ public sealed class ReviewAiModerationService : IReviewAiModerationService
             .Include(x => x.Images)
             .FirstOrDefaultAsync(x => x.Id == reviewId, cancellationToken);
 
-        if (review is null || review.ModerationStatus != RoomingHouseReviewModerationStatus.PendingAiReview)
+        if (review is null || review.IsHidden || review.ModerationStatus != RoomingHouseReviewModerationStatus.PendingAiReview)
         {
             return;
         }

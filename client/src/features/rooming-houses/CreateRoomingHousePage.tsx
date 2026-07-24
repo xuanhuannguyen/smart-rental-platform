@@ -275,6 +275,20 @@ export default function CreateRoomingHousePage() {
 
   return (
     <main className="create-rooming-house-page">
+      <div className="create-rooming-house-page__top-actions">
+        <Button
+          type="button"
+          variant="secondary"
+          className="create-rooming-house-page__back-to-manager"
+          onClick={() => navigate(ROUTE_PATHS.LANDLORD.ROOMING_HOUSES)}
+        >
+          <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+            <path d="M19 12H5" />
+            <path d="M12 19l-7-7 7-7" />
+          </svg>
+          Quay lại quản lý khu trọ
+        </Button>
+      </div>
       <RoomingHouseEditor
         title={pageCopy.title}
         subtitle={pageCopy.subtitle}

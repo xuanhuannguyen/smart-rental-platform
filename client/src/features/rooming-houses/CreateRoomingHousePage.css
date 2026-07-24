@@ -13,6 +13,19 @@
   max-width: 960px;
 }
 
+.create-rooming-house-page__top-actions {
+  display: flex;
+  justify-content: flex-start;
+  margin-bottom: 16px;
+}
+
+.create-rooming-house-page__back-to-manager {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  width: auto;
+}
+
 /* ==========================================
    VIEW SUBMITTED HEADER
    ========================================== */

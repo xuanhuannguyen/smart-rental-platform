@@ -31,4 +31,4 @@ COPY --from=build /out/efbundle ./efbundle
 COPY --from=build /src/data ./data
 RUN chmod +x /app/efbundle
 
-ENTRYPOINT ["dotnet", "SmartRentalPlatform.Api.dll"]
+ENTRYPOINT ["/bin/sh", "-c", "/app/efbundle --connection \"$ConnectionStrings__DefaultConnection\" && dotnet SmartRentalPlatform.Api.dll"]

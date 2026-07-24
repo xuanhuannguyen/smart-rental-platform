@@ -3019,6 +3019,7 @@ public static class DevelopmentDataSeed
         await EnsureShowcaseUsersAndHouseAsync(context, reviewedByAdminId, cancellationToken);
         await EnsureShowcaseWalletsAsync(context, cancellationToken);
         await EnsureShowcaseRentalRequestAndContractAsync(context, cancellationToken);
+        await EnsureShowcaseDepositPaymentTransferAsync(context, cancellationToken);
         await EnsureShowcaseInvoicesAndReadingsAsync(
             context,
             mediaStorageService,
@@ -3045,7 +3046,8 @@ public static class DevelopmentDataSeed
         var tenantSeeds = SecondaryLandlordTenantSeeds;
         var landlordBalance = 0m;
 
-        await EnsureWalletAsync(context, SecondaryLandlordWalletAccountId, SecondaryLandlordUserId, 95000000m, 0m, cancellationToken);
+        var totalReservedDeposits = roomSeeds.Sum(x => x.MonthlyRent);
+        await EnsureWalletAsync(context, SecondaryLandlordWalletAccountId, SecondaryLandlordUserId, 95000000m, totalReservedDeposits, cancellationToken);
         await EnsureRoomingHouseImageSetAsync(context, mediaStorageService, mediaObjectKeyFactory, SunriseHouseId, SecondaryLandlordUserId, "an-phu", cancellationToken);
         await EnsureRoomingHouseImageSetAsync(context, mediaStorageService, mediaObjectKeyFactory, GreenViewHouseId, SecondaryLandlordUserId, "minh-khang", cancellationToken);
 
@@ -3071,6 +3073,25 @@ public static class DevelopmentDataSeed
 
             await EnsureOperationalRentalRequestAsync(context, requestId, roomSeed, tenantSeed, i, cancellationToken);
             await EnsureOperationalDepositAsync(context, depositId, requestId, roomSeed, tenantSeed, cancellationToken);
+            await EnsureDepositPaymentTransferAsync(
+                context,
+                $"xunhuns:deposit-transfer:{roomSeed.RoomNumber}",
+                depositId,
+                tenantWalletId,
+                tenantSeed.UserId,
+                SecondaryLandlordWalletAccountId,
+                SecondaryLandlordUserId,
+                roomSeed.MonthlyRent,
+                25000000m,
+                25000000m - roomSeed.MonthlyRent,
+                95000000m,
+                95000000m,
+                totalReservedDeposits,
+                totalReservedDeposits,
+                $"Thanh toán tiền cọc phòng {roomSeed.RoomNumber}.",
+                $"Nhận và giữ tiền cọc phòng {roomSeed.RoomNumber}.",
+                SeedVietnamTime(2026, 3, 8 + i, 14),
+                cancellationToken);
             await EnsureOperationalContractAsync(context, contractId, requestId, depositId, occupantId, roomSeed, tenantSeed, contractNumber, cancellationToken);
             await EnsureOperationalContractDocumentsAsync(
                 context,
@@ -3429,6 +3450,30 @@ public static class DevelopmentDataSeed
             null,
             "Nap vi ban dau cho chu tro, gom 3.600.000 tien coc dang giu.",
             SeededAt.AddMonths(5),
+            cancellationToken);
+
+    }
+
+    private static Task EnsureShowcaseDepositPaymentTransferAsync(AppDbContext context, CancellationToken cancellationToken)
+    {
+        return EnsureDepositPaymentTransferAsync(
+            context,
+            "showcase:deposit-transfer:b201",
+            LinhRoomDepositId,
+            TenantLinhWalletAccountId,
+            CoTenantUserId,
+            LandlordWalletAccountId,
+            LandlordUserId,
+            3600000m,
+            54280000m,
+            50680000m,
+            8900000m,
+            12500000m,
+            0m,
+            3600000m,
+            "Thanh toán tiền cọc phòng B201.",
+            "Nhận và giữ tiền cọc phòng B201.",
+            SeededAt.AddMonths(5).AddDays(1).AddHours(2),
             cancellationToken);
     }
 
@@ -3858,6 +3903,82 @@ public static class DevelopmentDataSeed
         wallet.UpdatedAt = DateTimeOffset.UtcNow;
     }
 
+    private static async Task EnsureDepositPaymentTransferAsync(
+        AppDbContext context,
+        string seedKey,
+        Guid depositId,
+        Guid tenantWalletAccountId,
+        Guid tenantUserId,
+        Guid landlordWalletAccountId,
+        Guid landlordUserId,
+        decimal amount,
+        decimal tenantBalanceBefore,
+        decimal tenantBalanceAfter,
+        decimal landlordBalanceBefore,
+        decimal landlordBalanceAfter,
+        decimal landlordReservedBefore,
+        decimal landlordReservedAfter,
+        string tenantDescription,
+        string landlordDescription,
+        DateTimeOffset createdAt,
+        CancellationToken cancellationToken)
+    {
+        var transferGroupId = CreateSeedGuid($"{seedKey}:group");
+        var deposit = await context.RoomDeposits.FirstOrDefaultAsync(x => x.Id == depositId, cancellationToken);
+        if (deposit is null)
+        {
+            throw new InvalidOperationException($"Seed deposit '{depositId}' must exist before seeding its payment transfer.");
+        }
+
+        deposit.Status = RoomDepositStatus.Paid;
+        deposit.PaidAt ??= createdAt;
+        deposit.PaymentTransferGroupId = transferGroupId;
+        deposit.RefundTransferGroupId = null;
+        deposit.RefundedAt = null;
+        deposit.ForfeitedAt = null;
+        deposit.RefundAmount = null;
+        deposit.ForfeitedAmount = null;
+        deposit.UpdatedAt = DateTimeOffset.UtcNow;
+
+        await EnsureWalletTransactionAsync(
+            context,
+            CreateSeedGuid($"{seedKey}:tenant-debit"),
+            tenantWalletAccountId,
+            tenantUserId,
+            WalletTransactionType.DepositPayment,
+            WalletTransactionDirection.Debit,
+            amount,
+            tenantBalanceBefore,
+            tenantBalanceAfter,
+            0m,
+            0m,
+            nameof(RoomDeposit),
+            depositId,
+            tenantDescription,
+            createdAt,
+            cancellationToken,
+            transferGroupId);
+
+        await EnsureWalletTransactionAsync(
+            context,
+            CreateSeedGuid($"{seedKey}:landlord-credit"),
+            landlordWalletAccountId,
+            landlordUserId,
+            WalletTransactionType.DepositReceive,
+            WalletTransactionDirection.Credit,
+            amount,
+            landlordBalanceBefore,
+            landlordBalanceAfter,
+            landlordReservedBefore,
+            landlordReservedAfter,
+            nameof(RoomDeposit),
+            depositId,
+            landlordDescription,
+            createdAt,
+            cancellationToken,
+            transferGroupId);
+    }
+
     private static async Task EnsureWalletTransactionAsync(
         AppDbContext context,
         Guid id,
@@ -3874,7 +3995,8 @@ public static class DevelopmentDataSeed
         Guid? relatedEntityId,
         string description,
         DateTimeOffset createdAt,
-        CancellationToken cancellationToken)
+        CancellationToken cancellationToken,
+        Guid? transferGroupId = null)
     {
         var transaction = await context.WalletTransactions
             .FirstOrDefaultAsync(x => x.Id == id, cancellationToken);
@@ -3898,6 +4020,7 @@ public static class DevelopmentDataSeed
         transaction.RelatedEntityId = relatedEntityId;
         transaction.Description = description;
         transaction.Status = WalletTransactionStatus.Succeeded;
+        transaction.TransferGroupId = transferGroupId;
         transaction.CreatedAt = createdAt;
     }
 

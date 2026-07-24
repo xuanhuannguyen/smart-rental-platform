@@ -250,56 +250,66 @@ export function KycSubmitPage() {
           ) : null}
 
           {result ? (
-            <dl className="user-summary">
-              <div>
-                <dt>Trạng thái</dt>
-                <dd>{result.status}</dd>
+            <>
+              <dl className="user-summary">
+                <div>
+                  <dt>Trạng thái</dt>
+                  <dd>{result.status}</dd>
+                </div>
+                <div>
+                  <dt>eKYC</dt>
+                  <dd>{result.ekycResult}</dd>
+                </div>
+                <div>
+                  <dt>Rủi ro</dt>
+                  <dd>{result.riskLevel}</dd>
+                </div>
+                {result.submittedWithManualFallback ? (
+                  <div>
+                    <dt>Nguồn thông tin</dt>
+                    <dd>Người dùng nhập thủ công do VNPT không đọc được</dd>
+                  </div>
+                ) : null}
+                {result.ocrFullName ? (
+                  <div>
+                    <dt>Họ tên OCR</dt>
+                    <dd>{result.ocrFullName}</dd>
+                  </div>
+                ) : null}
+                {result.ocrCitizenIdMasked ? (
+                  <div>
+                    <dt>Số CCCD OCR</dt>
+                    <dd>{result.ocrCitizenIdMasked}</dd>
+                  </div>
+                ) : null}
+                {result.ocrDateOfBirth ? (
+                  <div>
+                    <dt>Ngày sinh OCR</dt>
+                    <dd>{new Date(result.ocrDateOfBirth).toLocaleDateString()}</dd>
+                  </div>
+                ) : null}
+                {result.ocrGender ? (
+                  <div>
+                    <dt>Giới tính OCR</dt>
+                    <dd>{result.ocrGender}</dd>
+                  </div>
+                ) : null}
+                {result.ocrAddress ? (
+                  <div>
+                    <dt>Địa chỉ OCR</dt>
+                    <dd>{result.ocrAddress}</dd>
+                  </div>
+                ) : null}
+              </dl>
+              <div style={{ display: 'flex', flexWrap: 'wrap', gap: '12px', marginTop: '12px' }}>
+                <Button type="button" onClick={() => navigate(ROUTE_PATHS.ME.ROOT)}>
+                  Quay lại trang chủ
+                </Button>
+                <Button type="button" variant="secondary" onClick={() => navigate(ROUTE_PATHS.ME.KYC_STATUS)}>
+                  Xem trạng thái KYC
+                </Button>
               </div>
-              <div>
-                <dt>eKYC</dt>
-                <dd>{result.ekycResult}</dd>
-              </div>
-              <div>
-                <dt>Rủi ro</dt>
-                <dd>{result.riskLevel}</dd>
-              </div>
-              {result.submittedWithManualFallback ? (
-                <div>
-                  <dt>Nguồn thông tin</dt>
-                  <dd>Người dùng nhập thủ công do VNPT không đọc được</dd>
-                </div>
-              ) : null}
-              {result.ocrFullName ? (
-                <div>
-                  <dt>Họ tên OCR</dt>
-                  <dd>{result.ocrFullName}</dd>
-                </div>
-              ) : null}
-              {result.ocrCitizenIdMasked ? (
-                <div>
-                  <dt>Số CCCD OCR</dt>
-                  <dd>{result.ocrCitizenIdMasked}</dd>
-                </div>
-              ) : null}
-              {result.ocrDateOfBirth ? (
-                <div>
-                  <dt>Ngày sinh OCR</dt>
-                  <dd>{new Date(result.ocrDateOfBirth).toLocaleDateString()}</dd>
-                </div>
-              ) : null}
-              {result.ocrGender ? (
-                <div>
-                  <dt>Giới tính OCR</dt>
-                  <dd>{result.ocrGender}</dd>
-                </div>
-              ) : null}
-              {result.ocrAddress ? (
-                <div>
-                  <dt>Địa chỉ OCR</dt>
-                  <dd>{result.ocrAddress}</dd>
-                </div>
-              ) : null}
-            </dl>
+            </>
           ) : null}
 
           <div className="auth-actions">
