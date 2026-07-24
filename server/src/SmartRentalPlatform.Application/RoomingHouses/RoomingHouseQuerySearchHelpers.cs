@@ -11,6 +11,11 @@ namespace SmartRentalPlatform.Application.RoomingHouses;
 
 public partial class RoomingHouseQueryService
 {
+    private string VersionPublicCacheKey(string cacheKey)
+    {
+        return $"{cacheKey}:v{publicCacheInvalidator.CurrentVersion}";
+    }
+
     private static void ValidateSearchRequest(ParsedRoomingHouseSearchCriteria criteria)
     {
         if (criteria.Page < 1)

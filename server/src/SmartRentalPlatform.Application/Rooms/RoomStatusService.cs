@@ -1,6 +1,7 @@
 ﻿using Microsoft.EntityFrameworkCore;
 using SmartRentalPlatform.Application.Common.Exceptions;
 using SmartRentalPlatform.Application.Common.Interfaces;
+using SmartRentalPlatform.Application.RoomingHouses;
 using SmartRentalPlatform.Contracts.Common;
 using SmartRentalPlatform.Contracts.Rooms;
 using SmartRentalPlatform.Domain.Enums;
@@ -12,15 +13,18 @@ public class RoomStatusService : IRoomStatusService
     private readonly IAppDbContext context;
     private readonly RoomAccessService roomAccessService;
     private readonly IRoomQueryService roomQueryService;
+    private readonly IPublicRoomingHouseCacheInvalidator publicCacheInvalidator;
 
     public RoomStatusService(
         IAppDbContext context,
         RoomAccessService roomAccessService,
-        IRoomQueryService roomQueryService)
+        IRoomQueryService roomQueryService,
+        IPublicRoomingHouseCacheInvalidator publicCacheInvalidator)
     {
         this.context = context;
         this.roomAccessService = roomAccessService;
         this.roomQueryService = roomQueryService;
+        this.publicCacheInvalidator = publicCacheInvalidator;
     }
 
     public async Task<RoomResponse?> SubmitAsync(
@@ -66,6 +70,7 @@ public class RoomStatusService : IRoomStatusService
         room.UpdatedAt = DateTimeOffset.UtcNow;
 
         await context.SaveChangesAsync(cancellationToken);
+        publicCacheInvalidator.Invalidate();
 
         return await roomQueryService.GetByIdAsync(landlordUserId, roomId, cancellationToken);
     }
@@ -104,6 +109,7 @@ public class RoomStatusService : IRoomStatusService
         room.UpdatedAt = DateTimeOffset.UtcNow;
 
         await context.SaveChangesAsync(cancellationToken);
+        publicCacheInvalidator.Invalidate();
 
         return await roomQueryService.GetByIdAsync(landlordUserId, roomId, cancellationToken);
     }

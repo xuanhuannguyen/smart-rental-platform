@@ -21,6 +21,8 @@ import RentalAiChatbot from '../../rooming-houses/components/RentalAiChatbot';
 import FavoriteButton from '../../rooming-houses/components/FavoriteButton';
 import {
   GUEST_RECOMMENDATION_CACHE_KEY,
+  HOME_LISTING_CACHE_KEY,
+  PUBLIC_CATALOG_CACHE_STAMP_KEY,
   saveRoomingHouseView,
   saveSearchBehavior,
   toGuestRecommendationRequest,
@@ -59,7 +61,6 @@ type HomeListingCategory = {
 };
 
 /** sessionStorage cache key for home page listing. Bump when the card payload changes. */
-const LISTING_CACHE_KEY = 'srp_home_listing_cache_v2';
 const PROVINCES_CACHE_KEY = 'srp_home_provinces_cache_v1';
 const HOME_SCROLL_CACHE_KEY = 'srp_home_scroll_restore_v1';
 /** Cache TTL: 5 minutes. */
@@ -123,13 +124,13 @@ export function MePage() {
 
   const [error, setError] = useState('');
   const [homeListings, setHomeListings] = useState<HomeListingItem[]>(
-    () => readTimedCache<ListingCacheEntry>(LISTING_CACHE_KEY, LISTING_CACHE_TTL)?.items ?? []
+    () => readHomeListingCache()?.items ?? []
   );
   const [recommendedListings, setRecommendedListings] = useState<HomeListingItem[]>([]);
   const [recommendationMeta, setRecommendationMeta] = useState<RecommendationDisplayMeta>(DEFAULT_RECOMMENDATION_META);
   const [searchQuery, setSearchQuery] = useState('');
   const [loadingHouses, setLoadingHouses] = useState(
-    () => !readTimedCache<ListingCacheEntry>(LISTING_CACHE_KEY, LISTING_CACHE_TTL)
+    () => !readHomeListingCache()
   );
   const [isCheckingLandlord, setIsCheckingLandlord] = useState(false);
   const [showDropdown, setShowDropdown] = useState(false);
@@ -156,7 +157,7 @@ export function MePage() {
 
   useEffect(() => {
     async function loadHomeListings() {
-      const cached = readTimedCache<ListingCacheEntry>(LISTING_CACHE_KEY, LISTING_CACHE_TTL);
+      const cached = readHomeListingCache();
       if (cached) {
         setHomeListings(cached.items);
         setLoadingHouses(false);
@@ -172,7 +173,7 @@ export function MePage() {
 
         try {
           const entry: ListingCacheEntry = { items: mapped, timestamp: Date.now() };
-          sessionStorage.setItem(LISTING_CACHE_KEY, JSON.stringify(entry));
+          sessionStorage.setItem(HOME_LISTING_CACHE_KEY, JSON.stringify(entry));
         } catch {
           // sessionStorage full — silently skip cache
         }
@@ -991,6 +992,23 @@ function mapListingItemToHomeItem(item: RoomingHouseListingItem): HomeListingIte
     averageRating: item.averageRating,
     totalReviews: item.totalReviews,
   };
+}
+
+function readHomeListingCache() {
+  const cached = readTimedCache<ListingCacheEntry>(HOME_LISTING_CACHE_KEY, LISTING_CACHE_TTL);
+  if (!cached) return null;
+
+  try {
+    const invalidatedAt = Number(localStorage.getItem(PUBLIC_CATALOG_CACHE_STAMP_KEY) ?? '0');
+    if (Number.isFinite(invalidatedAt) && cached.timestamp < invalidatedAt) {
+      sessionStorage.removeItem(HOME_LISTING_CACHE_KEY);
+      return null;
+    }
+  } catch {
+    // If storage is unavailable, use the normal session cache behavior.
+  }
+
+  return cached;
 }
 
 function mapSearchItemToHomeItem(item: RoomingHouseSearchItem, reason?: string): HomeListingItem {

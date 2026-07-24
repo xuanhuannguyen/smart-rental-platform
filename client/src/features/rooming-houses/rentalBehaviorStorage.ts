@@ -1,7 +1,9 @@
 import type { GuestRoomingHouseRecommendationRequest, RoomingHouseSearchParams } from './types';
 
 const RENTAL_BEHAVIOR_KEY = 'srp_guest_rental_behavior';
+export const HOME_LISTING_CACHE_KEY = 'srp_home_listing_cache_v2';
 export const GUEST_RECOMMENDATION_CACHE_KEY = 'srp_home_ai_recommendation_cache_v3';
+export const PUBLIC_CATALOG_CACHE_STAMP_KEY = 'srp_public_catalog_cache_stamp_v1';
 const MAX_QUERIES = 10;
 const MAX_IDS = 30;
 const MAX_AMENITIES = 30;
@@ -118,6 +120,16 @@ function updateBehavior(updater: (current: RentalBehaviorStorage) => RentalBehav
 export function invalidateGuestRecommendationCache() {
   try {
     sessionStorage.removeItem(GUEST_RECOMMENDATION_CACHE_KEY);
+  } catch {
+    // Storage can be unavailable in private mode or blocked browser contexts.
+  }
+}
+
+export function invalidatePublicCatalogCaches() {
+  try {
+    sessionStorage.removeItem(HOME_LISTING_CACHE_KEY);
+    sessionStorage.removeItem(GUEST_RECOMMENDATION_CACHE_KEY);
+    localStorage.setItem(PUBLIC_CATALOG_CACHE_STAMP_KEY, String(Date.now()));
   } catch {
     // Storage can be unavailable in private mode or blocked browser contexts.
   }

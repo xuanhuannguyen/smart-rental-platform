@@ -48,6 +48,7 @@ import { openContractFileForView } from '../../contracts/fileAccess';
 import { LandlordCreateAppendixModalV2 } from '../../contracts/components/LandlordCreateAppendixModalV2';
 import type { Amenity, PropertyImageRequest } from '../../rooming-houses/types';
 import { getAmenities } from '../../rooming-houses/api';
+import { invalidatePublicCatalogCaches } from '../../rooming-houses/rentalBehaviorStorage';
 import PropertyImageEditor from '../../rooming-houses/components/PropertyImageEditor';
 import { cleanImages, toImageRequests } from '../../rooming-houses/utils/imageRequests';
 import { formatDateVi, formatMoneyString, parseMoneyString } from '../../../shared/utils/format';
@@ -468,6 +469,7 @@ export default function RoomDetailPage() {
     try {
       const updated = await submitRoom(selectedRoom.id);
       setSelectedRoom(updated);
+      invalidatePublicCatalogCaches();
       setToast({ message: 'Phòng đã được hiển thị hoạt động và sẵn sàng cho thuê.', type: 'success' });
     } catch (err) {
       setToast({ message: getApiErrorMessage(err, 'Không thể hiển thị hoạt động phòng.'), type: 'error' });
@@ -485,6 +487,7 @@ export default function RoomDetailPage() {
     try {
       const updated = await updateRoomStatus(selectedRoom.id, nextStatus);
       setSelectedRoom(updated);
+      invalidatePublicCatalogCaches();
       setToast({ message: nextStatus === 'Maintenance' ? 'Phòng đã được tạm ngưng hiển thị.' : 'Phòng đã được mở lại và có thể nhận thuê.', type: 'success' });
     } catch (err) {
       setToast({ message: getApiErrorMessage(err, 'Không thể cập nhật trạng thái phòng.'), type: 'error' });

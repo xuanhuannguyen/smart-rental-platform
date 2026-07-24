@@ -7,6 +7,7 @@ using SmartRentalPlatform.Contracts.RentalContracts.Responses;
 using SmartRentalPlatform.Domain.Entities.RentalContracts;
 using SmartRentalPlatform.Domain.Entities.Users;
 using SmartRentalPlatform.Domain.Enums.Notifications;
+using SmartRentalPlatform.Domain.Enums.Properties;
 using SmartRentalPlatform.Domain.Enums.RentalContracts;
 using System.Text.Json;
 using System.Security.Cryptography;
@@ -352,8 +353,63 @@ public class ContractESignService : IContractESignService
         envelope.Status = allSigned ? SigningEnvelopeStatus.Completed : SigningEnvelopeStatus.PartiallySigned;
         envelope.CompletedAt = allSigned ? now : null;
 
-        var contract = await _context.RentalContracts.FirstOrDefaultAsync(x => x.Id == contractId, cancellationToken)
+        var contract = await BaseContractQuery().FirstOrDefaultAsync(x => x.Id == contractId, cancellationToken)
             ?? throw new NotFoundException(ErrorCodes.RentalContractNotFound, "Không tìm thấy hợp đồng.");
+
+        var mainContractMovedToTenantSignature = false;
+        var mainContractBecameActive = false;
+
+        if (appendixId is null)
+        {
+            if (signature.SignerRole == ContractSignerRole.Landlord &&
+                contract.Status == RentalContractStatus.PendingLandlordSignature)
+            {
+                contract.Status = RentalContractStatus.PendingTenantSignature;
+                contract.StatusReason = null;
+                contract.SignatureDeadlineAt = now.Add(TenantSignatureTtl);
+                mainContractMovedToTenantSignature = true;
+            }
+            else if (signature.SignerRole == ContractSignerRole.Tenant &&
+                     allSigned &&
+                     contract.Status == RentalContractStatus.PendingTenantSignature)
+            {
+                var today = DateOnly.FromDateTime(now.UtcDateTime);
+                contract.Status = RentalContractStatus.Active;
+                contract.StatusReason = null;
+                contract.SignatureDeadlineAt = null;
+                contract.ActivatedAt ??= now;
+                mainContractBecameActive = true;
+
+                if (contract.Room is not null)
+                {
+                    contract.Room.Status = contract.StartDate <= today
+                        ? RoomStatus.Occupied
+                        : RoomStatus.Reserved;
+                    contract.Room.UpdatedAt = now;
+                }
+
+                await _context.ContractOccupants
+                    .Where(x => x.RentalContractId == contractId &&
+                                x.Status != ContractOccupantStatus.MoveOut &&
+                                x.Status != ContractOccupantStatus.Voided &&
+                                x.MoveInDate <= today)
+                    .ExecuteUpdateAsync(setters => setters
+                        .SetProperty(x => x.Status, ContractOccupantStatus.Active)
+                        .SetProperty(x => x.UpdatedAt, now),
+                        cancellationToken);
+
+                await _context.ContractOccupants
+                    .Where(x => x.RentalContractId == contractId &&
+                                x.Status != ContractOccupantStatus.MoveOut &&
+                                x.Status != ContractOccupantStatus.Voided &&
+                                x.MoveInDate > today)
+                    .ExecuteUpdateAsync(setters => setters
+                        .SetProperty(x => x.Status, ContractOccupantStatus.PendingMoveIn)
+                        .SetProperty(x => x.UpdatedAt, now),
+                        cancellationToken);
+            }
+        }
+
         contract.UpdatedAt = now;
         await _context.SaveChangesAsync(cancellationToken);
 
@@ -380,6 +436,51 @@ public class ContractESignService : IContractESignService
             {
                 _logger.LogWarning(ex, "Could not create masked reference PDF for envelope {EnvelopeId}", envelope.Id);
             }
+        }
+
+        try
+        {
+            if (mainContractMovedToTenantSignature)
+            {
+                await SendAwaitingTenantSignatureEmailAsync(contract.Id, cancellationToken);
+                await NotifyContractStateAsync(
+                    contract.MainTenantUserId,
+                    NotificationType.ContractAwaitingTenantSignature,
+                    "Cần ký hợp đồng",
+                    $"Hợp đồng {contract.ContractNumber} đã được chủ trọ ký và đang chờ bạn ký trong 24 giờ.",
+                    contract.RentalRequestId,
+                    "RentalRequest",
+                    cancellationToken);
+            }
+
+            if (mainContractBecameActive)
+            {
+                await NotifyContractStateAsync(
+                    contract.MainTenantUserId,
+                    NotificationType.ContractActivated,
+                    "Hợp đồng đã có hiệu lực",
+                    $"Hợp đồng {contract.ContractNumber} đã hoàn tất ký. Bạn có thể xem trong lịch sử thuê.",
+                    contract.Id,
+                    "RentalContract",
+                    cancellationToken);
+
+                await NotifyContractStateAsync(
+                    contract.Room.RoomingHouse.LandlordUserId,
+                    NotificationType.ContractActivated,
+                    "Hợp đồng đã có hiệu lực",
+                    $"Hợp đồng {contract.ContractNumber} của khu trọ của bạn đã hoàn tất ký và có hiệu lực.",
+                    contract.Id,
+                    "RentalContract",
+                    cancellationToken);
+            }
+        }
+        catch (Exception notificationException)
+        {
+            _logger.LogWarning(
+                notificationException,
+                "VNPT OTP signing succeeded but contract notification delivery failed. ContractId={ContractId}, EnvelopeId={EnvelopeId}.",
+                contract.Id,
+                envelope.Id);
         }
     }
 

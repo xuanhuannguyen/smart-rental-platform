@@ -8,6 +8,7 @@ internal static class RoomingHouseServiceRegistration
 {
     public static IServiceCollection AddRoomingHouseServices(this IServiceCollection services)
     {
+        services.AddSingleton<IPublicRoomingHouseCacheInvalidator, PublicRoomingHouseCacheInvalidator>();
         services.AddScoped<IRoomingHouseQueryService, RoomingHouseQueryService>();
         services.AddScoped<IRoomingHouseAiChatService, RoomingHouseAiChatService>();
         services.AddScoped<IRoomingHouseSearchParser, RoomingHouseSearchParser>();

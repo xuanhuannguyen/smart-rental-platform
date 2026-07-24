@@ -8,13 +8,31 @@ export function getNotificationRole(notification: Notification): NotificationRol
   const type = notification.type;
   const title = notification.title.toLowerCase();
   const body = notification.body.toLowerCase();
+  const isViewingAppointment =
+    notification.referenceType === 'ViewingAppointment' ||
+    type === 'NewViewingAppointment' ||
+    type.startsWith('ViewingAppointment');
+
+  if (isViewingAppointment) {
+    if (type === 'NewViewingAppointment') {
+      return 'landlord';
+    }
+
+    if (body.includes('khách thuê') || title.includes('khách thuê')) {
+      return 'landlord';
+    }
+
+    if (body.includes('chủ trọ') || title.includes('chủ trọ')) {
+      return 'tenant';
+    }
+
+    return type === 'ViewingAppointmentRequested' ? 'landlord' : 'tenant';
+  }
 
   if (
     type === 'ContractAwaitingLandlordSignature' ||
     type === 'NewRentalRequest' ||
-    type === 'NewViewingAppointment' ||
     title.includes('khách thuê') ||
-    title.includes('chủ trọ') ||
     body.includes('chủ trọ ký') ||
     body.includes('khu trọ của bạn') ||
     body.includes('muốn xem phòng') ||

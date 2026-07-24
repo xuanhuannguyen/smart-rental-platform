@@ -41,6 +41,7 @@ public partial class RoomingHouseQueryService : IRoomingHouseQueryService
     private readonly IRoomingHouseRecommendationReranker recommendationReranker;
     private readonly IVietMapService vietMapService;
     private readonly IMemoryCache memoryCache;
+    private readonly IPublicRoomingHouseCacheInvalidator publicCacheInvalidator;
     private readonly ILogger<RoomingHouseQueryService> logger;
 
     public RoomingHouseQueryService(
@@ -51,6 +52,7 @@ public partial class RoomingHouseQueryService : IRoomingHouseQueryService
         IRoomingHouseRecommendationReranker recommendationReranker,
         IVietMapService vietMapService,
         IMemoryCache memoryCache,
+        IPublicRoomingHouseCacheInvalidator publicCacheInvalidator,
         ILogger<RoomingHouseQueryService> logger)
     {
         this.context = context;
@@ -60,6 +62,7 @@ public partial class RoomingHouseQueryService : IRoomingHouseQueryService
         this.recommendationReranker = recommendationReranker;
         this.vietMapService = vietMapService;
         this.memoryCache = memoryCache;
+        this.publicCacheInvalidator = publicCacheInvalidator;
         this.logger = logger;
     }
 
@@ -146,7 +149,7 @@ public partial class RoomingHouseQueryService : IRoomingHouseQueryService
         page = Math.Max(1, page);
         pageSize = Math.Clamp(pageSize, 1, 48);
 
-        var cacheKey = $"public-rooming-house-listing:{page}:{pageSize}";
+        var cacheKey = VersionPublicCacheKey($"public-rooming-house-listing:{page}:{pageSize}");
         if (memoryCache.TryGetValue(cacheKey, out List<RoomingHouseListingResponse>? cached) && cached is not null)
         {
             return cached;
@@ -262,7 +265,7 @@ public partial class RoomingHouseQueryService : IRoomingHouseQueryService
     {
         var criteria = searchParser.Parse(request);
         await PrepareSearchCriteriaAsync(criteria, cancellationToken);
-        var cacheKey = BuildPublicSearchCacheKey(criteria);
+        var cacheKey = VersionPublicCacheKey(BuildPublicSearchCacheKey(criteria));
         if (memoryCache.TryGetValue(cacheKey, out PagedResult<RoomingHouseSearchItemResponse>? cachedResult) &&
             cachedResult is not null)
         {
@@ -681,7 +684,7 @@ public partial class RoomingHouseQueryService : IRoomingHouseQueryService
 
     private async Task<List<FastSearchRow>> GetPublicSearchSnapshotAsync(CancellationToken cancellationToken)
     {
-        const string cacheKey = "public-rooming-house-search-snapshot";
+        var cacheKey = VersionPublicCacheKey("public-rooming-house-search-snapshot");
         if (memoryCache.TryGetValue(cacheKey, out List<FastSearchRow>? cachedRows) &&
             cachedRows is not null)
         {
@@ -1714,7 +1717,7 @@ public partial class RoomingHouseQueryService : IRoomingHouseQueryService
         Guid roomingHouseId,
         CancellationToken cancellationToken = default)
     {
-        var cacheKey = $"public-rooming-house-detail:{roomingHouseId:N}";
+        var cacheKey = VersionPublicCacheKey($"public-rooming-house-detail:{roomingHouseId:N}");
         if (memoryCache.TryGetValue(cacheKey, out RoomingHouseDetailResponse? cachedResponse) &&
             cachedResponse is not null)
         {
