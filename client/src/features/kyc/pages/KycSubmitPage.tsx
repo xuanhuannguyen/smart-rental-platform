@@ -1,7 +1,7 @@
 import { useCallback, useState, type FormEvent } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { ROUTE_PATHS } from '../../../app/router/routePaths';
-import { getApiErrorMessage } from '../../../shared/api/apiError';
+import { ApiClientError, getApiErrorMessage } from '../../../shared/api/apiError';
 import { Alert } from '../../../shared/components/ui/Alert';
 import { Button } from '../../../shared/components/ui/Button';
 import { FormField } from '../../../shared/components/ui/FormField';
@@ -19,6 +19,19 @@ function fileLabel(file: File | null) {
   return file ? file.name : 'Chưa chọn';
 }
 
+function isVnptManualFallbackError(error: unknown) {
+  if (!(error instanceof ApiClientError)) {
+    return false;
+  }
+
+  const message = `${error.message} ${error.errorCode ?? ''}`.toLowerCase();
+  return (
+    error.status === 400 &&
+    (message.includes('vnpt') || message.includes('ekyc')) &&
+    (message.includes('thủ công') || message.includes('thu cong') || message.includes('không nhận dạng') || message.includes('không đọc'))
+  );
+}
+
 export function KycSubmitPage() {
   const navigate = useNavigate();
   const [step, setStep] = useState(0);
@@ -34,6 +47,7 @@ export function KycSubmitPage() {
   const [manualAddress, setManualAddress] = useState('');
   const [result, setResult] = useState<KycSubmissionResponse | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [requiresManualInput, setRequiresManualInput] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
 
   const handleSubmit = useCallback(
@@ -44,6 +58,14 @@ export function KycSubmitPage() {
 
       if (!frontImage || !backImage || !selfieImage) {
         setError('Vui lòng chọn đủ ảnh mặt trước, mặt sau và selfie.');
+        return;
+      }
+
+      if (
+        requiresManualInput &&
+        (!manualCitizenId.trim() || !manualFullName.trim() || !manualDateOfBirth || !manualAddress.trim())
+      ) {
+        setError('VNPT không đọc được giấy tờ. Vui lòng điền số CCCD, họ tên, ngày sinh và quê quán/địa chỉ để gửi admin duyệt.');
         return;
       }
 
@@ -63,7 +85,12 @@ export function KycSubmitPage() {
           manualAddress
         });
         setResult(response.data);
+        setRequiresManualInput(Boolean(response.data.requiresManualInput));
       } catch (submitError) {
+        if (isVnptManualFallbackError(submitError)) {
+          setRequiresManualInput(true);
+          setStep(3);
+        }
         setError(getApiErrorMessage(submitError, 'Không thể gửi KYC.'));
       } finally {
         setIsSubmitting(false);
@@ -187,65 +214,67 @@ export function KycSubmitPage() {
                 </div>
               </dl>
 
-              <div className="kyc-manual-section">
-                <h2>Thông tin dự phòng khi VNPT không đọc được</h2>
-                <p className="subtle" style={{ marginTop: 0 }}>
-                  Nếu VNPT lỗi hoặc không nhận dạng được giấy tờ, hệ thống sẽ dùng các trường này để gửi hồ sơ cho admin duyệt thủ công.
-                </p>
-                <FormField label="Số CCCD" htmlFor="kyc-manual-citizen-id">
-                  <input
-                    id="kyc-manual-citizen-id"
-                    className="ui-input"
-                    value={manualCitizenId}
-                    disabled={isSubmitting}
-                    onChange={(event) => setManualCitizenId(event.target.value)}
-                    placeholder="Ví dụ: 012345678901"
-                  />
-                </FormField>
-                <FormField label="Họ và tên" htmlFor="kyc-manual-full-name">
-                  <input
-                    id="kyc-manual-full-name"
-                    className="ui-input"
-                    value={manualFullName}
-                    disabled={isSubmitting}
-                    onChange={(event) => setManualFullName(event.target.value)}
-                    placeholder="Ví dụ: Nguyễn Văn A"
-                  />
-                </FormField>
-                <div className="kyc-grid">
-                  <FormField label="Ngày sinh" htmlFor="kyc-manual-dob">
+              {requiresManualInput ? (
+                <div className="kyc-manual-section">
+                  <h2>Thông tin dự phòng khi VNPT không đọc được</h2>
+                  <p className="subtle" style={{ marginTop: 0 }}>
+                    VNPT vừa trả về lỗi đọc giấy tờ. Vui lòng nhập các trường bên dưới để gửi hồ sơ cho admin duyệt thủ công.
+                  </p>
+                  <FormField label="Số CCCD" htmlFor="kyc-manual-citizen-id">
                     <input
-                      id="kyc-manual-dob"
+                      id="kyc-manual-citizen-id"
                       className="ui-input"
-                      type="date"
-                      value={manualDateOfBirth}
+                      value={manualCitizenId}
                       disabled={isSubmitting}
-                      onChange={(event) => setManualDateOfBirth(event.target.value)}
+                      onChange={(event) => setManualCitizenId(event.target.value)}
+                      placeholder="Ví dụ: 012345678901"
                     />
                   </FormField>
-                  <FormField label="Giới tính" htmlFor="kyc-manual-gender">
+                  <FormField label="Họ và tên" htmlFor="kyc-manual-full-name">
                     <input
-                      id="kyc-manual-gender"
+                      id="kyc-manual-full-name"
                       className="ui-input"
-                      value={manualGender}
+                      value={manualFullName}
                       disabled={isSubmitting}
-                      onChange={(event) => setManualGender(event.target.value)}
-                      placeholder="Nam/Nữ"
+                      onChange={(event) => setManualFullName(event.target.value)}
+                      placeholder="Ví dụ: Nguyễn Văn A"
+                    />
+                  </FormField>
+                  <div className="kyc-grid">
+                    <FormField label="Ngày sinh" htmlFor="kyc-manual-dob">
+                      <input
+                        id="kyc-manual-dob"
+                        className="ui-input"
+                        type="date"
+                        value={manualDateOfBirth}
+                        disabled={isSubmitting}
+                        onChange={(event) => setManualDateOfBirth(event.target.value)}
+                      />
+                    </FormField>
+                    <FormField label="Giới tính" htmlFor="kyc-manual-gender">
+                      <input
+                        id="kyc-manual-gender"
+                        className="ui-input"
+                        value={manualGender}
+                        disabled={isSubmitting}
+                        onChange={(event) => setManualGender(event.target.value)}
+                        placeholder="Nam/Nữ"
+                      />
+                    </FormField>
+                  </div>
+                  <FormField label="Quê quán / địa chỉ thường trú" htmlFor="kyc-manual-address">
+                    <textarea
+                      id="kyc-manual-address"
+                      className="ui-input"
+                      value={manualAddress}
+                      disabled={isSubmitting}
+                      onChange={(event) => setManualAddress(event.target.value)}
+                      placeholder="Nhập theo thông tin trên giấy tờ"
+                      rows={3}
                     />
                   </FormField>
                 </div>
-                <FormField label="Quê quán / địa chỉ thường trú" htmlFor="kyc-manual-address">
-                  <textarea
-                    id="kyc-manual-address"
-                    className="ui-input"
-                    value={manualAddress}
-                    disabled={isSubmitting}
-                    onChange={(event) => setManualAddress(event.target.value)}
-                    placeholder="Nhập theo thông tin trên giấy tờ"
-                    rows={3}
-                  />
-                </FormField>
-              </div>
+              ) : null}
             </>
           ) : null}
 

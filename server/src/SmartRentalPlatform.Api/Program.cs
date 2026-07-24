@@ -6,6 +6,11 @@ using QuestPDF.Infrastructure;
 using SmartRentalPlatform.Api.Hubs;
 
 var builder = WebApplication.CreateBuilder(args);
+builder.Configuration.AddJsonFile("appsettings.Local.json", optional: true, reloadOnChange: false);
+builder.Configuration.AddJsonFile(
+    Path.Combine("server", "src", "SmartRentalPlatform.Api", "appsettings.Local.json"),
+    optional: true,
+    reloadOnChange: false);
 
 builder.Services.Configure<HostOptions>(options =>
 {

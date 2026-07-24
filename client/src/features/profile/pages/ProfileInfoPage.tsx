@@ -139,6 +139,13 @@ export function ProfileInfoPage() {
   }
 
   const displayedKycStatus = profile?.kycStatus ?? (latestKyc?.hasSubmission ? latestKyc.status : null);
+  const hasApprovedIdentity = displayedKycStatus === 'Approved' && profile?.identityVerified === true;
+  const identityFullName = hasApprovedIdentity ? profile?.fullName : null;
+  const identityAddress = hasApprovedIdentity ? profile?.addressLine : null;
+  const identityDateOfBirth = hasApprovedIdentity ? profile?.dateOfBirth : null;
+  const identityCitizenId = hasApprovedIdentity ? profile?.verifiedCitizenIdMasked : null;
+  const identityGender = hasApprovedIdentity ? profile?.gender : null;
+  const identityReviewedAt = hasApprovedIdentity ? profile?.kycReviewedAt : null;
 
   async function handleSaveProfile(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -495,7 +502,9 @@ export function ProfileInfoPage() {
             <div className="ekyc-header-left">
               <h2>Thông tin định danh (eKYC)</h2>
               <p className="subtle">
-                Thông tin định danh được lấy trực tiếp từ hồ sơ eKYC của bạn.
+                {hasApprovedIdentity
+                  ? 'Thông tin định danh được lấy trực tiếp từ hồ sơ eKYC đã được duyệt.'
+                  : 'Thông tin định danh chỉ hiển thị sau khi hồ sơ eKYC được admin duyệt.'}
               </p>
             </div>
             <div className="ekyc-header-right">
@@ -550,7 +559,7 @@ export function ProfileInfoPage() {
               </div>
               <div className="ekyc-info">
                 <span className="ekyc-label">Họ tên</span>
-                <span className="ekyc-value name-bold-uppercase">{display(profile?.fullName)}</span>
+                <span className="ekyc-value name-bold-uppercase">{display(identityFullName)}</span>
               </div>
             </div>
 
@@ -563,7 +572,7 @@ export function ProfileInfoPage() {
               </div>
               <div className="ekyc-info">
                 <span className="ekyc-label">Địa chỉ</span>
-                <span className="ekyc-value">{display(profile?.addressLine)}</span>
+                <span className="ekyc-value">{display(identityAddress)}</span>
               </div>
             </div>
 
@@ -578,7 +587,7 @@ export function ProfileInfoPage() {
               </div>
               <div className="ekyc-info">
                 <span className="ekyc-label">Ngày sinh</span>
-                <span className="ekyc-value">{formatDate(profile?.dateOfBirth)}</span>
+                <span className="ekyc-value">{formatDate(identityDateOfBirth)}</span>
               </div>
             </div>
 
@@ -593,7 +602,7 @@ export function ProfileInfoPage() {
               </div>
               <div className="ekyc-info">
                 <span className="ekyc-label">CCCD</span>
-                <span className="ekyc-value">{display(profile?.verifiedCitizenIdMasked)}</span>
+                <span className="ekyc-value">{display(identityCitizenId)}</span>
               </div>
             </div>
 
@@ -607,7 +616,7 @@ export function ProfileInfoPage() {
               </div>
               <div className="ekyc-info">
                 <span className="ekyc-label">Giới tính</span>
-                <span className="ekyc-value">{display(profile?.gender)}</span>
+                <span className="ekyc-value">{display(identityGender)}</span>
               </div>
             </div>
 
@@ -621,7 +630,7 @@ export function ProfileInfoPage() {
               <div className="ekyc-info">
                 <span className="ekyc-label">Duyệt lúc</span>
                 <span className="ekyc-value">
-                  {profile?.kycReviewedAt ? new Date(profile.kycReviewedAt).toLocaleString() : 'Chưa duyệt'}
+                  {identityReviewedAt ? new Date(identityReviewedAt).toLocaleString() : 'Chưa duyệt'}
                 </span>
               </div>
             </div>
