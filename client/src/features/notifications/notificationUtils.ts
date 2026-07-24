@@ -10,9 +10,13 @@ export function getNotificationRole(notification: Notification): NotificationRol
   const body = notification.body.toLowerCase();
 
   if (
+    type === 'ContractAwaitingLandlordSignature' ||
     type === 'NewRentalRequest' ||
     type === 'NewViewingAppointment' ||
     title.includes('khách thuê') ||
+    title.includes('chủ trọ') ||
+    body.includes('chủ trọ ký') ||
+    body.includes('khu trọ của bạn') ||
     body.includes('muốn xem phòng') ||
     body.includes('đã gửi yêu cầu thuê') ||
     title.includes('nhận thanh toán') ||
@@ -25,6 +29,8 @@ export function getNotificationRole(notification: Notification): NotificationRol
 }
 
 export function getNotificationLink(notification: Notification): string {
+  if (notification.id.startsWith('mock-')) return '#';
+
   const role = getNotificationRole(notification);
 
   if (notification.referenceType === 'Conversation' && notification.referenceId) {
@@ -37,6 +43,12 @@ export function getNotificationLink(notification: Notification): string {
     (notification.referenceType === 'RoomingHouse' || notification.type === 'RoomingHouseReviewRejected')
   ) {
     return `/rooming-houses/${notification.referenceId}?review=1#review-section`;
+  }
+
+  if (notification.referenceType === 'RentalContract' && notification.referenceId) {
+    return role === 'landlord'
+      ? ROUTE_PATHS.LANDLORD.CONTRACT_DETAIL(notification.referenceId)
+      : ROUTE_PATHS.ACCOUNT.RENTAL_HISTORY_DETAIL(notification.referenceId);
   }
 
   if (role === 'landlord') {
@@ -71,7 +83,9 @@ export function getNotificationCategory(notification: Notification): Notificatio
 
   if (
     notification.referenceType === 'RentalRequest' ||
+    notification.referenceType === 'RentalContract' ||
     type.includes('rentalrequest') ||
+    type.includes('contract') ||
     title.includes('yêu cầu thuê')
   ) {
     return 'rental';

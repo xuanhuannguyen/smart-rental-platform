@@ -6,6 +6,7 @@ using System.Threading;
 using System.Threading.Tasks;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Query;
+using Microsoft.Extensions.Logging;
 using SmartRentalPlatform.Application.Billing;
 using SmartRentalPlatform.Application.Common.Exceptions;
 using SmartRentalPlatform.Application.Common.Interfaces;
@@ -22,6 +23,7 @@ using SmartRentalPlatform.Domain.Entities.RentalContracts;
 using SmartRentalPlatform.Domain.Entities.Users;
 using SmartRentalPlatform.Domain.Enums.Billing;
 using SmartRentalPlatform.Domain.Enums.Media;
+using SmartRentalPlatform.Domain.Enums.Notifications;
 using SmartRentalPlatform.Domain.Enums.Properties;
 using SmartRentalPlatform.Domain.Enums.Payments;
 using SmartRentalPlatform.Domain.Enums.Rental;
@@ -32,8 +34,10 @@ namespace SmartRentalPlatform.Application.RentalContracts;
 public class RentalContractService : IRentalContractService
 {
 	private sealed record LinkedMediaAssetResolution(Guid MediaAssetId);
+	private sealed record ContractNotification(Guid UserId, NotificationType Type, string Title, string Body, Guid ReferenceId, string ReferenceType);
 
-	private static readonly TimeSpan TenantSignatureTtl = TimeSpan.FromHours(48);
+	private static readonly TimeSpan LandlordSignatureTtl = TimeSpan.FromHours(24);
+	private static readonly TimeSpan TenantSignatureTtl = TimeSpan.FromHours(24);
 
 	private readonly IAppDbContext context;
 
@@ -59,7 +63,13 @@ public class RentalContractService : IRentalContractService
 
 	private readonly IContractDocumentModelFactory contractDocumentModelFactory;
 
-	public RentalContractService(IAppDbContext context, IContractPdfRenderer contractPdfRenderer, IContractSignatureOtpService contractSignatureOtpService, IContractFileService contractFileService, RentalContractPreviewBuilder previewBuilder, RentalContractOccupantValidator occupantValidator, RentalContractDocumentHelper documentHelper, RentalContractFinalInvoiceStatusResolver finalInvoiceStatusResolver, IBillingService billingService, IWalletService walletService, IPaymentRowLockService rowLockService, IContractDocumentModelFactory contractDocumentModelFactory)
+	private readonly IEmailSender emailSender;
+
+	private readonly INotificationService notificationService;
+
+	private readonly ILogger<RentalContractService> logger;
+
+	public RentalContractService(IAppDbContext context, IContractPdfRenderer contractPdfRenderer, IContractSignatureOtpService contractSignatureOtpService, IContractFileService contractFileService, RentalContractPreviewBuilder previewBuilder, RentalContractOccupantValidator occupantValidator, RentalContractDocumentHelper documentHelper, RentalContractFinalInvoiceStatusResolver finalInvoiceStatusResolver, IBillingService billingService, IWalletService walletService, IPaymentRowLockService rowLockService, IContractDocumentModelFactory contractDocumentModelFactory, IEmailSender emailSender, INotificationService notificationService, ILogger<RentalContractService> logger)
 	{
 		this.context = context;
 		this.contractPdfRenderer = contractPdfRenderer;
@@ -73,6 +83,9 @@ public class RentalContractService : IRentalContractService
 		this.walletService = walletService;
 		this.rowLockService = rowLockService;
 		this.contractDocumentModelFactory = contractDocumentModelFactory;
+		this.emailSender = emailSender;
+		this.notificationService = notificationService;
+		this.logger = logger;
 	}
 
 	public async Task<ContractDetailResponse?> GetByIdAsync(Guid userId, Guid contractId, CancellationToken cancellationToken = default(CancellationToken))
@@ -273,6 +286,7 @@ public class RentalContractService : IRentalContractService
 				}
 				contract.Status = RentalContractStatus.PendingLandlordSignature;
 				contract.StatusReason = null;
+				contract.SignatureDeadlineAt = now.Add(LandlordSignatureTtl);
 				contract.UpdatedAt = now;
 				await context.SaveChangesAsync(cancellationToken);
 				await transaction.CommitAsync(cancellationToken);
@@ -283,6 +297,25 @@ public class RentalContractService : IRentalContractService
 				await transaction.RollbackAsync(cancellationToken);
 				throw;
 			}
+		}
+		try
+		{
+			await SendAwaitingLandlordSignatureEmailAsync(contract.Id, cancellationToken);
+			await NotifyContractStateAsync(
+				contract.Room.RoomingHouse.LandlordUserId,
+				NotificationType.ContractAwaitingLandlordSignature,
+				"Cần ký hợp đồng",
+				$"Hợp đồng {contract.ContractNumber} đang chờ chủ trọ ký trong 24 giờ.",
+				contract.RentalRequestId,
+				"RentalRequest",
+				cancellationToken);
+		}
+		catch (Exception notificationException)
+		{
+			logger.LogWarning(
+				notificationException,
+				"Contract occupants were submitted but landlord signature notification delivery failed for contract {ContractId}.",
+				contract.Id);
 		}
 		return result;
 	}
@@ -785,6 +818,146 @@ public class RentalContractService : IRentalContractService
 		return await GetByIdAsync(userId, contract.Id, cancellationToken);
 	}
 
+	public async Task<int> ExpireOverdueLandlordSignaturesAsync(CancellationToken cancellationToken = default(CancellationToken))
+	{
+		DateTimeOffset now = DateTimeOffset.UtcNow;
+		var overdueContractSnapshots = await BaseQuery()
+			.AsNoTracking()
+			.Where((RentalContract x) => x.Status == RentalContractStatus.PendingLandlordSignature &&
+				x.SignatureDeadlineAt.HasValue &&
+				x.SignatureDeadlineAt.Value <= now &&
+				x.DeletedAt == null)
+			.Select((RentalContract x) => new
+			{
+				x.Id,
+				x.ContractNumber,
+				x.RentalRequestId,
+				x.RoomDeposit.LandlordUserId,
+				x.RoomDeposit.TenantUserId
+			})
+			.ToListAsync(cancellationToken);
+
+		if (overdueContractSnapshots.Count == 0)
+		{
+			return 0;
+		}
+
+		Dictionary<Guid, Guid> walletIdsByUserId = new Dictionary<Guid, Guid>();
+		foreach (Guid userId in overdueContractSnapshots
+			.SelectMany(x => new[] { x.LandlordUserId, x.TenantUserId })
+			.Distinct())
+		{
+			var wallet = await walletService.GetOrCreateWalletAsync(userId, cancellationToken);
+			walletIdsByUserId[userId] = wallet.Id;
+		}
+
+		List<ContractNotification> notifications = new List<ContractNotification>();
+		int count = 0;
+		await using (IAppDbContextTransaction transaction = await context.BeginTransactionAsync(cancellationToken))
+		{
+			try
+			{
+				foreach (Guid contractId in overdueContractSnapshots
+					.Select(x => x.Id)
+					.Distinct()
+					.OrderBy(x => x))
+				{
+					await rowLockService.LockRentalContractAsync(contractId, cancellationToken);
+					RentalContract? contract = await BaseQuery()
+						.FirstOrDefaultAsync((RentalContract x) => x.Id == contractId && x.DeletedAt == null, cancellationToken);
+					if (contract is null)
+					{
+						continue;
+					}
+
+					await rowLockService.LockRoomDepositAsync(contract.RoomDepositId, cancellationToken);
+					contract = await BaseQuery()
+						.FirstAsync((RentalContract x) => x.Id == contractId && x.DeletedAt == null, cancellationToken);
+
+					if (contract.Status != RentalContractStatus.PendingLandlordSignature ||
+						!contract.SignatureDeadlineAt.HasValue ||
+						contract.SignatureDeadlineAt.Value > now)
+					{
+						continue;
+					}
+
+					RentalContractLifecycleHelper.EnsureDepositReadyForSettlement(contract.RoomDeposit);
+					if (!walletIdsByUserId.TryGetValue(contract.RoomDeposit.LandlordUserId, out Guid landlordWalletId) ||
+						!walletIdsByUserId.TryGetValue(contract.RoomDeposit.TenantUserId, out Guid tenantWalletId))
+					{
+						throw new NotFoundException(
+							ErrorCodes.NotFound,
+							"Không tìm thấy ví để hoàn cọc hợp đồng quá hạn chủ trọ ký.",
+							new
+							{
+								contract.Id,
+								contract.RoomDepositId,
+								contract.RoomDeposit.LandlordUserId,
+								contract.RoomDeposit.TenantUserId
+							});
+					}
+
+					var settlementGroupId = Guid.NewGuid();
+					await walletService.TransferFromReservedWithinTransactionAsync(
+						landlordWalletId,
+						tenantWalletId,
+						contract.RoomDeposit.DepositAmount,
+						contract.RoomDeposit.DepositAmount,
+						WalletTransactionType.DepositRefundDebit,
+						WalletTransactionType.DepositRefundCredit,
+						RentalContractLifecycleHelper.CreateDepositSettlementMetadata(contract.RoomDeposit, settlementGroupId, "Landlord signature deadline deposit refund."),
+						cancellationToken);
+
+					contract.Status = RentalContractStatus.Expired;
+					contract.StatusReason = "Chủ trọ không ký hợp đồng trong thời hạn quy định.";
+					contract.SignatureDeadlineAt = null;
+					contract.UpdatedAt = now;
+					contract.RoomDeposit.Status = RoomDepositStatus.Refunded;
+					contract.RoomDeposit.RefundedAt = now;
+					contract.RoomDeposit.RefundAmount = contract.RoomDeposit.DepositAmount;
+					contract.RoomDeposit.ForfeitedAt = null;
+					contract.RoomDeposit.ForfeitedAmount = default(decimal);
+					contract.RoomDeposit.RefundTransferGroupId = settlementGroupId;
+					contract.RoomDeposit.UpdatedAt = now;
+					contract.RentalRequest.Status = RentalRequestStatus.Expired;
+					contract.RentalRequest.RejectedReason = "Chủ trọ không ký hợp đồng trong thời hạn quy định.";
+					contract.RentalRequest.UpdatedAt = now;
+					if (contract.Room.Status == RoomStatus.Reserved)
+					{
+						contract.Room.Status = RoomStatus.Available;
+						contract.Room.UpdatedAt = now;
+					}
+
+					notifications.Add(new ContractNotification(
+						contract.RoomDeposit.TenantUserId,
+						NotificationType.ContractExpired,
+						"Hợp đồng đã quá hạn ký",
+						$"Hợp đồng {contract.ContractNumber} đã hết hạn do chủ trọ không ký trong thời hạn. Khoản cọc sẽ được hoàn về ví của bạn.",
+						contract.RentalRequestId,
+						"RentalRequest"));
+					notifications.Add(new ContractNotification(
+						contract.Room.RoomingHouse.LandlordUserId,
+						NotificationType.ContractExpired,
+						"Hợp đồng đã quá hạn ký",
+						$"Hợp đồng {contract.ContractNumber} của khu trọ của bạn đã hết hạn do chủ trọ không ký trong thời hạn.",
+						contract.RentalRequestId,
+						"RentalRequest"));
+					count++;
+				}
+				await context.SaveChangesAsync(cancellationToken);
+				await transaction.CommitAsync(cancellationToken);
+			}
+			catch
+			{
+				await transaction.RollbackAsync(cancellationToken);
+				throw;
+			}
+		}
+
+		await NotifyContractStatesAsync(notifications, cancellationToken);
+		return count;
+	}
+
 	public async Task<int> ExpireOverdueTenantSignaturesAsync(CancellationToken cancellationToken = default(CancellationToken))
 	{
 		DateTimeOffset now = DateTimeOffset.UtcNow;
@@ -815,6 +988,7 @@ public class RentalContractService : IRentalContractService
 			landlordWalletIdsByUserId[landlordUserId] = landlordWallet.Id;
 		}
 
+		List<ContractNotification> notifications = new List<ContractNotification>();
 		int count = 0;
 		await using (IAppDbContextTransaction transaction = await context.BeginTransactionAsync(cancellationToken))
 		{
@@ -886,6 +1060,20 @@ public class RentalContractService : IRentalContractService
 						contract.Room.UpdatedAt = now;
 					}
 
+					notifications.Add(new ContractNotification(
+						contract.RoomDeposit.TenantUserId,
+						NotificationType.ContractExpired,
+						"Hợp đồng đã quá hạn ký",
+						$"Hợp đồng {contract.ContractNumber} đã hết hạn do người thuê không ký trong thời hạn.",
+						contract.RentalRequestId,
+						"RentalRequest"));
+					notifications.Add(new ContractNotification(
+						contract.Room.RoomingHouse.LandlordUserId,
+						NotificationType.ContractExpired,
+						"Hợp đồng đã quá hạn ký",
+						$"Hợp đồng {contract.ContractNumber} của khu trọ của bạn đã hết hạn do người thuê không ký trong thời hạn.",
+						contract.RentalRequestId,
+						"RentalRequest"));
 					count++;
 				}
 				await context.SaveChangesAsync(cancellationToken);
@@ -897,6 +1085,7 @@ public class RentalContractService : IRentalContractService
 				throw;
 			}
 		}
+		await NotifyContractStatesAsync(notifications, cancellationToken);
 		return count;
 	}
 
@@ -950,6 +1139,82 @@ public class RentalContractService : IRentalContractService
 		}
 
 		return count;
+	}
+
+	private async Task SendAwaitingLandlordSignatureEmailAsync(Guid contractId, CancellationToken cancellationToken)
+	{
+		RentalContract contract = await BaseQuery()
+			.AsNoTracking()
+			.FirstAsync(x => x.Id == contractId && x.DeletedAt == null, cancellationToken);
+
+		User landlord = contract.Room.RoomingHouse.Landlord;
+		if (string.IsNullOrWhiteSpace(landlord.Email) || !contract.SignatureDeadlineAt.HasValue)
+		{
+			return;
+		}
+
+		await emailSender.SendContractAwaitingLandlordSignatureAsync(
+			landlord.Email,
+			ResolveDisplayName(landlord),
+			contract.ContractNumber,
+			contract.SignatureDeadlineAt.Value,
+			cancellationToken);
+	}
+
+	private Task NotifyContractStateAsync(
+		Guid userId,
+		NotificationType type,
+		string title,
+		string body,
+		Guid referenceId,
+		string referenceType,
+		CancellationToken cancellationToken)
+	{
+		return notificationService.CreateAsync(
+			userId,
+			type,
+			title,
+			body,
+			referenceId.ToString(),
+			referenceType,
+			cancellationToken);
+	}
+
+	private async Task NotifyContractStatesAsync(
+		IReadOnlyCollection<ContractNotification> notifications,
+		CancellationToken cancellationToken)
+	{
+		foreach (ContractNotification notification in notifications)
+		{
+			try
+			{
+				await NotifyContractStateAsync(
+					notification.UserId,
+					notification.Type,
+					notification.Title,
+					notification.Body,
+					notification.ReferenceId,
+					notification.ReferenceType,
+					cancellationToken);
+			}
+			catch (Exception notificationException)
+			{
+				logger.LogWarning(
+					notificationException,
+					"Contract notification delivery failed after state transition. Type={NotificationType}, ReferenceType={ReferenceType}, ReferenceId={ReferenceId}, UserId={UserId}.",
+					notification.Type,
+					notification.ReferenceType,
+					notification.ReferenceId,
+					notification.UserId);
+			}
+		}
+	}
+
+	private static string ResolveDisplayName(User user)
+	{
+		return !string.IsNullOrWhiteSpace(user.DisplayName)
+			? user.DisplayName
+			: user.UserProfile?.FullName ?? user.Email ?? "Người dùng";
 	}
 
 	private IQueryable<RentalContract> BaseQuery()

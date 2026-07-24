@@ -29,10 +29,16 @@ public class RentalContractExpirationWorker : BackgroundService
                 using var scope = serviceScopeFactory.CreateScope();
                 var rentalContractService = scope.ServiceProvider.GetRequiredService<IRentalContractService>();
 
-                var expiredCount = await rentalContractService.ExpireOverdueTenantSignaturesAsync(stoppingToken);
+                var landlordExpiredCount = await rentalContractService.ExpireOverdueLandlordSignaturesAsync(stoppingToken);
+                var tenantExpiredCount = await rentalContractService.ExpireOverdueTenantSignaturesAsync(stoppingToken);
+                var expiredCount = landlordExpiredCount + tenantExpiredCount;
                 if (expiredCount > 0)
                 {
-                    logger.SafeLogInformation("Đã xử lý {ExpiredCount} hợp đồng quá hạn ký.", expiredCount);
+                    logger.SafeLogInformation(
+                        "Đã xử lý {ExpiredCount} hợp đồng quá hạn ký. Chủ trọ quá hạn: {LandlordExpiredCount}, người thuê quá hạn: {TenantExpiredCount}.",
+                        expiredCount,
+                        landlordExpiredCount,
+                        tenantExpiredCount);
                 }
             }
             catch (OperationCanceledException) when (stoppingToken.IsCancellationRequested)

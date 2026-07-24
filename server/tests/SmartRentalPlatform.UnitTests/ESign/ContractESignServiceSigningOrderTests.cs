@@ -63,6 +63,42 @@ public class ContractESignServiceSigningOrderTests
         Assert.IsType<ConflictException>(exception.InnerException);
     }
 
+    [Fact]
+    public void ResolveNextAppendixSigner_WhenLandlordSigned_ReturnsTenant()
+    {
+        var tenantUserId = Guid.NewGuid();
+        var envelope = new ContractSigningEnvelope
+        {
+            Signatures =
+            [
+                Signature(Guid.NewGuid(), ContractSignerRole.Landlord, ContractSignatureStatus.Signed),
+                Signature(tenantUserId, ContractSignerRole.Tenant)
+            ]
+        };
+
+        var result = InvokeResolveNextAppendixSignerUserId(envelope);
+
+        Assert.Equal(tenantUserId, result);
+    }
+
+    [Fact]
+    public void ResolveNextAppendixSigner_WhenWebhookArrivesBeforeLocalSignatureUpdate_ReturnsSecondSigner()
+    {
+        var tenantUserId = Guid.NewGuid();
+        var envelope = new ContractSigningEnvelope
+        {
+            Signatures =
+            [
+                Signature(Guid.NewGuid(), ContractSignerRole.Landlord),
+                Signature(tenantUserId, ContractSignerRole.Tenant)
+            ]
+        };
+
+        var result = InvokeResolveNextAppendixSignerUserId(envelope);
+
+        Assert.Equal(tenantUserId, result);
+    }
+
     private static ContractSignature InvokeGetNextSignatureForUser(
         ContractSigningEnvelope envelope,
         Guid userId)
@@ -75,11 +111,24 @@ public class ContractESignServiceSigningOrderTests
         return (ContractSignature)method.Invoke(null, [envelope, userId])!;
     }
 
-    private static ContractSignature Signature(Guid userId, ContractSignerRole role) => new()
+    private static Guid? InvokeResolveNextAppendixSignerUserId(ContractSigningEnvelope envelope)
+    {
+        var method = typeof(ContractESignService).GetMethod(
+            "ResolveNextAppendixSignerUserId",
+            BindingFlags.NonPublic | BindingFlags.Static)
+            ?? throw new InvalidOperationException("Appendix signing notification resolver was not found.");
+
+        return (Guid?)method.Invoke(null, [envelope]);
+    }
+
+    private static ContractSignature Signature(
+        Guid userId,
+        ContractSignerRole role,
+        ContractSignatureStatus status = (ContractSignatureStatus)0) => new()
     {
         SignerUserId = userId,
         SignerRole = role,
         SigningOrder = 0,
-        Status = (ContractSignatureStatus)0
+        Status = status
     };
 }

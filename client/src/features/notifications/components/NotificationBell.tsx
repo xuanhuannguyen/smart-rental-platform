@@ -7,6 +7,7 @@ import {
 import { getMockNotifications, saveMockDeletedId } from '../mockNotifications';
 import { ROUTE_PATHS } from '../../../app/router/routePaths';
 import type { Notification } from '../types';
+import { getNotificationLink, getNotificationRole } from '../notificationUtils';
 import './NotificationBell.css';
 
 function formatTime(isoString: string): string {
@@ -26,69 +27,6 @@ function formatTime(isoString: string): string {
 
 function isChatNotification(notification: Notification): boolean {
   return notification.referenceType === 'Conversation' || notification.type === 'NewChatMessage';
-}
-
-function getNotificationRole(notification: Notification): 'tenant' | 'landlord' {
-  const type = notification.type;
-  const title = notification.title.toLowerCase();
-  const body = notification.body.toLowerCase();
-  
-  if (
-    type === 'NewRentalRequest' ||
-    type === 'NewViewingAppointment' ||
-    title.includes('khách thuê') ||
-    body.includes('muốn xem phòng') ||
-    body.includes('đã gửi yêu cầu thuê') ||
-    title.includes('nhận thanh toán') ||
-    body.includes('nhận được thanh toán')
-  ) {
-    return 'landlord';
-  }
-  
-  return 'tenant';
-}
-
-function getNotificationLink(notification: Notification): string {
-  if (notification.id.startsWith('mock-')) return '#';
-
-  if (notification.referenceType === 'Conversation' && notification.referenceId) {
-    const currentRole = window.location.pathname.startsWith('/landlord') ? 'landlord' : 'tenant';
-    const base = ROUTE_PATHS.MESSAGES;
-    return `${base}?conversationId=${notification.referenceId}`;
-  }
-
-  if (
-    notification.referenceId &&
-    (notification.referenceType === 'RoomingHouse' || notification.type === 'RoomingHouseReviewRejected')
-  ) {
-    return `/rooming-houses/${notification.referenceId}?review=1#review-section`;
-  }
-  
-  const role = getNotificationRole(notification);
-  
-  if (role === 'landlord') {
-    if (notification.referenceType === 'ViewingAppointment') {
-      return ROUTE_PATHS.LANDLORD.VIEWING_APPOINTMENTS;
-    }
-    if (notification.referenceType === 'RentalRequest' && notification.referenceId) {
-      return `/landlord/rental-requests/${notification.referenceId}`;
-    }
-    if ((notification.referenceType === 'Billing' || notification.referenceType === 'Invoice' || notification.referenceType === 'Payment') && notification.referenceId) {
-      return `/landlord/invoices/${notification.referenceId}`;
-    }
-    return ROUTE_PATHS.LANDLORD.DASHBOARD;
-  } else {
-    if (notification.referenceType === 'ViewingAppointment') {
-      return ROUTE_PATHS.ACCOUNT.VIEWING_APPOINTMENTS;
-    }
-    if (notification.referenceType === 'RentalRequest' && notification.referenceId) {
-      return `/account/rental-requests/${notification.referenceId}`;
-    }
-    if ((notification.referenceType === 'Billing' || notification.referenceType === 'Invoice' || notification.referenceType === 'Payment') && notification.referenceId) {
-      return `/account/invoices/${notification.referenceId}`;
-    }
-    return ROUTE_PATHS.ACCOUNT.PROFILE;
-  }
 }
 
 function getNotificationIconInfo(notification: Notification) {

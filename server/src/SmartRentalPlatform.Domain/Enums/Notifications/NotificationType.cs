@@ -14,4 +14,13 @@ public enum NotificationType
     RoomingHouseReviewNeedsAdminReview,
     RoomingHouseReviewRejected,
     RoomingHouseReviewReplied,
+    ContractAwaitingLandlordSignature,
+    ContractAwaitingTenantSignature,
+    ContractActivated,
+    ContractExpired,
+    ContractRevisionRequested,
+    ContractAppendixAwaitingSignature,
+    ContractAppendixActivated,
+    ContractAppendixRevisionRequested,
+    ContractAppendixRejected,
 }

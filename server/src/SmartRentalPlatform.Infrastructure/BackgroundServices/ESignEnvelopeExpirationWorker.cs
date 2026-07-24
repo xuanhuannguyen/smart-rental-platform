@@ -48,14 +48,6 @@ public class ESignEnvelopeExpirationWorker : BackgroundService
                         sig.Status = ContractSignatureStatus.Expired;
                     }
                     
-                    if (envelope.RentalContractId.HasValue)
-                    {
-                        var contract = await dbContext.RentalContracts.FindAsync(new object[] { envelope.RentalContractId.Value }, stoppingToken);
-                        if (contract != null && contract.Status == RentalContractStatus.PendingTenantSignature)
-                        {
-                            contract.Status = RentalContractStatus.Expired;
-                        }
-                    }
                 }
 
                 if (expiredEnvelopes.Any())

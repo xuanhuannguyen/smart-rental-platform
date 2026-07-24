@@ -97,6 +97,56 @@ public class EmailSender : IEmailSender
         return SendAsync(email, displayName, subject, textBody, htmlBody, cancellationToken);
     }
 
+    public Task SendContractAwaitingLandlordSignatureAsync(
+        string email,
+        string displayName,
+        string contractNumber,
+        DateTimeOffset deadlineAt,
+        CancellationToken cancellationToken = default)
+    {
+        var deadlineText = FormatVietnamDeadline(deadlineAt);
+        var subject = $"Cần ký hợp đồng {contractNumber} trong 24 giờ - Smart Rental Platform";
+        var textBody = $"""
+            Xin chào {displayName},
+
+            Hợp đồng {contractNumber} đang chờ bạn ký với vai trò chủ trọ.
+            Hạn ký: {deadlineText}.
+
+            Smart Rental Platform
+            """;
+        var htmlBody = BuildBasicHtml(
+            "Cần ký hợp đồng",
+            $"Hợp đồng {contractNumber} đang chờ bạn ký với vai trò chủ trọ.",
+            $"Hạn ký: {deadlineText}.");
+
+        return SendAsync(email, displayName, subject, textBody, htmlBody, cancellationToken);
+    }
+
+    public Task SendContractAwaitingTenantSignatureAsync(
+        string email,
+        string displayName,
+        string contractNumber,
+        DateTimeOffset deadlineAt,
+        CancellationToken cancellationToken = default)
+    {
+        var deadlineText = FormatVietnamDeadline(deadlineAt);
+        var subject = $"Cần ký hợp đồng {contractNumber} trong 24 giờ - Smart Rental Platform";
+        var textBody = $"""
+            Xin chào {displayName},
+
+            Hợp đồng {contractNumber} đã được chủ trọ ký và đang chờ bạn ký xác nhận.
+            Hạn ký: {deadlineText}.
+
+            Smart Rental Platform
+            """;
+        var htmlBody = BuildBasicHtml(
+            "Cần ký hợp đồng",
+            $"Hợp đồng {contractNumber} đã được chủ trọ ký và đang chờ bạn ký xác nhận.",
+            $"Hạn ký: {deadlineText}.");
+
+        return SendAsync(email, displayName, subject, textBody, htmlBody, cancellationToken);
+    }
+
     private async Task SendAsync(
         string toEmail,
         string toName,
@@ -165,6 +215,28 @@ public class EmailSender : IEmailSender
             </body>
             </html>
             """;
+    }
+
+    private static string BuildBasicHtml(string title, string description, string detail)
+    {
+        return $"""
+            <!doctype html>
+            <html>
+            <body style="font-family: Arial, sans-serif; color: #0f172a; line-height: 1.6;">
+                <h2 style="color: #0f766e;">{title}</h2>
+                <p>{description}</p>
+                <p>{detail}</p>
+                <p>Smart Rental Platform</p>
+            </body>
+            </html>
+            """;
+    }
+
+    private static string FormatVietnamDeadline(DateTimeOffset deadlineAt)
+    {
+        return deadlineAt.ToUniversalTime()
+            .ToOffset(TimeSpan.FromHours(7))
+            .ToString("dd/MM/yyyy HH:mm 'GMT+7'");
     }
 }
 

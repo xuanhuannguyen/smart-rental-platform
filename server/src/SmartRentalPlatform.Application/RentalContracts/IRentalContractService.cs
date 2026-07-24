@@ -65,6 +65,8 @@ public interface IRentalContractService
         TerminateContractRequest request,
         CancellationToken cancellationToken = default);
 
+    Task<int> ExpireOverdueLandlordSignaturesAsync(CancellationToken cancellationToken = default);
+
     Task<int> ExpireOverdueTenantSignaturesAsync(CancellationToken cancellationToken = default);
 
     Task<int> ActivatePendingMoveInsAsync(CancellationToken cancellationToken = default);

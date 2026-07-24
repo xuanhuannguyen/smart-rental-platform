@@ -21,4 +21,18 @@ public interface IEmailSender
         string role,
         string otp,
         CancellationToken cancellationToken = default);
+
+    Task SendContractAwaitingLandlordSignatureAsync(
+        string email,
+        string displayName,
+        string contractNumber,
+        DateTimeOffset deadlineAt,
+        CancellationToken cancellationToken = default);
+
+    Task SendContractAwaitingTenantSignatureAsync(
+        string email,
+        string displayName,
+        string contractNumber,
+        DateTimeOffset deadlineAt,
+        CancellationToken cancellationToken = default);
 }

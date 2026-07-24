@@ -241,6 +241,8 @@ public class FakeEmailSender : IEmailSender
     public Task SendEmailVerificationOtpAsync(string email, string displayName, string otp, CancellationToken cancellationToken = default) => Task.CompletedTask;
     public Task SendResetPasswordOtpAsync(string email, string displayName, string otp, CancellationToken cancellationToken = default) => Task.CompletedTask;
     public Task SendContractSignatureOtpAsync(string email, string displayName, string contractNumber, string role, string otp, CancellationToken cancellationToken = default) => Task.CompletedTask;
+    public Task SendContractAwaitingLandlordSignatureAsync(string email, string displayName, string contractNumber, DateTimeOffset deadlineAt, CancellationToken cancellationToken = default) => Task.CompletedTask;
+    public Task SendContractAwaitingTenantSignatureAsync(string email, string displayName, string contractNumber, DateTimeOffset deadlineAt, CancellationToken cancellationToken = default) => Task.CompletedTask;
 }
 
 public class FakeHttpContextAccessor : IHttpContextAccessor
