@@ -179,30 +179,31 @@ export function TenantRentalRequestsPage() {
 
       {error && <div style={{ marginBottom: 16 }}><Alert type="error">{error}</Alert></div>}
 
-      {loading ? (
-        <p>Đang tải dữ liệu...</p>
-      ) : requests.length === 0 ? (
-        <div className="empty-state">
-          <p>Bạn chưa gửi yêu cầu thuê phòng nào.</p>
-        </div>
-      ) : (
-        <>
-          <Tabs
-            className="attached-bottom"
-            variant="segmented-secondary"
-            activeId={activeTab}
-            onChange={(tab) => setActiveTab(tab as RentalRequestTab)}
-            items={[
-              { id: 'all', label: 'Tất cả', icon: getRentalRequestTabIcon('all') },
-              { id: 'Pending', label: 'Chờ duyệt', icon: getRentalRequestTabIcon('Pending') },
-              { id: 'Accepted', label: 'Chấp nhận', icon: getRentalRequestTabIcon('Accepted') },
-              { id: 'Rejected', label: 'Từ chối', icon: getRentalRequestTabIcon('Rejected') },
-              { id: 'Cancelled', label: 'Đã hủy', icon: getRentalRequestTabIcon('Cancelled') },
-              { id: 'Expired', label: 'Hết hạn', icon: getRentalRequestTabIcon('Expired') },
-            ]}
-          />
+      <Tabs
+        className="attached-bottom"
+        variant="segmented-secondary"
+        activeId={activeTab}
+        onChange={(tab) => setActiveTab(tab as RentalRequestTab)}
+        items={[
+          { id: 'all', label: 'Tất cả', icon: getRentalRequestTabIcon('all') },
+          { id: 'Pending', label: 'Chờ duyệt', icon: getRentalRequestTabIcon('Pending') },
+          { id: 'Accepted', label: 'Chấp nhận', icon: getRentalRequestTabIcon('Accepted') },
+          { id: 'Rejected', label: 'Từ chối', icon: getRentalRequestTabIcon('Rejected') },
+          { id: 'Cancelled', label: 'Đã hủy', icon: getRentalRequestTabIcon('Cancelled') },
+          { id: 'Expired', label: 'Hết hạn', icon: getRentalRequestTabIcon('Expired') },
+        ]}
+      />
 
-          <section className="tab-attached-panel tab-attached-panel--cards">
+      <section className="tab-attached-panel tab-attached-panel--cards">
+        {loading ? (
+          <div className="empty-state">
+            <p>Đang tải dữ liệu...</p>
+          </div>
+        ) : filteredRequests.length === 0 ? (
+          <div className="empty-state">
+            <p>{requests.length === 0 ? 'Bạn chưa gửi yêu cầu thuê phòng nào.' : 'Không tìm thấy yêu cầu thuê nào tương ứng.'}</p>
+          </div>
+        ) : (
           <div className="requests-list">
             {filteredRequests.map(req => {
               const actionItems: CardAction[] = [];
@@ -275,9 +276,8 @@ export function TenantRentalRequestsPage() {
               );
             })}
           </div>
-          </section>
-        </>
-      )}
+        )}
+      </section>
 
       {selectedContractIdForSetup && (
         <ContractOccupantsSetupModal
