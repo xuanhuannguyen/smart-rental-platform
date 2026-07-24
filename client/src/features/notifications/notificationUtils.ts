@@ -13,6 +13,14 @@ export function getNotificationRole(notification: Notification): NotificationRol
     type === 'NewViewingAppointment' ||
     type.startsWith('ViewingAppointment');
 
+  if (type === 'ContractAwaitingLandlordSignature') {
+    return 'landlord';
+  }
+
+  if (type === 'ContractAwaitingTenantSignature') {
+    return 'tenant';
+  }
+
   if (isViewingAppointment) {
     if (type === 'NewViewingAppointment') {
       return 'landlord';
@@ -30,10 +38,8 @@ export function getNotificationRole(notification: Notification): NotificationRol
   }
 
   if (
-    type === 'ContractAwaitingLandlordSignature' ||
     type === 'NewRentalRequest' ||
     title.includes('khách thuê') ||
-    body.includes('chủ trọ ký') ||
     body.includes('khu trọ của bạn') ||
     body.includes('muốn xem phòng') ||
     body.includes('đã gửi yêu cầu thuê') ||
