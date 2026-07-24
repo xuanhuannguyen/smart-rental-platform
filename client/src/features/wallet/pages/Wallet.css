@@ -551,6 +551,18 @@
   font-weight: 700;
 }
 
+.amount-neutral {
+  color: #64748b !important;
+  font-weight: 700;
+}
+
+.transaction-movement-detail {
+  margin-top: 4px;
+  color: #64748b;
+  font-size: 12px;
+  font-weight: 600;
+}
+
 .balance-item-icon-box.credit {
   background: #effaf5;
   color: #10b981;

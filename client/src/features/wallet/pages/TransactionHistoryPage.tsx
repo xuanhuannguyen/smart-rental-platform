@@ -83,9 +83,28 @@ export const TransactionHistoryPage: React.FC = () => {
     }
   };
 
+  const getBalanceDelta = (transaction: WalletTransactionResponse) =>
+    transaction.balanceAfter - transaction.balanceBefore;
+
+  const getReservedDelta = (transaction: WalletTransactionResponse) =>
+    transaction.reservedBalanceAfter - transaction.reservedBalanceBefore;
+
+  const getAvailableDelta = (transaction: WalletTransactionResponse) =>
+    getBalanceDelta(transaction) - getReservedDelta(transaction);
+
+  const getTransactionFlow = (transaction: WalletTransactionResponse): FilterTab | 'Internal' => {
+    const balanceDelta = getBalanceDelta(transaction);
+    if (balanceDelta > 0) return 'Credit';
+    if (balanceDelta < 0) return 'Debit';
+    return 'Internal';
+  };
+
+  const isDepositForfeitRelease = (transaction: WalletTransactionResponse) =>
+    transaction.transactionType === 'DepositForfeitRelease';
+
   const filteredTransactions = transactions.filter(transaction => {
     if (activeTab === 'All') return true;
-    return transaction.direction === activeTab;
+    return getTransactionFlow(transaction) === activeTab;
   });
 
   const getStatusText = (status: string) => {
@@ -149,7 +168,7 @@ export const TransactionHistoryPage: React.FC = () => {
       case 'InvoiceReceive': return 'Nhận tiền hóa đơn';
       case 'DepositRefundDebit': return 'Hoàn tiền cọc';
       case 'DepositRefundCredit': return 'Nhận hoàn tiền cọc';
-      case 'DepositForfeitRelease': return 'Tất toán/tịch thu tiền cọc';
+      case 'DepositForfeitRelease': return 'Chuyển tiền cọc sang khả dụng';
       case 'ManualAdjustment': return 'Điều chỉnh thủ công';
       default: return transactionType;
     }
@@ -162,6 +181,10 @@ export const TransactionHistoryPage: React.FC = () => {
   };
 
   const getTransactionDescription = (transaction: WalletTransactionResponse) => {
+    if (isDepositForfeitRelease(transaction)) {
+      return getTransactionTypeText(transaction.transactionType);
+    }
+
     return transaction.description || getTransactionTypeText(transaction.transactionType);
   };
 
@@ -177,16 +200,53 @@ export const TransactionHistoryPage: React.FC = () => {
 
   const formatCurrency = (value: number) => `${formatMoneyString(value) || '0'} đ`;
 
+  const formatSignedCurrency = (value: number) => {
+    const sign = value > 0 ? '+' : value < 0 ? '-' : '';
+    return `${sign}${formatCurrency(Math.abs(value))}`;
+  };
+
+  const getTransactionAmountClass = (transaction: WalletTransactionResponse) => {
+    const balanceDelta = getBalanceDelta(transaction);
+    if (balanceDelta > 0) return 'amount-in';
+    if (balanceDelta < 0) return 'amount-out';
+    return 'amount-neutral';
+  };
+
+  const getTransactionAmountText = (transaction: WalletTransactionResponse) => {
+    const balanceDelta = getBalanceDelta(transaction);
+    if (balanceDelta === 0) return '+0 đ';
+    return formatSignedCurrency(balanceDelta);
+  };
+
+  const getDepositReleaseDetail = (transaction: WalletTransactionResponse) => {
+    if (!isDepositForfeitRelease(transaction)) return null;
+
+    return (
+      <div className="transaction-movement-detail">
+        Khả dụng {formatSignedCurrency(getAvailableDelta(transaction))}
+        <span aria-hidden="true"> · </span>
+        Đang giữ {formatSignedCurrency(getReservedDelta(transaction))}
+      </div>
+    );
+  };
+
   // Stats calculations
   const totalTransactions = transactions.length;
-  const creditCount = transactions.filter(t => t.direction === 'Credit').length;
-  const debitCount = transactions.filter(t => t.direction === 'Debit').length;
+  const succeededTransactions = transactions.filter(t => t.status === 'Succeeded');
+  const creditCount = succeededTransactions.filter(t => getBalanceDelta(t) > 0).length;
+  const debitCount = succeededTransactions.filter(t => getBalanceDelta(t) < 0).length;
   const totalCredit = transactions
-    .filter(t => t.direction === 'Credit' && t.status === 'Succeeded')
-    .reduce((sum, t) => sum + t.amount, 0);
+    .filter(t => t.status === 'Succeeded')
+    .reduce((sum, t) => {
+      const delta = getBalanceDelta(t);
+      return delta > 0 ? sum + delta : sum;
+    }, 0);
   const totalDebit = transactions
-    .filter(t => t.direction === 'Debit' && t.status === 'Succeeded')
-    .reduce((sum, t) => sum + t.amount, 0);
+    .filter(t => t.status === 'Succeeded')
+    .reduce((sum, t) => {
+      const delta = getBalanceDelta(t);
+      return delta < 0 ? sum + Math.abs(delta) : sum;
+    }, 0);
 
   if (isLoading && page === 1) return <div>Đang tải lịch sử giao dịch...</div>;
 
@@ -331,9 +391,12 @@ export const TransactionHistoryPage: React.FC = () => {
                         </button>
                       </span>
                     </td>
-                    <td>{getTransactionDescription(transaction)}</td>
-                    <td className={transaction.direction === 'Credit' ? 'amount-in' : 'amount-out'}>
-                      {transaction.direction === 'Credit' ? '+' : '-'}{formatMoneyString(transaction.amount)} đ
+                    <td>
+                      <div>{getTransactionDescription(transaction)}</div>
+                      {getDepositReleaseDetail(transaction)}
+                    </td>
+                    <td className={getTransactionAmountClass(transaction)}>
+                      {getTransactionAmountText(transaction)}
                     </td>
                     <td>
                       <span className={`wallet-status-badge ${getStatusClass(transaction.status)}`}>
